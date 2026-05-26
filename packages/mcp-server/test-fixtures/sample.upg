@@ -1,0 +1,153 @@
+{
+  "upg_version": "0.2",
+  "exported_at": "2026-03-13T12:00:00.000Z",
+  "source": {
+    "tool": "upg-mcp-local",
+    "tool_version": "0.1.0"
+  },
+  "product": {
+    "id": "prod_test_001",
+    "title": "Example Product Graph",
+    "description": "Sample fixture: a knowledge graph for product strategy",
+    "stage": "mvp"
+  },
+  "nodes": [
+    {
+      "id": "n_persona_solo",
+      "type": "persona",
+      "title": "Solo Product Creator",
+      "description": "A solo founder or product thinker building something from scratch",
+      "tags": [
+        "core",
+        "primary"
+      ],
+      "properties": {
+        "goals": [
+          "Ship a product",
+          "Validate an idea",
+          "Think clearly about strategy"
+        ],
+        "frustrations": [
+          "Too many tools",
+          "No single source of truth",
+          "Context switching"
+        ],
+        "context": "Works alone or in a very small team. Wears every hat."
+      }
+    },
+    {
+      "id": "n_jtbd_clarity",
+      "type": "jtbd",
+      "title": "Get clarity on what to build next",
+      "description": "When I have too many ideas and not enough time, I want to see all my product thinking in one place, so I can make confident decisions about what to prioritise.",
+      "properties": {
+        "statement": "When I have too many ideas, I want to see all my thinking in one place, so I can prioritise with confidence.",
+        "job_type": "functional",
+        "importance": 5,
+        "satisfaction": 2
+      }
+    },
+    {
+      "id": "n_pain_scattered",
+      "type": "pain_point",
+      "title": "Product knowledge is scattered across tools",
+      "description": "Strategy in Notion, research in Google Docs, metrics in spreadsheets, designs in Figma — nothing is connected.",
+      "properties": {
+        "frequency": 5,
+        "severity": 4
+      }
+    },
+    {
+      "id": "n_opportunity_graph",
+      "type": "opportunity",
+      "title": "Unified product knowledge graph",
+      "description": "A single graph that connects all product thinking — strategy, research, design, engineering — so nothing falls through the cracks.",
+      "status": "validated",
+      "properties": {
+        "status": "validated",
+        "reach": 4,
+        "frequency": 5,
+        "pain": 4
+      }
+    },
+    {
+      "id": "n_solution_canvas",
+      "type": "solution",
+      "title": "Visual product strategy canvas",
+      "description": "A canvas-based tool that lets you build, explore, and evolve your product's knowledge graph with AI assistance.",
+      "status": "in_progress",
+      "properties": {
+        "status": "in_progress",
+        "reach": 4,
+        "impact": 5,
+        "confidence": 4,
+        "effort": 4,
+        "rice_score": 20
+      }
+    },
+    {
+      "id": "n_feature_mcp",
+      "type": "feature",
+      "title": "MCP Server — AI integration layer",
+      "description": "Expose the product graph via Model Context Protocol so AI agents can read and write product knowledge.",
+      "status": "shipped",
+      "properties": {
+        "status": "shipped"
+      }
+    },
+    {
+      "id": "n_feature_canvas",
+      "type": "feature",
+      "title": "React Flow canvas — visual graph editor",
+      "description": "Zoomable, pannable canvas for exploring and editing the product graph visually.",
+      "status": "shipped"
+    },
+    {
+      "id": "n_outcome_decisions",
+      "type": "outcome",
+      "title": "Product creators make better decisions faster",
+      "description": "Users report increased confidence in prioritisation and reduced time spent searching for context.",
+      "properties": {
+        "timeline": "Q2 2026"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_persona_jtbd",
+      "source": "n_persona_solo",
+      "target": "n_jtbd_clarity",
+      "type": "persona_pursues_job_semantic"
+    },
+    {
+      "id": "e_jtbd_pain",
+      "source": "n_jtbd_clarity",
+      "target": "n_pain_scattered",
+      "type": "job_surfaces_need"
+    },
+    {
+      "id": "e_outcome_opp",
+      "source": "n_outcome_decisions",
+      "target": "n_opportunity_graph",
+      "type": "outcome_reveals_opportunity_causal"
+    },
+    {
+      "id": "e_opp_solution",
+      "source": "n_opportunity_graph",
+      "target": "n_solution_canvas",
+      "type": "opportunity_drives_solution"
+    },
+    {
+      "id": "e_solution_feature_mcp",
+      "source": "n_solution_canvas",
+      "target": "n_feature_mcp",
+      "type": "solution_contains_feature"
+    },
+    {
+      "id": "e_solution_feature_canvas",
+      "source": "n_solution_canvas",
+      "target": "n_feature_canvas",
+      "type": "solution_contains_feature"
+    }
+  ]
+}

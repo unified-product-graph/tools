@@ -1,0 +1,60 @@
+{
+  "name": "@unified-product-graph/sdk",
+  "version": "0.6.0",
+  "description": "Unified Product Graph — programmatic SDK for reading and writing .upg product knowledge graphs",
+  "license": "MIT",
+  "author": "The Product Creator <hello@theproductcreator.com>",
+  "homepage": "https://unifiedproductgraph.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unified-product-graph/sdk"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./logic": {
+      "types": "./dist/logic.d.ts",
+      "import": "./dist/logic.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@unified-product-graph/core": "*",
+    "chokidar": "^4.0.0",
+    "nanoid": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@unified-product-graph/frameworks": "*",
+    "tsup": "^8.5.1",
+    "typescript": "^5.8.0"
+  },
+  "keywords": [
+    "upg",
+    "unified-product-graph",
+    "sdk",
+    "product-management",
+    "knowledge-graph",
+    "graph",
+    "open-standard"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

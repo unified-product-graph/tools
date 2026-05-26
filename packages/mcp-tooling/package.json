@@ -1,0 +1,64 @@
+{
+  "name": "@unified-product-graph/mcp-tooling",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Shared tool-registry, transport contract, and JSDoc-driven reference generator for UPG MCP servers (local, cloud, and embedded)",
+  "license": "MIT",
+  "author": "The Product Creator <hello@theproductcreator.com>",
+  "homepage": "https://unifiedproductgraph.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unified-product-graph/mcp-tooling"
+  },
+  "bugs": {
+    "url": "https://github.com/unified-product-graph/mcp-tooling/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./generator": {
+      "types": "./dist/generator/index.d.ts",
+      "import": "./dist/generator/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@unified-product-graph/core": "*",
+    "typescript": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "vitest": "^3.0.0"
+  },
+  "keywords": [
+    "upg",
+    "unified-product-graph",
+    "mcp",
+    "model-context-protocol",
+    "tooling"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

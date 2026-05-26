@@ -1,0 +1,656 @@
+[
+  {
+    "name": "get_product_context",
+    "input": {},
+    "output": "## Notion (SATURATED test graph)\n\nStage: concept\n\nLens: product\n\n### 🧭 Product Lens\n- Personas: 4\n- Outcomes: 6\n- Hypotheses: 6 (0 validated)\n\n### Graph Stats\n- Nodes: 2054\n- Edges: 3120\n- Entity types: 312\n\n### Entities by Type\n- Person (`person`): 215\n- Journey Step (`journey_step`): 53\n- Test Case (`test_case`): 48\n- Screen State (`screen_state`): 36\n- Assumption (`assumption`): 30\n- Journey Phase (`journey_phase`): 28\n- Journey Action (`journey_action`): 28\n- Interaction Spec (`interaction_spec`): 28\n- Metric (`metric`): 23\n- Test Result (`test_result`): 23\n- Capability (`capability`): 20\n- Participant (`participant`): 19\n- Regression Test (`regression_test`): 19\n- Experiment Run (`experiment_run`): 18\n- Alert Rule (`alert_rule`): 18\n- Validated Learning (`learning`): 17\n- Observation (`observation`): 17\n- Survey Response (`survey_response`): 17\n- Annotation (`annotation`): 17\n- Vulnerability (`vulnerability`): 16\n- Design Component (`design_component`): 15\n- Screen (`screen`): 15\n- Monitor (`monitor`): 15\n- Research Question (`research_question`): 15\n- Service Level Indicator (`service_level_indicator`): 15\n- Error Budget (`error_budget`): 15\n- Key Result (`key_result`): 14\n- Product (`product`): 13\n- Decision (`decision`): 13\n- Experiment Plan (`experiment_plan`): 13\n- Bounded Context (`bounded_context`): 13\n- Insight (`insight`): 13\n- Theme (`theme`): 13\n- Feature\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_graph_digest",
+    "input": {},
+    "output": "{\n  \"product\": {\n    \"title\": \"Notion (SATURATED test graph)\",\n    \"stage\": \"concept\"\n  },\n  \"counts\": {\n    \"total_nodes\": 2054,\n    \"total_edges\": 3120,\n    \"by_type\": {\n      \"product\": 13,\n      \"capability\": 20,\n      \"value_stream\": 3,\n      \"decision\": 13,\n      \"evidence\": 10,\n      \"assumption\": 30,\n      \"outcome\": 6,\n      \"document\": 9,\n      \"objective\": 6,\n      \"key_result\": 14,\n      \"design_component\": 15,\n      \"hypothesis\": 6,\n      \"experiment\": 5,\n      \"experiment_plan\": 13,\n      \"job\": 10,\n      \"bounded_context\": 13,\n      \"initiative\": 11,\n      \"strategic_pillar\": 6,\n      \"test_plan\": 8,\n      \"screen\": 15,\n      \"experiment_run\": 18,\n      \"design_system\": 4,\n      \"team\": 1,\n      \"compliance_requirement\": 5,\n      \"workspace\": 3,\n      \"epic\": 4,\n      \"bug\": 6,\n      \"task\": 3,\n      \"feature_area\": 3,\n      \"mission\": 2,\n      \"desired_outcome\": 4,\n      \"model_comparison\": 3,\n      \"agent_session\": 3,\n      \"learning\": 17,\n      \"research_plan\": 6,\n      \"constraint\": 3,\n      \"stakeholder\": 10,\n      \"feature\": 12,\n      \"security_review\": 8,\n      \"metric\": 23,\n      \"person\": 215,\n      \"technical_debt_item\": 12,\n      \"risk\": 9,\n      \"service\": 11,\n      \"opportunity\": 7,\n      \"solution\": 11,\n      \"feasibility_study\": 3,\n      \"design_sprint\": 3,\n      \"prototype\": 8,\n      \"design_concept\": 7,\n      \"vision\": 1,\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_nodes",
+    "input": {},
+    "output": "{\n  \"nodes\": [\n    {\n      \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"type\": \"product\",\n      \"title\": \"Notion (SATURATED test graph)\"\n    },\n    {\n      \"id\": \"1c051617-6cb7-4a59-b0a1-7779f404145b\",\n      \"type\": \"capability\",\n      \"title\": \"Real-time multi-cursor collaboration\"\n    },\n    {\n      \"id\": \"478852b7-ca46-4bdd-85fa-cd2334b9565d\",\n      \"type\": \"capability\",\n      \"title\": \"Block-based composable editing\"\n    },\n    {\n      \"id\": \"0904ef52-cc7e-4bcd-9c9d-0072beb28878\",\n      \"type\": \"capability\",\n      \"title\": \"Tree-inherited permissions\"\n    },\n    {\n      \"id\": \"f8ce72c1-af1a-48ba-945e-72e08c5aeeb5\",\n      \"type\": \"capability\",\n      \"title\": \"Permission-aware AI grounding\"\n    },\n    {\n      \"id\": \"4dffea49-4122-4599-858c-f3c2f0c3e5c4\",\n      \"type\": \"value_stream\",\n      \"title\": \"Personal → Team conversion stream\"\n    },\n    {\n      \"id\": \"9d03304e-8beb-4734-845b-1bc3c07ce20c\",\n      \"type\": \"decision\",\n      \"title\": \"Build Frankfurt region (not partner)\"\n    },\n    {\n      \"id\": \"6ea52729-4462-4fc0-b2a1-0c7e2c0362b2\",\n      \"type\": \"evidence\",\n      \"title\": \"Self-hostable waitlist: 1.2k signups, 0% paid intent\"\n    },\n    {\n      \"id\": \"3f1c1804-b33b-4b1f-9094-c91cc8957912\",\n      \"type\": \"assumption\",\n      \"title\": \"Teams prefer one tool over a stack of four\"\n    },\n    {\n      \"id\": \"6719fce7-61e7-44df-b6cf-92f7c7312554\",\n      \"type\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_node",
+    "input": {
+      "node_id": "ec3d5479-4947-4bd9-9e77-b5ee01beb851"
+    },
+    "output": "{\n  \"node\": {\n    \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n    \"type\": \"product\",\n    \"title\": \"Notion (SATURATED test graph)\",\n    \"slug\": \"notion-saturated-test-graph\",\n    \"description\": \"Canonical SATURATED test graph for UCS / GPE / .upg-loader / MCP test surfaces. Fictional Notion modelled as a thinly-disguised version of the real Notion. Built via parallel MCP-driven domain waves. Exported as `.upg/notion-saturated.upg` in `the-product-creator` repo at `mr-data/upg-saturated-graph` branch (PR #1532).\",\n    \"properties\": {\n      \"stage\": \"idea\",\n      \"health_status\": \"off_track\",\n      \"url\": \"url sample 10\",\n      \"logo_url\": \"logo url sample 69\",\n      \"launched_at\": \"2026-12-13T09:00:00Z\"\n    }\n  },\n  \"edges_out\": [\n    {\n      \"id\": \"1d645a2e-391b-4bc7-b0de-e15691c8a7d6\",\n      \"source\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"target\": \"dce7a627-2ef4-4cb7-a63a-5044a8ad1802\",\n      \"type\": \"product_serves_account\",\n      \"target_title\": \"Acme Corp Enterprise Workspace\"\n    },\n    {\n      \"id\": \"b4a77a49-7d28-4926-831f-464574d927fe\",\n      \"source\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"target\": \"2a3ab02e-4110-43f2-848b-a1ebeedb6fa9\",\n      \"type\": \"product_shares_metric_with_product\",\n      \"target_title\": \"Notion Mail (preview)\"\n    },\n    {\n      \"id\": \"1ee422bc-64c1-4da1-b797-62e4d206b79c\",\n      \"source\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_nodes",
+    "input": {
+      "ids": [
+        "ec3d5479-4947-4bd9-9e77-b5ee01beb851",
+        "1c051617-6cb7-4a59-b0a1-7779f404145b"
+      ]
+    },
+    "output": "{\n  \"nodes\": [\n    {\n      \"node\": {\n        \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n        \"type\": \"product\",\n        \"title\": \"Notion (SATURATED test graph)\",\n        \"slug\": \"notion-saturated-test-graph\"\n      },\n      \"edges_out\": [\n        {\n          \"id\": \"1d645a2e-391b-4bc7-b0de-e15691c8a7d6\",\n          \"type\": \"product_serves_account\",\n          \"source\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n          \"target\": \"dce7a627-2ef4-4cb7-a63a-5044a8ad1802\"\n        },\n        {\n          \"id\": \"b4a77a49-7d28-4926-831f-464574d927fe\",\n          \"type\": \"product_shares_metric_with_product\",\n          \"source\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n          \"target\": \"2a3ab02e-4110-43f2-848b-a1ebeedb6fa9\"\n        },\n        {\n          \"id\": \"1ee422bc-64c1-4da1-b797-62e4d206b79c\",\n          \"type\": \"product_ships_via_release\",\n          \"source\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n          \"target\": \"024aa3ef-d8e0-4791-8979-c8a9f2a69618\"\n        },\n        {\n          \"id\": \"013ac760-b99a-423e-bb94-700acda058c0\",\n          \"type\": \"product_sold_via_pipeline_sales\",\n          \"source\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n          \"target\": \"8737db50-a948-4225-9fa6-7a54ca4ca374\"\n        },\n        {\n          \"id\": \"e72fc432-9b4e-443d-b0c3-619b4a1cff62\",\n          \"type\": \"product_stored_in_code_repository\",\n          \"source\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "search_nodes",
+    "input": {
+      "query": "Notion"
+    },
+    "output": "{\n  \"results\": [\n    {\n      \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"type\": \"product\",\n      \"title\": \"Notion (SATURATED test graph)\",\n      \"match_field\": \"title\",\n      \"score\": 3\n    },\n    {\n      \"id\": \"7f5ae55d-68c5-4ca7-9e4c-b5e9d4dd32a5\",\n      \"type\": \"design_system\",\n      \"title\": \"Notion Design System · Block-primitive foundation\",\n      \"match_field\": \"title\",\n      \"score\": 3\n    },\n    {\n      \"id\": \"24b43d57-48a4-4499-bac7-e38f3eb7bae4\",\n      \"type\": \"design_system\",\n      \"title\": \"Notion Design System · Database views\",\n      \"match_field\": \"title\",\n      \"score\": 3\n    },\n    {\n      \"id\": \"6700fd68-27be-4b21-9186-82e490bebf33\",\n      \"type\": \"workspace\",\n      \"title\": \"Notion Internal · Architecture Decisions workspace\",\n      \"match_field\": \"title\",\n      \"score\": 3\n    },\n    {\n      \"id\": \"c355f3ea-1e9f-45a1-aedc-a7adf66050e1\",\n      \"type\": \"product\",\n      \"title\": \"Notion Calendar\",\n      \"match_field\": \"title\",\n      \"score\": 3\n    },\n    {\n      \"id\": \"2a3ab02e-4110-43f2-848b-a1ebeedb6fa9\",\n      \"type\": \"product\",\n      \"title\": \"Notion Mail (preview)\",\n      \"match_field\": \"title\",\n      \"score\": 3\n    },\n    {\n      \"id\": \"e83e8cec-8f00-4dd5-b36a-c5e143f7e911\",\n      \"type\": \"design_system\",\n      \"title\": \"Notion Design System · Mobile parity tokens\",\n      \"match_field\": \"title\",\n      \"score\": 3\n    },\n    {\n      \"id\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "query",
+    "input": {
+      "from": "persona",
+      "traverse": [
+        "persona_pursues_job"
+      ],
+      "depth": 1,
+      "limit": 5,
+      "include": [
+        "title"
+      ],
+      "edge_include": []
+    },
+    "output": "{\n  \"nodes\": [\n    {\n      \"id\": \"9cd363dc-b1be-4132-b1dc-043467866e57\",\n      \"type\": \"persona\",\n      \"title\": \"Akira the Admin\"\n    },\n    {\n      \"id\": \"65234b60-eb2b-4c41-be63-7b17b2bc6a38\",\n      \"type\": \"persona\",\n      \"title\": \"Theo the Consultant\"\n    },\n    {\n      \"id\": \"e956a8ef-288f-4ee2-b758-2a14b9d07206\",\n      \"type\": \"persona\",\n      \"title\": \"Lin the Thinker\"\n    },\n    {\n      \"id\": \"2e8dd86d-6085-4068-a804-38d3e891ea1b\",\n      \"type\": \"persona\",\n      \"title\": \"Maya the Maker\"\n    },\n    {\n      \"id\": \"7b2e7c5a-a73e-42c9-9416-e9e9ccfecc20\",\n      \"type\": \"job\",\n      \"title\": \"Build a team system that survives growth\"\n    }\n  ],\n  \"edges\": [],\n  \"total_nodes\": 5,\n  \"total_edges\": 0,\n  \"truncated\": true,\n  \"truncated_at_depth\": 0,\n  \"hint\": \"Limit of 5 nodes reached at depth 0. Increase limit to see deeper results.\",\n  \"_result_id\": \"qr_1\"\n}",
+    "ok": true
+  },
+  {
+    "name": "create_node",
+    "input": {
+      "type": "person",
+      "title": "Example node"
+    },
+    "output": "{\n  \"node\": {\n    \"id\": \"n_LSjd64yzUUdx5X9r\",\n    \"type\": \"person\",\n    \"title\": \"Example node\",\n    \"slug\": \"example-node\"\n  },\n  \"edge\": null\n}",
+    "ok": true
+  },
+  {
+    "name": "update_node",
+    "input": {
+      "node_id": "ec3d5479-4947-4bd9-9e77-b5ee01beb851"
+    },
+    "output": "{\n  \"node\": {\n    \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n    \"type\": \"product\",\n    \"title\": \"Notion (SATURATED test graph)\",\n    \"slug\": \"notion-saturated-test-graph\"\n  }\n}",
+    "ok": true
+  },
+  {
+    "name": "delete_node",
+    "input": {
+      "node_id": "ec3d5479-4947-4bd9-9e77-b5ee01beb851"
+    },
+    "output": "{\n  \"deleted_node_id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n  \"deleted_node_title\": \"Notion (SATURATED test graph)\",\n  \"deleted_edge_ids\": [\n    \"1d645a2e-391b-4bc7-b0de-e15691c8a7d6\",\n    \"b4a77a49-7d28-4926-831f-464574d927fe\",\n    \"1ee422bc-64c1-4da1-b797-62e4d206b79c\",\n    \"013ac760-b99a-423e-bb94-700acda058c0\",\n    \"e72fc432-9b4e-443d-b0c3-619b4a1cff62\",\n    \"1dd3f0dd-4185-43b0-bbf5-a4685099b22a\",\n    \"e1002543-96a9-4d6c-b708-b7c91055f391\",\n    \"f080a424-9da2-499e-98b0-b9219493690c\",\n    \"66237b58-5c5f-4ce1-9f69-13338b363d51\",\n    \"95795513-430f-408c-b4ab-ea08a7744939\",\n    \"5db91b8d-0d36-40fa-861d-d528ac22c1f5\",\n    \"f986bd5c-19a6-4c97-86b7-c07555c37495\",\n    \"2ace745e-05a9-4d2c-9683-343a52ae6e64\",\n    \"6e2abc91-7066-4310-9e17-3441d81c4e63\",\n    \"f0a45c02-54e4-4cd8-8752-d265fa1957bb\",\n    \"10dc7124-99e0-4851-9268-5c5896e4e365\",\n    \"02552438-55e4-4bac-957e-c2d451a70eee\",\n    \"16308874-0ebc-4303-a2ef-ea1e0a987a8f\",\n    \"9ece5292-9874-4b2e-a797-15f542e63467\",\n    \"372bf1ec-da83-4ce0-97d6-484374a74c67\",\n    \"0fe88c72-7bca-4b65-8f2e-46a7b17a5dde\",\n    \"3fc58a2e-79bf-476c-9092-3f658d03536b\",\n    \"e0172dc5-4d03-41d7-b615-1c18b6cbfff7\",\n    \"45920303-286d-467e-a7c4-5afdce1374ba\",\n    \"cfb6d93c-ad4c-4565-971b-df5d5d6da734\",\n    \"d3919111-98e7-409a-b212-0bf453aae0c4\",\n    \"e149cd50-8fc1-40cc-8a8e-5fab20daa8c9\",\n    \"b089a933-a5b7-4a5c-97f2-abfe73d91614\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "batch_create_nodes",
+    "input": {
+      "nodes": [
+        {
+          "type": "person",
+          "title": "Example node A"
+        },
+        {
+          "type": "person",
+          "title": "Example node B"
+        }
+      ]
+    },
+    "output": "{\n  \"created\": [\n    {\n      \"id\": \"n_j6U_8nTCFs7stzLl\",\n      \"type\": \"person\",\n      \"title\": \"Example node A\"\n    },\n    {\n      \"id\": \"n_J6z4nc-D40LV54G5\",\n      \"type\": \"person\",\n      \"title\": \"Example node B\"\n    }\n  ],\n  \"edges\": [],\n  \"count\": 2,\n  \"warnings\": [\n    \"Created 2 nodes with no edges — they are orphans. Use the edges[] array in this call to link them. See get_entity_schema(<type>) for canonical edges per type.\"\n  ]\n}",
+    "ok": true
+  },
+  {
+    "name": "batch_update_nodes",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "batch_delete_nodes",
+    "input": {
+      "node_ids": [
+        "1c051617-6cb7-4a59-b0a1-7779f404145b"
+      ]
+    },
+    "output": "{\n  \"deleted\": [\n    {\n      \"id\": \"1c051617-6cb7-4a59-b0a1-7779f404145b\",\n      \"title\": \"Real-time multi-cursor collaboration\"\n    }\n  ],\n  \"edges_removed\": 4,\n  \"count\": 1\n}",
+    "ok": true
+  },
+  {
+    "name": "batch_create_edges",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "batch_delete_edges",
+    "input": {
+      "edge_ids": [
+        "8a3b23fd-172e-4151-8283-aee40eeb4c0d"
+      ]
+    },
+    "output": "{\n  \"deleted\": [\n    {\n      \"id\": \"8a3b23fd-172e-4151-8283-aee40eeb4c0d\",\n      \"type\": \"opportunity_drives_solution\"\n    }\n  ],\n  \"count\": 1\n}",
+    "ok": true
+  },
+  {
+    "name": "repair_dangling_edges",
+    "input": {},
+    "output": "{\n  \"dry_run\": true,\n  \"report\": {\n    \"total\": 0,\n    \"by_class\": {\n      \"expected\": 0,\n      \"suspect\": 0,\n      \"corrupt\": 0\n    },\n    \"edges\": []\n  }\n}",
+    "ok": true
+  },
+  {
+    "name": "export_edges",
+    "input": {},
+    "output": "{\n  \"edges\": [\n    {\n      \"id\": \"44012ce7-99d5-4a96-b930-c8f7b1d6b45f\",\n      \"source\": \"3197ef3e-4ffc-48cf-9903-59db8eed94f8\",\n      \"target\": \"a719b36e-97a9-4927-b27c-f95f0da05d8c\",\n      \"type\": \"opportunity_drives_solution\"\n    },\n    {\n      \"id\": \"d7aaba50-cf2e-4a46-ac1b-15e61aa49212\",\n      \"source\": \"d8c4bbfb-669d-4e29-b75e-fba353455255\",\n      \"target\": \"d272290a-7006-4372-b4f4-0deb59161d39\",\n      \"type\": \"opportunity_drives_solution\"\n    },\n    {\n      \"id\": \"4c3e592e-61f3-4d7d-a7c9-486fa3a5cb6d\",\n      \"source\": \"88766ab4-a3e7-40be-bffa-469882937e47\",\n      \"target\": \"d8b467ef-9b3f-4d52-994e-ada00327f73e\",\n      \"type\": \"opportunity_drives_solution\"\n    },\n    {\n      \"id\": \"676dcc0e-7fa6-46c0-b0d3-0c4cc0e10982\",\n      \"source\": \"b5df3308-dc29-4958-aae7-123bc616217d\",\n      \"target\": \"425b4721-6c79-4da7-9b94-a66f97d308ed\",\n      \"type\": \"opportunity_drives_solution\"\n    },\n    {\n      \"id\": \"6e4b2226-2d47-4e3a-ba14-4291a2e8896b\",\n      \"source\": \"3197ef3e-4ffc-48cf-9903-59db8eed94f8\",\n      \"target\": \"b17e4f0e-5ed2-4170-a754-b17cafb42b21\",\n      \"type\": \"opportunity_assessed_by_feasibility_study\"\n    },\n    {\n      \"id\": \"5101bf03-3d91-4da1-b3e8-33363a117227\",\n      \"source\": \"87d8086c-ac51-4021-882a-7728c394f6ab\",\n      \"target\": \"dade8cd7-ffae-4800-9f72-c8767520a21c\",\n      \"type\": \"opportunity_assessed_by_feasibility_study\"\n    },\n    {\n      \"id\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "rename_edge_type",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "create_edge",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "delete_edge",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "move_node",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "batch_move_nodes",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "get_changes",
+    "input": {},
+    "output": "{\n  \"changes\": [\n    {\n      \"action\": \"create\",\n      \"entity\": \"node\",\n      \"id\": \"n_LSjd64yzUUdx5X9r\",\n      \"type\": \"person\",\n      \"title\": \"Example node\",\n      \"timestamp\": \"2026-05-26T13:23:52.872Z\"\n    },\n    {\n      \"action\": \"update\",\n      \"entity\": \"node\",\n      \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"type\": \"product\",\n      \"title\": \"Notion (SATURATED test graph)\",\n      \"timestamp\": \"2026-05-26T13:23:52.873Z\"\n    },\n    {\n      \"action\": \"delete\",\n      \"entity\": \"node\",\n      \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"type\": \"product\",\n      \"title\": \"Notion (SATURATED test graph)\",\n      \"timestamp\": \"2026-05-26T13:23:52.874Z\"\n    },\n    {\n      \"action\": \"delete\",\n      \"entity\": \"edge\",\n      \"id\": \"1d645a2e-391b-4bc7-b0de-e15691c8a7d6\",\n      \"type\": \"cascade\",\n      \"timestamp\": \"2026-05-26T13:23:52.874Z\"\n    },\n    {\n      \"action\": \"delete\",\n      \"entity\": \"edge\",\n      \"id\": \"b4a77a49-7d28-4926-831f-464574d927fe\",\n      \"type\": \"cascade\",\n      \"timestamp\": \"2026-05-26T13:23:52.874Z\"\n    },\n    {\n      \"action\": \"delete\",\n      \"entity\": \"edge\",\n      \"id\": \"1ee422bc-64c1-4da1-b797-62e4d206b79c\",\n      \"type\": \"cascade\",\n      \"timestamp\": \"2026-05-26T13:23:52.874Z\"\n    },\n    {\n      \"action\": \"delete\",\n      \"entity\": \"edge\",\n      \"id\": \"013ac760-b99a-423e-bb94-700acda058c0\",\n      \"type\": \"cascade\",\n      \"timestamp\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_product_areas",
+    "input": {},
+    "output": "{\n  \"areas\": [],\n  \"total\": 0\n}",
+    "ok": true
+  },
+  {
+    "name": "get_area_graph",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "list_local_products",
+    "input": {},
+    "output": "{\n  \"products\": [\n    {\n      \"file\": \"test-fixtures/sample.upg\",\n      \"title\": \"Example Product Graph\",\n      \"stage\": \"mvp\",\n      \"nodes\": 8,\n      \"edges\": 6\n    }\n  ]\n}",
+    "ok": true
+  },
+  {
+    "name": "switch_product",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "get_workspace_info",
+    "input": {},
+    "output": "{\n  \"mode\": \"single-file\",\n  \"current_file\": \"../../../../../../../../var/folders/68/wlsstx1s23l9n5shd79wgw8r0000gp/T/upg-capture-cdOo0q/fixture.upg\",\n  \"products\": [\n    {\n      \"file\": \"../../../../../../../../var/folders/68/wlsstx1s23l9n5shd79wgw8r0000gp/T/upg-capture-cdOo0q/fixture.upg\",\n      \"title\": \"Notion (SATURATED test graph)\",\n      \"active\": true\n    }\n  ]\n}",
+    "ok": true
+  },
+  {
+    "name": "init_workspace",
+    "input": {},
+    "output": "{\n  \"message\": \"Workspace initialized\",\n  \"workspace_path\": \".upg/\",\n  \"default_product\": \"fixture.upg\",\n  \"products\": [\n    {\n      \"file\": \"fixture.upg\",\n      \"title\": \"Notion (SATURATED test graph)\"\n    }\n  ],\n  \"current_product\": {\n    \"title\": \"Notion (SATURATED test graph)\",\n    \"entities\": 2054\n  }\n}",
+    "ok": true
+  },
+  {
+    "name": "create_product",
+    "input": {
+      "name": "example"
+    },
+    "output": "{\n  \"message\": \"Created product: example\",\n  \"id\": \"p_1IGfQKJJbvHp3zuo\",\n  \"file\": \"example.upg\",\n  \"slug\": \"example\",\n  \"title\": \"example\",\n  \"workspace_path\": \".upg/\",\n  \"portfolio_attached\": false\n}",
+    "ok": true
+  },
+  {
+    "name": "migrate_type",
+    "input": {
+      "from_type": "jtbd",
+      "to_type": "job",
+      "dry_run": true
+    },
+    "output": "{\n  \"migrated_nodes\": 0,\n  \"migrated_edges\": 0,\n  \"edge_renames\": [],\n  \"dropped_edges\": [],\n  \"unmapped_legacy_edges\": [],\n  \"defaults_applied\": null,\n  \"dry_run\": true\n}",
+    "ok": true
+  },
+  {
+    "name": "migrate_properties",
+    "input": {},
+    "output": "{\n  \"top_level_renames\": [],\n  \"lifted_properties\": [\n    {\n      \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"from_property\": \"stage\",\n      \"to\": \"status\",\n      \"value_changed\": true\n    },\n    {\n      \"id\": \"3f1c1804-b33b-4b1f-9094-c91cc8957912\",\n      \"from_property\": \"validation_status\",\n      \"to\": \"status\",\n      \"value_changed\": false\n    },\n    {\n      \"id\": \"6719fce7-61e7-44df-b6cf-92f7c7312554\",\n      \"from_property\": \"validation_status\",\n      \"to\": \"status\",\n      \"value_changed\": false\n    },\n    {\n      \"id\": \"7b22f5f3-b344-4e49-8d5a-35cf9087dc6c\",\n      \"from_property\": \"validation_status\",\n      \"to\": \"status\",\n      \"value_changed\": false\n    },\n    {\n      \"id\": \"c969753e-8e7b-4c14-9c99-acba5b1862be\",\n      \"from_property\": \"validation_status\",\n      \"to\": \"status\",\n      \"value_changed\": false\n    },\n    {\n      \"id\": \"6bc0cfd3-29a2-47b5-8f2e-746ded26351f\",\n      \"from_property\": \"validation_status\",\n      \"to\": \"status\",\n      \"value_changed\": false\n    },\n    {\n      \"id\": \"2326222c-cfab-4793-bf58-818039939753\",\n      \"from_property\": \"bug_status\",\n      \"to\": \"status\",\n      \"value_changed\": false\n    },\n    {\n      \"id\": \"1373c0c9-4aba-49fc-8a26-bbc78661ca5a\",\n      \"from_property\": \"bug_status\",\n      \"to\": \"status\",\n      \"value_changed\": false\n    },\n    {\n      \"id\": \"655c81dc-f827-45e3-b871-d9c78e569076\",\n      \"from_property\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "migrate_status",
+    "input": {},
+    "output": "{\n  \"migrated_nodes\": 0,\n  \"skipped_no_migration\": 0,\n  \"changes\": [],\n  \"dry_run\": true\n}",
+    "ok": true
+  },
+  {
+    "name": "deduplicate_nodes",
+    "input": {},
+    "output": "{\n  \"duplicates\": [\n    {\n      \"title\": \"Cap AI inference cost at $0.18 / MAU / month\",\n      \"type\": \"decision\",\n      \"count\": 2,\n      \"ids\": [\n        \"e4078a2d-ff4f-4047-98e7-7d6556109eb0\",\n        \"afd2234f-3c50-487d-8507-95762895c7dd\"\n      ]\n    },\n    {\n      \"title\": \"AI Q&A acceptance rate ≥ 70%\",\n      \"type\": \"key_result\",\n      \"count\": 2,\n      \"ids\": [\n        \"6d6991c4-36f2-46d4-bd1a-cccc87313751\",\n        \"eee73bb6-52ac-47eb-b007-d578d17870cf\"\n      ]\n    },\n    {\n      \"title\": \"AI-native, not AI-bolted-on\",\n      \"type\": \"strategic_pillar\",\n      \"count\": 2,\n      \"ids\": [\n        \"620af368-90b8-4d26-8479-1359826af5e1\",\n        \"d8665db0-5210-4354-a4ab-391ae8a843a2\"\n      ]\n    },\n    {\n      \"title\": \"Notion Calendar\",\n      \"type\": \"product\",\n      \"count\": 2,\n      \"ids\": [\n        \"c355f3ea-1e9f-45a1-aedc-a7adf66050e1\",\n        \"4d5b21d6-66b1-4663-add8-2b24a10848ea\"\n      ]\n    },\n    {\n      \"title\": \"One workspace, every team\",\n      \"type\": \"strategic_pillar\",\n      \"count\": 2,\n      \"ids\": [\n        \"4c23a9dc-a4b3-4c80-83ee-10e35b839c26\",\n        \"4d1b0619-b5eb-4d5d-a465-b98bc164a203\"\n      ]\n    },\n    {\n      \"title\": \"react\",\n      \"type\": \"library_dependency\",\n      \"count\": 2,\n      \"ids\": [\n        \"abe04949-9bc9-48e7-8ff8-8023a6c87b11\",\n        \"4a04fd43-2451-4492-9647-c883545af3c2\"\n      ]\n    },\n    {\n      \"title\": \"AI-native vs\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_entity_schema",
+    "input": {
+      "type": "person"
+    },
+    "output": "{\n  \"type\": \"person\",\n  \"domain\": {\n    \"id\": \"team_org\",\n    \"label\": \"Team & Organisation\"\n  },\n  \"expected_properties\": {\n    \"email\": {\n      \"type\": \"string\",\n      \"description\": \"Primary contact email. Stable identifier for de-duplication.\"\n    },\n    \"role_title\": {\n      \"type\": \"string\",\n      \"description\": \"Free-text job title. Distinct from the structured `role` entity.\"\n    },\n    \"time_zone\": {\n      \"type\": \"string\",\n      \"description\": \"IANA time zone (e.g. \\\"Europe/Berlin\\\"). Useful for capacity / on-call planning.\"\n    }\n  },\n  \"edges_out\": [],\n  \"edges_in\": [\n    {\n      \"edge_type\": \"node_owned_by_person\",\n      \"source_type\": \"node\",\n      \"reverse_verb\": \"owns\"\n    }\n  ],\n  \"domain_guide\": {\n    \"anchor_entity\": \"team\",\n    \"creation_sequence\": [\n      \"team\",\n      \"role\",\n      \"stakeholder\",\n      \"person\",\n      \"team_okr\",\n      \"retrospective\",\n      \"dependency\",\n      \"department\",\n      \"skill\",\n      \"ceremony\",\n      \"capacity_plan\"\n    ],\n    \"position_in_sequence\": 3,\n    \"anti_patterns\": [\n      {\n        \"description\": \"Teams without OKRs — every team needs clear goals\"\n      },\n      {\n        \"description\": \"Dependencies without both teams linked — a dependency must connect blocker and blocked\"\n      },\n      {\n        \"description\": \"Retrospectives without action items — reflection without action is just venting\"\n      }\n    ]\n  }\n}",
+    "ok": true
+  },
+  {
+    "name": "list_playbooks",
+    "input": {},
+    "output": "{\n  \"count\": 23,\n  \"playbooks\": [\n    {\n      \"id\": \"playbook:strategy-outcomes\",\n      \"name\": \"Strategy & Outcomes\",\n      \"version\": \"0.2.0\",\n      \"description\": \"Cascade vision through themes, outcomes, objectives, key results — and the bets you are making to get there.\",\n      \"region\": \"strategy_outcomes\",\n      \"is_canonical\": true,\n      \"target_anchor_entity\": \"objective\",\n      \"creation_sequence\": [\n        {\n          \"kind\": \"entity_sequence\",\n          \"order\": 1,\n          \"phase\": \"Vision & Mission\",\n          \"name\": \"Vision & Mission\",\n          \"prompt_hint\": \"Name what you are building toward and how you will get there. Vision is the destination; mission is the orientation. One of each — more is dilution.\",\n          \"entity_types\": [\n            \"vision\",\n            \"mission\"\n          ]\n        },\n        {\n          \"kind\": \"entity_sequence\",\n          \"order\": 2,\n          \"phase\": \"Themes\",\n          \"name\": \"Themes\",\n          \"prompt_hint\": \"Choose 2–4 strategic themes that focus the work. Past four, you have lost focus, not gained coverage.\",\n          \"entity_types\": [\n            \"strategic_theme\",\n            \"strategic_pillar\"\n          ]\n        },\n        {\n          \"kind\": \"entity_sequence\",\n          \"order\": 3,\n          \"phase\": \"Outcomes\",\n          \"name\": \"Outcomes\",\n          \"prompt_hint\": \"Frame the changes in the world the\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_playbook",
+    "input": {
+      "id": "playbook:strategy-outcomes"
+    },
+    "output": "{\n  \"id\": \"playbook:strategy-outcomes\",\n  \"name\": \"Strategy & Outcomes\",\n  \"version\": \"0.2.0\",\n  \"description\": \"Cascade vision through themes, outcomes, objectives, key results — and the bets you are making to get there.\",\n  \"region\": \"strategy_outcomes\",\n  \"is_canonical\": true,\n  \"target_anchor_entity\": \"objective\",\n  \"creation_sequence\": [\n    {\n      \"kind\": \"entity_sequence\",\n      \"order\": 1,\n      \"phase\": \"Vision & Mission\",\n      \"name\": \"Vision & Mission\",\n      \"prompt_hint\": \"Name what you are building toward and how you will get there. Vision is the destination; mission is the orientation. One of each — more is dilution.\",\n      \"entity_types\": [\n        \"vision\",\n        \"mission\"\n      ]\n    },\n    {\n      \"kind\": \"entity_sequence\",\n      \"order\": 2,\n      \"phase\": \"Themes\",\n      \"name\": \"Themes\",\n      \"prompt_hint\": \"Choose 2–4 strategic themes that focus the work. Past four, you have lost focus, not gained coverage.\",\n      \"entity_types\": [\n        \"strategic_theme\",\n        \"strategic_pillar\"\n      ]\n    },\n    {\n      \"kind\": \"entity_sequence\",\n      \"order\": 3,\n      \"phase\": \"Outcomes\",\n      \"name\": \"Outcomes\",\n      \"prompt_hint\": \"Frame the changes in the world the product is trying to cause — shifts in behavior, perception, or position. Not features shipped.\",\n      \"entity_types\": [\n        \"outcome\"\n      ]\n    },\n    {\n      \"kind\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_approaches",
+    "input": {},
+    "output": "{\n  \"count\": 5,\n  \"approaches\": [\n    {\n      \"id\": \"plan\",\n      \"label\": \"Plan\",\n      \"description\": \"The path of arrival to \\\"what should I build next?\\\". Plan engages a region by surveying its entity coverage against canonical expectations and surfacing the missing scaffolding: the entities a healthy region carries that this graph does not. Cartographic sense: you are walking the coastline of a region and noting where the contour is incomplete, not deciding a strategy. Frameworks like Now/Next/Later, MoSCoW, and Wardley Mapping live within Plan as the named techniques for organising the gap-filling sequence.\",\n      \"question_answered\": \"what should I build next?\",\n      \"signature_hint\": \"({ region?: UPGRegionId }) → { missing_entities, coverage_score }\",\n      \"framework_id_examples\": [\n        \"now-next-later\",\n        \"moscow\",\n        \"wardley-map\",\n        \"okr-framework\",\n        \"three-horizons\"\n      ]\n    },\n    {\n      \"id\": \"inspect\",\n      \"label\": \"Inspect\",\n      \"description\": \"The path of arrival to \\\"what's broken?\\\". Inspect engages a region or a set of entities by running canonical health checks (anti-pattern audits, drift reports, lint passes) and emitting a structured violation list with severity, kind, target entity, description, and fix hint. Cartographic sense: you are surveying the coastline for hazards before approach; the violations are the\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_approach",
+    "input": {
+      "id": "plan"
+    },
+    "output": "{\n  \"id\": \"plan\",\n  \"label\": \"Plan\",\n  \"description\": \"The path of arrival to \\\"what should I build next?\\\". Plan engages a region by surveying its entity coverage against canonical expectations and surfacing the missing scaffolding: the entities a healthy region carries that this graph does not. Cartographic sense: you are walking the coastline of a region and noting where the contour is incomplete, not deciding a strategy. Frameworks like Now/Next/Later, MoSCoW, and Wardley Mapping live within Plan as the named techniques for organising the gap-filling sequence.\",\n  \"question_answered\": \"what should I build next?\",\n  \"signature_hint\": \"({ region?: UPGRegionId }) → { missing_entities, coverage_score }\",\n  \"framework_id_examples\": [\n    \"now-next-later\",\n    \"moscow\",\n    \"wardley-map\",\n    \"okr-framework\",\n    \"three-horizons\"\n  ]\n}",
+    "ok": true
+  },
+  {
+    "name": "plan",
+    "input": {},
+    "output": "{\n  \"approach_id\": \"plan\",\n  \"scope\": null,\n  \"generated_at\": \"2026-05-26T13:23:53.077Z\",\n  \"approach\": {\n    \"id\": \"plan\",\n    \"label\": \"Plan\",\n    \"description\": \"The path of arrival to \\\"what should I build next?\\\". Plan engages a region by surveying its entity coverage against canonical expectations and surfacing the missing scaffolding: the entities a healthy region carries that this graph does not. Cartographic sense: you are walking the coastline of a region and noting where the contour is incomplete, not deciding a strategy. Frameworks like Now/Next/Later, MoSCoW, and Wardley Mapping live within Plan as the named techniques for organising the gap-filling sequence.\",\n    \"question_answered\": \"what should I build next?\",\n    \"signature_hint\": \"({ region?: UPGRegionId }) → { missing_entities, coverage_score }\",\n    \"framework_id_examples\": [\n      \"now-next-later\",\n      \"moscow\",\n      \"wardley-map\",\n      \"okr-framework\",\n      \"three-horizons\"\n    ]\n  },\n  \"params\": {\n    \"region\": null\n  },\n  \"region\": null,\n  \"missing_entities\": [],\n  \"coverage_score\": 1,\n  \"expected_count\": 312,\n  \"covered_count\": 312,\n  \"execution_mode\": \"execution_v0_4_0\"\n}",
+    "ok": true
+  },
+  {
+    "name": "inspect",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "prioritise",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "trace",
+    "input": {
+      "anchor": "ec3d5479-4947-4bd9-9e77-b5ee01beb851",
+      "path": [
+        "opportunity_drives_solution"
+      ]
+    },
+    "output": "{\n  \"approach_id\": \"trace\",\n  \"scope\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n  \"generated_at\": \"2026-05-26T13:23:53.077Z\",\n  \"approach\": {\n    \"id\": \"trace\",\n    \"label\": \"Trace\",\n    \"description\": \"The path of arrival to \\\"walk a meaningful path through existing graph\\\". Trace engages an anchor entity and follows a path expressed as a UPGEntityType[] shorthand. Example: `[\\\"persona\\\", \\\"job\\\", \\\"feature\\\"]` walks persona→job→feature using the canonical edge for each pair (resolved via `resolve_edge_for_pair`). An optional `edges_override` array selects non-canonical edges per hop when a pair has multiple resolutions. Cartographic sense: you are tracing a route across charted terrain; anchor is the departure, path is the heading sequence, the canonical edges are the roads. No DSL invented; the shorthand IS the path expression.\",\n    \"question_answered\": \"walk a meaningful path through existing graph\",\n    \"signature_hint\": \"({ anchor: entity_id, path: UPGEntityType[], edges_override?: (string | null)[] }) → { trail: [{ depth, entity_id, edge_type_in }], reached: entity_id[] }\",\n    \"framework_id_examples\": [\n      \"opportunity-solution-tree\",\n      \"strategic-cascade\",\n      \"metrics-tree\",\n      \"user-journey-map\",\n      \"impact-map\",\n      \"dependency-map\"\n    ]\n  },\n  \"params\": {\n    \"anchor\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n    \"path\": [\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "reflect",
+    "input": {},
+    "output": "{\n  \"approach_id\": \"reflect\",\n  \"scope\": null,\n  \"generated_at\": \"2026-05-26T13:23:53.082Z\",\n  \"approach\": {\n    \"id\": \"reflect\",\n    \"label\": \"Reflect\",\n    \"description\": \"The path of arrival to \\\"what should I be questioning?\\\". Reflect engages an optional scope (region, entity, or `null` for the whole graph) and emits structured prompts a thinker should consider: assumptions to test, alternatives to weigh, blind-spots to surface, load-bearing claims to verify. Mode is optional; absence is open reflection. Cartographic sense: before approaching the coastline, you are asking which features of your chart you have not actually verified; the prompts mark the parts of the map that may be conjecture. Five Whys, Pre-mortem, Red Team, and Devil's Advocate are the named techniques inside this approach.\",\n    \"question_answered\": \"what should I be questioning?\",\n    \"signature_hint\": \"({ scope?: UPGRegionId | entity_id | null, mode?: 'assumptions' | 'alternatives' | 'blind-spots' | 'load-bearing' }) → { prompts: [{ kind, question, target_entities? }] }\",\n    \"framework_id_examples\": [\n      \"five-whys\",\n      \"pre-mortem\",\n      \"red-team\",\n      \"devils-advocate\",\n      \"second-order-thinking\",\n      \"retrospective\",\n      \"four-forces-of-progress\",\n      \"assumption-canvas\",\n      \"win-loss-analysis\"\n    ]\n  },\n  \"params\": {\n    \"scope\": null,\n    \"mode\": null\n  },\n  \"prompts\": [\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_domains",
+    "input": {},
+    "output": "{\n  \"count\": 36,\n  \"domains\": [\n    {\n      \"domain_id\": \"portfolio\",\n      \"anchor_entity\": \"organization\",\n      \"creation_sequence\": [\n        \"organization\",\n        \"portfolio\",\n        \"product_area\"\n      ]\n    },\n    {\n      \"domain_id\": \"workspace\",\n      \"anchor_entity\": \"workspace\",\n      \"creation_sequence\": [\n        \"workspace\"\n      ]\n    },\n    {\n      \"domain_id\": \"user\",\n      \"anchor_entity\": \"persona\",\n      \"creation_sequence\": [\n        \"persona\",\n        \"job\",\n        \"need\",\n        \"desired_outcome\",\n        \"job_step\",\n        \"switching_cost\"\n      ]\n    },\n    {\n      \"domain_id\": \"user_research\",\n      \"anchor_entity\": \"research_study\",\n      \"creation_sequence\": [\n        \"research_study\",\n        \"research_question\",\n        \"interview_guide\",\n        \"participant\",\n        \"observation\",\n        \"quote\",\n        \"survey_response\",\n        \"affinity_cluster\",\n        \"insight\"\n      ]\n    },\n    {\n      \"domain_id\": \"market_intelligence\",\n      \"anchor_entity\": \"competitive_analysis\",\n      \"creation_sequence\": [\n        \"competitive_analysis\",\n        \"competitor\",\n        \"competitor_feature\",\n        \"market_trend\",\n        \"market_segment\",\n        \"classification_axis\",\n        \"classification_value\"\n      ]\n    },\n    {\n      \"domain_id\": \"discovery\",\n      \"anchor_entity\": \"opportunity\",\n      \"creation_sequence\": [\n        \"opportunity\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_domain_guide",
+    "input": {
+      "domain_id": "strategy"
+    },
+    "output": "{\n  \"domain_id\": \"strategy\",\n  \"anchor_entity\": \"outcome\",\n  \"creation_sequence\": [\n    \"product\",\n    \"vision\",\n    \"mission\",\n    \"outcome\",\n    \"objective\",\n    \"key_result\",\n    \"metric\",\n    \"metric_quality_assessment\",\n    \"strategic_theme\",\n    \"strategic_pillar\",\n    \"initiative\",\n    \"capability\",\n    \"value_stream\",\n    \"assumption\",\n    \"decision\",\n    \"constraint\"\n  ],\n  \"patterns\": [\n    {\n      \"name\": \"Strategic Cascade\",\n      \"description\": \"Vision grounds mission, product pursues outcomes and targets objectives, objectives achieved through key results measured by metrics\",\n      \"entity_types\": [\n        \"vision\",\n        \"mission\",\n        \"outcome\",\n        \"objective\",\n        \"key_result\",\n        \"metric\"\n      ],\n      \"edge_chain\": [\n        \"product_guided_by_vision\",\n        \"product_fulfils_mission\",\n        \"vision_realised_through_mission\",\n        \"product_pursues_outcome\",\n        \"product_targets_objective\",\n        \"objective_achieved_through_key_result\",\n        \"outcome_measured_by_metric\"\n      ]\n    }\n  ],\n  \"required_bridges\": [\n    {\n      \"edge_type\": \"outcome_reveals_opportunity\",\n      \"target_domain\": \"discovery\",\n      \"when\": \"Outcomes should connect to the opportunities that deliver them\"\n    },\n    {\n      \"edge_type\": \"outcome_delivered_by_feature\",\n      \"target_domain\": \"product_spec\",\n      \"when\": \"Strategic outcomes should\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_frameworks",
+    "input": {},
+    "output": "{\n  \"total\": 216,\n  \"count\": 50,\n  \"frameworks\": [\n    {\n      \"id\": \"rice-scoring\",\n      \"approach_ids\": [\n        \"prioritise\"\n      ],\n      \"name\": \"RICE Scoring\",\n      \"version\": \"1.0.0\",\n      \"description\": \"Score features and opportunities by Reach, Impact, Confidence, and Effort to produce a ranked priority list.\",\n      \"category\": \"prioritization\",\n      \"origin\": {\n        \"type\": \"practitioner\",\n        \"attribution\": \"Intercom (Sean McBride)\",\n        \"description\": \"Developed at Intercom as a way to quantify feature prioritisation. Published as a blog post that became an industry standard.\",\n        \"url\": \"https://www.intercom.com/blog/rice-simple-prioritization-for-product-managers/\",\n        \"year\": 2014,\n        \"license\": \"open_attribution\"\n      },\n      \"tags\": [\n        \"prioritization\",\n        \"table\"\n      ],\n      \"slots\": [\n        {\n          \"label\": \"Items to score\",\n          \"entityTypeId\": \"feature\",\n          \"description\": \"Features, opportunities, or solutions being evaluated\"\n        },\n        {\n          \"label\": \"Reach\",\n          \"entityTypeId\": \"feature\",\n          \"description\": \"How many users does this affect per quarter?\"\n        },\n        {\n          \"label\": \"Impact\",\n          \"entityTypeId\": \"feature\",\n          \"description\": \"How much does this move the target outcome?\"\n        },\n        {\n          \"label\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_framework",
+    "input": {
+      "id": "opportunity-solution-tree"
+    },
+    "output": "{\n  \"id\": \"opportunity-solution-tree\",\n  \"approach_ids\": [\n    \"trace\"\n  ],\n  \"name\": \"Opportunity Solution Tree\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Map desired outcomes to opportunities, then branch into solutions and experiments. Ensures every solution traces back to a real user need.\",\n  \"category\": \"discovery\",\n  \"origin\": {\n    \"type\": \"practitioner\",\n    \"attribution\": \"Teresa Torres\",\n    \"description\": \"Introduced in Continuous Discovery Habits. Maps outcomes to opportunities, solutions, and experiments.\",\n    \"url\": \"https://www.producttalk.org/opportunity-solution-tree/\",\n    \"year\": 2021,\n    \"license\": \"published_methodology\"\n  },\n  \"tags\": [\n    \"discovery\",\n    \"tree\"\n  ],\n  \"slots\": [\n    {\n      \"label\": \"Root Outcome\",\n      \"entityTypeId\": \"outcome\",\n      \"description\": \"The desired business or user outcome\"\n    },\n    {\n      \"label\": \"Opportunities\",\n      \"entityTypeId\": \"opportunity\",\n      \"description\": \"User needs, pain points, or desires\"\n    },\n    {\n      \"label\": \"Solutions\",\n      \"entityTypeId\": \"solution\",\n      \"description\": \"Ideas to address each opportunity\"\n    },\n    {\n      \"label\": \"Experiments\",\n      \"entityTypeId\": \"experiment_run\",\n      \"description\": \"Tests to validate each solution\"\n    }\n  ],\n  \"data\": {\n    \"entity_types\": [\n      {\n        \"type\": \"outcome\",\n        \"role\": \"root\"\n      },\n      {\n        \"type\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_edge_types",
+    "input": {},
+    "output": "{\n  \"count\": 938,\n  \"edges\": [\n    {\n      \"type\": \"product_targets_persona\",\n      \"forward_verb\": \"targets\",\n      \"reverse_verb\": \"targeted_by\",\n      \"classification\": \"semantic\",\n      \"source_type\": \"product\",\n      \"target_type\": \"persona\"\n    },\n    {\n      \"type\": \"persona_pursues_job\",\n      \"forward_verb\": \"pursues\",\n      \"reverse_verb\": \"pursued_by\",\n      \"classification\": \"semantic\",\n      \"source_type\": \"persona\",\n      \"target_type\": \"job\"\n    },\n    {\n      \"type\": \"persona_experiences_need\",\n      \"forward_verb\": \"experiences\",\n      \"reverse_verb\": \"experienced_by\",\n      \"classification\": \"semantic\",\n      \"source_type\": \"persona\",\n      \"target_type\": \"need\"\n    },\n    {\n      \"type\": \"persona_aspires_to_desired_outcome\",\n      \"forward_verb\": \"aspires_to\",\n      \"reverse_verb\": \"aspirational_for\",\n      \"classification\": \"hierarchy\",\n      \"source_type\": \"persona\",\n      \"target_type\": \"desired_outcome\"\n    },\n    {\n      \"type\": \"persona_incurs_switching_cost\",\n      \"forward_verb\": \"incurs\",\n      \"reverse_verb\": \"incurred_by\",\n      \"classification\": \"hierarchy\",\n      \"source_type\": \"persona\",\n      \"target_type\": \"switching_cost\"\n    },\n    {\n      \"type\": \"job_surfaces_need\",\n      \"forward_verb\": \"surfaces\",\n      \"reverse_verb\": \"surfaces_from\",\n      \"classification\": \"causal\",\n      \"source_type\": \"job\",\n      \"target_type\": \"need\"\n    },\n    {\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_edge_type",
+    "input": {
+      "type": "opportunity_drives_solution"
+    },
+    "output": "{\n  \"type\": \"opportunity_drives_solution\",\n  \"forward_verb\": \"drives\",\n  \"reverse_verb\": \"addresses\",\n  \"classification\": \"causal\",\n  \"source_type\": \"opportunity\",\n  \"target_type\": \"solution\"\n}",
+    "ok": true
+  },
+  {
+    "name": "list_regions",
+    "input": {},
+    "output": "{\n  \"count\": 10,\n  \"regions\": [\n    {\n      \"id\": \"strategy_outcomes\",\n      \"label\": \"Strategy & Outcomes\",\n      \"order\": 1,\n      \"shape\": \"cascade\",\n      \"mental_model\": \"Aspiration → direction → bet → measurable → proof.\",\n      \"anchor_type\": \"objective\",\n      \"composes_atomic_domains\": [\n        \"strategy\"\n      ],\n      \"entity_count\": 13,\n      \"intra_edge_count\": 19,\n      \"boundary_edge_count\": 7\n    },\n    {\n      \"id\": \"users_needs\",\n      \"label\": \"Users & Needs\",\n      \"order\": 2,\n      \"shape\": \"convergent\",\n      \"mental_model\": \"Who → what they want to do → what is in their way → what they would accept as done.\",\n      \"anchor_type\": \"persona\",\n      \"composes_atomic_domains\": [\n        \"user\"\n      ],\n      \"entity_count\": 7,\n      \"intra_edge_count\": 5,\n      \"boundary_edge_count\": 22\n    },\n    {\n      \"id\": \"discovery_research_validation\",\n      \"label\": \"Discovery, Research & Validation\",\n      \"order\": 3,\n      \"shape\": \"directed-cyclic\",\n      \"mental_model\": \"Question → hypothesis → test → evidence → decision → loop back.\",\n      \"anchor_type\": \"opportunity\",\n      \"composes_atomic_domains\": [\n        \"discovery\",\n        \"validation\",\n        \"user_research\"\n      ],\n      \"entity_count\": 19,\n      \"intra_edge_count\": 13,\n      \"boundary_edge_count\": 11\n    },\n    {\n      \"id\": \"market_competitive\",\n      \"label\": \"Market & Competitive\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_region",
+    "input": {
+      "id": "strategy_outcomes"
+    },
+    "output": "{\n  \"id\": \"strategy_outcomes\",\n  \"label\": \"Strategy & Outcomes\",\n  \"order\": 1,\n  \"shape\": \"cascade\",\n  \"mental_model\": \"Aspiration → direction → bet → measurable → proof.\",\n  \"operators\": [\n    \"CEO\",\n    \"PM\",\n    \"leadership\",\n    \"strategy team\"\n  ],\n  \"composes_atomic_domains\": [\n    \"strategy\"\n  ],\n  \"entities\": [\n    {\n      \"type\": \"vision\",\n      \"role\": \"root\"\n    },\n    {\n      \"type\": \"mission\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"strategic_pillar\",\n      \"role\": \"hub\"\n    },\n    {\n      \"type\": \"strategic_theme\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"initiative\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"capability\",\n      \"role\": \"leaf\"\n    },\n    {\n      \"type\": \"value_stream\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"objective\",\n      \"role\": \"anchor\"\n    },\n    {\n      \"type\": \"key_result\",\n      \"role\": \"hub\"\n    },\n    {\n      \"type\": \"metric\",\n      \"role\": \"leaf\",\n      \"notes\": \"shared with Analytics\"\n    },\n    {\n      \"type\": \"decision\",\n      \"role\": \"hub\",\n      \"notes\": \"polymorphic across domains\"\n    },\n    {\n      \"type\": \"assumption\",\n      \"role\": \"leaf\"\n    },\n    {\n      \"type\": \"outcome\",\n      \"role\": \"hub\"\n    }\n  ],\n  \"anchor\": {\n    \"type\": \"objective\",\n    \"rationale\": \"The single entity where P5 language meets P3 measurement. The accountability question of strategy flows through\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_region_for_entity_type",
+    "input": {
+      "entity_type": "outcome"
+    },
+    "output": "{\n  \"id\": \"strategy_outcomes\",\n  \"label\": \"Strategy & Outcomes\",\n  \"order\": 1,\n  \"shape\": \"cascade\",\n  \"mental_model\": \"Aspiration → direction → bet → measurable → proof.\",\n  \"operators\": [\n    \"CEO\",\n    \"PM\",\n    \"leadership\",\n    \"strategy team\"\n  ],\n  \"composes_atomic_domains\": [\n    \"strategy\"\n  ],\n  \"entities\": [\n    {\n      \"type\": \"vision\",\n      \"role\": \"root\"\n    },\n    {\n      \"type\": \"mission\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"strategic_pillar\",\n      \"role\": \"hub\"\n    },\n    {\n      \"type\": \"strategic_theme\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"initiative\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"capability\",\n      \"role\": \"leaf\"\n    },\n    {\n      \"type\": \"value_stream\",\n      \"role\": \"container\"\n    },\n    {\n      \"type\": \"objective\",\n      \"role\": \"anchor\"\n    },\n    {\n      \"type\": \"key_result\",\n      \"role\": \"hub\"\n    },\n    {\n      \"type\": \"metric\",\n      \"role\": \"leaf\",\n      \"notes\": \"shared with Analytics\"\n    },\n    {\n      \"type\": \"decision\",\n      \"role\": \"hub\",\n      \"notes\": \"polymorphic across domains\"\n    },\n    {\n      \"type\": \"assumption\",\n      \"role\": \"leaf\"\n    },\n    {\n      \"type\": \"outcome\",\n      \"role\": \"hub\"\n    }\n  ],\n  \"anchor\": {\n    \"type\": \"objective\",\n    \"rationale\": \"The single entity where P5 language meets P3 measurement. The accountability question of strategy flows through\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_spec_version",
+    "input": {},
+    "output": "{\n  \"upg_version\": \"0.5.8\",\n  \"markdown_format_version\": \"0.1\",\n  \"entity_count\": 312,\n  \"edge_count\": 938,\n  \"domain_count\": 36,\n  \"region_count\": 10\n}",
+    "ok": true
+  },
+  {
+    "name": "resolve_edge_for_pair",
+    "input": {
+      "source_type": "example",
+      "target_type": "example"
+    },
+    "output": "{\n  \"source_type\": \"example\",\n  \"target_type\": \"example\",\n  \"edge_type\": null\n}",
+    "ok": true
+  },
+  {
+    "name": "list_cross_edge_types",
+    "input": {},
+    "output": "{\n  \"count\": 6,\n  \"types\": [\n    \"shares_persona\",\n    \"shares_competitor\",\n    \"shares_metric\",\n    \"depends_on_product\",\n    \"cannibalises\",\n    \"succeeds\"\n  ]\n}",
+    "ok": true
+  },
+  {
+    "name": "list_lenses",
+    "input": {},
+    "output": "{\n  \"count\": 8,\n  \"lenses\": [\n    {\n      \"id\": \"product\",\n      \"name\": \"Product\",\n      \"description\": \"Full graph, PM vocabulary, outcome-driven workflow\",\n      \"icon\": \"target\",\n      \"audience\": \"Product managers, founders making strategic decisions, and anyone thinking about what to build and why\",\n      \"perspective\": \"Sees the product as a system of outcomes, opportunities, and validated bets. Outcome-driven, evidence-aware, strategically oriented.\",\n      \"framework_id\": \"ost\",\n      \"visible_domain_count\": 0,\n      \"intelligence_prompt_count\": 5\n    },\n    {\n      \"id\": \"ux_design\",\n      \"name\": \"Design\",\n      \"description\": \"User-centric view with design vocabulary, journey-first workflow\",\n      \"icon\": \"pen-tool\",\n      \"audience\": \"Designers, UX researchers, and anyone focused on the user experience\",\n      \"perspective\": \"Sees the product through the eyes of the people using it. Journey-first, evidence-based, obsessed with friction and delight.\",\n      \"framework_id\": \"design_thinking\",\n      \"playbook_id\": \"playbook:experience-design-brand\",\n      \"visible_domain_count\": 7,\n      \"intelligence_prompt_count\": 5\n    },\n    {\n      \"id\": \"engineering\",\n      \"name\": \"Engineering\",\n      \"description\": \"Architecture-first view of the product as a technical system\",\n      \"icon\": \"cpu\",\n      \"audience\": \"Developers, CTOs, and anyone building the technical\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_lens",
+    "input": {
+      "id": "product"
+    },
+    "output": "{\n  \"id\": \"product\",\n  \"name\": \"Product\",\n  \"description\": \"Full graph, PM vocabulary, outcome-driven workflow\",\n  \"icon\": \"target\",\n  \"framework_id\": \"ost\",\n  \"label_overrides\": {\n    \"experiment\": \"Experiment\",\n    \"learning\": \"Validated Learning\"\n  },\n  \"visible_domains\": [],\n  \"benchmark_domains\": [\n    \"strategy\",\n    \"user\",\n    \"discovery\",\n    \"validation\",\n    \"market_intelligence\",\n    \"product_spec\",\n    \"growth\"\n  ],\n  \"intelligence_prompts\": [\n    {\n      \"condition\": \"outcomes.length === 0\",\n      \"structured_condition\": {\n        \"check\": {\n          \"type\": \"entity_count\",\n          \"entity_type\": \"outcome\",\n          \"comparison\": \"zero\"\n        }\n      },\n      \"message\": \"No outcomes defined yet. Start with what success looks like — what measurable result should this product drive?\"\n    },\n    {\n      \"condition\": \"hypotheses.untested.length > 3\",\n      \"structured_condition\": {\n        \"check\": {\n          \"type\": \"entity_count\",\n          \"entity_type\": \"hypothesis\",\n          \"filter\": {\n            \"status\": \"untested\"\n          },\n          \"comparison\": \"gt\",\n          \"threshold\": 3\n        }\n      },\n      \"message\": \"You have untested hypotheses stacking up. Pick the riskiest one and design an experiment before adding more.\"\n    },\n    {\n      \"condition\": \"features.length > 0 && hypotheses.length === 0\",\n      \"structured_condition\": {\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_type_labels",
+    "input": {},
+    "output": "{\n  \"total\": 312,\n  \"count\": 100,\n  \"labels\": [\n    {\n      \"id\": \"product\",\n      \"canonical_label\": \"Product\",\n      \"alt_labels\": [\n        \"offering\",\n        \"app\",\n        \"service\",\n        \"platform\",\n        \"product\"\n      ],\n      \"framework_labels\": {\n        \"three-horizons\": \"Product\",\n        \"marketing-mix-4ps\": \"Product\"\n      }\n    },\n    {\n      \"id\": \"outcome\",\n      \"canonical_label\": \"Outcome\",\n      \"alt_labels\": [\n        \"desired outcome\",\n        \"product outcome\",\n        \"business outcome\",\n        \"target outcome\",\n        \"root outcome\",\n        \"consequences\",\n        \"what went well\",\n        \"outcome\"\n      ],\n      \"framework_labels\": {\n        \"opportunity-solution-tree\": \"Root Outcome\",\n        \"adr-log\": \"Consequences\",\n        \"retrospective\": \"What Went Well\",\n        \"metrics-tree\": \"Outcome\",\n        \"ost\": \"Desired Outcome\",\n        \"okr_tree\": \"Outcome\"\n      }\n    },\n    {\n      \"id\": \"objective\",\n      \"canonical_label\": \"Objective\",\n      \"alt_labels\": [\n        \"goal\",\n        \"strategic goal\",\n        \"team goal\",\n        \"objective\"\n      ],\n      \"framework_labels\": {\n        \"okr-framework\": \"Objective\",\n        \"okr_tree\": \"Objective\"\n      }\n    },\n    {\n      \"id\": \"key_result\",\n      \"canonical_label\": \"Key Result\",\n      \"alt_labels\": [\n        \"kr\",\n        \"measurable result\",\n        \"target\",\n        \"key result 1\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_type_label",
+    "input": {
+      "entity_type": "person"
+    },
+    "output": "{\n  \"id\": \"person\",\n  \"canonical_label\": \"Person\",\n  \"alt_labels\": [],\n  \"framework_labels\": {},\n  \"resolved_label\": \"Person\"\n}",
+    "ok": true
+  },
+  {
+    "name": "get_valid_children",
+    "input": {
+      "parent_type": "example"
+    },
+    "output": "{\n  \"parent_type\": \"example\",\n  \"valid_children\": []\n}",
+    "ok": true
+  },
+  {
+    "name": "list_entity_types",
+    "input": {},
+    "output": "{\n  \"total\": 349,\n  \"count\": 50,\n  \"types\": [\n    {\n      \"name\": \"product\",\n      \"type_id\": \"ent_001\",\n      \"maturity\": \"stable\",\n      \"since\": \"0.1.0\",\n      \"domain_id\": \"strategy\"\n    },\n    {\n      \"name\": \"outcome\",\n      \"type_id\": \"ent_002\",\n      \"maturity\": \"stable\",\n      \"since\": \"0.1.0\",\n      \"domain_id\": \"strategy\"\n    },\n    {\n      \"name\": \"kpi\",\n      \"type_id\": \"ent_003\",\n      \"maturity\": \"deprecated\",\n      \"since\": \"0.1.0\",\n      \"deprecated_in\": \"0.1.0\",\n      \"replacement\": \"metric\",\n      \"domain_id\": null\n    },\n    {\n      \"name\": \"objective\",\n      \"type_id\": \"ent_004\",\n      \"maturity\": \"stable\",\n      \"since\": \"0.1.0\",\n      \"domain_id\": \"strategy\"\n    },\n    {\n      \"name\": \"key_result\",\n      \"type_id\": \"ent_005\",\n      \"maturity\": \"stable\",\n      \"since\": \"0.1.0\",\n      \"domain_id\": \"strategy\"\n    },\n    {\n      \"name\": \"metric\",\n      \"type_id\": \"ent_006\",\n      \"maturity\": \"stable\",\n      \"since\": \"0.1.0\",\n      \"domain_id\": \"strategy\"\n    },\n    {\n      \"name\": \"metric_quality_assessment\",\n      \"type_id\": \"ent_339\",\n      \"maturity\": \"proposed\",\n      \"since\": \"0.2.2\",\n      \"domain_id\": \"strategy\"\n    },\n    {\n      \"name\": \"vision\",\n      \"type_id\": \"ent_007\",\n      \"maturity\": \"stable\",\n      \"since\": \"0.1.0\",\n      \"domain_id\": \"strategy\"\n    },\n    {\n      \"name\": \"mission\",\n      \"type_id\": \"ent_008\",\n      \"maturity\": \"stable\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_entity_meta",
+    "input": {
+      "name": "person"
+    },
+    "output": "{\n  \"name\": \"person\",\n  \"type_id\": \"ent_349\",\n  \"maturity\": \"stable\",\n  \"since\": \"0.5.0\",\n  \"domain_id\": \"team_org\"\n}",
+    "ok": true
+  },
+  {
+    "name": "list_anti_patterns",
+    "input": {},
+    "output": "{\n  \"total\": 12,\n  \"count\": 12,\n  \"anti_patterns\": [\n    {\n      \"id\": \"personas-without-jobs\",\n      \"name\": \"Personas without jobs\",\n      \"description\": \"The graph has persona entities, but none link into the user chain via any of the v0.2 chain edges (job, need, desired_outcome, or switching_cost). A persona without chain links is a demographic profile: who someone is, not what they are trying to get done.\",\n      \"structured_condition\": {\n        \"operator\": \"and\",\n        \"checks\": [\n          {\n            \"check\": {\n              \"type\": \"entity_count\",\n              \"entity_type\": \"persona\",\n              \"comparison\": \"nonzero\"\n            }\n          },\n          {\n            \"check\": {\n              \"type\": \"relationship\",\n              \"source_type\": \"persona\",\n              \"edge_type\": \"persona_pursues_job\",\n              \"target_type\": \"job\",\n              \"comparison\": \"not_exists\"\n            }\n          },\n          {\n            \"check\": {\n              \"type\": \"relationship\",\n              \"source_type\": \"persona\",\n              \"edge_type\": \"persona_experiences_need\",\n              \"target_type\": \"need\",\n              \"comparison\": \"not_exists\"\n            }\n          },\n          {\n            \"check\": {\n              \"type\": \"relationship\",\n              \"source_type\": \"persona\",\n              \"edge_type\": \"persona_aspires_to_desired_outcome\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_anti_pattern",
+    "input": {
+      "id": "personas-without-jobs"
+    },
+    "output": "{\n  \"id\": \"personas-without-jobs\",\n  \"name\": \"Personas without jobs\",\n  \"description\": \"The graph has persona entities, but none link into the user chain via any of the v0.2 chain edges (job, need, desired_outcome, or switching_cost). A persona without chain links is a demographic profile: who someone is, not what they are trying to get done.\",\n  \"structured_condition\": {\n    \"operator\": \"and\",\n    \"checks\": [\n      {\n        \"check\": {\n          \"type\": \"entity_count\",\n          \"entity_type\": \"persona\",\n          \"comparison\": \"nonzero\"\n        }\n      },\n      {\n        \"check\": {\n          \"type\": \"relationship\",\n          \"source_type\": \"persona\",\n          \"edge_type\": \"persona_pursues_job\",\n          \"target_type\": \"job\",\n          \"comparison\": \"not_exists\"\n        }\n      },\n      {\n        \"check\": {\n          \"type\": \"relationship\",\n          \"source_type\": \"persona\",\n          \"edge_type\": \"persona_experiences_need\",\n          \"target_type\": \"need\",\n          \"comparison\": \"not_exists\"\n        }\n      },\n      {\n        \"check\": {\n          \"type\": \"relationship\",\n          \"source_type\": \"persona\",\n          \"edge_type\": \"persona_aspires_to_desired_outcome\",\n          \"target_type\": \"desired_outcome\",\n          \"comparison\": \"not_exists\"\n        }\n      },\n      {\n        \"check\": {\n          \"type\": \"relationship\",\n          \"source_type\": \"persona\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_benchmarks",
+    "input": {
+      "kind": "count"
+    },
+    "output": "{\n  \"kind\": \"count\",\n  \"total\": 47,\n  \"count\": 47,\n  \"benchmarks\": [\n    {\n      \"type\": \"product\",\n      \"domain\": \"strategy\",\n      \"concept\": {\n        \"min\": 1,\n        \"max\": 1\n      },\n      \"validation\": {\n        \"min\": 1,\n        \"max\": 1\n      },\n      \"build\": {\n        \"min\": 1,\n        \"max\": 1\n      },\n      \"beta\": {\n        \"min\": 1,\n        \"max\": 1\n      },\n      \"launch\": {\n        \"min\": 1,\n        \"max\": 1\n      },\n      \"growth\": {\n        \"min\": 1,\n        \"max\": 1\n      },\n      \"mature\": {\n        \"min\": 1,\n        \"max\": 3\n      },\n      \"maintenance\": {\n        \"min\": 1,\n        \"max\": 3\n      },\n      \"sunset\": {\n        \"min\": 1,\n        \"max\": 1\n      },\n      \"source\": {\n        \"kind\": \"fundamental\"\n      },\n      \"rationale\": \"Every graph needs exactly one product (or one per product area at scale).\"\n    },\n    {\n      \"type\": \"outcome\",\n      \"domain\": \"strategy\",\n      \"concept\": {\n        \"min\": 1,\n        \"max\": 3\n      },\n      \"validation\": {\n        \"min\": 2,\n        \"max\": 4\n      },\n      \"build\": {\n        \"min\": 2,\n        \"max\": 5\n      },\n      \"beta\": {\n        \"min\": 3,\n        \"max\": 7\n      },\n      \"launch\": {\n        \"min\": 2,\n        \"max\": 5\n      },\n      \"growth\": {\n        \"min\": 3,\n        \"max\": 8\n      },\n      \"mature\": {\n        \"min\": 5,\n        \"max\": 15\n      },\n      \"maintenance\": {\n        \"min\": 5,\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_product_stages",
+    "input": {},
+    "output": "{\n  \"count\": 9,\n  \"stages\": [\n    \"concept\",\n    \"validation\",\n    \"build\",\n    \"beta\",\n    \"launch\",\n    \"growth\",\n    \"mature\",\n    \"maintenance\",\n    \"sunset\"\n  ]\n}",
+    "ok": true
+  },
+  {
+    "name": "list_type_migrations",
+    "input": {},
+    "output": "{\n  \"migrations\": [\n    {\n      \"from\": \"hypothesis_claim\",\n      \"to\": \"hypothesis\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"from\": \"hypothesis_evidence\",\n      \"to\": \"evidence\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"from\": \"story_task\",\n      \"to\": \"task\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"from\": \"hypothesis\",\n      \"to\": \"hypothesis_claim\",\n      \"since\": \"0.2.8\"\n    },\n    {\n      \"from\": \"pain_point\",\n      \"to\": \"need\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"user_need\",\n      \"to\": \"need\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"research_insight\",\n      \"to\": \"insight\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"finding\",\n      \"to\": \"insight\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"ux_insight\",\n      \"to\": \"insight\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"highlight\",\n      \"to\": \"observation\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"kpi\",\n      \"to\": \"metric\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"north_star_metric\",\n      \"to\": \"metric\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"input_metric\",\n      \"to\": \"metric\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"metric_definition\",\n      \"to\": \"metric\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"ab_test\",\n      \"to\": \"experiment_run\",\n      \"since\": \"0.1.0\"\n    },\n    {\n      \"from\": \"growth_experiment\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_edge_migrations",
+    "input": {},
+    "output": "{\n  \"migrations\": [\n    {\n      \"kind\": \"rename\",\n      \"from\": \"solution_proposes_hypothesis_claim\",\n      \"to\": \"solution_proposes_hypothesis\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\": \"hypothesis_claim_requires_experiment_plan\",\n      \"to\": \"hypothesis_requires_experiment_plan\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\": \"hypothesis_claim_planned_via_test_plan\",\n      \"to\": \"hypothesis_planned_via_test_plan\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\": \"hypothesis_claim_investigated_via_research_plan\",\n      \"to\": \"hypothesis_investigated_via_research_plan\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\": \"learning_updates_hypothesis_claim\",\n      \"to\": \"learning_updates_hypothesis\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\": \"learning_refines_hypothesis_claim\",\n      \"to\": \"learning_refines_hypothesis\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\": \"assumption_becomes_hypothesis_claim\",\n      \"to\": \"assumption_becomes_hypothesis\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\": \"experiment_run_validates_hypothesis_claim\",\n      \"to\": \"experiment_run_validates_hypothesis\",\n      \"since\": \"0.4.0\"\n    },\n    {\n      \"kind\": \"rename\",\n      \"from\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_split_migrations",
+    "input": {},
+    "output": "{\n  \"splits\": [\n    {\n      \"kind\": \"status_routed\",\n      \"from\": \"experiment\",\n      \"status_property\": \"status\",\n      \"produces\": [\n        {\n          \"ref\": \"plan\",\n          \"type\": \"experiment_plan\",\n          \"keep_props\": [\n            \"__id\",\n            \"method\",\n            \"sample_size\",\n            \"expected_lift\",\n            \"expected_lift_unit\"\n          ],\n          \"defaults\": {}\n        },\n        {\n          \"ref\": \"run\",\n          \"type\": \"experiment_run\",\n          \"keep_props\": [\n            \"actual_lift\",\n            \"start_date\",\n            \"end_date\"\n          ],\n          \"defaults\": {}\n        }\n      ],\n      \"routing\": {\n        \"draft\": {\n          \"spawn\": [\n            \"plan\"\n          ],\n          \"plan\": {\n            \"defaults\": {\n              \"status\": \"drafted\"\n            }\n          }\n        },\n        \"planned\": {\n          \"spawn\": [\n            \"plan\"\n          ],\n          \"plan\": {\n            \"defaults\": {\n              \"status\": \"scheduled\"\n            }\n          }\n        },\n        \"cancelled\": {\n          \"spawn\": [\n            \"plan\"\n          ],\n          \"plan\": {\n            \"defaults\": {\n              \"status\": \"cancelled\"\n            }\n          }\n        },\n        \"running\": {\n          \"spawn\": [\n            \"plan\",\n            \"run\"\n          ],\n          \"plan\": {\n            \"defaults\": {\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_lifecycles",
+    "input": {},
+    "output": "{\n  \"total\": 189,\n  \"lifecycles\": [\n    {\n      \"entity_type\": \"product\",\n      \"initial_phase\": \"concept\",\n      \"terminal_phases\": [\n        \"sunset\"\n      ],\n      \"phases\": [\n        {\n          \"id\": \"concept\",\n          \"label\": \"Concept\",\n          \"description\": \"Napkin idea. Problem shape and solution sketch, pre-validation.\",\n          \"transitions_to\": [\n            \"validation\",\n            \"build\",\n            \"beta\",\n            \"launch\",\n            \"growth\",\n            \"mature\",\n            \"sunset\"\n          ]\n        },\n        {\n          \"id\": \"validation\",\n          \"label\": \"Validation\",\n          \"description\": \"Testing demand. User conversations and experiments pressure-test assumptions before build commits.\",\n          \"transitions_to\": [\n            \"build\",\n            \"beta\",\n            \"launch\",\n            \"growth\",\n            \"mature\",\n            \"sunset\"\n          ]\n        },\n        {\n          \"id\": \"build\",\n          \"label\": \"Build\",\n          \"description\": \"Actively developing v1. Core functionality is being authored, pre-user.\",\n          \"transitions_to\": [\n            \"beta\",\n            \"launch\",\n            \"growth\",\n            \"mature\",\n            \"sunset\"\n          ]\n        },\n        {\n          \"id\": \"beta\",\n          \"label\": \"Beta\",\n          \"description\": \"Early users, iterating. Feature-complete enough to learn from,\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_lifecycle",
+    "input": {
+      "entity_type": "hypothesis"
+    },
+    "output": "{\n  \"entity_type\": \"hypothesis\",\n  \"initial_phase\": \"drafted\",\n  \"terminal_phases\": [\n    \"validated\",\n    \"invalidated\",\n    \"archived\"\n  ],\n  \"phases\": [\n    {\n      \"id\": \"drafted\",\n      \"label\": \"Drafted\",\n      \"description\": \"The claim is being written. We_believe / will_result_in / we_know_when may not yet be complete. Not yet committed for testing.\",\n      \"transitions_to\": [\n        \"active\",\n        \"archived\"\n      ]\n    },\n    {\n      \"id\": \"active\",\n      \"label\": \"Active\",\n      \"description\": \"The claim is committed and being tested. Experiments may be running; evidence may be accruing via supports/refutes edges. current_confidence updates as evidence weight shifts.\",\n      \"transitions_to\": [\n        \"validated\",\n        \"invalidated\",\n        \"archived\"\n      ]\n    },\n    {\n      \"id\": \"validated\",\n      \"label\": \"Validated\",\n      \"description\": \"Evidence sufficiently supports the claim. The belief held. Reopens to `active` if new evidence materially changes the picture.\",\n      \"transitions_to\": [\n        \"active\"\n      ]\n    },\n    {\n      \"id\": \"invalidated\",\n      \"label\": \"Invalidated\",\n      \"description\": \"Evidence sufficiently refutes the claim. The belief did not hold. Reopens to `active` if new evidence materially changes the picture.\",\n      \"transitions_to\": [\n        \"active\"\n      ]\n    },\n    {\n      \"id\": \"archived\",\n      \"label\":\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "list_scales",
+    "input": {},
+    "output": "{\n  \"scales\": [\n    {\n      \"id\": \"reach_5\",\n      \"label\": \"Reach (5-point)\",\n      \"description\": \"How many users experience this problem or benefit from this feature\",\n      \"min\": 1,\n      \"max\": 5,\n      \"steps\": 5,\n      \"points\": [\n        {\n          \"value\": 1,\n          \"label\": \"Almost no one\",\n          \"description\": \"Affects <5% of users\"\n        },\n        {\n          \"value\": 2,\n          \"label\": \"A few\",\n          \"description\": \"Affects 5-20% of users\"\n        },\n        {\n          \"value\": 3,\n          \"label\": \"Some\",\n          \"description\": \"Affects 20-50% of users\"\n        },\n        {\n          \"value\": 4,\n          \"label\": \"Most\",\n          \"description\": \"Affects 50-80% of users\"\n        },\n        {\n          \"value\": 5,\n          \"label\": \"Nearly everyone\",\n          \"description\": \"Affects >80% of users\"\n        }\n      ]\n    },\n    {\n      \"id\": \"frequency_5\",\n      \"label\": \"Frequency (5-point)\",\n      \"description\": \"How often the problem or situation occurs\",\n      \"min\": 1,\n      \"max\": 5,\n      \"steps\": 5,\n      \"points\": [\n        {\n          \"value\": 1,\n          \"label\": \"Rarely\",\n          \"description\": \"Less than once a month\"\n        },\n        {\n          \"value\": 2,\n          \"label\": \"Occasionally\",\n          \"description\": \"A few times a month\"\n        },\n        {\n          \"value\": 3,\n          \"label\": \"Sometimes\",\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_scale",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "list_framework_categories",
+    "input": {},
+    "output": "{\n  \"categories\": [\n    \"prioritization\",\n    \"strategy\",\n    \"discovery\",\n    \"business_model\",\n    \"metrics\",\n    \"validation\",\n    \"planning\",\n    \"competitive\",\n    \"design\",\n    \"ux_research\",\n    \"user_understanding\",\n    \"research\",\n    \"accessibility\",\n    \"feedback_voc\",\n    \"engineering\",\n    \"devops\",\n    \"security\",\n    \"qa_testing\",\n    \"ai_ml\",\n    \"agentic\",\n    \"growth\",\n    \"marketing\",\n    \"go_to_market\",\n    \"sales\",\n    \"pricing\",\n    \"data_analytics\",\n    \"legal_compliance\",\n    \"customer_success\",\n    \"team_process\",\n    \"program_mgmt\",\n    \"content\",\n    \"education\",\n    \"partnerships\",\n    \"localisation\",\n    \"portfolio\"\n  ],\n  \"total\": 35\n}",
+    "ok": true
+  },
+  {
+    "name": "list_framework_structure_patterns",
+    "input": {},
+    "output": "{\n  \"patterns\": [\n    \"tree\",\n    \"table\",\n    \"matrix\",\n    \"funnel\",\n    \"collection\",\n    \"quadrant\",\n    \"flow\"\n  ],\n  \"total\": 7\n}",
+    "ok": true
+  },
+  {
+    "name": "list_domain_rings",
+    "input": {},
+    "output": "{\n  \"rings\": [\n    {\n      \"id\": \"nucleus\",\n      \"label\": \"Product\",\n      \"description\": \"The seed\",\n      \"domain_ids\": [\n        \"portfolio\",\n        \"workspace\"\n      ]\n    },\n    {\n      \"id\": \"understand\",\n      \"label\": \"Understand\",\n      \"description\": \"Who are we building for?\",\n      \"domain_ids\": [\n        \"user\",\n        \"user_research\",\n        \"market_intelligence\",\n        \"discovery\",\n        \"validation\",\n        \"feedback\"\n      ]\n    },\n    {\n      \"id\": \"define\",\n      \"label\": \"Define\",\n      \"description\": \"What are we building?\",\n      \"domain_ids\": [\n        \"strategy\",\n        \"product_spec\",\n        \"legal\",\n        \"ux_design\",\n        \"design_system\",\n        \"brand\"\n      ]\n    },\n    {\n      \"id\": \"build\",\n      \"label\": \"Build\",\n      \"description\": \"How do we construct it?\",\n      \"domain_ids\": [\n        \"engineering\",\n        \"devops\",\n        \"testing\",\n        \"security\",\n        \"accessibility\",\n        \"data_analytics\",\n        \"ai\",\n        \"automation\"\n      ]\n    },\n    {\n      \"id\": \"grow\",\n      \"label\": \"Grow\",\n      \"description\": \"How do we make money?\",\n      \"domain_ids\": [\n        \"business_model\",\n        \"growth\",\n        \"go_to_market\",\n        \"pricing\",\n        \"sales\",\n        \"marketing\"\n      ]\n    },\n    {\n      \"id\": \"operate\",\n      \"label\": \"Operate\",\n      \"description\": \"How do we serve?\",\n      \"domain_ids\": [\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_domain_ring",
+    "input": {
+      "id": "nucleus"
+    },
+    "output": "{\n  \"id\": \"nucleus\",\n  \"label\": \"Product\",\n  \"description\": \"The seed\",\n  \"domain_ids\": [\n    \"portfolio\",\n    \"workspace\"\n  ]\n}",
+    "ok": true
+  },
+  {
+    "name": "validate_graph",
+    "input": {},
+    "output": "{\n  \"valid\": false,\n  \"summary\": {\n    \"entity_drift\": 0,\n    \"edge_drift\": 0,\n    \"top_level_drift\": 0,\n    \"lifecycle_drift\": 0,\n    \"self_referential\": 0,\n    \"property_drift\": 164,\n    \"total_nodes\": 2054,\n    \"total_edges\": 3120,\n    \"spec_version\": \"0.5.8\",\n    \"scope\": \"all\",\n    \"limit\": 100,\n    \"anti_pattern_violations_high\": 0,\n    \"anti_pattern_violations_medium\": 1,\n    \"anti_pattern_violations_low\": 0,\n    \"edge_type_pair_drift\": 100,\n    \"graph_topology_self_loops\": 0,\n    \"property_type_drift\": 100\n  },\n  \"_hash\": \"592a8d0ae65f17ac\",\n  \"entity_drift\": [],\n  \"edge_drift\": [],\n  \"top_level_drift\": [],\n  \"lifecycle_drift\": [],\n  \"self_referential\": [],\n  \"property_drift\": [\n    {\n      \"id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n      \"type\": \"product\",\n      \"property\": \"stage\",\n      \"via\": \"UPG_PROPERTY_MIGRATIONS['0.2.13']\"\n    },\n    {\n      \"id\": \"3f1c1804-b33b-4b1f-9094-c91cc8957912\",\n      \"type\": \"assumption\",\n      \"property\": \"validation_status\",\n      \"via\": \"UPG_PROPERTY_MIGRATIONS['0.5.0']\"\n    },\n    {\n      \"id\": \"6719fce7-61e7-44df-b6cf-92f7c7312554\",\n      \"type\": \"assumption\",\n      \"property\": \"validation_status\",\n      \"via\": \"UPG_PROPERTY_MIGRATIONS['0.5.0']\"\n    },\n    {\n      \"id\": \"7b22f5f3-b344-4e49-8d5a-35cf9087dc6c\",\n      \"type\": \"assumption\",\n      \"property\": \"validation_status\",\n      \"via\": \"UPG_PROPERTY_MIGRATIONS['0.5.0']\"\n… (truncated)",
+    "ok": true
+  },
+  {
+    "name": "get_anti_pattern_violations_for",
+    "input": {
+      "entity_id": "ec3d5479-4947-4bd9-9e77-b5ee01beb851"
+    },
+    "output": "{\n  \"entity_id\": \"ec3d5479-4947-4bd9-9e77-b5ee01beb851\",\n  \"type\": \"product\",\n  \"violations\": []\n}",
+    "ok": true
+  },
+  {
+    "name": "get_session_context",
+    "input": {},
+    "output": "{\n  \"lens\": \"product\",\n  \"skills_invoked\": [],\n  \"recommendations_given\": [],\n  \"recommendations_to_avoid\": [],\n  \"focus_area\": null,\n  \"custom\": {},\n  \"skills_count\": 0,\n  \"last_skill\": null,\n  \"last_recommendation\": null\n}",
+    "ok": true
+  },
+  {
+    "name": "skill_audit",
+    "input": {},
+    "output": "{\n  \"skills\": []\n}",
+    "ok": true
+  },
+  {
+    "name": "update_session_context",
+    "input": {},
+    "output": "{\n  \"updated\": true,\n  \"session\": {\n    \"lens\": \"product\",\n    \"skills_invoked\": [],\n    \"recommendations_given\": [],\n    \"focus_area\": null,\n    \"custom\": {}\n  }\n}",
+    "ok": true
+  },
+  {
+    "name": "get_area_context",
+    "input": {},
+    "output": "{\n  \"has_area_context\": false\n}",
+    "ok": true
+  },
+  {
+    "name": "create_area",
+    "input": {
+      "title": "Example node"
+    },
+    "output": "{\n  \"node\": {\n    \"id\": \"n_cyDWeH77JTYEF4t_\",\n    \"title\": \"Example node\"\n  },\n  \"portfolio_file\": \"/Users/FH/Documents/_Code/tpc-worktrees/wt-cli-section/packages/upg-mcp-server/.upg/portfolio.upg\",\n  \"written_to\": \"product_areas\"\n}",
+    "ok": true
+  },
+  {
+    "name": "list_portfolios",
+    "input": {},
+    "output": "{\n  \"portfolios\": [],\n  \"total\": 0\n}",
+    "ok": true
+  },
+  {
+    "name": "get_organization",
+    "input": {},
+    "output": "{\n  \"organization\": {\n    \"id\": \"org_1853eb2e\",\n    \"title\": \"Portfolio\"\n  },\n  \"portfolio_file\": \".upg/portfolio.upg\"\n}",
+    "ok": true
+  },
+  {
+    "name": "create_cross_product_edge",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "list_portfolio_cross_edges",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "migrate_cross_edges",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "get_sync_state",
+    "input": {},
+    "output": "{\n  \"synced\": false,\n  \"message\": \"No .upg-sync file found. This product has never been pushed to the cloud.\"\n}",
+    "ok": true
+  },
+  {
+    "name": "apply_pull_changeset",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  },
+  {
+    "name": "push_to_cloud",
+    "input": {},
+    "ok": false,
+    "note": "skipped (not runnable on a single local fixture)"
+  }
+]

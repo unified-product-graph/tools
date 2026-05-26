@@ -1,0 +1,76 @@
+{
+  "name": "@unified-product-graph/mcp-server",
+  "version": "0.6.0",
+  "description": "Local MCP server for .upg files. Read and write product knowledge graphs offline.",
+  "license": "MIT",
+  "author": "The Product Creator <hello@theproductcreator.com>",
+  "homepage": "https://unifiedproductgraph.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unified-product-graph/mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/unified-product-graph/mcp-server/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "bin": {
+    "upg-mcp-server": "dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "skills",
+    "scripts/install-skills.sh",
+    "scripts/claudemd-snippet.md",
+    "TOOLS.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "postbuild": "npm run generate-tools",
+    "dev": "echo '@unified-product-graph/mcp-server: standalone only. Run with: npx upg-mcp-server --file <path.upg>'",
+    "generate-tools": "tsx scripts/generate-tool-reference.ts",
+    "generate-tools:check": "tsx scripts/generate-tool-reference.ts --check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "@unified-product-graph/core": "*",
+    "@unified-product-graph/sdk": "*",
+    "chokidar": "^4.0.0",
+    "nanoid": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.8.0",
+    "@unified-product-graph/frameworks": "*",
+    "@unified-product-graph/mcp-tooling": "*"
+  },
+  "keywords": [
+    "mcp",
+    "upg",
+    "unified-product-graph",
+    "product-management",
+    "model-context-protocol",
+    "knowledge-graph"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

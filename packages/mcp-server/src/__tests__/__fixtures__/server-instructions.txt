@@ -1,0 +1,38 @@
+Unified Product Graph (local) MCP. Reads and writes .upg files directly.
+
+Batching (50 per call, atomic):
+- 3+ nodes: batch_create_nodes, batch_update_nodes, batch_delete_nodes.
+- 3+ edges: batch_create_edges, batch_delete_edges.
+- Chain inside a batch via parent_ref ("$0", "$1") to reference earlier nodes.
+- Singles: create_node, update_node, delete_node, create_edge, delete_edge.
+
+Reads:
+- Traverse the graph: query (BFS, projection-aware). Default for "show me the graph".
+  query({ from: "persona", traverse: ["persona_pursues_job"], depth: 2, include: ["title"], edge_include: [] })
+- get_node: one node + its edges. get_nodes: batch by ID (max 50).
+- list_nodes: filter by type/status/tags/parent. DO NOT pass include_edges:true with limit > 50 (transport overflow); use compact_edges:true for ID-only edges.
+- export_edges({ types?: [...] }): flat { id, source, target, type } enumeration for migration passes.
+- search_nodes: fuzzy title/description match.
+- Overview: get_graph_digest (~500 tokens, counts + health), get_product_context (lens-aware summary).
+
+Edge migration: rename_edge_type({ from, to, flip?, dry_run? }): single transactional rename.
+
+Multi-product: list_local_products, switch_product, init_workspace.
+
+Schema: get_entity_schema returns valid parent→child hierarchy, properties, and edge types per type.
+
+Spec introspection (read @unified-product-graph/core without importing it):
+- Entity catalog: list_entity_types, get_entity_meta, list_type_labels, get_type_label, get_valid_children.
+- Edges: list_edge_types, get_edge_type, list_cross_edge_types, resolve_edge_for_pair (canonical edge for source→target).
+- Regions and lenses: list_regions, get_region, get_region_for_entity_type, list_lenses, get_lens (with visible_types).
+- Domains and rings: list_domains, get_domain_guide, list_domain_rings, get_domain_ring.
+- Frameworks: list_frameworks, get_framework, list_framework_categories, list_framework_structure_patterns.
+- Playbooks: list_playbooks, get_playbook (region-anchored creation sequences).
+- Health catalogs: list_anti_patterns, get_anti_pattern, list_benchmarks (kind: count | relationship | ratio | domain_activation).
+- Lifecycles and scales: list_lifecycles, get_lifecycle, list_scales, get_scale, list_product_stages (9-stage enum).
+- Migrations: list_type_migrations, list_edge_migrations, list_split_migrations.
+- Version: get_spec_version.
+
+Approach verbs (plan, inspect, prioritise, trace, reflect):
+- Return { approach_id, scope, generated_at, approach, params }. The LLM reads signature_hint and synthesises the structured projection against the live graph.
+- An approach is the path of arrival to a region (cartographic framing). Definition lookup: list_approaches, get_approach.

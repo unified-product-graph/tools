@@ -1,0 +1,75 @@
+{
+  "name": "@unified-product-graph/cloud-server",
+  "version": "0.6.0",
+  "description": "Postgres-backed MCP server for the Unified Product Graph \u2014 self-hostable, open source",
+  "license": "MIT",
+  "author": "The Product Creator <hello@theproductcreator.com>",
+  "homepage": "https://unifiedproductgraph.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unified-product-graph/cloud-server.git"
+  },
+  "type": "module",
+  "bin": {
+    "upg-cloud-server": "dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "migrations",
+    "docker",
+    "CHANGELOG.md",
+    "SELF-HOSTING.md"
+  ],
+  "scripts": {
+    "prebuild": "npm run build --workspace=@unified-product-graph/mcp-tooling 2>/dev/null || true",
+    "pregenerate-tools": "npm run build --workspace=@unified-product-graph/mcp-tooling 2>/dev/null || true",
+    "build": "tsup",
+    "postbuild": "npm run generate-tools",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "generate-tools": "tsx scripts/generate-tool-reference.ts",
+    "generate-tools:check": "tsx scripts/generate-tool-reference.ts --check",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "@unified-product-graph/core": "*",
+    "@unified-product-graph/sdk": "*",
+    "nanoid": "^5.1.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.0.0",
+    "eslint": "^9.0.0",
+    "@unified-product-graph/mcp-tooling": "*"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bugs": {
+    "url": "https://github.com/unified-product-graph/cloud-server/issues"
+  },
+  "keywords": [
+    "mcp",
+    "upg",
+    "unified-product-graph",
+    "product-management",
+    "model-context-protocol",
+    "knowledge-graph",
+    "postgres",
+    "self-hosted"
+  ]
+}

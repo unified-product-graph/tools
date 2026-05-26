@@ -1,0 +1,1409 @@
+/**
+ * Node tools: read, search, traverse, mutate, batch, migrate, dedupe.
+ * Every batch handler validates the entire payload before any mutation lands.
+ * `update_node` delegates to `migrateNodeType` (atomic with rollback) when the
+ * caller passes a `type` change.
+ */
+
+import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
+import { text, textError } from '../lib/server-context.js'
+import { preflightPayload, getSoftLimit } from '../lib/payload-guard.js'
+import { degradeProgressively } from '../lib/payload-degrader.js'
+import { edgeId } from '@unified-product-graph/sdk'
+import {
+  isPortfolioScopedType,
+  writePortfolioScopedNode,
+  PortfolioRoutingError,
+} from '@unified-product-graph/sdk'
+import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
+import {
+  UPG_MIGRATIONS,
+  UPG_EDGE_CATALOG,
+  UPG_VERSION,
+  migrateEdge,
+  migrateNodeProperties,
+  getPropertySchema,
+  type UPGPropertyMigrationChange,
+} from '@unified-product-graph/core'
+import {
+  normalizeTags,
+  searchNodes as searchNodesLib,
+  listNodes as listNodesLib,
+  getNode as getNodeLib,
+  getNodes as getNodesLib,
+  createNode as createNodeLib,
+  deleteNode as deleteNodeLib,
+  validateStatusAgainstLifecycle,
+  migrateNodeType as migrateNodeTypeLib,
+  batchCreateNodes as batchCreateNodesLib,
+  UnknownEntityTypeError,
+  type GetNodeResult,
+} from '@unified-product-graph/sdk'
+import { buildEntitySchema, type MigrateTypeResult } from '@unified-product-graph/mcp-tooling'
+import {
+  checkPropertyTypes,
+  renderPropertyTypeWarning,
+} from '@unified-product-graph/sdk'
+import { checkLengthCaps } from '@unified-product-graph/sdk'
+
+// ── Unknown-property guard ─────────────────────────────────────────
+
+/**
+ * Validate `properties` against the entity type's property schema.
+ *
+ * @returns `unknown_properties` (keys not in the schema) and a `warning`
+ *   string suitable for embedding in the tool response. Both are empty/undefined
+ *   when all properties are canonical.
+ *
+ * Entity types with no registered schema (no typed properties) are treated as
+ * fully permissive: no unknowns reported.
+ */
+function checkUnknownProperties(
+  entityType: string,
+  properties: Record<string, unknown> | undefined,
+): { unknown_properties: string[]; warning: string | undefined } {
+  if (!properties || Object.keys(properties).length === 0) {
+    return { unknown_properties: [], warning: undefined }
+  }
+  const schema = getPropertySchema(entityType)
+  if (!schema) {
+    // No schema registered for this type — all properties are allowed.
+    return { unknown_properties: [], warning: undefined }
+  }
+  const unknown = Object.keys(properties).filter((k) => !(k in schema))
+  if (unknown.length === 0) return { unknown_properties: [], warning: undefined }
+  const warning =
+    `Unknown properties for type "${entityType}": [${unknown.map((k) => `"${k}"`).join(', ')}]. ` +
+    `These will be stored but are not part of the canonical UPG schema. ` +
+    `Check get_entity_schema("${entityType}") for the canonical property list.`
+  return { unknown_properties: unknown, warning }
+}
+
+/**
+ * List entities in the graph with filtering, edge inclusion, and count-only
+ * mode. Supports pagination. Filters compose with AND semantics; `tags` matches
+ * any.
+ *
+ * For graph-wide edge enumeration, prefer `export_edges` (flat) or `query`
+ * (traversal). `list_nodes(include_edges:true)` is for entity-scoped reads,
+ * not flat edge dumps.
+ *
+ * @returns JSON: `{ nodes, total, offset, limit, _hash }`. With
+ *   `count_only: true`, returns `{ total, _hash }` only. May include a
+ *   `degraded` block when the response was auto-trimmed to fit.
+ * @warning Pre-flight payload guardrail: refuses with a steering
+ *   error when the estimated response exceeds `UPG_MCP_PAYLOAD_HARD_LIMIT`
+ *   (default 150 KB), and attaches a `_warning` field above
+ *   `UPG_MCP_PAYLOAD_SOFT_LIMIT` (default 50 KB). For graph-wide reads,
+ *   prefer `query` with a tight projection.
+ * @warning Auto-degrade: between the soft and hard limits, the
+ *   response is automatically truncated. Surfaced as
+ *   `degraded.applied: ['truncate_at_count_auto']` on the response.
+ * @atomicity atomic (read-only)
+ * @see search_nodes
+ * @see query
+ */
+export const listNodes: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const ifChangedList = args.if_changed_since as string | undefined
+  const currentHashList = store.getContentHash()
+  if (ifChangedList && ifChangedList === currentHashList) {
+    return text(JSON.stringify({ changed: false, _hash: currentHashList }, null, 2))
+  }
+
+  const countOnly = (args.count_only as boolean) ?? false
+  const offset = (args.offset as number) ?? 0
+  const limit = Math.min((args.limit as number) ?? 50, 200)
+  const includeEdges = (args.include_edges as boolean) ?? false
+
+  const result = listNodesLib(store, {
+    type: args.type as string | undefined,
+    status: args.status as string | undefined,
+    tags: args.tags as string[] | undefined,
+    parentId: args.parent_id as string | undefined,
+    includeEdges,
+    countOnly,
+    offset,
+    limit,
+  })
+
+  if (countOnly) {
+    return text(JSON.stringify({ total: result.total, _hash: currentHashList }, null, 2))
+  }
+
+  const countEdges = (nodes: typeof result.nodes) =>
+    includeEdges
+      ? nodes.reduce((sum, n) => sum + ((n.edges as unknown[] | undefined)?.length ?? 0), 0)
+      : 0
+
+  const guardOutcome = preflightPayload({
+    toolName: 'list_nodes',
+    nodeCount: result.nodes.length,
+    edgeCount: countEdges(result.nodes),
+    compactEdges: true,
+    argsHint: `limit=${limit}, include_edges=${includeEdges}`,
+  })
+  if (guardOutcome.kind === 'refuse') return guardOutcome.result
+
+  const response: Record<string, unknown> = {
+    nodes: result.nodes,
+    total: result.total,
+    offset,
+    limit,
+    _hash: currentHashList,
+  }
+
+  if (guardOutcome.kind === 'warn') {
+    // list_nodes already emits a tight projection; the only useful auto-degrade
+    // is truncation. Try halving the page until the estimate fits.
+    let workingNodes = result.nodes
+    const degradeOutcome = degradeProgressively({
+      toolName: 'list_nodes',
+      initialBytes: guardOutcome.bytes,
+      countAfterStage: () => ({
+        nodeCount: workingNodes.length,
+        edgeCount: countEdges(workingNodes),
+        compactEdges: true,
+      }),
+      stages: [
+        {
+          name: 'truncate_at_count_auto',
+          apply: () => {
+            if (workingNodes.length <= 5) return false
+            // Slice straight to the largest count that fits under soft —
+            // soft / initialBytes is the survival ratio. Apply a 0.85 safety
+            // factor so the post-truncate estimate lands clearly under.
+            const soft = getSoftLimit()
+            const ratio = guardOutcome.bytes < 1 ? 1 : Math.min(1, (soft / guardOutcome.bytes) * 0.85)
+            const targetCount = Math.max(5, Math.floor(workingNodes.length * ratio))
+            if (targetCount >= workingNodes.length) return false
+            workingNodes = workingNodes.slice(0, targetCount)
+            return true
+          },
+        },
+      ],
+    })
+    response.nodes = workingNodes
+    if (degradeOutcome.block) {
+      response.degraded = degradeOutcome.block
+    } else {
+      Object.assign(response, guardOutcome.fields)
+    }
+  }
+  return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * Get a single entity by ID with its full properties and all connected edges.
+ *
+ * @returns JSON: the node object plus an `edges` array. `compact_edges: true`
+ *   omits `source_title` and `target_title` (saves ~30% on edge-heavy nodes).
+ * @throws Returns a textError when `node_id` is missing or the node does not
+ *   exist.
+ * @atomicity atomic (read-only)
+ * @see get_nodes
+ */
+export const getNode: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  if (!args.node_id) return textError(`Missing required parameter: node_id`)
+  const result = getNodeLib(store, {
+    node_id: args.node_id as string,
+    compact_edges: (args.compact_edges as boolean) ?? false,
+  })
+  if (!result) return textError(`Node not found: ${args.node_id}`)
+
+  // Surface unknown-property warnings on read, matching the shape
+  // used by write paths (create_node / update_node). Nodes with deprecated
+  // inline properties (e.g. persona.goals / persona.frustrations in earlier
+  // versions) are flagged here so callers know to migrate without having to
+  // run validate_graph.
+  const typed = result as GetNodeResult
+  if (typed.node.properties) {
+    const { unknown_properties, warning } = checkUnknownProperties(typed.node.type as string, typed.node.properties)
+    if (unknown_properties.length > 0) {
+      const withWarning: Record<string, unknown> = { ...typed, unknown_properties, warning }
+      return text(JSON.stringify(withWarning, null, 2))
+    }
+  }
+
+  return text(JSON.stringify(result, null, 2))
+}
+
+/**
+ * Batch-fetch multiple entities by ID. Returns each node with its edges. More
+ * efficient than multiple `get_node` calls.
+ *
+ * @returns JSON array of node objects with edges. Missing IDs are silently
+ *   skipped. May include a `degraded` block when the response was
+ *   auto-trimmed to fit.
+ * @throws Returns a textError when `ids` is missing/empty or longer than 50.
+ * @warning Pre-flight payload guardrail: refuses above
+ *   `UPG_MCP_PAYLOAD_HARD_LIMIT` (default 150 KB), warns above
+ *   `UPG_MCP_PAYLOAD_SOFT_LIMIT` (default 50 KB). 50 edge-heavy nodes can
+ *   still cross 50 KB. Pass `compact_edges:true` to halve edge size.
+ * @warning Auto-degrade: between soft and hard limits, the server
+ *   may drop edge titles, optional node fields, or truncate the result list.
+ *   Surfaced as `degraded.applied[]` on the response.
+ * @atomicity atomic (read-only)
+ * @see get_node
+ */
+export const getNodes: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const ids = args.ids as string[] | undefined
+  if (!ids || !Array.isArray(ids) || ids.length === 0)
+    return textError('Missing required parameter: ids (non-empty array)')
+  if (ids.length > 50)
+    return textError('Maximum 50 IDs per batch request')
+
+  const requestedCompactEdges = (args.compact_edges as boolean) ?? false
+  const result = getNodesLib(store, { ids, compact_edges: requestedCompactEdges })
+
+  const countEdges = (nodes: typeof result.nodes) =>
+    nodes.reduce((sum, n) => sum + (n.edges_out?.length ?? 0) + (n.edges_in?.length ?? 0), 0)
+
+  const guardOutcome = preflightPayload({
+    toolName: 'get_nodes',
+    nodeCount: result.nodes.length,
+    edgeCount: countEdges(result.nodes),
+    compactEdges: requestedCompactEdges,
+    argsHint: `${ids.length} ids, compact_edges=${requestedCompactEdges}`,
+  })
+  if (guardOutcome.kind === 'refuse') return guardOutcome.result
+
+  if (guardOutcome.kind === 'ok') {
+    return text(JSON.stringify(result, null, 2))
+  }
+
+  // Warn path: try progressive degradation.
+  let workingNodes = result.nodes
+  let effectiveCompactEdges = requestedCompactEdges
+  let droppedFields = false
+
+  const degradeOutcome = degradeProgressively({
+    toolName: 'get_nodes',
+    initialBytes: guardOutcome.bytes,
+    countAfterStage: () => ({
+      nodeCount: workingNodes.length,
+      edgeCount: countEdges(workingNodes),
+      compactEdges: effectiveCompactEdges,
+    }),
+    stages: [
+      {
+        name: 'compact_edges_auto',
+        apply: () => {
+          if (effectiveCompactEdges) return false
+          for (const wrapper of workingNodes) {
+            wrapper.edges_out = wrapper.edges_out.map((e) => ({
+              id: e.id, type: e.type, source: e.source, target: e.target,
+            }))
+            wrapper.edges_in = wrapper.edges_in.map((e) => ({
+              id: e.id, type: e.type, source: e.source, target: e.target,
+            }))
+          }
+          effectiveCompactEdges = true
+          return true
+        },
+      },
+      {
+        name: 'drop_optional_fields_auto',
+        apply: () => {
+          if (droppedFields) return false
+          let changed = false
+          for (const wrapper of workingNodes) {
+            const node = wrapper.node as unknown as Record<string, unknown>
+            if ('description' in node) { delete node.description; changed = true }
+            if ('properties' in node) { delete node.properties; changed = true }
+          }
+          droppedFields = changed
+          return changed
+        },
+      },
+      {
+        name: 'truncate_at_count_auto',
+        apply: () => {
+          if (workingNodes.length <= 1) return false
+          const soft = getSoftLimit()
+          const ratio = guardOutcome.bytes < 1 ? 1 : Math.min(1, (soft / guardOutcome.bytes) * 0.85)
+          const targetCount = Math.max(1, Math.floor(workingNodes.length * ratio))
+          if (targetCount >= workingNodes.length) return false
+          workingNodes = workingNodes.slice(0, targetCount)
+          return true
+        },
+      },
+    ],
+  })
+
+  const response: Record<string, unknown> = { ...result, nodes: workingNodes }
+  if (degradeOutcome.block) response.degraded = degradeOutcome.block
+  else Object.assign(response, guardOutcome.fields)
+  return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * Search entities by text. Default fields: title (score 3) and description
+ * (score 1). Pass `fields` to also search `tags` (score 2) and `properties`
+ * (score 1). Results include `match_field` and `score` per hit.
+ *
+ * @returns JSON: `{ results: Array<{ id, type, title, status, tags,
+ *   match_field, score }>, total, searched_fields }`.
+ * @throws Returns a textError when `query` is missing.
+ * @atomicity atomic (read-only)
+ * @see list_nodes
+ * @see query
+ */
+export const searchNodes: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  if (!args.query) return textError(`Missing required parameter: query`)
+  const searchFields = (args.fields as string[] | undefined) ?? ['title', 'description']
+
+  const scored = searchNodesLib(store, args.query as string, {
+    type: args.type as string | undefined,
+    fields: searchFields,
+    limit: (args.limit as number) ?? 20,
+  })
+
+  return text(
+    JSON.stringify(
+      {
+        results: scored.map((s) => ({
+          id: s.node.id,
+          type: s.node.type,
+          title: s.node.title,
+          status: s.node.status,
+          tags: s.node.tags,
+          match_field: s.match_field,
+          score: s.score,
+        })),
+        total: scored.length,
+        searched_fields: searchFields,
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Traverse the graph following typed edges. Returns a subgraph (nodes + edges)
+ * in a single call. Replaces multi-step fetch patterns for trees and discovery
+ * flows. Supports BFS with per-level edge-type filters, negation (`!type`),
+ * field projection, and diff-based repeat queries via `diff_from`.
+ *
+ * @returns JSON: `{ nodes, edges, total_nodes, total_edges, _result_id,
+ *   truncated?, truncated_at_depth?, diff? }`. The `_result_id` is a cache
+ *   handle for `diff_from`; cache holds the last 20 results.
+ * @throws Returns a textError when neither `from` nor `from_id` is provided,
+ *   or when `from_id` does not exist.
+ * @warning Pre-flight payload guardrail: refuses above
+ *   `UPG_MCP_PAYLOAD_HARD_LIMIT` (default 150 KB), warns above
+ *   `UPG_MCP_PAYLOAD_SOFT_LIMIT` (default 50 KB). Tighten with `include`
+ *   (e.g. `["title"]`) or `edge_include: []` to drop edges from the wire.
+ * @atomicity atomic (read-only)
+ * @see list_nodes
+ * @see get_area_graph
+ */
+export const query: ToolHandler = (args, ctx): ToolResult => {
+  const { store, queryCache } = ctx
+  const fromType = args.from as string | undefined
+  const fromId = args.from_id as string | undefined
+  if (!fromType && !fromId)
+    return textError('Provide either "from" (entity type) or "from_id" (node ID)')
+
+  const traverseEdgeTypes = args.traverse as string[] | undefined
+  const maxDepth = Math.min(Math.max((args.depth as number) ?? 3, 1), 10)
+  const maxNodes = Math.min(Math.max((args.limit as number) ?? 200, 1), 1000)
+  const includeFields = new Set(
+    (args.include as string[] | undefined) ?? ['title', 'status', 'type'],
+  )
+  includeFields.add('id')
+  includeFields.add('type')
+
+  let startNodes: UPGBaseNode[]
+  if (fromId) {
+    const node = store.getNode(fromId)
+    if (!node) return textError(`Node not found: ${fromId}`)
+    startNodes = [node]
+  } else {
+    startNodes = store.getAllNodes().filter((n) => n.type === fromType)
+  }
+
+  if (startNodes.length === 0)
+    return text(JSON.stringify({ nodes: [], edges: [], total_nodes: 0, total_edges: 0 }, null, 2))
+
+  const visited = new Set<string>()
+  const collectedNodes: UPGBaseNode[] = []
+  const collectedEdges = new Map<string, UPGEdge>()
+  const queue: Array<{ id: string; level: number }> = []
+  let truncated = false
+  let maxDepthReached = 0
+
+  for (const n of startNodes) {
+    if (collectedNodes.length >= maxNodes) { truncated = true; break }
+    visited.add(n.id)
+    collectedNodes.push(n)
+    queue.push({ id: n.id, level: 0 })
+  }
+
+  while (queue.length > 0) {
+    if (collectedNodes.length >= maxNodes) { truncated = true; break }
+    const { id, level } = queue.shift()!
+    if (level > maxDepthReached) maxDepthReached = level
+    if (level >= maxDepth) continue
+
+    const edges = store.getEdgesForNode(id)
+    for (const edge of edges) {
+      if (edge.source !== id) continue
+
+      if (traverseEdgeTypes && traverseEdgeTypes.length > 0) {
+        const edgeTypeForLevel =
+          level < traverseEdgeTypes.length
+            ? traverseEdgeTypes[level]
+            : traverseEdgeTypes[traverseEdgeTypes.length - 1]
+
+        if (edgeTypeForLevel.startsWith('!')) {
+          if (edge.type === edgeTypeForLevel.slice(1)) continue
+        } else {
+          if (edge.type !== edgeTypeForLevel) continue
+        }
+      }
+
+      collectedEdges.set(edge.id, edge)
+      const neighborId = edge.target
+      if (!visited.has(neighborId)) {
+        visited.add(neighborId)
+        const neighbor = store.getNode(neighborId)
+        if (neighbor) {
+          if (collectedNodes.length >= maxNodes) { truncated = true; break }
+          collectedNodes.push(neighbor)
+          queue.push({ id: neighborId, level: level + 1 })
+        }
+      }
+    }
+  }
+
+  const propInclude = args.property_include as string[] | undefined
+  const propFilter = propInclude && propInclude.length > 0 ? new Set(propInclude) : null
+
+  const projectedNodes = collectedNodes.map((n) => {
+    const projected: Record<string, unknown> = { id: n.id, type: n.type }
+    if (includeFields.has('title')) projected.title = n.title
+    if (includeFields.has('status')) projected.status = n.status
+    if (includeFields.has('tags')) projected.tags = n.tags
+    if (includeFields.has('description')) projected.description = n.description
+    if (includeFields.has('properties')) {
+      if (propFilter && n.properties) {
+        const filtered: Record<string, unknown> = {}
+        for (const key of propFilter) {
+          if (key in n.properties) filtered[key] = n.properties[key]
+        }
+        projected.properties = filtered
+      } else {
+        projected.properties = n.properties
+      }
+    }
+    return projected
+  })
+
+  const edgeInclude = args.edge_include as string[] | undefined
+  let edgeArray: Array<Record<string, unknown>>
+  if (edgeInclude !== undefined && edgeInclude.length === 0) {
+    edgeArray = []
+  } else {
+    const edgeFields = edgeInclude ? new Set(edgeInclude) : null
+    edgeArray = [...collectedEdges.values()].map((e) => {
+      if (!edgeFields) return { id: e.id, type: e.type, source: e.source, target: e.target }
+      const projected: Record<string, unknown> = {}
+      if (edgeFields.has('id')) projected.id = e.id
+      if (edgeFields.has('type')) projected.type = e.type
+      if (edgeFields.has('source')) projected.source = e.source
+      if (edgeFields.has('target')) projected.target = e.target
+      return projected
+    })
+  }
+
+  const response: Record<string, unknown> = {
+    nodes: projectedNodes,
+    edges: edgeArray,
+    total_nodes: projectedNodes.length,
+    total_edges: edgeArray.length,
+  }
+  if (truncated) {
+    response.truncated = true
+    response.truncated_at_depth = maxDepthReached
+    response.hint = `Limit of ${maxNodes} nodes reached at depth ${maxDepthReached}. Increase limit to see deeper results.`
+  }
+
+  const queryCompactEdges = !edgeInclude || (edgeInclude && !edgeInclude.includes('source_title') && !edgeInclude.includes('target_title'))
+  const queryGuard = preflightPayload({
+    toolName: 'query',
+    nodeCount: projectedNodes.length,
+    edgeCount: edgeArray.length,
+    compactEdges: queryCompactEdges,
+    argsHint: `from=${fromType ?? fromId}, depth=${maxDepth}, limit=${maxNodes}`,
+  })
+  if (queryGuard.kind === 'refuse') return queryGuard.result
+
+  if (queryGuard.kind === 'warn') {
+    let workingNodes = projectedNodes
+    let workingEdges = edgeArray
+    let droppedFields = false
+    const queryDegrade = degradeProgressively({
+      toolName: 'query',
+      initialBytes: queryGuard.bytes,
+      countAfterStage: () => ({
+        nodeCount: workingNodes.length,
+        edgeCount: workingEdges.length,
+        compactEdges: queryCompactEdges,
+      }),
+      stages: [
+        {
+          name: 'drop_optional_fields_auto',
+          apply: () => {
+            if (droppedFields) return false
+            let changed = false
+            for (const n of workingNodes) {
+              if ('description' in n) { delete (n as Record<string, unknown>).description; changed = true }
+              if ('properties' in n) { delete (n as Record<string, unknown>).properties; changed = true }
+            }
+            droppedFields = changed
+            return changed
+          },
+        },
+        {
+          name: 'truncate_at_count_auto',
+          apply: () => {
+            if (workingNodes.length <= 1) return false
+            const soft = getSoftLimit()
+            const ratio = queryGuard.bytes < 1 ? 1 : Math.min(1, (soft / queryGuard.bytes) * 0.85)
+            const targetCount = Math.max(1, Math.floor(workingNodes.length * ratio))
+            if (targetCount >= workingNodes.length) return false
+            const keepIds = new Set(workingNodes.slice(0, targetCount).map((n) => n.id as string))
+            workingNodes = workingNodes.slice(0, targetCount)
+            workingEdges = workingEdges.filter((e) => keepIds.has(e.source as string) && keepIds.has(e.target as string))
+            return true
+          },
+        },
+      ],
+    })
+    response.nodes = workingNodes
+    response.edges = workingEdges
+    response.total_nodes = workingNodes.length
+    response.total_edges = workingEdges.length
+    if (queryDegrade.block) response.degraded = queryDegrade.block
+    else Object.assign(response, queryGuard.fields)
+  }
+
+  const diffFrom = args.diff_from as string | undefined
+  const resultId = `qr_${++queryCache.counter}`
+  const cacheEntry = {
+    params: JSON.stringify({ from: fromType, from_id: fromId, traverse: traverseEdgeTypes, depth: maxDepth }),
+    nodes: projectedNodes.map((n) => ({ id: n.id as string, type: n.type as string })),
+    edges: edgeArray.map((e) => ({ id: (e.id ?? '') as string })),
+    timestamp: new Date().toISOString(),
+  }
+
+  if (diffFrom && queryCache.entries.has(diffFrom)) {
+    const prev = queryCache.entries.get(diffFrom)!
+    const prevNodeIds = new Set(prev.nodes.map((n) => n.id))
+    const currNodeIds = new Set(cacheEntry.nodes.map((n) => n.id))
+    const added = projectedNodes.filter((n) => !prevNodeIds.has(n.id as string))
+    const removed = prev.nodes.filter((n) => !currNodeIds.has(n.id))
+    response.diff = { added, removed, added_count: added.length, removed_count: removed.length }
+  }
+
+  queryCache.entries.set(resultId, cacheEntry)
+  response._result_id = resultId
+
+  if (queryCache.entries.size > 20) {
+    const oldest = queryCache.entries.keys().next().value
+    if (oldest) queryCache.entries.delete(oldest)
+  }
+
+  return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * UPG-506 — first-use schema hints.
+ *
+ * Build a compact hints block when the caller has just created their FIRST
+ * node of a given type in this graph. Pulls anti-patterns, the next entity
+ * in the domain's creation sequence, and canonical out-edges from
+ * `buildEntitySchema`. Intentionally caps the hint surface at the
+ * highest-leverage signals — total response stays under ~500 tokens.
+ *
+ * Returns `undefined` when the type has no usable schema slice (no domain
+ * guide, no edges out) — silence beats noise.
+ */
+function buildFirstUseHints(canonicalType: string): Record<string, unknown> | undefined {
+  let schema: ReturnType<typeof buildEntitySchema>
+  try {
+    schema = buildEntitySchema(canonicalType)
+  } catch {
+    return undefined
+  }
+
+  const antiPatterns = schema.domain_guide?.anti_patterns ?? []
+  const sequence = schema.domain_guide?.creation_sequence ?? []
+  const position = schema.domain_guide?.position_in_sequence ?? -1
+  const nextInSequence =
+    position >= 0 && position + 1 < sequence.length ? sequence[position + 1] : undefined
+
+  // Cap to the 3 highest-signal items per axis. Anti-patterns are 1-line
+  // strings (~150 chars each); edges are short identifiers (~40 chars).
+  // Combined hint surface stays well under 500 tokens.
+  const antiPatternStrings = antiPatterns
+    .slice(0, 3)
+    .map((ap) => (ap.name ? `${ap.name}: ${ap.description}` : ap.description))
+    .filter((s) => s.length > 0)
+  const edgesOut = schema.edges_out.slice(0, 5).map((e) => e.edge_type)
+
+  if (antiPatternStrings.length === 0 && edgesOut.length === 0 && !nextInSequence) {
+    return undefined
+  }
+
+  const hints: Record<string, unknown> = {
+    schema_call: `get_entity_schema("${canonicalType}")`,
+  }
+  if (antiPatternStrings.length > 0) hints.anti_patterns = antiPatternStrings
+  if (nextInSequence) hints.next_in_creation_sequence = nextInSequence
+  if (edgesOut.length > 0) hints.canonical_edges_out = edgesOut
+  return hints
+}
+
+/**
+ * Create a new entity in the graph. Optionally connect it to a parent node via
+ * `parent_id` (the edge type is inferred from the parent→child types). For 3+
+ * entities, ALWAYS use `batch_create_nodes` instead.
+ *
+ * **Portfolio-scoped routing (UPG-526):** When `type` is `portfolio`,
+ * `organization`, or `product_area`, the entity is written to
+ * `.upg/portfolio.upg` (the portfolio document), NOT to the active product's
+ * `nodes[]`. The portfolio document is created on demand. `organization` is a
+ * singleton — pass `overwrite_organization: true` to replace an existing one.
+ * `parent_id` is currently ignored for portfolio-scoped writes (the portfolio
+ * document has its own parent edges modelled inside each typed record, e.g.
+ * `parent_portfolio_id`).
+ *
+ * @returns JSON: `{ node, edge?, unknown_properties?, warning? }`. The `edge`
+ *   field is present only when `parent_id` was supplied and a canonical
+ *   hierarchy edge could be inferred. `unknown_properties` and `warning` are
+ *   present when the caller passed properties not in the entity's schema
+ *  . Pass `strict: true` to reject unknown properties instead of
+ *   warning. For portfolio-scoped types the response shape is
+ *   `{ node, portfolio_file, written_to, warning? }` where `node` is the
+ *   persisted typed record.
+ * @throws Returns a textError when `type` or `title` is missing, when the type
+ *   is unknown (`UnknownEntityTypeError`), when `strict: true` and unknown
+ *   properties are present, or when the underlying store rejects the write.
+ * @atomicity atomic-with-rollback. Schema validation runs before mutation.
+ * @see batch_create_nodes
+ * @see update_node
+ */
+export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const { store } = ctx
+  if (!args.type) return textError(`Missing required parameter: type`)
+  if (!args.title) return textError(`Missing required parameter: title`)
+
+  const entityType = args.type as string
+  const properties = args.properties as Record<string, unknown> | undefined
+  const strict = (args.strict as boolean) ?? false
+
+  // Portfolio-scoped routing (UPG-526). `portfolio`, `organization`, and
+  // `product_area` belong in `.upg/portfolio.upg` and never in a product's
+  // `nodes[]`. Routed before the schema check because these types are managed
+  // by the portfolio-document shape (UPGPortfolio / UPGProductArea /
+  // UPGOrganization), not by the entity-property schema registry used for
+  // product nodes.
+  if (isPortfolioScopedType(entityType)) {
+    try {
+      const result = await writePortfolioScopedNode(process.cwd(), {
+        type: entityType,
+        title: args.title as string,
+        description: args.description as string | undefined,
+        properties,
+        overwrite_organization: (args.overwrite_organization as boolean | undefined) ?? false,
+      })
+      const payload: Record<string, unknown> = {
+        node: result.entity,
+        portfolio_file: result.portfolio_file,
+        written_to: result.written_to,
+      }
+      if (result.warning) payload.warning = result.warning
+      return text(JSON.stringify(payload, null, 2))
+    } catch (err) {
+      if (err instanceof PortfolioRoutingError) return textError(err.message)
+      return textError((err as Error).message)
+    }
+  }
+
+  const { unknown_properties, warning } = checkUnknownProperties(entityType, properties)
+  if (strict && unknown_properties.length > 0) {
+    return textError(
+      `[strict mode] ${warning ?? `Unknown properties for type "${entityType}": [${unknown_properties.join(', ')}]`}`,
+    )
+  }
+
+  // Property type validation — refuses declared-but-mismatched-type values.
+  // F4 (2026-05-20). Undeclared properties are handled separately above.
+  const { violations } = checkPropertyTypes(entityType, properties)
+  if (violations.length > 0) {
+    return textError(renderPropertyTypeWarning(entityType, violations)!)
+  }
+
+  // Length caps — soft warnings only, never refusals. F8 (2026-05-20).
+  const { warnings: lengthWarnings } = checkLengthCaps({
+    title: args.title as string,
+    description: args.description as string | undefined,
+    properties,
+  })
+
+  // UPG-506: detect "first node of type" BEFORE the write lands. We compare
+  // against the canonical type (post-alias resolution) so that authors who
+  // pass a deprecated alias don't get hints on every call.
+  let isFirstOfType = false
+  try {
+    const canonicalTypeForCheck = buildEntitySchema(entityType).type
+    isFirstOfType = !store
+      .getAllNodes()
+      .some((n) => n.type === canonicalTypeForCheck)
+  } catch {
+    // Unknown type — let createNodeLib raise the canonical error below.
+  }
+
+
+  try {
+    const result = createNodeLib(store, {
+      type: entityType,
+      title: args.title as string,
+      description: args.description as string | undefined,
+      tags: args.tags,
+      status: args.status as string | undefined,
+      properties,
+      parent_id: args.parent_id as string | undefined,
+    })
+
+    // UPG-506: attach first-use hints. Resolve the canonical type from the
+    // returned node so aliases (e.g. `jtbd → job`) hint against the correct
+    // canonical schema. Skipped on second-and-later calls of the same type.
+    let hints: Record<string, unknown> | undefined
+    if (isFirstOfType) {
+      hints = buildFirstUseHints((result.node as { type: string }).type)
+    }
+
+    // UPG-520: aggregate length-cap warnings with any existing warning.
+    const aggregatedWarnings: string[] = []
+    if (warning) aggregatedWarnings.push(warning)
+    if (lengthWarnings.length > 0) aggregatedWarnings.push(...lengthWarnings)
+    const libWarning = (result as { warning?: string }).warning
+    const combinedWarning = libWarning
+      ? aggregatedWarnings.length > 0
+        ? `${libWarning} | ${aggregatedWarnings.join(' | ')}`
+        : libWarning
+      : aggregatedWarnings.length > 0
+        ? aggregatedWarnings.join(' | ')
+        : undefined
+
+    if (unknown_properties.length > 0 || combinedWarning || hints) {
+      const withExtras: Record<string, unknown> = { ...result }
+      if (combinedWarning) withExtras.warning = combinedWarning
+      if (unknown_properties.length > 0) withExtras.unknown_properties = unknown_properties
+      if (hints) withExtras.hints = hints
+      return text(JSON.stringify(withExtras, null, 2))
+    }
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    if (err instanceof UnknownEntityTypeError) {
+      return textError(err.message)
+    }
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Update an existing entity. Unspecified fields are preserved. Passing `type`
+ * performs a single-node migration (delegates to `migrateNodeType`): every
+ * incident edge is re-inferred against the catalog and the change is atomic
+ * with rollback. For 3+ entities, ALWAYS use `batch_update_nodes` instead.
+ *
+ * @returns JSON: `{ node, warning?, unknown_properties? }`. `warning`
+ *   aggregates lifecycle-status hints, migration warnings, and any
+ *   unknown-property notice. `unknown_properties` lists property
+ *   keys not in the entity's schema. Pass `strict: true` to reject unknown
+ *   properties instead of warning.
+ * @throws Returns a textError when `node_id` is missing, the type migration
+ *   fails, when `strict: true` and unknown properties are present, or when
+ *   the underlying store rejects the patch.
+ * @atomicity atomic-with-rollback (when `type` is changed); atomic for
+ *   shallow-merge patches.
+ * @see migrate_type
+ * @see batch_update_nodes
+ */
+export const updateNode: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  if (!args.node_id) return textError(`Missing required parameter: node_id`)
+  const nid = args.node_id as string
+  const warnings: string[] = []
+  const strict = (args.strict as boolean) ?? false
+
+  if (args.type !== undefined) {
+    const migrationResult = migrateNodeTypeLib(store, {
+      node_id: nid,
+      new_type: args.type as string,
+    })
+    if (!migrationResult.migrated) {
+      return textError(migrationResult.error)
+    }
+    if (migrationResult.warning) warnings.push(migrationResult.warning)
+  }
+
+  const patch: Record<string, unknown> = {}
+  if (args.title !== undefined) patch.title = args.title
+  if (args.description !== undefined) patch.description = args.description
+  if (args.tags !== undefined) patch.tags = normalizeTags(args.tags) ?? []
+  if (args.status !== undefined) patch.status = args.status
+  if (args.properties !== undefined) patch.properties = args.properties
+
+  if (args.status !== undefined) {
+    const existingNode = store.getNode(nid)
+    if (existingNode) {
+      const sw = validateStatusAgainstLifecycle(existingNode.type, args.status as string)
+      if (sw) warnings.push(sw)
+    }
+  }
+
+  // Unknown-property guard: check against the effective entity type
+  // (post-migration type when args.type was provided, otherwise existing type).
+  let unknownProperties: string[] = []
+  if (args.properties !== undefined) {
+    const nodeAfterTypeMigration = store.getNode(nid)
+    const effectiveType = nodeAfterTypeMigration?.type ?? (args.type as string | undefined) ?? ''
+    const { unknown_properties, warning: propWarning } = checkUnknownProperties(
+      effectiveType,
+      args.properties as Record<string, unknown>,
+    )
+    unknownProperties = unknown_properties
+    if (strict && unknownProperties.length > 0) {
+      return textError(
+        `[strict mode] ${propWarning ?? `Unknown properties for type "${effectiveType}": [${unknownProperties.join(', ')}]`}`,
+      )
+    }
+    if (propWarning) warnings.push(propWarning)
+
+    // Property type validation — refuses declared-but-mismatched-type values.
+    // F4 (2026-05-20).
+    const { violations } = checkPropertyTypes(
+      effectiveType,
+      args.properties as Record<string, unknown>,
+    )
+    if (violations.length > 0) {
+      return textError(renderPropertyTypeWarning(effectiveType, violations)!)
+    }
+  }
+
+  // Length caps — soft warnings only, never refusals. F8 (2026-05-20).
+  const { warnings: lengthWarnings } = checkLengthCaps({
+    title: args.title as string | undefined,
+    description: args.description as string | undefined,
+    properties: args.properties as Record<string, unknown> | undefined,
+  })
+  if (lengthWarnings.length > 0) warnings.push(...lengthWarnings)
+
+  try {
+    const updated = store.updateNode(nid, patch)
+    const result: Record<string, unknown> = { node: updated }
+    if (warnings.length > 0) result.warning = warnings.join(' | ')
+    if (unknownProperties.length > 0) result.unknown_properties = unknownProperties
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Remove an entity and all its connected edges from the graph. For 3+
+ * entities, ALWAYS use `batch_delete_nodes` instead.
+ *
+ * @returns JSON: `{ node, removed_edge_ids }`.
+ * @throws Returns a textError when `node_id` is missing or the node does not
+ *   exist.
+ * @atomicity atomic. Node + cascading edges removed in one mutation.
+ * @see batch_delete_nodes
+ */
+export const deleteNode: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  if (!args.node_id) return textError(`Missing required parameter: node_id`)
+  try {
+    const result = deleteNodeLib(store, { node_id: args.node_id as string })
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Create up to 50 entities in a single call, optionally with explicit edges in
+ * the same atomic transaction. Supports `parent_ref` chaining (`"$0"`, `"$1"`)
+ * to reference nodes created earlier in the same batch. The optional `edges`
+ * array uses the same `$N` ref convention (or existing node IDs) for both
+ * endpoints. All nodes + edges are validated against the schema BEFORE any
+ * mutation; on failure nothing lands.
+ *
+ * @returns JSON: `{ created, edges_created, count, edges_count, warnings? }`.
+ * @throws Returns a textError when `nodes` is missing/non-array or any
+ *   validation fails.
+ * @atomicity atomic-with-rollback. Full validation pass first, then commit.
+ * @see create_node
+ * @see batch_create_edges
+ */
+export const batchCreateNodes: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const nodes = args.nodes as Array<Record<string, unknown>> | undefined
+  const explicitEdges = args.edges as Array<Record<string, unknown>> | undefined
+  if (!nodes || !Array.isArray(nodes)) return textError('Missing required parameter: nodes (array)')
+
+  const result = batchCreateNodesLib(store, {
+    nodes: nodes as never,
+    edges: explicitEdges as never,
+  })
+  if (!result.ok) return textError(result.error)
+  const { ok: _ok, ...payload } = result
+  void _ok
+  return text(JSON.stringify(payload, null, 2))
+}
+
+/**
+ * Update up to 50 entities in a single call. Unspecified fields are preserved.
+ * Properties are merged with existing. Atomic: all succeed or all fail.
+ *
+ * @returns JSON: `{ updated, count, warnings? }`. `warnings` carries
+ *   lifecycle-phase hints aggregated across the batch.
+ * @throws Returns a textError when `updates` is missing/non-array, the array
+ *   is empty, longer than 50, or any item references a missing node.
+ * @atomicity atomic. Validation pass rejects the entire batch before any
+ *   mutation lands.
+ * @see update_node
+ */
+export const batchUpdateNodes: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const updates = args.updates as Array<Record<string, unknown>> | undefined
+  if (!updates || !Array.isArray(updates)) return textError('Missing required parameter: updates (array)')
+  if (updates.length === 0) return textError('updates array is empty')
+  if (updates.length > 50) return textError('Maximum 50 updates per batch')
+
+  for (let i = 0; i < updates.length; i++) {
+    const u = updates[i]
+    if (!u.node_id) return textError(`Update at index ${i}: missing required field "node_id"`)
+    const existing = store.getNode(u.node_id as string)
+    if (!existing) return textError(`Update at index ${i}: node "${u.node_id}" not found`)
+
+    // Property type validation up-front, before any mutation. Reject the
+    // whole batch on the first violation. F4 (2026-05-20).
+    if (u.properties !== undefined) {
+      const { violations } = checkPropertyTypes(
+        existing.type as string,
+        u.properties as Record<string, unknown>,
+      )
+      if (violations.length > 0) {
+        return textError(
+          `Update at index ${i}: ${renderPropertyTypeWarning(existing.type as string, violations)!}`,
+        )
+      }
+    }
+  }
+
+  const updatedNodes: Array<{ id: string; type: string; title: string; status?: string }> = []
+  const updateWarnings: string[] = []
+
+  for (const u of updates) {
+    const patch: Record<string, unknown> = {}
+    if (u.title !== undefined) patch.title = u.title
+    if (u.description !== undefined) patch.description = u.description
+    if (u.status !== undefined) patch.status = u.status
+    if (u.tags !== undefined) patch.tags = normalizeTags(u.tags) ?? []
+    if (u.properties !== undefined) patch.properties = u.properties
+
+    if (u.status !== undefined) {
+      const existingNode = store.getNode(u.node_id as string)
+      const entityType = existingNode?.type
+      if (entityType) {
+        const sw = validateStatusAgainstLifecycle(entityType, u.status as string)
+        if (sw) updateWarnings.push(`Node "${u.node_id}": ${sw}`)
+      }
+    }
+
+    // Length-cap soft warnings (per-item, never refusals). F8.
+    const { warnings: lengthWarnings } = checkLengthCaps({
+      title: u.title as string | undefined,
+      description: u.description as string | undefined,
+      properties: u.properties as Record<string, unknown> | undefined,
+    })
+    for (const w of lengthWarnings) updateWarnings.push(`Node "${u.node_id}": ${w}`)
+
+    const updated = store.updateNode(u.node_id as string, patch)
+    updatedNodes.push({ id: updated.id, type: updated.type, title: updated.title, status: updated.status })
+  }
+
+  const batchUpdateResult: Record<string, unknown> = { updated: updatedNodes, count: updatedNodes.length }
+  if (updateWarnings.length > 0) batchUpdateResult.warnings = updateWarnings
+  return text(JSON.stringify(batchUpdateResult, null, 2))
+}
+
+/**
+ * Delete up to 50 entities and their connected edges in a single call.
+ * Atomic: all succeed or all fail.
+ *
+ * @returns JSON: `{ deleted, edges_removed, count }`.
+ * @throws Returns a textError when `node_ids` is missing/non-array, empty,
+ *   longer than 50, or any ID does not resolve.
+ * @atomicity atomic. Validation pass rejects the entire batch before any
+ *   mutation lands.
+ * @see delete_node
+ */
+export const batchDeleteNodes: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const nodeIds = args.node_ids as string[] | undefined
+  if (!nodeIds || !Array.isArray(nodeIds)) return textError('Missing required parameter: node_ids (array)')
+  if (nodeIds.length === 0) return textError('node_ids array is empty')
+  if (nodeIds.length > 50) return textError('Maximum 50 node IDs per batch')
+
+  for (let i = 0; i < nodeIds.length; i++) {
+    if (!store.getNode(nodeIds[i])) return textError(`Node at index ${i}: "${nodeIds[i]}" not found`)
+  }
+
+  const deleted: Array<{ id: string; title: string }> = []
+  let edgesRemoved = 0
+
+  for (const nid of nodeIds) {
+    const { node, removedEdgeIds } = store.removeNode(nid)
+    deleted.push({ id: node.id, title: node.title })
+    edgesRemoved += removedEdgeIds.length
+  }
+
+  return text(JSON.stringify({ deleted, edges_removed: edgesRemoved, count: deleted.length }, null, 2))
+}
+
+/**
+ * Migrate all entities of one type to another, applying registered defaults
+ * from `UPG_MIGRATIONS` to migrated nodes. Use for entity-type schema
+ * migrations (e.g. `pain_point → need`).
+ *
+ * **Edge migration is catalog-aware (since v0.2.10).** After node
+ * migration completes, every edge in the graph is run through
+ * `UPG_EDGE_MIGRATIONS`. Renames retarget the edge to its canonical form;
+ * flipped renames swap source/target; drops remove edges that have been
+ * retired without replacement. Endpoint guards (`requires_source_type` /
+ * `requires_target_type`) check post-migration node types.
+ *
+ * Edges whose type has no rule in `UPG_EDGE_MIGRATIONS` AND no entry in
+ * `UPG_EDGE_CATALOG` are surfaced under `unmapped_legacy_edges` rather
+ * than silently substring-substituted (which is what v0.2.0–v0.2.9 did).
+ * The caller can decide whether to leave them, hand-migrate via
+ * `rename_edge_type`, or escalate.
+ *
+ * @returns JSON: `{ migrated_nodes, migrated_edges, edge_renames,
+ *   dropped_edges, unmapped_legacy_edges, defaults_applied, dry_run }`.
+ *   `edge_renames` is `[{ id, from, to, flipped }]`; `dropped_edges` is
+ *   `[{ id, from }]`; `unmapped_legacy_edges` is `[{ type, count }]`.
+ *   `migrated_edges` is the total mutated count (renames + drops).
+ * @throws Returns a textError when `from_type` or `to_type` is missing.
+ * @atomicity atomic. Single store-level migration call commits or fails as
+ *   one mutation. Note: full graph canonicalisation runs as a side-effect of
+ *   any node-type migration, so unrelated legacy edges may also be retargeted.
+ * @see rename_edge_type
+ * @see export_edges
+ * @see update_node
+ */
+export const migrateType: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const fromType = args.from_type as string | undefined
+  const toType = args.to_type as string | undefined
+  if (!fromType) return textError('Missing required parameter: from_type')
+  if (!toType) return textError('Missing required parameter: to_type')
+
+  const dryRun = (args.dry_run as boolean) ?? false
+  const force = (args.force as boolean) ?? false
+
+  // Strict-by-default: refuse pairs without a registered UPG_MIGRATIONS rule
+  // unless the caller explicitly opts in. F6 (2026-05-20). Without a
+  // registered rule there are no defaults to apply and no semantic substrate
+  // for the migration.
+  let registeredRule: { from: string; to: string; defaults?: Record<string, unknown>; reason: string } | undefined
+  const availableFromThisFrom: string[] = []
+  for (const migrations of Object.values(UPG_MIGRATIONS)) {
+    for (const m of migrations) {
+      if (m.from === fromType) {
+        availableFromThisFrom.push(m.to)
+        if (m.to === toType) {
+          registeredRule = m
+        }
+      }
+    }
+  }
+
+  if (!registeredRule && !force) {
+    const availableHint =
+      availableFromThisFrom.length > 0
+        ? ` Available migrations from "${fromType}": [${[...new Set(availableFromThisFrom)].join(', ')}].`
+        : ` No migration rules registered from "${fromType}".`
+    return textError(
+      `No UPG_MIGRATIONS rule for (${fromType} → ${toType}).` +
+      availableHint +
+      ` Refusing by default to prevent semantic-nonsense type rewrites. ` +
+      `Pass \`force: true\` to override — be aware that all type-specific properties will be carried verbatim and may not match the new type's schema.`,
+    )
+  }
+
+  const defaults = registeredRule?.defaults && Object.keys(registeredRule.defaults).length > 0
+    ? registeredRule.defaults
+    : undefined
+
+  const allNodes = store.getAllNodes()
+  const allEdges = store.getAllEdges()
+  const matchingNodes = allNodes.filter((n) => n.type === fromType)
+
+  // Compute unmapped_legacy_edges: types in the graph that are NOT in
+  // UPG_EDGE_CATALOG AND would not be migrated (no rule fires under
+  // post-node-migration endpoint context).
+  const canonicalEdgeKeys = new Set(Object.keys(UPG_EDGE_CATALOG))
+  const unmappedCounts: Record<string, number> = {}
+
+  if (dryRun) {
+    const plannedRenames: Array<{ id: string; from: string; to: string; flipped: boolean }> = []
+    const plannedDrops: Array<{ id: string; from: string }> = []
+    for (const edge of allEdges) {
+      const sourceNode = store.getNode(edge.source)
+      const targetNode = store.getNode(edge.target)
+      // Simulate post-node-migration endpoint types
+      const sourceType =
+        sourceNode?.type === fromType ? toType : (sourceNode?.type as string | undefined)
+      const targetType =
+        targetNode?.type === fromType ? toType : (targetNode?.type as string | undefined)
+      const result = migrateEdge(edge, '0.0.0', UPG_VERSION, { sourceType, targetType })
+      if (result === null) {
+        plannedDrops.push({ id: edge.id, from: edge.type })
+      } else if (result !== edge) {
+        const flipped = result.source !== edge.source
+        plannedRenames.push({
+          id: edge.id,
+          from: edge.type,
+          to: result.type,
+          flipped,
+        })
+      } else if (!canonicalEdgeKeys.has(edge.type)) {
+        unmappedCounts[edge.type] = (unmappedCounts[edge.type] ?? 0) + 1
+      }
+    }
+    const unmappedLegacyEdges = Object.entries(unmappedCounts).map(([type, count]) => ({
+      type,
+      count,
+    }))
+    const dryResponse: MigrateTypeResult = {
+      migrated_nodes: matchingNodes.length,
+      migrated_edges: plannedRenames.length + plannedDrops.length,
+      edge_renames: plannedRenames,
+      dropped_edges: plannedDrops,
+      unmapped_legacy_edges: unmappedLegacyEdges,
+      defaults_applied: defaults ?? null,
+      dry_run: true,
+    }
+    return text(JSON.stringify(dryResponse, null, 2))
+  }
+
+  const result = store.migrateType(fromType, toType, defaults)
+
+  // Re-scan post-migration edges for unmapped legacy types
+  for (const edge of store.getAllEdges()) {
+    if (!canonicalEdgeKeys.has(edge.type)) {
+      unmappedCounts[edge.type] = (unmappedCounts[edge.type] ?? 0) + 1
+    }
+  }
+  const unmappedLegacyEdges = Object.entries(unmappedCounts).map(([type, count]) => ({
+    type,
+    count,
+  }))
+
+  const applyResponse: MigrateTypeResult = {
+    migrated_nodes: result.migratedNodes,
+    migrated_edges: result.edgeRenames.length + result.edgeDrops.length,
+    edge_renames: result.edgeRenames,
+    dropped_edges: result.edgeDrops,
+    unmapped_legacy_edges: unmappedLegacyEdges,
+    defaults_applied: defaults ?? null,
+    dry_run: false,
+  }
+  return text(JSON.stringify(applyResponse, null, 2))
+}
+
+/**
+ * Walk every node and apply `UPG_PROPERTY_MIGRATIONS` (renames, lifts, drops).
+ * Skips entity-type renames and edge changes. Use `dry_run: true` (default)
+ * to preview. Pass `dry_run: false` to commit.
+ *
+ * @returns JSON: `{ top_level_renames, lifted_properties, dropped_props,
+ *   dropped_self_referential, dry_run }`.
+ * @atomicity non-atomic. Mutations are applied node-by-node; a mid-flight
+ *   error may leave the graph partially migrated.
+ * @warning Default is `dry_run: true`. Pass `dry_run: false` to commit.
+ *   Re-running with `dry_run: true` after a successful commit reports zero
+ *   changes (idempotent on the canonical-properties shape).
+ * @see migrate_type
+ * @see validate_graph
+ * @see list_type_migrations
+ */
+export const migrateProperties: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const dryRun = (args.dry_run as boolean) ?? true
+
+  if (dryRun) {
+    const top_level_renames: Array<{ id: string; from: string; to: string; value_changed: boolean }> = []
+    const lifted_properties: Array<{ id: string; from_property: string; to: string; value_changed: boolean }> = []
+    const dropped_props: Array<{ id: string; key: string }> = []
+    const dropped_self_referential: Array<{ id: string; field: string }> = []
+
+    for (const node of store.getAllNodes()) {
+      const { changes } = migrateNodeProperties(
+        node as unknown as Record<string, unknown> & { id?: string; type: string; properties?: Record<string, unknown> },
+        '0.0.0',
+        UPG_VERSION,
+      )
+      for (const change of changes as UPGPropertyMigrationChange[]) {
+        switch (change.kind) {
+          case 'dropped': dropped_props.push({ id: node.id, key: change.key }); break
+          case 'renamed_top_level': top_level_renames.push({ id: node.id, from: change.from, to: change.to, value_changed: change.value_changed }); break
+          case 'lifted_to_top_level': lifted_properties.push({ id: node.id, from_property: change.from_property, to: change.to, value_changed: change.value_changed }); break
+          case 'self_ref_dropped': dropped_self_referential.push({ id: node.id, field: change.field }); break
+        }
+      }
+    }
+    return text(JSON.stringify({ top_level_renames, lifted_properties, dropped_props, dropped_self_referential, dry_run: true }, null, 2))
+  }
+
+  const result = store.applyPropertyMigrations('0.0.0', UPG_VERSION)
+  return text(JSON.stringify({ ...result, dry_run: false }, null, 2))
+}
+
+/**
+ * Find and resolve duplicate entities (same title + type, case-insensitive).
+ * Returns groups of duplicates. Use `dry_run` to preview, or pass
+ * `dry_run: false` to keep one per group and redirect the others' edges to
+ * the keeper. `keep` selects `"newest"` (default) or `"oldest"`.
+ *
+ * @returns JSON: with `dry_run: true`, `{ duplicates, total_groups,
+ *   total_duplicate_nodes, dry_run, message }`. With `dry_run: false`,
+ *   `{ merged: true, groups_merged, nodes_removed, edges_redirected,
+ *   strategy }`.
+ * @throws Returns a textError when `keep` is provided but is not
+ *   `"newest"` or `"oldest"`.
+ * @atomicity non-atomic. Merges are applied group-by-group; a mid-flight
+ *   error leaves earlier groups merged.
+ * @warning Default is `dry_run: true`. Pass `dry_run: false` to commit.
+ *   Idempotent on retry: a second `dry_run: false` against an
+ *   already-deduplicated graph reports zero merges.
+ * @see search_nodes
+ * @see list_nodes
+ * @see batch_delete_nodes
+ * @see validate_graph
+ */
+export const deduplicateNodes: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const filterType = args.type as string | undefined
+  const dryRun = (args.dry_run as boolean) ?? true
+  const keepStrategy = (args.keep as string) ?? 'newest'
+
+  let nodes = store.getAllNodes()
+  if (filterType) nodes = nodes.filter((n) => n.type === filterType)
+
+  const groups = new Map<string, UPGBaseNode[]>()
+  for (const n of nodes) {
+    const key = `${n.type}::${n.title.toLowerCase().trim()}`
+    let group = groups.get(key)
+    if (!group) {
+      group = []
+      groups.set(key, group)
+    }
+    group.push(n)
+  }
+
+  const duplicates: Array<{ title: string; type: string; count: number; ids: string[] }> = []
+  for (const [, group] of groups) {
+    if (group.length < 2) continue
+    duplicates.push({
+      title: group[0].title,
+      type: group[0].type,
+      count: group.length,
+      ids: group.map((n) => n.id),
+    })
+  }
+
+  if (duplicates.length === 0) {
+    return text(JSON.stringify({ duplicates: [], message: 'No duplicate entities found.' }, null, 2))
+  }
+
+  if (dryRun) {
+    return text(
+      JSON.stringify(
+        {
+          duplicates,
+          total_groups: duplicates.length,
+          total_duplicate_nodes: duplicates.reduce((sum, d) => sum + d.count - 1, 0),
+          dry_run: true,
+          message: `Found ${duplicates.length} groups of duplicates. Set dry_run: false to merge.`,
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  let nodesRemoved = 0
+  let edgesRedirected = 0
+
+  for (const group of duplicates) {
+    const allInGroup = store.getAllNodes().filter((n) => group.ids.includes(n.id))
+    allInGroup.sort(() => {
+      if (keepStrategy === 'oldest') return 0
+      return -1
+    })
+
+    const keeper = allInGroup[0]
+    const toRemove = allInGroup.slice(1)
+
+    for (const dup of toRemove) {
+      const edges = store.getEdgesForNode(dup.id)
+      for (const edge of edges) {
+        const newEdge: UPGEdge = {
+          id: edgeId(),
+          source: edge.source === dup.id ? keeper.id : edge.source,
+          target: edge.target === dup.id ? keeper.id : edge.target,
+          type: edge.type,
+        }
+        if (newEdge.source !== newEdge.target) {
+          try {
+            store.addEdge(newEdge)
+            edgesRedirected++
+          } catch {
+            // skip edges that fail validation
+          }
+        }
+      }
+      store.removeNode(dup.id)
+      nodesRemoved++
+    }
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        merged: true,
+        groups_merged: duplicates.length,
+        nodes_removed: nodesRemoved,
+        edges_redirected: edgesRedirected,
+        strategy: keepStrategy,
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+export type { ToolContext }

@@ -1,0 +1,125 @@
+{
+  "upg_version": "0.4.0",
+  "exported_at": "2026-05-23T00:00:00.000Z",
+  "source": {
+    "tool": "@upg-examples/helm",
+    "tool_version": "0.1.0"
+  },
+  "product": {
+    "id": "p_bramble",
+    "title": "Bramble",
+    "stage": "build",
+    "lens": "product"
+  },
+  "nodes": [
+    {
+      "id": "p_bramble",
+      "type": "product",
+      "title": "Bramble",
+      "slug": "bramble",
+      "description": "A marketplace for homemade jams and preserves. Connects small-batch producers (hobbyists, retirees, farm kitchens) with curious foodies hunting for rare seasonal flavors."
+    },
+    {
+      "id": "n_persona_seller",
+      "type": "persona",
+      "title": "Hobbyist Hannah",
+      "slug": "hobbyist-hannah",
+      "description": "62, retired biology teacher. Makes 200 jars of jam each summer from her own orchard. Sells at the farmers market on Saturdays and wants a way to reach buyers the other six days.",
+      "properties": {
+        "context": "Rural, semi-retired, comfortable with email but not apps. Already keeps a paper ledger of who buys what.",
+        "goals": ["Sell out her summer batch by October", "Build a small repeat-customer base", "Not have to learn anything that feels like 'tech'"]
+      }
+    },
+    {
+      "id": "n_persona_buyer",
+      "type": "persona",
+      "title": "Jam-Curious Jamal",
+      "slug": "jam-curious-jamal",
+      "description": "29, marketing manager in Brooklyn. Subscribes to two specialty food newsletters, hosts brunches, and is the friend who brings the weird condiment. Will pay $14 for a small jar if the story is right.",
+      "properties": {
+        "context": "Urban, mobile-first, follows food creators on Instagram. Discovery happens in social feeds, purchase happens in 30 seconds or not at all.",
+        "goals": ["Find rare seasonal flavors", "Support small producers directly", "Have a story to tell when he serves it"]
+      }
+    },
+    {
+      "id": "n_feature_saved_searches",
+      "type": "feature",
+      "title": "Saved searches",
+      "slug": "saved-searches",
+      "description": "Buyers save a query (e.g. 'quince paste, under $20, ships to NY') and get an email when a matching jar is listed."
+    },
+    {
+      "id": "n_feature_dark_mode",
+      "type": "feature",
+      "title": "Dark mode",
+      "slug": "dark-mode",
+      "description": "Auto-switching dark theme. Surprisingly requested on a food-marketplace app — buyers browse in bed."
+    },
+    {
+      "id": "n_feature_seller_dashboard",
+      "type": "feature",
+      "title": "Seller dashboard",
+      "slug": "seller-dashboard",
+      "description": "Order list, shipping label generator, monthly payout summary. Designed to be readable on a single A4 sheet so sellers can print it."
+    },
+    {
+      "id": "n_job_discover_jams",
+      "type": "job",
+      "title": "Discover unique seasonal jams to gift or serve",
+      "slug": "discover-unique-seasonal-jams",
+      "description": "When I'm hosting friends or shopping for a thoughtful gift, I want to find a jam that nobody else will have brought, so that I look like the friend who knows things."
+    },
+    {
+      "id": "n_need_rare_flavors",
+      "type": "need",
+      "title": "Find rare seasonal flavors before they sell out",
+      "slug": "find-rare-seasonal-flavors",
+      "description": "Quince, mulberry, sea buckthorn, green tomato — flavors that don't make it to supermarkets and only exist in 50–200 jar batches."
+    },
+    {
+      "id": "n_decision_california_first",
+      "type": "decision",
+      "title": "Launch in California first, then expand",
+      "slug": "launch-california-first",
+      "description": "Cottage food laws are most permissive in California; we can onboard sellers without a commercial kitchen requirement. New York and Texas follow once we have ~100 active sellers.",
+      "properties": {
+        "decided_at": "2026-04-12T00:00:00Z",
+        "decided_by": "founders"
+      }
+    },
+    {
+      "id": "n_hypothesis_keyboard",
+      "type": "hypothesis",
+      "title": "Power-user buyers want keyboard shortcuts for search",
+      "slug": "power-users-keyboard-shortcuts",
+      "description": "Heavy buyers (>5 jars/month) re-run the same searches. We hypothesise cmd-K + saved-search recall would lift session conversion by 8%."
+    },
+    {
+      "id": "n_metric_wab",
+      "type": "metric",
+      "title": "Weekly active buyers",
+      "slug": "weekly-active-buyers",
+      "description": "Unique buyers who browsed or purchased in the last 7 days. Leading indicator for repeat-purchase cohorts."
+    },
+    {
+      "id": "n_competitor_etsy",
+      "type": "competitor",
+      "title": "Etsy Food",
+      "slug": "etsy-food",
+      "description": "Etsy's food category. Broad, low-curation, high seller-count. Bramble's wedge: tighter category focus + seller-storytelling that Etsy's UI buries."
+    }
+  ],
+  "edges": [
+    { "id": "e_001", "source": "p_bramble", "target": "n_persona_seller",        "type": "product_targets_persona" },
+    { "id": "e_002", "source": "p_bramble", "target": "n_persona_buyer",         "type": "product_targets_persona" },
+    { "id": "e_003", "source": "p_bramble", "target": "n_feature_saved_searches","type": "product_builds_feature" },
+    { "id": "e_004", "source": "p_bramble", "target": "n_feature_dark_mode",     "type": "product_builds_feature" },
+    { "id": "e_005", "source": "p_bramble", "target": "n_feature_seller_dashboard","type": "product_builds_feature" },
+    { "id": "e_006", "source": "n_persona_buyer", "target": "n_job_discover_jams",    "type": "persona_pursues_job" },
+    { "id": "e_007", "source": "n_persona_buyer", "target": "n_need_rare_flavors",    "type": "persona_experiences_need" },
+    { "id": "e_008", "source": "p_bramble",       "target": "n_decision_california_first", "type": "product_decided_via_decision" },
+    { "id": "e_009", "source": "n_feature_saved_searches", "target": "n_hypothesis_keyboard", "type": "feature_tests_hypothesis" },
+    { "id": "e_010", "source": "p_bramble",       "target": "n_metric_wab",           "type": "product_measures_with_metric" },
+    { "id": "e_011", "source": "p_bramble",       "target": "n_competitor_etsy",      "type": "product_has_competitor" }
+  ]
+}

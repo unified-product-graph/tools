@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# The skills/ folder is regenerated from ../upg-mcp-server/skills/ at
+# build/pack time by scripts/copy-skills.mjs. See the "Contributing" section
+# of README.md for details — edit the canonical source in
+# packages/upg-mcp-server/skills/, never the copy here.
+skills/
