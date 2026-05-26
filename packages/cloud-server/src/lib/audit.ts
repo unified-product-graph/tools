@@ -3,7 +3,7 @@
  *
  * `upg.audit_log` is the canonical history of mutations, read back by
  * `get_audit_log` and `get_changes`. Every mutation must record a row here, or
- * those tools return empty forever (the bug fixed in UPG-552).
+ * those tools return empty forever (the bug fixed in).
  *
  * `appendAudit` MUST be called with a **transaction-scoped client**, in the
  * same transaction as the mutation it records, so the audit row commits or
@@ -11,7 +11,7 @@
  * all-or-nothing semantics.
  *
  * `userId` is `null` on the stdio path until request-level auth context is
- * plumbed (see UPG-551, Tier-3 enforcement).
+ * plumbed (see, Tier-3 enforcement).
  */
 import type { PoolClient } from 'pg'
 

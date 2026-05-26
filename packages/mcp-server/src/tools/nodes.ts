@@ -623,7 +623,7 @@ export const query: ToolHandler = (args, ctx): ToolResult => {
 }
 
 /**
- * UPG-506 — first-use schema hints.
+ * — first-use schema hints.
  *
  * Build a compact hints block when the caller has just created their FIRST
  * node of a given type in this graph. Pulls anti-patterns, the next entity
@@ -675,7 +675,7 @@ function buildFirstUseHints(canonicalType: string): Record<string, unknown> | un
  * `parent_id` (the edge type is inferred from the parent→child types). For 3+
  * entities, ALWAYS use `batch_create_nodes` instead.
  *
- * **Portfolio-scoped routing (UPG-526):** When `type` is `portfolio`,
+ * **Portfolio-scoped routing:** When `type` is `portfolio`,
  * `organization`, or `product_area`, the entity is written to
  * `.upg/portfolio.upg` (the portfolio document), NOT to the active product's
  * `nodes[]`. The portfolio document is created on demand. `organization` is a
@@ -708,7 +708,7 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
   const properties = args.properties as Record<string, unknown> | undefined
   const strict = (args.strict as boolean) ?? false
 
-  // Portfolio-scoped routing (UPG-526). `portfolio`, `organization`, and
+  // Portfolio-scoped routing. `portfolio`, `organization`, and
   // `product_area` belong in `.upg/portfolio.upg` and never in a product's
   // `nodes[]`. Routed before the schema check because these types are managed
   // by the portfolio-document shape (UPGPortfolio / UPGProductArea /
@@ -757,7 +757,7 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
     properties,
   })
 
-  // UPG-506: detect "first node of type" BEFORE the write lands. We compare
+  //: detect "first node of type" BEFORE the write lands. We compare
   // against the canonical type (post-alias resolution) so that authors who
   // pass a deprecated alias don't get hints on every call.
   let isFirstOfType = false
@@ -782,7 +782,7 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
       parent_id: args.parent_id as string | undefined,
     })
 
-    // UPG-506: attach first-use hints. Resolve the canonical type from the
+    //: attach first-use hints. Resolve the canonical type from the
     // returned node so aliases (e.g. `jtbd → job`) hint against the correct
     // canonical schema. Skipped on second-and-later calls of the same type.
     let hints: Record<string, unknown> | undefined
@@ -790,7 +790,7 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
       hints = buildFirstUseHints((result.node as { type: string }).type)
     }
 
-    // UPG-520: aggregate length-cap warnings with any existing warning.
+    //: aggregate length-cap warnings with any existing warning.
     const aggregatedWarnings: string[] = []
     if (warning) aggregatedWarnings.push(warning)
     if (lengthWarnings.length > 0) aggregatedWarnings.push(...lengthWarnings)

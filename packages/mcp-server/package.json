@@ -1,16 +1,17 @@
 {
   "name": "@unified-product-graph/mcp-server",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Local MCP server for .upg files. Read and write product knowledge graphs offline.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
   "homepage": "https://unifiedproductgraph.org",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unified-product-graph/mcp-server.git"
+    "url": "git+https://github.com/unified-product-graph/tools.git",
+    "directory": "packages/mcp-server"
   },
   "bugs": {
-    "url": "https://github.com/unified-product-graph/mcp-server/issues"
+    "url": "https://github.com/unified-product-graph/tools/issues"
   },
   "engines": {
     "node": ">=20"
@@ -56,11 +57,11 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "@unified-product-graph/frameworks": "*",
+    "@unified-product-graph/mcp-tooling": "*",
     "tsup": "^8.5.1",
     "tsx": "^4.0.0",
-    "typescript": "^5.8.0",
-    "@unified-product-graph/frameworks": "*",
-    "@unified-product-graph/mcp-tooling": "*"
+    "typescript": "^5.8.0"
   },
   "keywords": [
     "mcp",

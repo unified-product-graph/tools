@@ -203,7 +203,7 @@ export const getProductContext: ToolHandler = (args, ctx): ToolResult => {
  * `lens_digest` block reflects the active lens (open bugs for engineering,
  * screens-mapped for design, etc.).
  *
- * Coverage is stage-aware (UPG-512 / Finding 9). The `coverage` block lists
+ * Coverage is stage-aware ( / Finding 9). The `coverage` block lists
  * every business-area region with `types_present` / `types_missing` for
  * awareness, but `counted_toward_stage` flags only the regions that should
  * be graded against the product's current `UPGProductStage`. The

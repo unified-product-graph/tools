@@ -1,5 +1,5 @@
 /**
- * Tests for approach verb execution (UPG-522).
+ * Tests for approach verb execution.
  *
  * Each test loads a small purpose-built graph and exercises one approach
  * verb end-to-end through its handler. The handlers return JSON envelopes;

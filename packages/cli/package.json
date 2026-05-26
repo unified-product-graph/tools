@@ -1,16 +1,17 @@
 {
   "name": "@unified-product-graph/cli",
-  "version": "0.6.0",
-  "description": "MCP server + CLI for the Unified Product Graph \u2014 drop into Claude Code or use the `upg` command.",
+  "version": "0.6.1",
+  "description": "MCP server + CLI for the Unified Product Graph — drop into Claude Code or use the `upg` command.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
   "homepage": "https://unifiedproductgraph.org",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unified-product-graph/cli.git"
+    "url": "git+https://github.com/unified-product-graph/tools.git",
+    "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/unified-product-graph/cli/issues"
+    "url": "https://github.com/unified-product-graph/tools/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -48,11 +49,11 @@
     "ora": "^8.0.0"
   },
   "devDependencies": {
+    "@unified-product-graph/adapters": "*",
     "tsup": "^8.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.1.1",
-    "@unified-product-graph/adapters": "*"
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=18"

@@ -41,7 +41,7 @@ async function main() {
   }
 
   const store = new PgStore(pool)
-  // Wire webhook delivery (UPG-553): mutations emit events post-commit; the
+  // Wire webhook delivery: mutations emit events post-commit; the
   // dispatcher fans them out to registered webhooks (fire-and-forget).
   const dispatcher = new WebhookDispatcher(pool)
   store.setEventSink((event) => dispatcher.emit(event))

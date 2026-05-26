@@ -1,7 +1,7 @@
 /**
  * Real-Postgres round-trips for the write/trigger paths the mocked unit suite
  * can't see. Each assertion would have failed before its corresponding fix —
- * these are the regression guards for the scaffold-vs-wired class (UPG-554).
+ * these are the regression guards for the scaffold-vs-wired class.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { Pool } from 'pg'
@@ -40,7 +40,7 @@ describe.skipIf(!HAS_DB)('integration: write→read round-trips (real Postgres)'
     expect(edges[0].id).toMatch(UUID)
   })
 
-  it('records the audit log on every mutation; get_audit_log returns it (guards UPG-552)', async () => {
+  it('records the audit log on every mutation; get_audit_log returns it (guards)', async () => {
     const product = await store.createProduct('Audit IT')
     const n = await store.addNode(product.id, { id: '', type: T('persona'), title: 'PM' })
     await store.updateNode(n.id, { title: 'Busy PM' })

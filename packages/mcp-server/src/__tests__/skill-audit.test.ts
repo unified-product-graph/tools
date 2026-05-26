@@ -1,5 +1,5 @@
 /**
- * UPG-540 — `skill_audit` reports source-vs-deployed status for UPG skills.
+ * — `skill_audit` reports source-vs-deployed status for UPG skills.
  *
  * Surfaces the exact failure mode caught in the 2026-05-23 Ro Laren E2E
  * audit: deployed `.claude/skills/<name>/SKILL.md` files diverging silently
@@ -102,7 +102,7 @@ user-invocable: true
 OLD body.
 `
 
-describe('UPG-540 — skill_audit reports source-vs-deployed status', () => {
+describe(' — skill_audit reports source-vs-deployed status', () => {
   let fixtureRoot: string
   let originalCwd: string
 

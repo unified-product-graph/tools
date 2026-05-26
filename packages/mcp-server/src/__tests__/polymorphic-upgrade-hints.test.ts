@@ -1,6 +1,6 @@
 /**
  * Tests for the `polymorphic_with_typed_alternative` drift class added by
- * UPG-507. This class is opt-in via `include_polymorphic_upgrades: true`.
+ *. This class is opt-in via `include_polymorphic_upgrades: true`.
  *
  * Decision context: Captain chose Option B — polymorphic edges are kept as a
  * deliberate feature (they let consumers express connections we haven't yet
@@ -302,7 +302,7 @@ describe('polymorphic_with_typed_alternative — does not affect valid', () => {
     // polymorphic_upgrade_hints is populated while the regular drift counts
     // are all zero (the hint is independent of valid).
     //
-    // Note: because UPG-520 edge_type_pair_drift fires when a polymorphic edge
+    // Note: because edge_type_pair_drift fires when a polymorphic edge
     // type (source_type='node') is wired between non-'node' typed entities, we
     // skip the drift block here and check only that the hint count is present.
     const store = await loadStore(

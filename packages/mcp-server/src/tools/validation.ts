@@ -69,7 +69,7 @@ const CANONICAL_NODE_FIELDS = new Set<string>([
 ])
 
 // New drift classes added by the 2026-05-20 audit hardening
-// (UPG-520). Kept as a local extension because the canonical
+//. Kept as a local extension because the canonical
 // ValidateGraphScope union lives in mcp-tooling. Callers can pass any of
 // the strings below as `scope`; the response envelope carries the matching
 // per-class arrays at top level.
@@ -103,7 +103,7 @@ type LifecycleDriftEntry = ValidateGraphLifecycleDrift
 type SelfReferentialEntry = ValidateGraphSelfReferential
 type PropertyDriftEntry = ValidateGraphPropertyDrift
 
-// New drift entry types — UPG-520 hardening (2026-05-20).
+// New drift entry types — hardening (2026-05-20).
 interface EdgeTypePairDriftEntry {
   id: string
   type: string
@@ -129,7 +129,7 @@ interface PropertyTypeDriftEntry {
   reason: string
 }
 
-// UPG-507: polymorphic upgrade hints (opt-in via include_polymorphic_upgrades).
+//: polymorphic upgrade hints (opt-in via include_polymorphic_upgrades).
 // One entry per polymorphic edge that has a typed alternative for its
 // actual source/target pair. Severity is "info" — the polymorphic edge
 // remains valid; this is a suggestion, not an error.
@@ -481,7 +481,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   }
 
   if (includes('edge_drift')) {
-    // UPG-529 fix (B + A):
+    // fix (B + A):
     //
     // Fix B (canonical suppression): an edge type listed in UPG_EDGE_CATALOG
     // is canonical and must NEVER surface as edge_drift, even if a historical
@@ -595,7 +595,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     }
   }
 
-  // ── Polymorphic upgrade hints (UPG-507) ───────────────────────────
+  // ── Polymorphic upgrade hints ───────────────────────────
   // Opt-in (include_polymorphic_upgrades: true). For each edge whose type is
   // in the registered polymorphic allow-list, look up whether a typed
   // alternative exists for the actual source/target node-type pair. If one
@@ -779,7 +779,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   //
   // The new drift classes (edge_type_pair_drift, graph_topology_self_loops,
   // property_type_drift) extend the canonical ValidateGraphResult contract
-  // additively — see UPG-520 hardening (2026-05-20). The local server emits
+  // additively — see hardening (2026-05-20). The local server emits
   // them as extra top-level fields plus matching summary counts. Consumers
   // can read them via `response.edge_type_pair_drift` etc.
   const response = {

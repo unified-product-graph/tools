@@ -1,5 +1,5 @@
 /**
- * UPG-512 / Finding 9 — stage-aware coverage targets in `get_graph_digest`.
+ * / Finding 9 — stage-aware coverage targets in `get_graph_digest`.
  *
  * The digest used to grade every product against the full 8-region
  * completeness model regardless of `UPGProductStage`. A concept-stage
@@ -52,7 +52,7 @@ async function makeStore(stage: UPGProductStage): Promise<UPGFileStore> {
   return store
 }
 
-describe('computeGraphDigest — stage-aware coverage (UPG-512)', () => {
+describe('computeGraphDigest — stage-aware coverage', () => {
   it('concept-stage product surfaces Sustaining as informational (not counted)', async () => {
     const store = await makeStore('concept')
     // Populate the three regions a concept-stage graph is graded on.

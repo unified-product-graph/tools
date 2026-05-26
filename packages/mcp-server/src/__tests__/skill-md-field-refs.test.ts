@@ -1,5 +1,5 @@
 /**
- * UPG-539 — Every `chains.X` / `health.X` / `lens_digest.X` reference in a
+ * — Every `chains.X` / `health.X` / `lens_digest.X` reference in a
  * canonical SKILL.md must resolve against the real `get_graph_digest` output.
  *
  * Why this exists: PR #1679's `/upg-impact` density gate referenced
@@ -9,7 +9,7 @@
  * any future drift fails CI.
  *
  * Baseline before this test: N/A (new contract). `/upg-impact`'s fictional
- * field was patched by PR #1681 (UPG-536) before this test landed, so the
+ * field was patched by PR #1681 before this test landed, so the
  * suite passes against the current source.
  */
 
@@ -139,7 +139,7 @@ function isValidReference(ref: Reference): boolean {
 
 // ── The contract ────────────────────────────────────────────────────────────
 
-describe('UPG-539 — SKILL.md digest field refs must resolve against real fields', () => {
+describe(' — SKILL.md digest field refs must resolve against real fields', () => {
   it('every chains.X / health.X / lens_digest.X reference in any SKILL.md is a real field', () => {
     const files = listSkillMdFiles()
     expect(files.length).toBeGreaterThan(0) // sanity — there's at least one SKILL.md

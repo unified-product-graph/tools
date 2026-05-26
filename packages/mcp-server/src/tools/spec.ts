@@ -1013,7 +1013,7 @@ export const getSpecVersion: ToolHandler = (): ToolResult => {
  * fall back to a polymorphic edge (e.g. `node_informs_node`) or skip when
  * `edge_type` is `null`.
  *
- * When `edge_type` is `null` (UPG-505 + UPG-515), the response is enriched
+ * When `edge_type` is `null` ( +), the response is enriched
  * with up to three hint blocks so the failure boundary becomes a teaching
  * moment:
  *

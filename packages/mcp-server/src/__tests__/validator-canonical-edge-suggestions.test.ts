@@ -1,5 +1,5 @@
 /**
- * Regression tests for UPG-529 — validator picks wrong migration version.
+ * Regression tests for — validator picks wrong migration version.
  *
  * The bug: `UPG_EDGE_MIGRATIONS` contains TWO rules per re-merged edge family:
  *   - v0.2.8: `solution_proposes_hypothesis → solution_proposes_hypothesis_claim` (split)
@@ -10,7 +10,7 @@
  * graph (162 nodes, all canonical edges), `validate_graph` reported
  * `edge_drift: 5` with reversed suggestions.
  *
- * Fixes applied (UPG-529):
+ * Fixes applied:
  *   - Fix B (canonical suppression): edges whose type is in UPG_EDGE_CATALOG
  *     are never flagged as drift, regardless of any stale `from` rule.
  *   - Fix A (chain walk): for non-canonical edges, walk the migration chain
@@ -54,7 +54,7 @@ function makeDoc(nodes: UPGBaseNode[], edges: UPGEdge[]): UPGDocument {
     upg_version: '0.5',
     exported_at: new Date().toISOString(),
     source: { tool: 'test' },
-    product: { id: 'p1', title: 'UPG-529 fixture', stage: 'concept' },
+    product: { id: 'p1', title: ' fixture', stage: 'concept' },
     nodes,
     edges,
   }
@@ -94,7 +94,7 @@ function makeCtx(store: UPGFileStore): ToolContext {
 
 // ─── 1. Negative case — the bug ────────────────────────────────────
 
-describe('UPG-529 — canonical edge suppression (Fix B)', () => {
+describe(' — canonical edge suppression (Fix B)', () => {
   it('reports edge_drift: 0 for a graph using canonical solution_proposes_hypothesis edges', async () => {
     // Pre-fix: this graph would report edge_drift: 1 with a reversed
     // suggestion (`solution_proposes_hypothesis_claim`, deprecated). The
@@ -124,7 +124,7 @@ describe('UPG-529 — canonical edge suppression (Fix B)', () => {
 
   it('does not suggest a migration for any canonical edge that also appears as `from` in UPG_EDGE_MIGRATIONS', async () => {
     // Build the full set of canonical edges that also appear as `from` in
-    // UPG_EDGE_MIGRATIONS. These are the precise edges UPG-529 affects.
+    // UPG_EDGE_MIGRATIONS. These are the precise edges affects.
     const canonicalKeys = new Set(Object.keys(UPG_EDGE_CATALOG))
     const fromKeysInMigrations = new Set<string>()
     for (const rules of Object.values(UPG_EDGE_MIGRATIONS)) {
@@ -151,7 +151,7 @@ describe('UPG-529 — canonical edge suppression (Fix B)', () => {
 
 // ─── 2. Positive case — true detection (Fix A) ─────────────────────
 
-describe('UPG-529 — chain walk lands on canonical (Fix A)', () => {
+describe(' — chain walk lands on canonical (Fix A)', () => {
   it('suggests `solution_proposes_hypothesis` (canonical) for deprecated `solution_proposes_hypothesis_claim` edges', async () => {
     // The deprecated alias has TWO rules:
     //   v0.2.8: solution_proposes_hypothesis → solution_proposes_hypothesis_claim
@@ -218,7 +218,7 @@ describe('UPG-529 — chain walk lands on canonical (Fix A)', () => {
 
 // ─── 3. Multi-hop chain walk ────────────────────────────────────────
 
-describe('UPG-529 — multi-hop chain walk', () => {
+describe(' — multi-hop chain walk', () => {
   it('walks intermediate → canonical (synthetic 3-step chain)', () => {
     // Synthesize a 3-step chain by injecting test data into a temporary
     // local map. We exercise the helper directly rather than through
@@ -268,7 +268,7 @@ describe('UPG-529 — multi-hop chain walk', () => {
 
 // ─── 4. Inkling regression ─────────────────────────────────────────
 
-describe('UPG-529 — Inkling graph regression', () => {
+describe(' — Inkling graph regression', () => {
   const inklingPath = join(
     process.cwd(),
     '..',
@@ -292,7 +292,7 @@ describe('UPG-529 — Inkling graph regression', () => {
     const body = JSON.parse(result.content[0].text)
     expect(
       body.summary.edge_drift,
-      `Inkling edge_drift should be 0 after UPG-529; entries: ${JSON.stringify(body.edge_drift?.slice(0, 5))}`,
+      `Inkling edge_drift should be 0 after; entries: ${JSON.stringify(body.edge_drift?.slice(0, 5))}`,
     ).toBe(0)
     expect(body.edge_drift).toEqual([])
   })

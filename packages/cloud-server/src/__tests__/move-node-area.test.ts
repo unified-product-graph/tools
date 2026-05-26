@@ -335,7 +335,7 @@ describe('createArea handler', () => {
     expect(insertCall![1]).toContain('area')
     expect(insertCall![1]).toContain('p1')
     expect(insertCall![1]).toContain('Growth')
-    // UPG-552: the create must write an audit row in the same transaction.
+    //: the create must write an audit row in the same transaction.
     expect(clientQuery.mock.calls.some((c: unknown[]) => (c[0] as string).includes('INSERT INTO upg.audit_log'))).toBe(true)
   })
 

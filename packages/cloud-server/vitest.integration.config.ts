@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 
-// Real-Postgres integration tier (UPG-554). Run with `npm run test:integration`.
+// Real-Postgres integration tier. Run with `npm run test:integration`.
 // Needs a reachable Postgres (UPG_TEST_DATABASE_URL or the docker default on
 // :5433); suites self-skip via `describe.skipIf` when none is available.
 export default defineConfig({

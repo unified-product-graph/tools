@@ -99,7 +99,7 @@ for (const rules of Object.values(UPG_SPLIT_MIGRATIONS)) {
 
 // Note: we deliberately do NOT pre-compute a `knownDeprecatedEdgeKeys` set
 // from UPG_EDGE_MIGRATIONS. An edge key that appears as `from` in a migration
-// rule is not necessarily deprecated — the hypothesis family (UPG-529) was
+// rule is not necessarily deprecated — the hypothesis family was
 // renamed and then renamed back, so the same key appears as `from` in one
 // version and as `to` (canonical) in another. Canonicality is determined by
 // UPG_EDGE_CATALOG alone; the migration registry is consulted only to suggest
@@ -204,7 +204,7 @@ export function computeSchemaDriftSummary(doc: UPGDocument): SchemaDriftSummary 
   // Mirror the entity_drift rule (line 147 above): a type listed in
   // UPG_EDGE_CATALOG is canonical and must never surface as drift, even if a
   // stale rename rule still references it as `from`. The hypothesis family
-  // (UPG-529, late finding 2026-05-21) is the canonical example: v0.2.8
+  // (late finding 2026-05-21) is the canonical example: v0.2.8
   // renamed `solution_proposes_hypothesis → solution_proposes_hypothesis_claim`,
   // v0.4.0 renamed it back — both rules are correct history, but both names
   // appear as `from` in UPG_EDGE_MIGRATIONS. The OR-with-knownDeprecatedEdgeKeys

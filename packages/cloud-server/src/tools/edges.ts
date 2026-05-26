@@ -11,7 +11,7 @@ import {
 import { edgeId } from '../id-helpers.js'
 
 /**
- * Build an `isError` result whose body carries the UPG-505/UPG-515 resolver
+ * Build an `isError` result whose body carries the/ resolver
  * enrichment (`anchor_hint` / `alternate_anchors` / `adjacent_edges`) for a
  * "no canonical edge" miss. Falls back to a plain `textError` when no
  * enrichment applies. Mirrors the local MCP server's `edgeResolverError` so

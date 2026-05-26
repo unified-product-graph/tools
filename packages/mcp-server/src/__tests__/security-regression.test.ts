@@ -1,7 +1,7 @@
 /**
  * Security regression tests — replays the 7 exploits surfaced by the
  * 2026-05-20 adversarial spec audit. Every attack here was confirmed against
- * `.upg/chaos.upg` before the UPG-520 hardening landed; this file ensures
+ * `.upg/chaos.upg` before the hardening landed; this file ensures
  * they stay refused / detected forever.
  *
  */
@@ -366,9 +366,9 @@ describe('F7 — create_cross_product_edge without a portfolio document', () => 
   })
 })
 
-// ─── UPG-508 — chain analyzer 2-hop persona-bridge ──────────────────
+// ─── — chain analyzer 2-hop persona-bridge ──────────────────
 
-describe('UPG-508 — chain analyzer 2-hop persona-bridged jobs+needs', () => {
+describe(' — chain analyzer 2-hop persona-bridged jobs+needs', () => {
   it('counts a job as needing-covered via the persona bridge', async () => {
     // Construct: persona pursues job; persona experiences need.
     // No direct job_surfaces_need edge — the chain is only satisfied via the
@@ -397,7 +397,7 @@ describe('UPG-508 — chain analyzer 2-hop persona-bridged jobs+needs', () => {
       ),
     )
     const digest = computeGraphDigest(store)
-    // Without the bridge, job_with_need would be 0. With UPG-508 it's 1.
+    // Without the bridge, job_with_need would be 0. With it's 1.
     expect(digest.chains.job_with_need).toBeGreaterThan(0)
     expect(digest.chains.job_with_need).toBe(1)
     expect(digest.chains.job_total).toBe(1)

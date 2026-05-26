@@ -106,7 +106,7 @@ After creating entities, check the graph and recommend ONE next step. **Use sess
 3. Prefer context-specific suggestions (based on what was just done) over global gap analysis.
 4. After rendering, call `update_session_context({ skill_invoked: "<this skill>", recommendation: "<what you suggested>" })`. This automatically extends `recommendations_to_avoid` for the next skill.
 
-> **Why a data-layer field instead of a prose rule:** `recommendations_to_avoid` removes the need for the runner to remember "filter against previous recommendations." The rule lives in the tool return; runners just use the field. (UPG-538)
+> **Why a data-layer field instead of a prose rule:** `recommendations_to_avoid` removes the need for the runner to remember "filter against previous recommendations." The rule lives in the tool return; runners just use the field.
 
 **Prioritise recommendations in this order:**
 1. What's most relevant to what was just created/discussed

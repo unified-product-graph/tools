@@ -1,5 +1,5 @@
 /**
- * UPG-526 — portfolio.upg honours its own structure.
+ * — portfolio.upg honours its own structure.
  *
  * Verifies the MCP write path routes portfolio-scoped entities (`portfolio`,
  * `organization`, `product_area`) to `.upg/portfolio.upg` rather than the
@@ -96,7 +96,7 @@ function readPortfolio(cwd: string): Record<string, unknown> | null {
 
 // ── 1. Portfolio-scoped entities route to portfolio.upg ──────────────────────
 
-describe('UPG-526 · create_node routes portfolio-scoped types to portfolio.upg', () => {
+describe(' · create_node routes portfolio-scoped types to portfolio.upg', () => {
   let cwd: string
   let originalCwd: string
   let store: UPGFileStore
@@ -255,7 +255,7 @@ describe('UPG-526 · create_node routes portfolio-scoped types to portfolio.upg'
 
 // ── 2. Read tools find portfolio-scoped entities ─────────────────────────────
 
-describe('UPG-526 · list_portfolios / list_product_areas / get_organization read from portfolio.upg', () => {
+describe(' · list_portfolios / list_product_areas / get_organization read from portfolio.upg', () => {
   let cwd: string
   let originalCwd: string
   let store: UPGFileStore
@@ -338,7 +338,7 @@ describe('UPG-526 · list_portfolios / list_product_areas / get_organization rea
 
 // ── 3. Empty / missing portfolio.upg handling ────────────────────────────────
 
-describe('UPG-526 · read tools return empty when no portfolio.upg exists', () => {
+describe(' · read tools return empty when no portfolio.upg exists', () => {
   let cwd: string
   let originalCwd: string
   let store: UPGFileStore
@@ -388,7 +388,7 @@ describe('UPG-526 · read tools return empty when no portfolio.upg exists', () =
 
 // ── 4. create_cross_product_edge auto-registers products ─────────────────────
 
-describe('UPG-526 · create_cross_product_edge auto-registers products on portfolio.upg.products[]', () => {
+describe(' · create_cross_product_edge auto-registers products on portfolio.upg.products[]', () => {
   let cwd: string
   let originalCwd: string
   let store: UPGFileStore

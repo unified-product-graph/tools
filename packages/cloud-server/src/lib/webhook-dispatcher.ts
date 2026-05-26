@@ -1,5 +1,5 @@
 /**
- * Webhook delivery (UPG-553).
+ * Webhook delivery.
  *
  * Mutations emit `WebhookEvent`s (via `PgStore`'s event sink); this dispatcher
  * looks up the active webhooks registered for that product + event and POSTs

@@ -1,16 +1,16 @@
 /**
- * MCP UX improvements — UPG-504, UPG-505, UPG-506, UPG-515.
+ * MCP UX improvements —.
  *
  * Covers the four 2026-05-20 live-authoring audit fixes:
  *
- * - UPG-504: `batch_create_nodes` surfaces an orphan warning when ≥2 nodes
+ * -: `batch_create_nodes` surfaces an orphan warning when ≥2 nodes
  *   land with zero edges of any kind.
- * - UPG-505: `resolve_edge_for_pair` enriches `null` returns with the
+ * -: `resolve_edge_for_pair` enriches `null` returns with the
  *   target domain's anchor (`anchor_hint`).
- * - UPG-515: same call enriches with `alternate_anchors` + `adjacent_edges`
+ * -: same call enriches with `alternate_anchors` + `adjacent_edges`
  *   walks of `UPG_EDGE_CATALOG`. Same enrichment fires from `create_edge`
  *   and `batch_create_edges` error paths.
- * - UPG-506: `create_node` attaches `hints` (anti-patterns, next entity in
+ * -: `create_node` attaches `hints` (anti-patterns, next entity in
  *   creation_sequence, canonical out-edges) on the FIRST node of a given
  *   type. Second-and-later calls of the same type emit no hints.
  */
@@ -82,9 +82,9 @@ function isErrorResult(result: ToolResult | Promise<ToolResult>): boolean {
   return (result as ToolResult).isError === true
 }
 
-// ── UPG-504 — batch_create_nodes silent orphans ──────────────────────────────
+// ── — batch_create_nodes silent orphans ──────────────────────────────
 
-describe('UPG-504 — batch_create_nodes orphan warning', () => {
+describe(' — batch_create_nodes orphan warning', () => {
   it('warns when ≥2 nodes land with no edges (no parent_ref, no explicit edges)', async () => {
     const store = await makeStore()
     const result = batchCreateNodesLib(store, {
@@ -149,9 +149,9 @@ describe('UPG-504 — batch_create_nodes orphan warning', () => {
   })
 })
 
-// ── UPG-505 — resolve_edge_for_pair anchor hint on null ──────────────────────
+// ── — resolve_edge_for_pair anchor hint on null ──────────────────────
 
-describe('UPG-505 — resolve_edge_for_pair anchor_hint', () => {
+describe(' — resolve_edge_for_pair anchor_hint', () => {
   it('returns anchor_hint with domain_anchor when target is anchored cross-domain', () => {
     // product → ideal_customer_profile: ICP is anchored in gtm_strategy.
     const result = resolveEdgeForPair(
@@ -193,9 +193,9 @@ describe('UPG-505 — resolve_edge_for_pair anchor_hint', () => {
   })
 })
 
-// ── UPG-515 — alternate_anchors + adjacent_edges ─────────────────────────────
+// ── — alternate_anchors + adjacent_edges ─────────────────────────────
 
-describe('UPG-515 — resolver UX alternates', () => {
+describe(' — resolver UX alternates', () => {
   it('returns non-empty alternate_anchors + adjacent_edges for product → ideal_customer_profile', () => {
     const result = resolveEdgeForPair(
       { source_type: 'product', target_type: 'ideal_customer_profile' },
@@ -304,9 +304,9 @@ describe('UPG-515 — resolver UX alternates', () => {
   })
 })
 
-// ── UPG-506 — create_node first-use schema hints ─────────────────────────────
+// ── — create_node first-use schema hints ─────────────────────────────
 
-describe('UPG-506 — create_node first-use hints', () => {
+describe(' — create_node first-use hints', () => {
   let store: UPGFileStore
   let ctx: ToolContext
 

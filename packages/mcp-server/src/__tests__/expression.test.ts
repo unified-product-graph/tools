@@ -1,6 +1,6 @@
 /**
  * Tests for the safe arithmetic expression evaluator that powers
- * `prioritise` (UPG-522).
+ * `prioritise`.
  *
  * The evaluator handles every framework formula in
  * `UPG_FRAMEWORKS[*].data.computed_properties[*].expression`. Tests cover

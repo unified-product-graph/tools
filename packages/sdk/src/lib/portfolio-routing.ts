@@ -1,5 +1,5 @@
 /**
- * Portfolio routing helpers — UPG-526.
+ * Portfolio routing helpers —.
  *
  * Portfolio-scoped entity types (`portfolio`, `organization`, `product_area`)
  * belong in `.upg/portfolio.upg` rather than the active product's `nodes[]`.

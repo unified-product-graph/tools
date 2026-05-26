@@ -79,7 +79,7 @@ export { UPGPgStore as PgStore }
 export class UPGPgStore {
   constructor(private pool: Pool) {}
 
-  // ── Event sink (webhook delivery, UPG-553) ──────────────────────────────────
+  // ── Event sink (webhook delivery) ──────────────────────────────────
   // Set by the server entry point. Mutations call `emit` AFTER they commit, so
   // events only fire for durable writes. Default is a no-op, so the store works
   // standalone (and in tests) with no dispatcher wired.

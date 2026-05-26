@@ -1,6 +1,6 @@
 /**
  * Tests for the new validate_graph drift classes added by the 2026-05-20
- * audit hardening (UPG-520):
+ * audit hardening:
  *
  *   - edge_type_pair_drift: canonical edge type wired to wrong node-type pair
  *   - graph_topology_self_loops: edges where source === target

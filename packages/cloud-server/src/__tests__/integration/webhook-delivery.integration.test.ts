@@ -1,5 +1,5 @@
 /**
- * Real-Postgres webhook delivery (UPG-553). Two halves, both deterministic:
+ * Real-Postgres webhook delivery. Two halves, both deterministic:
  *  - emission: real mutations push events to the store's sink.
  *  - delivery: the dispatcher reads real webhook rows and POSTs (stubbed fetch),
  *    including the 4xx → active=false auto-disable as a real DB round-trip.

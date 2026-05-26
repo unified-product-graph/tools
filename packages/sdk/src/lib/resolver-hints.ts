@@ -1,5 +1,5 @@
 /**
- * Resolver enrichment helpers — UPG-505 and UPG-515.
+ * Resolver enrichment helpers — and.
  *
  * When the canonical resolver returns `null` for a (source_type, target_type)
  * pair, these helpers surface what the catalog DOES know about, so the failure
@@ -7,19 +7,19 @@
  *
  * Three enrichments:
  *
- * - `buildAnchorHint(source, target)` — UPG-505: when the target's domain has
+ * - `buildAnchorHint(source, target)` —: when the target's domain has
  *   a canonical anchor entity that DIFFERS from the source, surface the
  *   anchor + the domain's creation sequence so the author can route via the
  *   correct entry point ("ideal_customer_profile is anchored in gtm_strategy
  *   — create one of those first").
  *
- * - `buildAlternateAnchors(source, target)` — UPG-515: catalog walk for
+ * - `buildAlternateAnchors(source, target)` —: catalog walk for
  *   edges where `target_type === requested_target` AND `source_type !==
  *   requested_source`. Surfaces the OTHER sources the catalog connects to
  *   this target. Sorted by classification: hierarchy > causal > semantic
  *   > cross-domain. Capped at 3.
  *
- * - `buildAdjacentEdges(source)` — UPG-515: catalog walk for edges where
+ * - `buildAdjacentEdges(source)` —: catalog walk for edges where
  *   `source_type === requested_source`. Helps the author discover what they
  *   CAN reach from this source. Capped at 3.
  *
@@ -61,7 +61,7 @@ const CLASSIFICATION_RANK: Record<string, number> = {
 }
 
 /**
- * UPG-505 — anchor hint.
+ * — anchor hint.
  *
  * When the target type is anchored in a domain different from the source's
  * domain, surface that anchor + the domain's creation sequence. Returns
@@ -109,7 +109,7 @@ export function buildAnchorHint(
 }
 
 /**
- * UPG-515 — alternate anchors.
+ * — alternate anchors.
  *
  * Walk `UPG_EDGE_CATALOG` for every edge whose `target_type` matches the
  * requested target AND whose `source_type` differs from the requested source.
@@ -148,7 +148,7 @@ export function buildAlternateAnchors(
 }
 
 /**
- * UPG-515 — adjacent edges.
+ * — adjacent edges.
  *
  * Walk `UPG_EDGE_CATALOG` for every edge whose `source_type` matches the
  * requested source. Surfaces what the author CAN reach from where they are

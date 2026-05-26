@@ -27,7 +27,7 @@ import type {
 
 /**
  * Build an `isError` result whose text body is a JSON envelope carrying both
- * the error message and the UPG-505 + UPG-515 resolver enrichment blocks.
+ * the error message and the + resolver enrichment blocks.
  * Used by `create_edge` and `batch_create_edges` when the failure is a
  * "no canonical edge" miss — the consumer can parse the body for
  * `anchor_hint` / `alternate_anchors` / `adjacent_edges`.
@@ -95,7 +95,7 @@ export const createEdge: ToolHandler = (args, ctx): ToolResult => {
   })
 
   if ('error' in result) {
-    // UPG-505 + UPG-515: enrich "no canonical edge" failures with hint
+    // +: enrich "no canonical edge" failures with hint
     // blocks so the failure boundary becomes a teaching moment.
     if (result.no_canonical_edge_for) {
       return edgeResolverError(
@@ -251,7 +251,7 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
         const suggestion = inference.suggestions.length > 0
           ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
           : ''
-        // UPG-505 + UPG-515: enrich with anchor_hint / alternate_anchors /
+        // +: enrich with anchor_hint / alternate_anchors /
         // adjacent_edges so the failure boundary teaches the author what
         // the catalog actually wires from this pair.
         return edgeResolverError(

@@ -98,9 +98,9 @@ describe('Tool registry — completeness', () => {
     //   adding a second tool.)
     //   → 89.
     // + 1 additional tool added for v0.5.0. → 90.
-    // + 1 portfolio organisation read (UPG-526): get_organization. → 91.
-    // + migrate_status (UPG-527 status migration). → 92.
-    // + skill_audit (UPG-540 source-vs-deployed integrity for skills). → 93.
+    // + 1 portfolio organisation read: get_organization. → 91.
+    // + migrate_status ( status migration). → 92.
+    // + skill_audit ( source-vs-deployed integrity for skills). → 93.
     expect(TOOL_DEFINITIONS).toHaveLength(93)
   })
 })

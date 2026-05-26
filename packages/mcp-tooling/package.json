@@ -8,10 +8,11 @@
   "homepage": "https://unifiedproductgraph.org",
   "repository": {
     "type": "git",
-    "url": "https://github.com/unified-product-graph/mcp-tooling"
+    "url": "git+https://github.com/unified-product-graph/tools.git",
+    "directory": "packages/mcp-tooling"
   },
   "bugs": {
-    "url": "https://github.com/unified-product-graph/mcp-tooling/issues"
+    "url": "https://github.com/unified-product-graph/tools/issues"
   },
   "type": "module",
   "main": "./dist/index.js",

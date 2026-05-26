@@ -165,7 +165,7 @@ export class UPGClient {
 
   /**
    * Diff against a previous version. Not yet implemented — tracked in
-   * UPG-541 follow-up. Will return a structured changeset between the
+   * follow-up. Will return a structured changeset between the
    * current graph and the named ref (git revision or snapshot id).
    */
   async diff(_ref: string): Promise<never> {

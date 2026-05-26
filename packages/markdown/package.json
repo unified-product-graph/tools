@@ -1,17 +1,18 @@
 {
   "name": "@unified-product-graph/markdown",
-  "version": "0.6.0",
-  "description": "Parser and utilities for UPG Markdown (.upg.md) \u2014 graph-aware documents with typed entity references",
+  "version": "0.6.1",
+  "description": "Parser and utilities for UPG Markdown (.upg.md) — graph-aware documents with typed entity references",
   "type": "module",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
   "homepage": "https://unifiedproductgraph.org",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unified-product-graph/upg-markdown.git"
+    "url": "git+https://github.com/unified-product-graph/tools.git",
+    "directory": "packages/markdown"
   },
   "bugs": {
-    "url": "https://github.com/unified-product-graph/upg-markdown/issues"
+    "url": "https://github.com/unified-product-graph/tools/issues"
   },
   "engines": {
     "node": ">=18"
@@ -48,8 +49,8 @@
     }
   },
   "devDependencies": {
-    "vitest": "^3.1.1",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
   },
   "keywords": [
     "upg",

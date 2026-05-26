@@ -46,7 +46,7 @@ function findQuery(queries: MockQuery[], substr: string): MockQuery {
   return found
 }
 
-/** True iff an audit row was written (UPG-552: every mutation must record one). */
+/** True iff an audit row was written (every mutation must record one). */
 function wroteAudit(queries: MockQuery[]): boolean {
   return queries.some((q) => q.text.includes('INSERT INTO upg.audit_log'))
 }

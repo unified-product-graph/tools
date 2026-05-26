@@ -2,11 +2,11 @@
  * Integration-test harness: a REAL Postgres, not a mocked pool.
  *
  * The mocked unit suite can't see write/trigger paths — which is exactly how
- * three bugs shipped invisibly (#1697 UUID ids, UPG-552 audit log, UPG-553
+ * three bugs shipped invisibly (#1697 UUID ids audit log
  * webhook delivery). These helpers stand up a real database so round-trips are
- * exercised end-to-end. See UPG-554.
+ * exercised end-to-end. See.
  *
- * ⚠️ ISOLATION (UPG-555): these tests DROP and recreate the `upg` schema, so
+ * ⚠️ ISOLATION: these tests DROP and recreate the `upg` schema, so
  * they MUST NOT run against the shared dev/MCP database. They default to a
  * dedicated `upg_test` database (auto-created on the same server) and HARD-REFUSE
  * to run against a database named `upg`. Override with `UPG_TEST_DATABASE_URL`,

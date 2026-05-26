@@ -479,7 +479,7 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     target_product_id: derivedTargetProductId,
   }
 
-  // Auto-register both products on portfolio.upg.products[] (UPG-526). Cross-
+  // Auto-register both products on portfolio.upg.products[]. Cross-
   // edges referring to products that aren't listed are still valid but harder
   // to follow — the registry gives a stable lookup table for tooling.
   const registeredProducts: Array<{ id: string; file_path?: string; title?: string }> = []

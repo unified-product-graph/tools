@@ -262,7 +262,7 @@ export interface CoverageRegion {
   covered: number
   total: number
   /**
-   * NEW (Finding 9 / UPG-512): True when this region is on the product
+   * NEW (Finding 9 /): True when this region is on the product
    * stage's expected-coverage list. Regions where this is `false` are
    * surfaced for awareness but excluded from `stage_summary.overall_pct`.
    */
@@ -371,7 +371,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
    * Like `chainStats` but ALSO counts parents covered via a registered
    * canonical bridge. Each bridge spec describes a 2-hop path where the
    * parent has an incoming edge from a bridge node, and the bridge node
-   * has an outgoing edge to the child type. UPG-508 (2026-05-20).
+   * has an outgoing edge to the child type. (2026-05-20).
    */
   const chainStatsWithBridge = (
     parentType: string,
@@ -428,7 +428,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   }
 
   const personaJob = chainStats('persona', 'job')
-  // UPG-508 (2026-05-20): jobs and needs are often connected only via
+  // (2026-05-20): jobs and needs are often connected only via
   // personas — `job ← persona_pursues_job ← persona → persona_experiences_need
   // → need`. Count direct edges OR the persona-bridge path.
   const jobNeed = chainStatsWithBridge(
@@ -455,7 +455,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
     typeSet.add(t)
     typeSet.add(canonicalType(t))
   }
-  // Stage-aware filtering (Finding 9 / UPG-512). Resolve the product's stage
+  // Stage-aware filtering (Finding 9 /). Resolve the product's stage
   // through the legacy-alias coercion path first, then read the list of
   // regions counted toward completeness for that stage. Per-region
   // `types_present` / `types_missing` are populated for ALL regions
@@ -881,7 +881,7 @@ export type CreateEdgeResult =
        * Source/target types when the failure is a "no canonical edge"
        * resolver miss — surfaced so the MCP handler can attach
        * `anchor_hint` / `alternate_anchors` / `adjacent_edges` enrichment
-       * blocks (UPG-505 + UPG-515).
+       * blocks ( +).
        */
       no_canonical_edge_for?: { source_type: string; target_type: string }
     }
@@ -1552,7 +1552,7 @@ export function batchCreateNodes(
     }
   }
 
-  // UPG-504: orphan warning. When the caller batched ≥2 nodes but produced
+  //: orphan warning. When the caller batched ≥2 nodes but produced
   // zero edges of any kind (no parent_ref auto-edges, no explicit edges),
   // surface a loud warning. Authors who don't read the warnings field stay
   // backward-compatible; authors who do read it get a teaching moment instead
