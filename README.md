@@ -1,5 +1,7 @@
 # Unified Product Graph — Tools
 
+> 🧪 **Public beta.** UPG v0.6 is an early public beta — the spec, APIs, and these packages may still change. Not broadly announced yet; issues and feedback are very welcome.
+
 The **reference implementation** of the [UPG standard](https://github.com/unified-product-graph/spec): a programmatic SDK, a CLI, local + cloud MCP servers, import adapters, and the `.upg.md` renderer.
 
 > **Read-only mirror.** Synced one-way from the canonical TPC monorepo. UPG is currently developed upstream; this repo exists for source transparency and the npm `repository` link. Issues welcome. PRs are accepted by being ported upstream — we're migrating toward develop-in-the-open.
