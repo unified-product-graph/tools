@@ -93,7 +93,7 @@ const PROPERTY_HEURISTICS: Array<{
   },
   {
     required: ['priority', 'status', 'assignee'],
-    inferred_entity_type: 'story_statement',
+    inferred_entity_type: 'user_story',
     confidence: 'low',
     reason: 'Priority + Status + Assignee: task or story pattern',
   },

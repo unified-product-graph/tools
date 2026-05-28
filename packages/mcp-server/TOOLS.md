@@ -1922,7 +1922,7 @@ JSON: `{ patterns: string[], total: number }`
 
 ### `list_frameworks`
 
-List canonical `UPGFramework` definitions (several hundred records spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.
+List the canonical `UPGFramework` definitions — the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2496,6 +2496,31 @@ pure spec-shape check; `skip_drift: true` for catalog-only.
     "anti_pattern_violations_medium": 2,
     "anti_pattern_violations_low": 0,
     "spec_version": "0.5.0",
+    "scope": "all"
+  },
+  "entity_drift": [
+    { "id": "pain_01", "type": "pain_point", "title": "Slow onboarding", "suggested_migration": { "kind": "rename", "to": "need" } }
+  ],
+  "anti_pattern_violations": [
+    { "anti_pattern_id": "features-without-hypotheses", "severity": "high", "remediation": "Add hypothesis_claim nodes linked to features via feature_tests_hypothesis" }
+  ],
+  "_hash": "sha256-abc123"
+}
+
+// Run a full graph health check — schema drift + anti-pattern violations
+// Input:
+{}
+// Output (truncated):
+{
+  "valid": false,
+  "summary": {
+    "entity_drift": 2,
+    "edge_drift": 0,
+    "property_drift": 1,
+    "anti_pattern_violations_high": 1,
+    "anti_pattern_violations_medium": 2,
+    "anti_pattern_violations_low": 0,
+    "spec_version": "0.4.0",
     "scope": "all"
   },
   "entity_drift": [

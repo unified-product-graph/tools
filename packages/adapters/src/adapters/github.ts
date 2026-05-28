@@ -6,7 +6,7 @@
  * warning: they are code-layer artifacts below UPG's scope.
  *
  * Mapping:
- * - Issue        → feature | bug | epic | story_statement | task
+ * - Issue        → feature | bug | epic | user_story | task
  *                  (discriminated via labels: see inferIssueType)
  * - Repository   → code_repository
  * - Milestone    → milestone
@@ -120,7 +120,7 @@ export function inferIssueType(labels: string[]): string {
   if (lower.some((l) => BUG_LABELS.has(l))) return 'bug'
   if (lower.some((l) => FEATURE_LABELS.has(l))) return 'feature'
   if (lower.some((l) => EPIC_LABELS.has(l))) return 'epic'
-  if (lower.some((l) => STORY_LABELS.has(l))) return 'story_statement'
+  if (lower.some((l) => STORY_LABELS.has(l))) return 'user_story'
   if (lower.some((l) => TASK_LABELS.has(l))) return 'task'
   return 'task' // default: unlabelled issues are delivery tasks
 }
@@ -236,7 +236,7 @@ export class GitHubAdapter implements UPGAdapter {
    * Pass 3: Resolve deferred cross-domain edges after all nodes are built.
    *
    * Mapping logic:
-   * - entity_type "issue"        → feature | bug | epic | story_statement | task
+   * - entity_type "issue"        → feature | bug | epic | user_story | task
    * - entity_type "milestone"    → milestone
    * - entity_type "release"      → release
    * - entity_type "repository"   → code_repository

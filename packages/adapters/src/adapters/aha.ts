@@ -15,7 +15,7 @@
  * - When an Idea is promoted to a Feature, a stub opportunity node is created:
  *   feature_request → stub opportunity → feature
  * - Key Result fields (target, current, unit) are preserved on the node
- * - Requirement → acceptance_criterion (not story_statement: Aha! Requirements
+ * - Requirement → acceptance_criterion (not user_story: Aha! Requirements
  *   are verifiable conditions, not user narratives)
  * - Product Line: no direct UPG equivalent: treated as grouping context, not emitted
  * - Scorecard Metric: stored as priority_score property, not as metric nodes
@@ -26,7 +26,7 @@
  * - key_result_tracked_by_metric        (key_result → metric child)
  * - release_contains_feature            (release → feature)
  * - feature_decomposed_into_epic        (feature → epic)
- * - epic_specified_by_story_statement   (epic → requirement/acceptance_criterion)
+ * - epic_specified_by_user_story   (epic → requirement/acceptance_criterion)
  * - feature_request_creates_opportunity (idea → stub opportunity)
  * - outcome_delivered_by_feature        (goal/objective → feature)
  * - product_targets_persona             (product → persona)
@@ -413,7 +413,7 @@ function resolveAhaHierarchyEdge(
 
   // epic → requirement (acceptance_criterion)
   if (parent === 'epic' && child === 'requirement') {
-    return 'epic_specified_by_story_statement'
+    return 'epic_specified_by_user_story'
   }
 
   // product → persona

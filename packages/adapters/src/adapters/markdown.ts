@@ -27,7 +27,7 @@ import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../typ
  * "research"). Add multi-word entries to defeat substring collisions: do NOT
  * change the sort-by-length-descending algorithm.
  *
- * Aligned with the canonical UPG entity catalogue: story_statement vs
+ * Aligned with the canonical UPG entity catalogue: user_story vs
  * user_story, the persona / job / desired_outcome chain, and the
  * experiment_plan vs experiment_run split.
  */
@@ -38,14 +38,14 @@ const TYPE_KEYWORDS: Record<string, UPGEntityType> = {
   feature: 'feature',
   capability: 'feature',
   epic: 'epic',
-  // user_story splits into story_statement (design artefact) and story_task
+  // user_story splits into user_story (design artefact) and story_task
   // (work unit). Markdown docs describe the "As X I want Y" promise,
   // so headings like "Story", "User Story", and "Story Statement" map to
-  // story_statement. The longer multi-word keys must appear here so the
+  // user_story. The longer multi-word keys must appear here so the
   // sort-by-length-descending pass sees them before the bare "story" substring.
-  'story statement': 'story_statement',
-  'user story': 'story_statement',
-  story: 'story_statement',
+  'story statement': 'user_story',
+  'user story': 'user_story',
+  story: 'user_story',
   // desired_outcome sits under the persona/job hierarchy.
   // "desired outcome" must appear before bare "outcome" to defeat substring hit.
   'desired outcome': 'desired_outcome',

@@ -208,6 +208,32 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  *   "_hash": "sha256-abc123"
  * }
  *
+ * @example
+ * // Run a full graph health check — schema drift + anti-pattern violations
+ * // Input:
+ * {}
+ * // Output (truncated):
+ * {
+ *   "valid": false,
+ *   "summary": {
+ *     "entity_drift": 2,
+ *     "edge_drift": 0,
+ *     "property_drift": 1,
+ *     "anti_pattern_violations_high": 1,
+ *     "anti_pattern_violations_medium": 2,
+ *     "anti_pattern_violations_low": 0,
+ *     "spec_version": "0.4.0",
+ *     "scope": "all"
+ *   },
+ *   "entity_drift": [
+ *     { "id": "pain_01", "type": "pain_point", "title": "Slow onboarding", "suggested_migration": { "kind": "rename", "to": "need" } }
+ *   ],
+ *   "anti_pattern_violations": [
+ *     { "anti_pattern_id": "features-without-hypotheses", "severity": "high", "remediation": "Add hypothesis_claim nodes linked to features via feature_tests_hypothesis" }
+ *   ],
+ *   "_hash": "sha256-abc123"
+ * }
+ *
  * @returns JSON: `{ valid, summary, entity_drift?, edge_drift?,
  *   property_drift?, top_level_drift?, lifecycle_drift?, self_referential?,
  *   anti_pattern_violations?, notes?, _hash }`. Per-class drift arrays appear

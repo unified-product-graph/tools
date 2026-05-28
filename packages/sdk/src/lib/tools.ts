@@ -120,7 +120,7 @@ export const BUSINESS_AREAS: Record<string, { emoji: string; types: string[] }> 
   reaching: { emoji: '📣', types: ['ideal_customer_profile', 'positioning', 'messaging', 'acquisition_channel', 'content_strategy'] },
   converting: { emoji: '💰', types: ['value_proposition', 'pricing_tier', 'funnel', 'funnel_step'] },
   // (since v0.4.0) story_task collapsed into task; building area uses task for story work.
-  building: { emoji: '📦', types: ['feature', 'story_statement', 'epic', 'release', 'user_journey', 'user_flow'] },
+  building: { emoji: '📦', types: ['feature', 'user_story', 'epic', 'release', 'user_journey', 'user_flow'] },
   sustaining: { emoji: '🏦', types: ['business_model', 'revenue_stream', 'cost_structure', 'unit_economics', 'pricing_strategy'] },
   learning: { emoji: '📊', types: ['outcome', 'metric', 'objective', 'key_result', 'retrospective'] },
   // Operations is a maintenance-stage concern — incidents, postmortems, error
@@ -190,7 +190,7 @@ export const LIFECYCLE_PHASES: Record<string, string[]> = {
   // are deprecated aliases. evidence replaces hypothesis_evidence in new graphs.
   validation: ['hypothesis', 'experiment_plan', 'experiment_run', 'learning', 'evidence', 'experiment', 'hypothesis_claim', 'hypothesis_evidence'],
   // (since v0.4.0) story_task collapsed into task (deprecated alias).
-  execution: ['feature', 'epic', 'story_statement', 'release', 'task', 'bug', 'user_story', 'story_task'],
+  execution: ['feature', 'epic', 'user_story', 'release', 'task', 'bug', 'user_story', 'story_task'],
 }
 
 // ── Chain definitions ──────────────────────────────────────────────────────
@@ -206,10 +206,10 @@ export const CHAINS = [
   { name: 'hypothesis → experiment_plan', from: 'hypothesis', to: 'experiment_plan', edgePattern: 'experiment_plan' },
   { name: 'experiment_run → learning', from: 'experiment_run', to: 'learning', edgePattern: 'learning' },
   { name: 'objective → key_result', from: 'objective', to: 'key_result', edgePattern: 'key_result' },
-  // (v0.2.7 split 2) features specify story_statements (the design
+  // (v0.2.7 split 2) features specify user_storys (the design
   // artefact / promise). story_tasks are the delivery work, linked from
-  // story_statement via story_task_implements_story_statement.
-  { name: 'feature → story_statement', from: 'feature', to: 'story_statement', edgePattern: 'story_statement' },
+  // user_story via story_task_implements_user_story.
+  { name: 'feature → user_story', from: 'feature', to: 'user_story', edgePattern: 'user_story' },
 ] as const
 
 // ── Type sort order (for tree rendering — group children by type) ────────────

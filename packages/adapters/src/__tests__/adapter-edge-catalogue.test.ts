@@ -109,7 +109,7 @@ describe('MarkdownAdapter — edges are all catalogued', () => {
     assertAllEdgesCatalogued(result.edges, 'MarkdownAdapter multi-entity')
   })
 
-  it('maps "story"/"user story" headings to story_statement (not user_story)', async () => {
+  it('maps "story"/"user story" headings to user_story (not story_statement)', async () => {
     const items = await adapter.list({
       content: [
         '# Feature',
@@ -120,11 +120,11 @@ describe('MarkdownAdapter — edges are all catalogued', () => {
       ].join('\n'),
     })
     const result = await adapter.convert(items)
-    const storyNodes = result.nodes.filter((n) => n.type === 'story_statement')
-    const legacyNodes = result.nodes.filter((n) => n.type === 'user_story')
+    const storyNodes = result.nodes.filter((n) => n.type === 'user_story')
+    const legacyNodes = result.nodes.filter((n) => n.type === 'story_statement')
     expect(storyNodes.length).toBeGreaterThan(0)
     expect(legacyNodes.length).toBe(0)
-    assertAllEdgesCatalogued(result.edges, 'MarkdownAdapter story_statement mapping')
+    assertAllEdgesCatalogued(result.edges, 'MarkdownAdapter user_story mapping')
   })
 
   it('experiment headings map to the canonical experiment type', async () => {
@@ -173,13 +173,13 @@ describe('NotionAdapter — edges are all catalogued', () => {
     expect(result.edges.length).toBe(2)
   })
 
-  it('"User Stories" database maps to story_statement (not user_story)', async () => {
+  it('"User Stories" database maps to user_story (not story_statement)', async () => {
     const items: SourceItem[] = [
       makeItem('s-1', 'As a user...', 'database_item', 'User Stories'),
     ]
     const result = await adapter.convert(items)
-    const storyNodes = result.nodes.filter((n) => n.type === 'story_statement')
-    const legacyNodes = result.nodes.filter((n) => n.type === 'user_story')
+    const storyNodes = result.nodes.filter((n) => n.type === 'user_story')
+    const legacyNodes = result.nodes.filter((n) => n.type === 'story_statement')
     expect(storyNodes.length).toBe(1)
     expect(legacyNodes.length).toBe(0)
   })

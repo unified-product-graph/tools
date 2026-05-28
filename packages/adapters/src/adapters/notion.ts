@@ -57,11 +57,11 @@ export const DATABASE_TYPE_MAP: Record<string, string | null> = {
   epic: 'epic',
   epics: 'epic',
 
-  story: 'story_statement',
-  stories: 'story_statement',
-  'user story': 'story_statement',
-  'user stories': 'story_statement',
-  'story statements': 'story_statement',
+  story: 'user_story',
+  stories: 'user_story',
+  'user story': 'user_story',
+  'user stories': 'user_story',
+  'story statements': 'user_story',
 
   release: 'release',
   releases: 'release',
@@ -367,10 +367,10 @@ export const RELATION_EDGE_MAP: Record<string, string> = {
   'decomposed into': 'feature_decomposed_into_epic',
   'broken into epics': 'feature_decomposed_into_epic',
 
-  // epic → story_statement
-  'specified by': 'epic_specified_by_story_statement',
-  'broken into stories': 'epic_specified_by_story_statement',
-  stories: 'epic_specified_by_story_statement',
+  // epic → user_story
+  'specified by': 'epic_specified_by_user_story',
+  'broken into stories': 'epic_specified_by_user_story',
+  stories: 'epic_specified_by_user_story',
 
   // project → initiative
   implements: 'project_implements_initiative',

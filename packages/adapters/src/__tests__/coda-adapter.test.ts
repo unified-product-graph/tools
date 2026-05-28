@@ -271,7 +271,7 @@ describe('CodaAdapter — lookup column edge emission', () => {
     expect(edge?.mapping_confidence).toBe('medium')
   })
 
-  it('story with Epic lookup emits epic_specified_by_story_statement edge', async () => {
+  it('story with Epic lookup emits epic_specified_by_user_story edge', async () => {
     const items: SourceItem[] = [
       makeRow('epic1', 'Onboarding epic', 'Epics'),
       makeRow('story1', 'As a user I can...', 'Stories', {
@@ -281,8 +281,8 @@ describe('CodaAdapter — lookup column edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'epic_specified_by_story_statement')
-    const edge = result.edges.find((e) => e.type === 'epic_specified_by_story_statement')
+    assertAllEdgesCatalogued(result.edges, 'epic_specified_by_user_story')
+    const edge = result.edges.find((e) => e.type === 'epic_specified_by_user_story')
     expect(edge).toBeDefined()
   })
 
@@ -490,7 +490,7 @@ describe('CodaAdapter — full fixture: all emitted edges are catalogued', () =>
     expect(result.edges.find((e) => e.type === 'key_result_tracked_by_metric')).toBeDefined()
     expect(result.edges.find((e) => e.type === 'opportunity_drives_solution')).toBeDefined()
     expect(result.edges.find((e) => e.type === 'release_contains_feature')).toBeDefined()
-    expect(result.edges.find((e) => e.type === 'epic_specified_by_story_statement')).toBeDefined()
+    expect(result.edges.find((e) => e.type === 'epic_specified_by_user_story')).toBeDefined()
   })
 })
 

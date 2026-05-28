@@ -1,7 +1,7 @@
 /**
  * — `skill_audit` reports source-vs-deployed status for UPG skills.
  *
- * Surfaces the exact failure mode caught in the 2026-05-23 Ro Laren E2E
+ * Surfaces the exact failure mode caught in a 2026-05-23 QA E2E
  * audit: deployed `.claude/skills/<name>/SKILL.md` files diverging silently
  * from canonical source because a real directory was committed instead of
  * a symlink. Runners need an in-session signal that "what I'm about to

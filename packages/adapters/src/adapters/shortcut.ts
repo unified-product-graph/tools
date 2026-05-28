@@ -15,8 +15,8 @@
  * - objective  → key_result     → objective_achieved_through_key_result
  * - key_result → metric         → key_result_tracked_by_metric
  * - project    → epic           → project_delivers_epic
- * - epic       → story (feature) → epic_specified_by_story_statement
- * - story (feature) → task      → task_implements_story_statement
+ * - epic       → story (feature) → epic_specified_by_user_story
+ * - story (feature) → task      → task_implements_user_story
  * - story (bug) → story (feature) → bug_affects_feature
  * - team       → any entity     → node_owned_by_team
  *
@@ -40,13 +40,13 @@ import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../typ
  * Maps Shortcut story_type values to UPG entity types.
  *
  * The story_type field is the CRITICAL discriminator for Story entities.
- * A feature story in Shortcut IS a UPG story_statement. A bug IS a bug.
+ * A feature story in Shortcut IS a UPG user_story. A bug IS a bug.
  * A chore IS a task (engineering maintenance, no user-facing capability).
  *
  * All UPG entity types verified against the live catalog.
  */
 export const SHORTCUT_STORY_TYPE_MAP: Record<string, string> = {
-  feature: 'story_statement',
+  feature: 'user_story',
   bug: 'bug',
   chore: 'task',
 }
@@ -62,7 +62,7 @@ export const SHORTCUT_STORY_TYPE_MAP: Record<string, string> = {
  * All UPG entity types verified against the live catalog.
  */
 export const SHORTCUT_ENTITY_TYPE_MAP: Record<string, string | null> = {
-  story: 'story_statement', // default when story_type is missing
+  story: 'user_story', // default when story_type is missing
   epic: 'epic',
   objective: 'objective',
   key_result: 'key_result',
@@ -137,7 +137,7 @@ export function resolveShortcutEntityType(entityType: string): string | null | u
 /** Resolve a Shortcut story_type to a UPG entity type */
 export function resolveStoryType(storyType: string): string {
   const lower = normalizeName(storyType)
-  return SHORTCUT_STORY_TYPE_MAP[lower] ?? 'story_statement'
+  return SHORTCUT_STORY_TYPE_MAP[lower] ?? 'user_story'
 }
 
 /** Normalize a Shortcut status or health_status string to a UPG status value */
@@ -221,10 +221,10 @@ export class ShortcutAdapter implements UPGAdapter {
    *
    * Mapping logic:
    * - entity_type "story" → discriminated by metadata.story_type:
-   *     feature → story_statement
+   *     feature → user_story
    *     bug     → bug
    *     chore   → task
-   *     missing → story_statement (default, warning emitted)
+   *     missing → user_story (default, warning emitted)
    * - entity_type "epic"       → epic
    * - entity_type "objective"  → objective (status from health_status)
    * - entity_type "key_result" → key_result (current_value, target_value, unit preserved)
@@ -293,10 +293,10 @@ export class ShortcutAdapter implements UPGAdapter {
         if (!storyType) {
           warnings.push(
             `Shortcut Story "${item.title}" has no story_type field. ` +
-              `Defaulting to "story_statement". Set story_type to "feature", "bug", or "chore" ` +
+              `Defaulting to "user_story". Set story_type to "feature", "bug", or "chore" ` +
               `for accurate mapping.`,
           )
-          resolvedType = 'story_statement'
+          resolvedType = 'user_story'
           mappingConfidence = 'medium'
         } else {
           resolvedType = resolveStoryType(storyType)
@@ -543,12 +543,12 @@ function resolveShortcutEdge(
     return 'project_delivers_epic'
   }
 
-  // epic → story (feature) → story_statement
+  // epic → story (feature) → user_story
   if (parent === 'epic' && child === 'story') {
-    const resolvedStoryType = childStory ? SHORTCUT_STORY_TYPE_MAP[childStory] : 'story_statement'
+    const resolvedStoryType = childStory ? SHORTCUT_STORY_TYPE_MAP[childStory] : 'user_story'
 
-    if (!childStory || resolvedStoryType === 'story_statement') {
-      return 'epic_specified_by_story_statement'
+    if (!childStory || resolvedStoryType === 'user_story') {
+      return 'epic_specified_by_user_story'
     }
 
     // epic → story (bug): no canonical epic→bug edge; use node_informs_node fallback
@@ -560,10 +560,10 @@ function resolveShortcutEdge(
     return null
   }
 
-  // story (feature) → task: task_implements_story_statement
+  // story (feature) → task: task_implements_user_story
   // parent is a feature story, child is a task
   if (parent === 'story' && child === 'task') {
-    return 'task_implements_story_statement'
+    return 'task_implements_user_story'
   }
 
   // story (bug) → story (feature): bug_affects_feature

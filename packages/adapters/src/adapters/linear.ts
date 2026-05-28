@@ -7,7 +7,7 @@
  *
  * Mapping:
  * - Project    → project
- * - Issue      → feature | bug | task | story_statement | epic
+ * - Issue      → feature | bug | task | user_story | epic
  *                (discriminated via metadata.issue_type: Linear's issueType.name)
  * - Milestone  → milestone
  * - Document   → document
@@ -15,13 +15,13 @@
  * - Cycle      → SKIPPED (no UPG equivalent)
  *
  * Linear's hierarchy: Team > Project > Issue > Sub-issue
- * maps to UPG: team > project > feature/bug/task/story_statement/epic
+ * maps to UPG: team > project > feature/bug/task/user_story/epic
  *
  * Cross-domain edges emitted (when metadata is present):
  * - project → initiative    (project_implements_initiative)
  * - project → milestone     (project_targets_milestone)
- * - epic    → story_statement (epic_specified_by_story_statement)
- * - task    → story_statement (task_implements_story_statement)
+ * - epic    → user_story (epic_specified_by_user_story)
+ * - task    → user_story (task_implements_user_story)
  * - node    → team           (node_owned_by_team)
  * - bug     → feature        (bug_affects_feature, when parent is a feature)
  */
@@ -40,7 +40,7 @@ const LINEAR_ISSUE_TYPE_MAP: Record<string, string> = {
   feature: 'feature',
   bug: 'bug',
   chore: 'task',
-  story: 'story_statement',
+  story: 'user_story',
   epic: 'epic',
   // Default value used when issue_type is absent or unrecognised
   default: 'task',
@@ -108,7 +108,7 @@ function resolveIssueEntityType(meta: Record<string, unknown>): string {
   if (lowerLabels.some((l) => ['bug', 'defect', 'fix'].includes(l))) return 'bug'
   if (lowerLabels.some((l) => ['feature', 'enhancement', 'feat'].includes(l))) return 'feature'
   if (lowerLabels.some((l) => ['epic'].includes(l))) return 'epic'
-  if (lowerLabels.some((l) => ['story', 'user story'].includes(l))) return 'story_statement'
+  if (lowerLabels.some((l) => ['story', 'user story'].includes(l))) return 'user_story'
   if (lowerLabels.some((l) => ['tech debt', 'refactor', 'chore'].includes(l))) return 'task'
   return LINEAR_ISSUE_TYPE_MAP.default
 }
@@ -206,7 +206,7 @@ export class LinearAdapter implements UPGAdapter {
    *
    * Mapping logic:
    * - entity_type "project"    → project
-   * - entity_type "issue"      → feature | bug | task | story_statement | epic
+   * - entity_type "issue"      → feature | bug | task | user_story | epic
    *                              (discriminated by metadata.issue_type)
    * - entity_type "milestone"  → milestone
    * - entity_type "document"   → document
@@ -362,23 +362,23 @@ export class LinearAdapter implements UPGAdapter {
         })
       }
 
-      // epic → story_statement
+      // epic → user_story
       const parentSourceId = meta.parent_id as string | undefined
-      if (resolvedType === 'story_statement' && parentSourceId) {
+      if (resolvedType === 'user_story' && parentSourceId) {
         // The parent may be an epic: we defer and check once all nodes exist
         deferredEdges.push({
           fromSourceId: parentSourceId,
           toSourceId: item.source_id,
-          edgeType: 'epic_specified_by_story_statement' as UPGEdgeType,
+          edgeType: 'epic_specified_by_user_story' as UPGEdgeType,
         })
       }
 
-      // task → story_statement (when a task has a parent story)
+      // task → user_story (when a task has a parent story)
       if (resolvedType === 'task' && parentSourceId) {
         deferredEdges.push({
           fromSourceId: item.source_id,
           toSourceId: parentSourceId,
-          edgeType: 'task_implements_story_statement' as UPGEdgeType,
+          edgeType: 'task_implements_user_story' as UPGEdgeType,
         })
       }
 
@@ -429,16 +429,16 @@ export class LinearAdapter implements UPGAdapter {
         if (targetNode?.type !== 'feature') continue
       }
 
-      // For epic_specified_by_story_statement: only emit if the source IS an epic.
-      if (edgeType === 'epic_specified_by_story_statement') {
+      // For epic_specified_by_user_story: only emit if the source IS an epic.
+      if (edgeType === 'epic_specified_by_user_story') {
         const sourceNode = nodes.find((n) => n.id === fromNodeId)
         if (sourceNode?.type !== 'epic') continue
       }
 
-      // For task_implements_story_statement: only emit if the target IS a story_statement.
-      if (edgeType === 'task_implements_story_statement') {
+      // For task_implements_user_story: only emit if the target IS a user_story.
+      if (edgeType === 'task_implements_user_story') {
         const targetNode = nodes.find((n) => n.id === toNodeId)
-        if (targetNode?.type !== 'story_statement') continue
+        if (targetNode?.type !== 'user_story') continue
       }
 
       const edgeId = `edge-xdomain-${fromNodeId}-${toNodeId}`

@@ -9,7 +9,7 @@
  *
  *
  * Key structural notes:
- * - Story maps to story_statement (user narrative form)
+ * - Story maps to user_story (user narrative form)
  * - Data Item maps to observation (raw research input)
  * - Feedback maps to customer_feedback
  * - Roadmap + workspace → skipped (view/access concerns)
@@ -37,7 +37,7 @@ export const CRAFTIO_TYPE_MAP: Record<string, string | null> = {
   key_result: 'key_result',
   initiative: 'initiative',
   feature: 'feature',
-  story: 'story_statement',
+  story: 'user_story',
   milestone: 'milestone',
   release: 'release',
   persona: 'persona',
@@ -299,7 +299,7 @@ function resolveCraftioEdge(
   }
 
   // feature → story (story is sub-entity of feature)
-  // UPG does not have a direct feature→story_statement edge; use node_informs_node
+  // UPG does not have a direct feature→user_story edge; use node_informs_node
   if (parent === 'feature' && child === 'story') {
     return null // fall through to node_informs_node in caller if needed
   }

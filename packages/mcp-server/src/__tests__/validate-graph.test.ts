@@ -100,10 +100,12 @@ describe('validate_graph — entity_drift', () => {
 })
 
 describe('validate_graph — entity_drift split suggestions', () => {
- it('populates suggested_migration.to from produces[].type, not empty []', async () => {
- // user_story is in UPG_SPLIT_MIGRATIONS['0.2.7'] only (not in UPG_MIGRATIONS),
- // so it hits the split path. Produces: ['task', 'story_statement'] (since v0.4.0,
- // when story_task was collapsed back into task — additive-vocabulary rule).
+ it('treats canonical user_story as NOT drift; flags deprecated story_statement as rename → user_story', async () => {
+ // v0.7.0/: user_story is canonical again (the templated promise), so a
+ // user_story node must NOT surface as entity_drift even though it remains the
+ // historical split source in UPG_SPLIT_MIGRATIONS['0.2.7'] — canonicality is the
+ // authoritative signal (same as `experiment`). The deprecated alias
+ // story_statement is the type that now drifts: a 1→1 rename to user_story.
  const store = await loadStore(
  makeDoc(
  [
@@ -112,6 +114,11 @@ describe('validate_graph — entity_drift split suggestions', () => {
  type: 'user_story' as UPGEntityType,
  title: 'As a user I want X',
  } as UPGBaseNode,
+ {
+ id: 'ss1',
+ type: 'story_statement' as UPGEntityType,
+ title: 'As a user I want Y',
+ } as UPGBaseNode,
  ],
  [],
  ),
@@ -119,14 +126,12 @@ describe('validate_graph — entity_drift split suggestions', () => {
  const ctx = makeCtx(store)
  const result = await validateGraph({ scope: 'entity_drift' }, ctx)
  const body = JSON.parse(result.content[0].text)
+ // Only story_statement drifts; canonical user_story is left alone.
  expect(body.entity_drift).toHaveLength(1)
  const entry = body.entity_drift[0]
- expect(entry.type).toBe('user_story')
- expect(entry.suggested_migration.kind).toBe('split')
- expect(Array.isArray(entry.suggested_migration.to)).toBe(true)
- expect(entry.suggested_migration.to).not.toHaveLength(0)
- expect(entry.suggested_migration.to).toContain('task')
- expect(entry.suggested_migration.to).toContain('story_statement')
+ expect(entry.type).toBe('story_statement')
+ expect(entry.suggested_migration.kind).toBe('rename')
+ expect(entry.suggested_migration.to).toBe('user_story')
  })
 })
 

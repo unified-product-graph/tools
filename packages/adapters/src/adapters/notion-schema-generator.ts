@@ -45,7 +45,7 @@ export const ENTITY_DATABASE_NAMES: Record<string, string> = {
   feature: 'Features',
   feature_area: 'Feature Areas',
   epic: 'Epics',
-  story_statement: 'Stories',
+  user_story: 'Stories',
   task: 'Tasks',
   bug: 'Bugs',
   insight: 'Insights',
@@ -107,7 +107,7 @@ export const EDGE_RELATION_VERBS: Record<string, { forward: string; reverse: str
   outcome_delivered_via_feature_area: { forward: 'Delivered via Area', reverse: 'Delivers Outcome' },
   initiative_drives_outcome: { forward: 'Drives', reverse: 'Driven by Initiative' },
   feature_decomposed_into_epic: { forward: 'Epics', reverse: 'Feature' },
-  epic_specified_by_story_statement: { forward: 'Stories', reverse: 'Epic' },
+  epic_specified_by_user_story: { forward: 'Stories', reverse: 'Epic' },
   project_implements_initiative: { forward: 'Implements', reverse: 'Implemented by' },
   document_describes_decision: { forward: 'Describes Decision', reverse: 'Documented in' },
   document_contains_insight: { forward: 'Contains Insight', reverse: 'Source Document' },
@@ -299,7 +299,7 @@ export function generateDatabaseSchema(entityType: string): NotionDatabaseSchema
       },
     },
 
-    story_statement: {
+    user_story: {
       'Acceptance Criteria': {
         type: 'rich_text',
         name: 'Acceptance Criteria',

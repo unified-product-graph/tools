@@ -66,10 +66,10 @@ const adapter = new ShortcutAdapter()
 // ─── Story type discrimination ────────────────────────────────────────────────
 
 describe('ShortcutAdapter — story_type discrimination', () => {
-  it('story with story_type "feature" maps to story_statement with confidence high', async () => {
+  it('story with story_type "feature" maps to user_story with confidence high', async () => {
     const result = await adapter.convert([makeStory('s1', 'Add dark mode', 'feature')])
     expect(result.nodes).toHaveLength(1)
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
     expect(result.nodes[0].mapping_confidence).toBe('high')
     expect(result.nodes[0].external_tool).toBe('shortcut')
   })
@@ -86,13 +86,13 @@ describe('ShortcutAdapter — story_type discrimination', () => {
     expect(result.nodes[0].mapping_confidence).toBe('high')
   })
 
-  it('story with missing story_type defaults to story_statement with confidence medium and warning', async () => {
+  it('story with missing story_type defaults to user_story with confidence medium and warning', async () => {
     const result = await adapter.convert([makeStory('s1', 'Vague story')])
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
     expect(result.nodes[0].mapping_confidence).toBe('medium')
     const warnText = result.warnings?.join(' ') ?? ''
     expect(warnText).toContain('no story_type field')
-    expect(warnText).toContain('story_statement')
+    expect(warnText).toContain('user_story')
     expect(warnText).toContain('feature')
   })
 })
@@ -323,7 +323,7 @@ describe('ShortcutAdapter — edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('epic_specified_by_story_statement emitted when feature story has epic parent', async () => {
+  it('epic_specified_by_user_story emitted when feature story has epic parent', async () => {
     const items: SourceItem[] = [
       makeEntity('e1', 'Auth epic', 'epic'),
       makeStory('s1', 'As a user I want to login', 'feature', {
@@ -333,13 +333,13 @@ describe('ShortcutAdapter — edge emission', () => {
     ]
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'epic → feature story')
-    const edge = result.edges.find((e) => e.type === 'epic_specified_by_story_statement')
+    const edge = result.edges.find((e) => e.type === 'epic_specified_by_user_story')
     expect(edge).toBeDefined()
     expect(edge?.source).toBe(result.source_map['e1'])
     expect(edge?.target).toBe(result.source_map['s1'])
   })
 
-  it('task_implements_story_statement emitted when task has story (feature) parent', async () => {
+  it('task_implements_user_story emitted when task has story (feature) parent', async () => {
     const items: SourceItem[] = [
       makeStory('s1', 'Login feature', 'feature'),
       makeEntity('tk1', 'Write login tests', 'task', {
@@ -349,7 +349,7 @@ describe('ShortcutAdapter — edge emission', () => {
     ]
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'story → task')
-    const edge = result.edges.find((e) => e.type === 'task_implements_story_statement')
+    const edge = result.edges.find((e) => e.type === 'task_implements_user_story')
     expect(edge).toBeDefined()
   })
 

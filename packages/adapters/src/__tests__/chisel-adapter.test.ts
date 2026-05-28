@@ -85,10 +85,10 @@ describe('ChiselAdapter — entity_type → UPG type mapping', () => {
     expect(result.nodes[0].mapping_confidence).toBe('high')
   })
 
-  it('user_story maps to story_statement with confidence medium', async () => {
+  it('user_story maps to user_story with confidence medium', async () => {
     const items: SourceItem[] = [makeItem('us1', 'As a user I want...', 'user_story')]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
     expect(result.nodes[0].mapping_confidence).toBe('medium')
   })
 

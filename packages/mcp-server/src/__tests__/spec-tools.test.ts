@@ -47,11 +47,9 @@ import {
  resolveLabel,
  getVisibleTypes,
  getLens,
-} from '@unified-product-graph/core'
-import {
  UPG_FRAMEWORK_CATEGORIES,
  UPG_STRUCTURE_PATTERNS,
-} from '@unified-product-graph/frameworks'
+} from '@unified-product-graph/core'
 import {
  listPlaybooks,
  getPlaybook,

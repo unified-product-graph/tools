@@ -6,7 +6,7 @@
  * they are engineering collaboration objects below UPG's scope.
  *
  * Mapping:
- * - Issue (label-discriminated) → bug | story_statement | epic | task
+ * - Issue (label-discriminated) → bug | user_story | epic | task
  * - Issue (issue_type=incident) → incident
  * - Epic (native GitLab Epic) → epic
  * - Milestone                  → release
@@ -21,8 +21,8 @@
  * - product → project                (product_organises_into_feature_area, approximation)
  * - project → epic                   (project_delivers_epic)
  * - epic → child epic                (feature_decomposed_into_epic)
- * - epic → story_statement/task/bug  (epic_specified_by_story_statement)
- * - release → story_statement/task   (release_contains_feature)
+ * - epic → user_story/task/bug  (epic_specified_by_user_story)
+ * - release → user_story/task   (release_contains_feature)
  * - release → bug                    (release_contains_bug)
  *
  */
@@ -45,9 +45,9 @@ export const GITLAB_ISSUE_LABEL_MAP: Record<string, string> = {
   defect: 'bug',
   fix: 'bug',
   // Feature / story labels
-  feature: 'story_statement',
-  enhancement: 'story_statement',
-  'feature request': 'story_statement',
+  feature: 'user_story',
+  enhancement: 'user_story',
+  'feature request': 'user_story',
   // Epic label (label-based convention; overridden if using native GitLab Epics)
   epic: 'epic',
   // Task / chore labels
@@ -105,7 +105,7 @@ export const GITLAB_STATUS_MAP: Record<string, string> = {
  * Precedence:
  * 1. issue_type == 'incident' (highest priority: platform-level type)
  * 2. Bug labels
- * 3. Feature / story labels → story_statement
+ * 3. Feature / story labels → user_story
  * 4. Epic label
  * 5. Task / chore / tech-debt labels
  * 6. Default: task (unlabelled issues are tasks)
@@ -121,7 +121,7 @@ export function inferIssueType(labels: string[], issueType?: string): string {
 
   // Feature / story labels
   const featureLabels = new Set(['feature', 'enhancement', 'feature request'])
-  if (lower.some((l) => featureLabels.has(l))) return 'story_statement'
+  if (lower.some((l) => featureLabels.has(l))) return 'user_story'
 
   // Epic label
   if (lower.includes('epic')) return 'epic'
@@ -182,7 +182,7 @@ export class GitLabAdapter implements UPGAdapter {
    * Pass 3: Resolve deferred cross-domain edges after all nodes are built.
    *
    * Mapping logic:
-   * - entity_type "issue"        → bug | story_statement | epic | task | incident
+   * - entity_type "issue"        → bug | user_story | epic | task | incident
    * - entity_type "epic"         → epic (native GitLab Epic)
    * - entity_type "milestone"    → release
    * - entity_type "group"        → product
@@ -422,7 +422,7 @@ export class GitLabAdapter implements UPGAdapter {
             edgeType: 'release_contains_bug' as UPGEdgeType,
           })
         } else {
-          // story_statement, task, epic, incident: use release_contains_feature as approximation
+          // user_story, task, epic, incident: use release_contains_feature as approximation
           deferredEdges.push({
             fromSourceId: milestoneLinkId,
             toSourceId: item.source_id,
@@ -440,13 +440,13 @@ export class GitLabAdapter implements UPGAdapter {
         })
       }
 
-      // Issue/epic belongs to an epic → epic_specified_by_story_statement
+      // Issue/epic belongs to an epic → epic_specified_by_user_story
       const epicId = meta.epic_id as string | undefined
       if (isIssue && epicId) {
         deferredEdges.push({
           fromSourceId: epicId,
           toSourceId: item.source_id,
-          edgeType: 'epic_specified_by_story_statement' as UPGEdgeType,
+          edgeType: 'epic_specified_by_user_story' as UPGEdgeType,
         })
       }
 

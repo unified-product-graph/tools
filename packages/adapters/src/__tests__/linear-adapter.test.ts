@@ -78,9 +78,9 @@ describe('LinearAdapter — issue type mapping (via issue_type)', () => {
     expect(result.nodes[0].type).toBe('task')
   })
 
-  it('story maps to story_statement', async () => {
+  it('story maps to user_story', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'As a user I want...', 'story')])
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
   })
 
   it('epic issue maps to epic entity', async () => {
@@ -256,13 +256,13 @@ describe('LinearAdapter — cross-domain edge emission', () => {
     expect(result.edges.find((e) => e.type === 'project_implements_initiative')).toBeUndefined()
   })
 
-  it('epic_specified_by_story_statement edge emitted when story parent_id points to an epic', async () => {
+  it('epic_specified_by_user_story edge emitted when story parent_id points to an epic', async () => {
     const items: SourceItem[] = [
       makeIssue('epic-1', 'Auth epic', 'epic'),
       makeIssue('story-1', 'As a user...', 'story', { parent_id: 'epic-1' }),
     ]
     const result = await adapter.convert(items)
-    const specEdge = result.edges.find((e) => e.type === 'epic_specified_by_story_statement')
+    const specEdge = result.edges.find((e) => e.type === 'epic_specified_by_user_story')
     expect(specEdge).toBeDefined()
     const epicNodeId = result.source_map['epic-1']
     const storyNodeId = result.source_map['story-1']

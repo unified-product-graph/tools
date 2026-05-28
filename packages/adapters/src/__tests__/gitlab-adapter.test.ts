@@ -169,16 +169,16 @@ describe('inferIssueType', () => {
     expect(inferIssueType(['fix'])).toBe('bug')
   })
 
-  it('feature label → story_statement', () => {
-    expect(inferIssueType(['feature'])).toBe('story_statement')
+  it('feature label → user_story', () => {
+    expect(inferIssueType(['feature'])).toBe('user_story')
   })
 
-  it('enhancement label → story_statement', () => {
-    expect(inferIssueType(['enhancement'])).toBe('story_statement')
+  it('enhancement label → user_story', () => {
+    expect(inferIssueType(['enhancement'])).toBe('user_story')
   })
 
-  it('feature request label → story_statement', () => {
-    expect(inferIssueType(['feature request'])).toBe('story_statement')
+  it('feature request label → user_story', () => {
+    expect(inferIssueType(['feature request'])).toBe('user_story')
   })
 
   it('epic label → epic', () => {
@@ -217,8 +217,8 @@ describe('inferIssueType', () => {
 
   it('labels are case-insensitive', () => {
     expect(inferIssueType(['Bug'])).toBe('bug')
-    expect(inferIssueType(['ENHANCEMENT'])).toBe('story_statement')
-    expect(inferIssueType(['Feature Request'])).toBe('story_statement')
+    expect(inferIssueType(['ENHANCEMENT'])).toBe('user_story')
+    expect(inferIssueType(['Feature Request'])).toBe('user_story')
   })
 })
 
@@ -231,14 +231,14 @@ describe('GitLabAdapter — issue type mapping via labels', () => {
     expect(result.nodes[0].mapping_confidence).toBe('high')
   })
 
-  it('issue with "enhancement" label maps to story_statement', async () => {
+  it('issue with "enhancement" label maps to user_story', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Dark mode', ['enhancement'])])
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
   })
 
-  it('issue with "feature" label maps to story_statement', async () => {
+  it('issue with "feature" label maps to user_story', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'New dashboard', ['feature'])])
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
   })
 
   it('issue with "epic" label maps to epic', async () => {
@@ -342,7 +342,7 @@ describe('GitLabAdapter — merge request skipping', () => {
       makeIssue('i-1', 'Dark mode', ['feature']),
     ])
     expect(result.nodes).toHaveLength(1)
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
   })
 })
 
@@ -420,14 +420,14 @@ describe('GitLabAdapter — edge emission', () => {
     expect(edge?.target).toBe(result.source_map['i-1'])
   })
 
-  it('epic_specified_by_story_statement emitted when issue has epic_id', async () => {
+  it('epic_specified_by_user_story emitted when issue has epic_id', async () => {
     const items: SourceItem[] = [
       makeEpic('ep-1', 'Auth system'),
       makeIssue('i-1', 'Login page', ['feature'], { epic_id: 'ep-1' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'epic_specified_by_story_statement')
-    const edge = result.edges.find((e) => e.type === 'epic_specified_by_story_statement')
+    assertAllEdgesCatalogued(result.edges, 'epic_specified_by_user_story')
+    const edge = result.edges.find((e) => e.type === 'epic_specified_by_user_story')
     expect(edge).toBeDefined()
     expect(edge?.source).toBe(result.source_map['ep-1'])
     expect(edge?.target).toBe(result.source_map['i-1'])
@@ -557,8 +557,8 @@ describe('GitLabAdapter — source_map, external_tool, external_id', () => {
 describe('GitLabAdapter — exported constants', () => {
   it('GITLAB_ISSUE_LABEL_MAP includes expected labels', () => {
     expect(GITLAB_ISSUE_LABEL_MAP['bug']).toBe('bug')
-    expect(GITLAB_ISSUE_LABEL_MAP['enhancement']).toBe('story_statement')
-    expect(GITLAB_ISSUE_LABEL_MAP['feature']).toBe('story_statement')
+    expect(GITLAB_ISSUE_LABEL_MAP['enhancement']).toBe('user_story')
+    expect(GITLAB_ISSUE_LABEL_MAP['feature']).toBe('user_story')
     expect(GITLAB_ISSUE_LABEL_MAP['epic']).toBe('epic')
     expect(GITLAB_ISSUE_LABEL_MAP['task']).toBe('task')
     expect(GITLAB_ISSUE_LABEL_MAP['tech-debt']).toBe('task')

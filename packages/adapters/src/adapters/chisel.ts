@@ -39,7 +39,7 @@ export const CHISEL_TYPE_MAP: Record<string, string | null> = {
   pillar: 'initiative',           // strategic pillar / theme
   idea: 'opportunity',            // Chisel's ideation layer = UPG opportunity
   feature: 'feature',
-  user_story: 'story_statement',
+  user_story: 'user_story',
   persona: 'persona',
   feedback: 'customer_feedback',
   insight: 'insight',

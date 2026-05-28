@@ -913,7 +913,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_frameworks',
     description:
-      'List canonical `UPGFramework` definitions (several hundred records spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.',
+      'List the canonical `UPGFramework` definitions — the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.',
     inputSchema: {
       type: 'object' as const,
       properties: {

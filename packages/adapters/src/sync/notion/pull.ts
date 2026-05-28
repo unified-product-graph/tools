@@ -54,7 +54,7 @@ const DB_NAME_PATTERNS: Array<{ pattern: RegExp; entity_type: string }> = [
   { pattern: /\bcontent piece/i, entity_type: 'content_piece' },
   { pattern: /\bresearch study/i, entity_type: 'research_study' },
   { pattern: /\bsprint|cycle/i, entity_type: 'sprint' },
-  { pattern: /\bstory|user stor/i, entity_type: 'story_statement' },
+  { pattern: /\bstory|user stor/i, entity_type: 'user_story' },
   { pattern: /\bopportunity|opportunit/i, entity_type: 'opportunity' },
   { pattern: /\bhypothes/i, entity_type: 'hypothesis' },
   { pattern: /\bexperiment/i, entity_type: 'experiment' },

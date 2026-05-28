@@ -104,15 +104,16 @@ import {
   type UPGLifecycle,
   type UPGScaleDefinition,
   type UPGDomainRing,
-} from '@unified-product-graph/core'
-
-import {
+  // Framework catalog — sourced from core's CANONICAL surface (34), not the
+  // internal @unified-product-graph/frameworks research library (216). The
+  // public tool surface advertises only the curated canonical set; research
+  // frameworks are promoted into canonical.ts incrementally as reviewed.
   UPG_FRAMEWORKS,
   UPG_FRAMEWORKS_BY_ID,
   UPG_FRAMEWORK_CATEGORIES,
   UPG_STRUCTURE_PATTERNS,
   type UPGFramework,
-} from '@unified-product-graph/frameworks'
+} from '@unified-product-graph/core'
 
 import type { ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
@@ -755,11 +756,10 @@ export const getDomainGuide: ToolHandler = (args): ToolResult => {
 // ── Frameworks ──────────────────────────────────────────────────────────────
 
 /**
- * List canonical UPGFramework definitions (several hundred records spanning
- * strategy, discovery, prioritisation, design, growth, engineering, and the
- * reflection classics). Paginated (default `limit: 50`, max 200) because
- * the full payload is large enough to overflow MCP transports if returned
- * in one shot.
+ * List the canonical UPGFramework definitions — the 34 curated, famous
+ * frameworks that anchor the public catalog (spanning strategy, discovery,
+ * prioritisation, design, growth, engineering, and the reflection classics).
+ * Paginated (default `limit: 50`, max 200).
  *
  * Cursor is opaque base64 (`offset:N`). Pass the `next_cursor` from a previous
  * response to advance; omit to start from the first page. The optional

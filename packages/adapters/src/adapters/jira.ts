@@ -17,8 +17,8 @@
  * - IssueLink "Causes": creates a root_cause node + root_cause_causes_bug edge
  *
  * Hierarchy edges emitted:
- * - epic_specified_by_story_statement   (epic → story or task)
- * - task_implements_story_statement     (sub-task → story parent)
+ * - epic_specified_by_user_story   (epic → story or task)
+ * - task_implements_user_story     (sub-task → story parent)
  * - project_delivers_epic               (project → epic)
  * - feature_area_contains_feature       (component → issue mapped as feature/story)
  * - release_contains_feature            (fixVersion → feature/story/epic)
@@ -39,8 +39,8 @@ import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../typ
  */
 export const JIRA_ISSUE_TYPE_MAP: Record<string, string | null> = {
   // Standard issue types
-  story: 'story_statement',
-  'user story': 'story_statement',
+  story: 'user_story',
+  'user story': 'user_story',
   task: 'task',
   'sub-task': 'task',
   subtask: 'task',
@@ -646,10 +646,10 @@ function resolveJiraHierarchyEdge(
   // epic → story / user story / task / chore / spike / design
   if (parent === 'epic') {
     if (child === 'story' || child === 'user story') {
-      return 'epic_specified_by_story_statement'
+      return 'epic_specified_by_user_story'
     }
     if (child === 'task' || child === 'sub-task' || child === 'subtask' || child === 'chore' || child === 'spike' || child === 'design' || child === 'change') {
-      return 'epic_specified_by_story_statement' // best available for task-under-epic
+      return 'epic_specified_by_user_story' // best available for task-under-epic
     }
     if (child === 'bug' || child === 'defect' || child === 'problem') {
       return null // no canonical epic→bug hierarchy edge: skip
@@ -658,12 +658,12 @@ function resolveJiraHierarchyEdge(
 
   // story → sub-task
   if ((parent === 'story' || parent === 'user story') && (child === 'sub-task' || child === 'subtask')) {
-    return 'task_implements_story_statement'
+    return 'task_implements_user_story'
   }
 
   // task → sub-task (generic)
   if (parent === 'task' && (child === 'sub-task' || child === 'subtask')) {
-    return 'task_implements_story_statement'
+    return 'task_implements_user_story'
   }
 
   // component → feature/story/epic (structural entity → issue)

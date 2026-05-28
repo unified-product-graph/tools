@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/mcp-server",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Local MCP server for .upg files. Read and write product knowledge graphs offline.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
@@ -37,6 +37,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
+    "prebuild": "cd ../upg-frameworks && npm run build",
     "build": "tsup",
     "postbuild": "npm run generate-tools",
     "dev": "echo '@unified-product-graph/mcp-server: standalone only. Run with: npx upg-mcp-server --file <path.upg>'",

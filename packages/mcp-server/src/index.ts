@@ -219,9 +219,27 @@ export async function runMcpServer() {
 // When imported as a library (e.g. by `@unified-product-graph/mcp` for the
 // `upg mcp run` subcommand), the importer calls runMcpServer() directly and
 // this branch is skipped.
+//
+// We compare *realpaths*, not the raw strings. `process.argv[1]` is the literal
+// invocation path, while `import.meta.url` is symlink-resolved by the ESM
+// loader. They diverge whenever a symlink sits anywhere in the path — npx
+// `.bin` shims, macOS `/tmp` → `/private/tmp`, and global installs all do this.
+// A raw-string compare would then evaluate false, the server would never start,
+// and `node dist/index.js` / `npx @unified-product-graph/mcp-server` would
+// silently exit 0 — which surfaces to MCP clients as "Failed to connect".
 import { fileURLToPath } from 'node:url'
-const isMainModule = process.argv[1] === fileURLToPath(import.meta.url)
-if (isMainModule) {
+import { realpathSync } from 'node:fs'
+
+function isEntrypoint(): boolean {
+  if (!process.argv[1]) return false
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
+}
+
+if (isEntrypoint()) {
   runMcpServer().catch((err) => {
     process.stderr.write(`Fatal: ${err}\n`)
     process.exit(1)

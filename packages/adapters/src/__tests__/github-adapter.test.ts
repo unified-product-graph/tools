@@ -82,12 +82,12 @@ describe('inferIssueType', () => {
     expect(inferIssueType(['epic'])).toBe('epic')
   })
 
-  it('story label → story_statement', () => {
-    expect(inferIssueType(['story'])).toBe('story_statement')
+  it('story label → user_story', () => {
+    expect(inferIssueType(['story'])).toBe('user_story')
   })
 
-  it('user story label → story_statement', () => {
-    expect(inferIssueType(['user story'])).toBe('story_statement')
+  it('user story label → user_story', () => {
+    expect(inferIssueType(['user story'])).toBe('user_story')
   })
 
   it('tech debt label → task', () => {
@@ -138,9 +138,9 @@ describe('GitHubAdapter — issue type mapping via labels', () => {
     expect(result.nodes[0].type).toBe('epic')
   })
 
-  it('issue with "story" label maps to story_statement', async () => {
+  it('issue with "story" label maps to user_story', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'As a user...', ['story'])])
-    expect(result.nodes[0].type).toBe('story_statement')
+    expect(result.nodes[0].type).toBe('user_story')
   })
 
   it('issue with "chore" label maps to task', async () => {

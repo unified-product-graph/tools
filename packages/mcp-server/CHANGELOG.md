@@ -2,6 +2,24 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.3] - 2026-05-27
+
+### Changed
+
+- **`list_frameworks` / `get_framework` now serve the 34 canonical frameworks**, not the full 216-record research library. They previously imported `UPG_FRAMEWORKS` from the internal `@unified-product-graph/frameworks` package; they now source it from `@unified-product-graph/core`'s canonical surface — matching `cloud-server`, the published `core` export, and the public catalog on unifiedproductgraph.org. Research frameworks remain internal and are promoted into the canonical set incrementally as each is reviewed. `get_framework` for a non-canonical id now returns "Unknown framework id".
+
+## [0.6.2] - 2026-05-26
+
+### Fixed
+
+- **Server failed to start when launched through a symlinked path** — which broke the primary install path `claude mcp add upg -- npx @unified-product-graph/mcp-server`, npx `.bin` shims, global installs, and macOS `/tmp`. The entrypoint guard compared `process.argv[1]` (literal invocation path) to `import.meta.url` (symlink-resolved by the ESM loader) as raw strings; when they diverged the server exited 0 with no output, which MCP clients report as "Failed to connect." The guard now compares realpaths. Added a regression test that spawns the built binary through a symlink.
+
+## [0.6.1] - 2026-05-26
+
+### Changed
+
+- Metadata only: `UPG_VERSION` aligned to 0.6.1 and `repository` repointed to the public `unified-product-graph/tools` mirror. No runtime changes.
+
 ## [0.6.0] - 2026-05-22
 
 Aligned with `@unified-product-graph/core@0.6.0` launch train.

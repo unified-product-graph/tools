@@ -364,7 +364,7 @@ describe('AhaAdapter — hierarchy edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('epic_specified_by_story_statement emitted when requirement has epic parent', async () => {
+  it('epic_specified_by_user_story emitted when requirement has epic parent', async () => {
     const items: SourceItem[] = [
       makeItem('e1', 'Step 1 wizard', 'epic'),
       makeItem('req1', 'User must confirm email before proceeding', 'requirement', {
@@ -373,8 +373,8 @@ describe('AhaAdapter — hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'epic_specified_by_story_statement')
-    const edge = result.edges.find((e) => e.type === 'epic_specified_by_story_statement')
+    assertAllEdgesCatalogued(result.edges, 'epic_specified_by_user_story')
+    const edge = result.edges.find((e) => e.type === 'epic_specified_by_user_story')
     expect(edge).toBeDefined()
   })
 
@@ -531,7 +531,7 @@ describe('AhaAdapter — full fixture', () => {
     // objective_achieved_through_key_result (g1→kr1)
     // release_contains_feature (r1→f1)
     // feature_decomposed_into_epic (f1→e1)
-    // epic_specified_by_story_statement (e1→req1)
+    // epic_specified_by_user_story (e1→req1)
     // feature_request_creates_opportunity (idea1→stub-opp)
     // opportunity_drives_solution (stub-opp→f1)
     // product_targets_persona (prod1→p1)

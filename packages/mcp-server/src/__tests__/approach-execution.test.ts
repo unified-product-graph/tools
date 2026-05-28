@@ -184,7 +184,7 @@ describe('prioritise — executes framework expressions', () => {
       prioritise,
       {
         candidates: ['feat_a'],
-        framework_id: 'story-points-poker', // no computed_properties
+        framework_id: 'now-next-later', // no computed_properties
       },
       ctx,
     )
@@ -624,11 +624,11 @@ describe('all 5 approach tools — execution_mode contract', () => {
     )
     expect(rice.body.execution_mode).toBe('execution_v0_4_0')
 
-    // kano-model HAS computed_properties (satisfaction_coefficient), so it runs;
-    // story-points-poker doesn't.
+    // rice-scoring HAS a computed expression, so prioritise executes it;
+    // now-next-later (canonical, no expression) falls back to definition_lookup.
     const sp = await callAsync(
       prioritise,
-      { candidates: ['feat_a'], framework_id: 'story-points-poker' },
+      { candidates: ['feat_a'], framework_id: 'now-next-later' },
       ctx,
     )
     expect(sp.body.execution_mode).toBe('definition_lookup_v0_4_0')

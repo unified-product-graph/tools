@@ -96,10 +96,10 @@ export const CODA_TABLE_TYPE_MAP: Record<string, string | null> = {
   epic: 'epic',
   epics: 'epic',
 
-  story: 'story_statement',
-  stories: 'story_statement',
-  'user story': 'story_statement',
-  'user stories': 'story_statement',
+  story: 'user_story',
+  stories: 'user_story',
+  'user story': 'user_story',
+  'user stories': 'user_story',
 
   task: 'task',
   tasks: 'task',
@@ -212,9 +212,9 @@ export const CODA_LOOKUP_EDGE_MAP: Record<string, string> = {
   release: 'release_contains_feature',
   releases: 'release_contains_feature',
 
-  // epic → story_statement
-  epic: 'epic_specified_by_story_statement',
-  epics: 'epic_specified_by_story_statement',
+  // epic → user_story
+  epic: 'epic_specified_by_user_story',
+  epics: 'epic_specified_by_user_story',
 
   // opportunity → solution
   opportunity: 'opportunity_drives_solution',
