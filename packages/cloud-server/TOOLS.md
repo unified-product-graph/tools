@@ -2248,7 +2248,7 @@ before BEGIN.
 
 **Warnings (non-error surfaces):**
 
-- Inference is catalog-strict — an unmapped pair is refused rather
+- Inference is catalog-strict: an unmapped pair is refused rather
 than fabricating a `${source}_contains_${target}` edge. Pass an explicit
 `type` (resolved via `resolve_edge_for_pair`) for non-catalog edges.
 

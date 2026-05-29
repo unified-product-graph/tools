@@ -3,14 +3,14 @@
  * logic in `@unified-product-graph/sdk/logic`.
  *
  * The existing `parity.test.ts` pins the tool-NAME surface. This file pins the
- * DISPOSITION — for a representative matrix of node pairs and property sets,
+ * DISPOSITION: for a representative matrix of node pairs and property sets,
  * the cloud handlers must accept/reject exactly as the SDK's `inferEdgeTypeWithTier`
  * and `checkPropertyTypes` say they should. Without this guard, cloud could
  * silently re-diverge (e.g. drift back to a permissive `_contains_` fallback)
  * and the name-only parity test would never notice.
  *
- * Drives the handlers through a lightweight in-memory store stub — no Postgres
- * needed — because the decision logic lives entirely above the store.
+ * Drives the handlers through a lightweight in-memory store stub (no Postgres
+ * needed) because the decision logic lives entirely above the store.
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -47,7 +47,7 @@ const EDGE_PAIRS: Array<[string, string]> = [
   ['need', 'persona'],         // non-canonical
 ]
 
-describe('cloud ↔ SDK logic parity — create_edge inference', () => {
+describe('cloud vs SDK logic parity: create_edge inference', () => {
   for (const [s, t] of EDGE_PAIRS) {
     it(`${s} → ${t} disposition matches inferEdgeTypeWithTier`, async () => {
       const sdk = inferEdgeTypeWithTier(s, t)
@@ -71,14 +71,14 @@ describe('cloud ↔ SDK logic parity — create_edge inference', () => {
   }
 })
 
-// (entityType, properties, label) — at least one violating and one clean case.
+// (entityType, properties, label): at least one violating and one clean case.
 const PROPERTY_CASES: Array<[string, Record<string, unknown>, string]> = [
   ['experiment', { sample_size: 'lots' }, 'wrong type (string for number) → reject'],
   ['experiment', { sample_size: 100 }, 'correct type → accept'],
   ['feature', {}, 'no properties → accept'],
 ]
 
-describe('cloud ↔ SDK logic parity — create_node property validation', () => {
+describe('cloud vs SDK logic parity: create_node property validation', () => {
   for (const [type, properties, label] of PROPERTY_CASES) {
     it(`${type}: ${label}`, async () => {
       const sdkViolations = checkPropertyTypes(type, properties).violations

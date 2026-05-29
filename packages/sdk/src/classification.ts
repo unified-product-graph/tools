@@ -1,5 +1,5 @@
 /**
- * UPG entity classification — three axes used by skills to determine
+ * UPG entity classification: three axes used by skills to determine
  * relevance:
  *
  * 1. **Business Area**: what question does this entity help answer?
@@ -51,12 +51,12 @@ export const BUSINESS_AREA_META: Record<BusinessArea, { label: string; question:
 
 export const TIER_DESCRIPTIONS: Record<Tier, { label: string; description: string }> = {
   solo:       { label: 'Solo Builder',  description: 'Everything one person needs to go from idea to product' },
-  team:       { label: 'Small Team',    description: '2-10 people — coordination, design alignment, user signal' },
-  scaleup:    { label: 'Scale-Up',      description: '10-50 people — growth operations, partnerships, program mgmt' },
-  enterprise: { label: 'Enterprise',    description: '50+ people — full operational breadth across all domains' },
+  team:       { label: 'Small Team',    description: '2-10 people: coordination, design alignment, user signal' },
+  scaleup:    { label: 'Scale-Up',      description: '10-50 people: growth operations, partnerships, program mgmt' },
+  enterprise: { label: 'Enterprise',    description: '50+ people: full operational breadth across all domains' },
 }
 
-/** Tier entity counts — computed from ENTITY_CLASSIFICATION so they never drift */
+/** Tier entity counts, computed from ENTITY_CLASSIFICATION so they never drift */
 export function getTierEntityCount(tier: Tier): number {
   const tierOrder: Tier[] = ['solo', 'team', 'scaleup', 'enterprise']
   const maxIndex = tierOrder.indexOf(tier)
@@ -83,7 +83,7 @@ interface EntityClassification {
 
 export const ENTITY_CLASSIFICATION: Record<string, EntityClassification> = {
   // ═══════════════════════════════════════════════════════════════════════════════
-  // SOLO BUILDER — 40 core types
+  // SOLO BUILDER: 40 core types
   // ═══════════════════════════════════════════════════════════════════════════════
 
   // identity (3)
@@ -146,7 +146,7 @@ export const ENTITY_CLASSIFICATION: Record<string, EntityClassification> = {
   retrospective:          { business_area: 'learning',      tier: 'solo' },
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // SMALL TEAM — +15 types (55 total)
+  // SMALL TEAM: +15 types (55 total)
   // ═══════════════════════════════════════════════════════════════════════════════
 
   // team_coordination cluster (5)
@@ -171,7 +171,7 @@ export const ENTITY_CLASSIFICATION: Record<string, EntityClassification> = {
   roadmap:                { business_area: 'building',      tier: 'team', cluster: 'user_signal' },
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // SCALE-UP — +15 types (70 total)
+  // SCALE-UP: +15 types (70 total)
   // ═══════════════════════════════════════════════════════════════════════════════
 
   // growth_operations cluster (5)
@@ -195,7 +195,7 @@ export const ENTITY_CLASSIFICATION: Record<string, EntityClassification> = {
   roadmap_item:           { business_area: 'building',      tier: 'scaleup', cluster: 'program_management' },
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // ENTERPRISE — everything else (311 total)
+  // ENTERPRISE: everything else (311 total)
   // ═══════════════════════════════════════════════════════════════════════════════
 
   // Strategic expansion
@@ -598,7 +598,7 @@ export function isRelevantForStage(entityType: string, stage: string): boolean {
 /**
  * Validates that ENTITY_CLASSIFICATION covers every type in @unified-product-graph/core.
  * Run at dev time or in tests to catch drift early.
- * Returns { missing, extra } — both should be empty for a healthy sync.
+ * Returns { missing, extra }; both should be empty for a healthy sync.
  */
 export function validateClassificationCoverage(): {
   missing: string[]

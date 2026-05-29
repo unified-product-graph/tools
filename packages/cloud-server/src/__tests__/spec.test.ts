@@ -1,5 +1,5 @@
 /**
- * Spec-introspection tools — cloud mirror of (round 1) + 
+ * Spec-introspection tools: cloud mirror of (round 1) +
  * (round 2) + (round 3) + (approach verbs)..
  *
  * All spec handlers ignore `ctx` (they're pure reads from
@@ -70,7 +70,7 @@ import {
 } from '../tools/spec.js'
 import type { ToolResult } from '../lib/server-context.js'
 
-// ctx is unused by all spec handlers — {} as any satisfies the CloudContext shape.
+// ctx is unused by all spec handlers; {} as any satisfies the CloudContext shape.
 function call(
   handler: (args: Record<string, unknown>, ctx: never) => ToolResult | Promise<ToolResult>,
   args: Record<string, unknown> = {},
@@ -97,7 +97,7 @@ describe('list_playbooks / get_playbook', () => {
     expect(b.count).toBe(23)
   })
 
-  it('list_playbooks filters by canonical_only (W1 invariant — exactly 10)', () => {
+  it('list_playbooks filters by canonical_only (W1 invariant: exactly 10)', () => {
     const { body } = call(listPlaybooks, { canonical_only: true })
     const b = body as { count: number; playbooks: Array<{ is_canonical?: boolean }> }
     expect(b.count).toBe(UPG_REGIONS.length)
@@ -188,7 +188,7 @@ describe('list_approaches / get_approach', () => {
 
 // ── Approach verbs ───────────────────
 
-describe('plan / inspect / prioritise / trace / reflect — definition lookups', () => {
+describe('plan / inspect / prioritise / trace / reflect: definition lookups', () => {
   it('plan returns the family-resemblance envelope with the Plan approach', () => {
     const { ok, body } = call(plan, { region: 'users_needs' })
     expect(ok).toBe(true)

@@ -2,7 +2,7 @@
  * Tests for the standalone `migrate_properties` MCP tool.
  *
  * Mirrors the catalog-aware `migrate_type` test pattern, but exercises the
- * pure property pass — no node-type rename, no edge migration. Each test
+ * pure property pass: no node-type rename, no edge migration. Each test
  * targets one of the four `UPG_PROPERTY_MIGRATIONS` rule kinds shipped in
  * `@unified-product-graph/core`: drop_props, rename_top_level,
  * lift_property_to_top_level, drop_when_self_referential.
@@ -61,7 +61,7 @@ const node = (id: string, type: string, title = `Node ${id}`): UPGBaseNode => ({
  title,
 })
 
-describe('migrate_properties — pure property pass', () => {
+describe('migrate_properties: pure property pass', () => {
  it('lifts pre-canonical product.properties.stage onto top-level status', async () => {
  const dirty = {
  ...node('p1', 'product'),
@@ -118,7 +118,7 @@ describe('migrate_properties — pure property pass', () => {
  const result = await migrateProperties({ dry_run: false }, ctx)
  const body = JSON.parse(result.content[0].text)
 
- // o1 is fully self-referential — both fields drop.
+ // o1 is fully self-referential; both fields drop.
  // o2 has a non-self source_id (kept) and a self source_type (dropped).
  expect(body.dropped_self_referential).toEqual(
  expect.arrayContaining([
@@ -200,7 +200,7 @@ describe('migrate_properties — pure property pass', () => {
  })
 
  it('does NOT migrate edges or rename node types', async () => {
- // Property pass is the *only* mutation — edges and types stay as-is.
+ // Property pass is the *only* mutation; edges and types stay as-is.
  const store = await loadStore(
  makeDoc(
  [node('p1', 'persona'), node('j1', 'jtbd', 'Pre-canonical jtbd')],

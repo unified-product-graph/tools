@@ -56,7 +56,7 @@ describe('install-skills: source resolution', () => {
     const src = resolveSkillsSource(__filename)
     expect(src).not.toBeNull()
     // Accepts either the CLI's own bundled skills dir or the MCP server's monorepo
-    // source dir — both contain the same canonical skill set.
+    // source dir; both contain the same canonical skill set.
     const isCliSkills = src!.includes(path.join('packages', 'upg-cli', 'skills'))
     const isMcpSkills = src!.includes(path.join('packages', 'upg-mcp-server', 'skills'))
     expect(isCliSkills || isMcpSkills).toBe(true)
@@ -140,7 +140,7 @@ describe('install-skills: install into a temp dir', () => {
     expect(['symlink', 'copy']).toContain(manifest.mode)
   })
 
-  it('is idempotent — second run produces same state (all updated)', async () => {
+  it('is idempotent: second run produces same state (all updated)', async () => {
     await runInstallSkills({
       scope: 'project', mode: 'auto', force: false, list: false, remove: false,
       sourceOverride: fakeSrc, destOverride: dest,
@@ -175,7 +175,7 @@ describe('install-skills: --remove', () => {
     await cleanup(fakeRoot)
   })
 
-  it('removes manifest-listed skills only — user skills survive', async () => {
+  it('removes manifest-listed skills only; user skills survive', async () => {
     await runInstallSkills({
       scope: 'project', mode: 'auto', force: false, list: false, remove: false,
       sourceOverride: fakeSrc, destOverride: dest,

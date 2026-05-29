@@ -1,8 +1,8 @@
 /**
- * Tests for the catalog-aware `migrate_type` path (Wave 3 — +).
+ * Tests for the catalog-aware `migrate_type` path (Wave 3+).
  *
  * Validates that node-type migration composes with `UPG_EDGE_MIGRATIONS`
- * (in @unified-product-graph/core@0.2.9+) — renames retarget edges to canonical form,
+ * (in @unified-product-graph/core@0.2.9+): renames retarget edges to canonical form,
  * flips swap source/target, drops remove edges, and unmapped legacy edges
  * surface in the response without silent substring mangling.
  */
@@ -67,11 +67,11 @@ const edge = (id: string, source: string, target: string, type: string): UPGEdge
  type: type as UPGEdgeType,
 })
 
-describe('migrate_type — catalog-aware edge migration', () => {
+describe('migrate_type: catalog-aware edge migration', () => {
  it('rewrites legacy edge keys to canonical form when guards pass', async () => {
  // Pre-v0.2.0 graph: jtbd entity + persona_has_jtbd legacy edge.
  // After migrate_type(jtbd → job), the edge should be retargeted to
- // persona_pursues_job — not the substring `persona_has_job`.
+ // persona_pursues_job, not the substring `persona_has_job`.
  const store = await loadStore(
  makeDoc(
  [node('p1', 'persona'), node('j1', 'jtbd', 'Build fast')],
@@ -195,7 +195,7 @@ describe('migrate_type — catalog-aware edge migration', () => {
  })
 })
 
-describe('migrate_type — property migration pass', () => {
+describe('migrate_type: property migration pass', () => {
  // NOTE: The property migration pass is now a separate `migrate_properties`
  // tool (split out from migrate_type). These tests drive `migrateProperties`
  // directly to verify the property-pass response shape and behaviour. The
@@ -234,7 +234,7 @@ describe('migrate_type — property migration pass', () => {
  })
 
  it('drops self-referential source_id / source_type during the same pass (rule 3)', async () => {
- // The `*` wildcard rule fires on every node — so an unrelated entity
+ // The `*` wildcard rule fires on every node, so an unrelated entity
  // type carrying self-ref round-trip metadata gets cleaned up too.
  const dirty = {
  ...node('o1', 'outcome'),

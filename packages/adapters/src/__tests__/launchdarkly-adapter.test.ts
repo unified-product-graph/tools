@@ -4,7 +4,7 @@
  * Covers type mapping, service node creation, service_toggles_feature_flag
  * edge emission, status normalisation, skip cases, and the full catalog check.
  *
- * CRITICAL: The service node creation is the most important test — it ensures
+ * CRITICAL: The service node creation is the most important test; it ensures
  * the adapter creates a synthetic `service` node per project as the intermediary
  * for service_toggles_feature_flag edges.
  */
@@ -48,7 +48,7 @@ const adapter = new LaunchDarklyAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('LaunchDarklyAdapter — entity type mapping', () => {
+describe('LaunchDarklyAdapter: entity type mapping', () => {
   it('feature_flag maps to feature_flag with high confidence', async () => {
     const items: SourceItem[] = [
       makeItem('ff1', 'new-checkout-flow', 'feature_flag', {
@@ -96,7 +96,7 @@ describe('LaunchDarklyAdapter — entity type mapping', () => {
 
 // ─── Service node creation ────────────────────────────────────────────────────
 
-describe('LaunchDarklyAdapter — synthetic service node creation', () => {
+describe('LaunchDarklyAdapter: synthetic service node creation', () => {
   it('creates one service node when a feature_flag is imported', async () => {
     const items: SourceItem[] = [
       makeItem('ff1', 'new-checkout-flow', 'feature_flag', {
@@ -146,7 +146,7 @@ describe('LaunchDarklyAdapter — synthetic service node creation', () => {
 
 // ─── service_toggles_feature_flag edge ───────────────────────────────────────
 
-describe('LaunchDarklyAdapter — service_toggles_feature_flag edge', () => {
+describe('LaunchDarklyAdapter: service_toggles_feature_flag edge', () => {
   it('emits service_toggles_feature_flag from service node to feature_flag node', async () => {
     const items: SourceItem[] = [
       makeItem('ff1', 'new-checkout-flow', 'feature_flag', {
@@ -187,7 +187,7 @@ describe('LaunchDarklyAdapter — service_toggles_feature_flag edge', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('LaunchDarklyAdapter — skip cases', () => {
+describe('LaunchDarklyAdapter: skip cases', () => {
   it('environment is skipped with warning', async () => {
     const items: SourceItem[] = [
       makeItem('env1', 'production', 'environment'),
@@ -203,7 +203,7 @@ describe('LaunchDarklyAdapter — skip cases', () => {
   it('webhook is skipped', async () => {
     const items: SourceItem[] = [makeItem('wh1', 'deploy-hook', 'webhook')]
     const result = await adapter.convert(items)
-    // Only 0 product-knowledge nodes (no service node created — no feature_flag)
+    // Only 0 product-knowledge nodes (no service node created; no feature_flag)
     const productNodes = result.nodes.filter((n) => n.type !== 'service')
     expect(productNodes).toHaveLength(0)
   })
@@ -217,7 +217,7 @@ describe('LaunchDarklyAdapter — skip cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('LaunchDarklyAdapter — status normalisation', () => {
+describe('LaunchDarklyAdapter: status normalisation', () => {
   it("status 'active' → 'active'", async () => {
     const items: SourceItem[] = [makeItem('ff1', 'Flag A', 'feature_flag', {
       project_id: 'p1', status: 'active',
@@ -257,7 +257,7 @@ describe('LaunchDarklyAdapter — status normalisation', () => {
 
 // ─── Source map and external fields ──────────────────────────────────────────
 
-describe('LaunchDarklyAdapter — source_map, external_tool, external_id', () => {
+describe('LaunchDarklyAdapter: source_map, external_tool, external_id', () => {
   it('external_tool is always launchdarkly', async () => {
     const items: SourceItem[] = [makeItem('ff1', 'Flag A', 'feature_flag', { project_id: 'p1' })]
     const result = await adapter.convert(items)

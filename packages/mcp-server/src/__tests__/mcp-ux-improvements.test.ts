@@ -1,5 +1,5 @@
 /**
- * MCP UX improvements —.
+ * MCP UX improvements:.
  *
  * Covers the four 2026-05-20 live-authoring audit fixes:
  *
@@ -82,9 +82,9 @@ async function isErrorResult(result: ToolResult | Promise<ToolResult>): Promise<
   return ((await result) as ToolResult).isError === true
 }
 
-// ── — batch_create_nodes silent orphans ──────────────────────────────
+// ──: batch_create_nodes silent orphans ──────────────────────────────
 
-describe(' — batch_create_nodes orphan warning', () => {
+describe(': batch_create_nodes orphan warning', () => {
   it('warns when ≥2 nodes land with no edges (no parent_ref, no explicit edges)', async () => {
     const store = await makeStore()
     const result = batchCreateNodesLib(store, {
@@ -149,9 +149,9 @@ describe(' — batch_create_nodes orphan warning', () => {
   })
 })
 
-// ── — resolve_edge_for_pair anchor hint on null ──────────────────────
+// ──: resolve_edge_for_pair anchor hint on null ──────────────────────
 
-describe(' — resolve_edge_for_pair anchor_hint', () => {
+describe(': resolve_edge_for_pair anchor_hint', () => {
   it('returns anchor_hint with domain_anchor when target is anchored cross-domain', async () => {
     // product → ideal_customer_profile: ICP is anchored in gtm_strategy.
     const result = resolveEdgeForPair(
@@ -184,7 +184,7 @@ describe(' — resolve_edge_for_pair anchor_hint', () => {
   })
 
   it('returns no anchor_hint when the target is its own anchor and the source shares its domain', async () => {
-    // job → desired_outcome with persona as the user-domain anchor — the
+    // job → desired_outcome with persona as the user-domain anchor; the
     // hint logic suppresses circular advice when source is already in the
     // anchored domain. (Note: job→desired_outcome IS canonical, so we use a
     // null-pair internally to the user domain.)
@@ -193,9 +193,9 @@ describe(' — resolve_edge_for_pair anchor_hint', () => {
   })
 })
 
-// ── — alternate_anchors + adjacent_edges ─────────────────────────────
+// ──: alternate_anchors + adjacent_edges ─────────────────────────────
 
-describe(' — resolver UX alternates', () => {
+describe(': resolver UX alternates', () => {
   it('returns non-empty alternate_anchors + adjacent_edges for product → ideal_customer_profile', async () => {
     const result = resolveEdgeForPair(
       { source_type: 'product', target_type: 'ideal_customer_profile' },
@@ -234,13 +234,13 @@ describe(' — resolver UX alternates', () => {
     const rows = buildAlternateAnchors('product', 'need')
     expect(rows.length).toBeGreaterThan(0)
     // First row should not be cross-domain when hierarchy or causal/semantic
-    // alternatives exist — we don't test exact ordering but verify uniqueness.
+    // alternatives exist; we don't test exact ordering but verify uniqueness.
     const sourceTypes = rows.map((r) => r.source_type)
     expect(new Set(sourceTypes).size).toBe(sourceTypes.length)
   })
 
   it('buildAdjacentEdges returns at most 3 rows from a high-degree source', async () => {
-    // `product` is the spine of the catalog — many outgoing edges.
+    // `product` is the spine of the catalog; many outgoing edges.
     const rows = buildAdjacentEdges('product')
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.length).toBeLessThanOrEqual(3)
@@ -304,9 +304,9 @@ describe(' — resolver UX alternates', () => {
   })
 })
 
-// ── — create_node first-use schema hints ─────────────────────────────
+// ──: create_node first-use schema hints ─────────────────────────────
 
-describe(' — create_node first-use hints', () => {
+describe(': create_node first-use hints', () => {
   let store: UPGFileStore
   let ctx: ToolContext
 

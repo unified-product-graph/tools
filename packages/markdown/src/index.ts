@@ -1,5 +1,5 @@
 /**
- * @unified-product-graph/markdown — public entry point.
+ * @unified-product-graph/markdown: public entry point.
  *
  * See https://unifiedproductgraph.org. MIT.
  */

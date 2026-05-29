@@ -65,7 +65,7 @@ function makeCtx(store: UPGFileStore): ToolContext {
 
 // ─── edge_type_pair_drift ────────────────────────────────────────────
 
-describe('validate_graph — edge_type_pair_drift', () => {
+describe('validate_graph: edge_type_pair_drift', () => {
   it('reports a canonical edge wired to a wrong source/target pair', async () => {
     const store = await loadStore(
       makeDoc(
@@ -155,9 +155,9 @@ describe('validate_graph — edge_type_pair_drift', () => {
 
 // ─── graph_topology_self_loops ───────────────────────────────────────
 
-describe('validate_graph — graph_topology_self_loops', () => {
+describe('validate_graph: graph_topology_self_loops', () => {
   it('reports an edge whose source === target', async () => {
-    // Inject a self-loop into the file directly — the file writer is the
+    // Inject a self-loop into the file directly; the file writer is the
     // only way to get a self-loop into the graph now that create_edge
     // refuses them at write-time.
     const store = await loadStore(
@@ -217,7 +217,7 @@ describe('validate_graph — graph_topology_self_loops', () => {
 
   it('is distinct from the existing self_referential class (props vs topology)', async () => {
     // self_referential fires when source_id/source_type properties on a node
-    // mirror the node's own id/type — that's an import-provenance redundancy,
+    // mirror the node's own id/type; that's an import-provenance redundancy,
     // not a graph-topology loop. The two classes report DIFFERENT things.
     const store = await loadStore(
       makeDoc([
@@ -243,7 +243,7 @@ describe('validate_graph — graph_topology_self_loops', () => {
 
 // ─── property_type_drift ─────────────────────────────────────────────
 
-describe('validate_graph — property_type_drift', () => {
+describe('validate_graph: property_type_drift', () => {
   it('reports a string written into a declared number field', async () => {
     // metric.target_value is declared `number` in UPG_PROPERTY_SCHEMA.
     const store = await loadStore(
@@ -315,7 +315,7 @@ describe('validate_graph — property_type_drift', () => {
 
 // ─── valid flag reflects new drift classes ──────────────────────────
 
-describe('validate_graph — valid flag respects the new drift classes', () => {
+describe('validate_graph: valid flag respects the new drift classes', () => {
   it('flips valid to false when only edge_type_pair_drift is present', async () => {
     const store = await loadStore(
       makeDoc(

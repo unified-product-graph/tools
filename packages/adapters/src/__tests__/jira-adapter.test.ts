@@ -64,7 +64,7 @@ const adapter = new JiraAdapter()
 
 // ─── Issue type mapping ───────────────────────────────────────────────────────
 
-describe('JiraAdapter — issue_type → entity type mapping', () => {
+describe('JiraAdapter: issue_type → entity type mapping', () => {
   it('story maps to user_story with confidence high', async () => {
     const items: SourceItem[] = [makeIssue('i1', 'User can log in', 'Story')]
     const result = await adapter.convert(items)
@@ -131,7 +131,7 @@ describe('JiraAdapter — issue_type → entity type mapping', () => {
 
 // ─── Skip / warning cases ─────────────────────────────────────────────────────
 
-describe('JiraAdapter — skip and warning cases', () => {
+describe('JiraAdapter: skip and warning cases', () => {
   it('sprint issue type is skipped and counted in a single warning', async () => {
     const items: SourceItem[] = [
       makeIssue('sp1', 'Sprint 22', 'sprint'),
@@ -180,7 +180,7 @@ describe('JiraAdapter — skip and warning cases', () => {
 
 // ─── Structural entity types ──────────────────────────────────────────────────
 
-describe('JiraAdapter — structural entity types', () => {
+describe('JiraAdapter: structural entity types', () => {
   it('project structural entity maps to project', async () => {
     const items: SourceItem[] = [makeStructural('p1', 'Eng Project', 'project')]
     const result = await adapter.convert(items)
@@ -204,7 +204,7 @@ describe('JiraAdapter — structural entity types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('JiraAdapter — status normalisation', () => {
+describe('JiraAdapter: status normalisation', () => {
   it("'To Do' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeIssue('i1', 'Story', 'Story', { status: 'To Do' })]
     const result = await adapter.convert(items)
@@ -238,7 +238,7 @@ describe('JiraAdapter — status normalisation', () => {
 
 // ─── Hierarchy edge emission ──────────────────────────────────────────────────
 
-describe('JiraAdapter — hierarchy edge emission', () => {
+describe('JiraAdapter: hierarchy edge emission', () => {
   it('epic_specified_by_user_story emitted when story has epic parent', async () => {
     const items: SourceItem[] = [
       makeIssue('e1', 'Onboarding Revamp', 'Epic'),
@@ -362,7 +362,7 @@ describe('JiraAdapter — hierarchy edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('JiraAdapter — source_map', () => {
+describe('JiraAdapter: source_map', () => {
   it('source_map contains an entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeIssue('i1', 'Story', 'Story'),
@@ -382,7 +382,7 @@ describe('JiraAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('JiraAdapter — external_tool and external_id', () => {
+describe('JiraAdapter: external_tool and external_id', () => {
   it('external_tool is always jira', async () => {
     const items: SourceItem[] = [makeIssue('i1', 'Story', 'Story')]
     const result = await adapter.convert(items)
@@ -398,7 +398,7 @@ describe('JiraAdapter — external_tool and external_id', () => {
 
 // ─── Full fixture ─────────────────────────────────────────────────────────────
 
-describe('JiraAdapter — full fixture', () => {
+describe('JiraAdapter: full fixture', () => {
   it('all emitted edges are in the UPG catalogue (full delivery tree)', async () => {
     const items: SourceItem[] = [
       makeStructural('p1', 'Engineering Project', 'project'),

@@ -31,7 +31,7 @@ function makeItem(
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('DovetailAdapter — entity type mapping', () => {
+describe('DovetailAdapter: entity type mapping', () => {
   const adapter = new DovetailAdapter()
 
   it('project maps to research_study', async () => {
@@ -152,7 +152,7 @@ describe('DovetailAdapter — entity type mapping', () => {
 
 // ─── Skipped types ────────────────────────────────────────────────────────────
 
-describe('DovetailAdapter — skipped types', () => {
+describe('DovetailAdapter: skipped types', () => {
   const adapter = new DovetailAdapter()
 
   it('reel is skipped with a warning', async () => {
@@ -191,7 +191,7 @@ describe('DovetailAdapter — skipped types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('DovetailAdapter — status normalisation', () => {
+describe('DovetailAdapter: status normalisation', () => {
   const adapter = new DovetailAdapter()
 
   it('published doc → status complete', async () => {
@@ -219,7 +219,7 @@ describe('DovetailAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('DovetailAdapter — edge emission', () => {
+describe('DovetailAdapter: edge emission', () => {
   const adapter = new DovetailAdapter()
 
   it('research_study_captures_observation emitted when data has project_id', async () => {
@@ -336,7 +336,7 @@ describe('DovetailAdapter — edge emission', () => {
 
 // ─── Insight → opportunity warning ───────────────────────────────────────────
 
-describe('DovetailAdapter — insight opportunity warning', () => {
+describe('DovetailAdapter: insight opportunity warning', () => {
   const adapter = new DovetailAdapter()
 
   it('emits warning when insight nodes are created', async () => {
@@ -379,7 +379,7 @@ describe('DovetailAdapter — insight opportunity warning', () => {
 
 // ─── source_map traceability ──────────────────────────────────────────────────
 
-describe('DovetailAdapter — source_map traceability', () => {
+describe('DovetailAdapter: source_map traceability', () => {
   const adapter = new DovetailAdapter()
 
   it('source_map contains entries for all converted items', async () => {
@@ -407,7 +407,7 @@ describe('DovetailAdapter — source_map traceability', () => {
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-describe('DovetailAdapter — tags', () => {
+describe('DovetailAdapter: tags', () => {
   const adapter = new DovetailAdapter()
 
   it('metadata.tags are attached to the node', async () => {
@@ -427,7 +427,7 @@ describe('DovetailAdapter — tags', () => {
 
 // ─── Empty input ──────────────────────────────────────────────────────────────
 
-describe('DovetailAdapter — empty input', () => {
+describe('DovetailAdapter: empty input', () => {
   const adapter = new DovetailAdapter()
 
   it('returns empty result with warning for empty input', async () => {

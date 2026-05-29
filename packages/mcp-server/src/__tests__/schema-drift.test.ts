@@ -3,12 +3,12 @@
  *
  * Validates that the load-time drift walker correctly counts deviations
  * across the six drift classes:
- *   1. entity_drift     — non-canonical entity types
- *   2. edge_drift       — non-canonical edge types
- *   3. top_level_drift  — non-spec top-level fields on nodes
- *   4. lifecycle_drift  — invalid status values for the entity's lifecycle
- *   5. self_referential — source_id/source_type that mirror id/type
- *   6. property_drift   — properties matching UPG_PROPERTY_MIGRATIONS rules
+ *   1. entity_drift     : non-canonical entity types
+ *   2. edge_drift       : non-canonical edge types
+ *   3. top_level_drift  : non-spec top-level fields on nodes
+ *   4. lifecycle_drift  : invalid status values for the entity's lifecycle
+ *   5. self_referential : source_id/source_type that mirror id/type
+ *   6. property_drift   : properties matching UPG_PROPERTY_MIGRATIONS rules
  */
 
 import { describe, it, expect } from 'vitest'
@@ -37,7 +37,7 @@ const edge = (id: string, source: string, target: string, type: string): UPGEdge
   type: type as UPGEdgeType,
 })
 
-describe('computeSchemaDriftSummary — clean canonical graph', () => {
+describe('computeSchemaDriftSummary: clean canonical graph', () => {
   it('returns all zeros for a fully canonical document', () => {
     const doc = makeDoc(
       [
@@ -58,7 +58,7 @@ describe('computeSchemaDriftSummary — clean canonical graph', () => {
   })
 })
 
-describe('entity_drift — non-canonical or deprecated entity types', () => {
+describe('entity_drift: non-canonical or deprecated entity types', () => {
   it('counts a node with a deprecated type', () => {
     const doc = makeDoc(
       [node({ id: 'h1', type: 'hypothesis_evidence' as UPGEntityType, title: 'Old evidence' })],
@@ -78,7 +78,7 @@ describe('entity_drift — non-canonical or deprecated entity types', () => {
   })
 })
 
-describe('edge_drift — non-canonical edge types', () => {
+describe('edge_drift: non-canonical edge types', () => {
   it('counts an edge with a non-canonical type', () => {
     const doc = makeDoc(
       [
@@ -92,7 +92,7 @@ describe('edge_drift — non-canonical edge types', () => {
   })
 })
 
-describe('top_level_drift — fields outside UPGBaseNode', () => {
+describe('top_level_drift: fields outside UPGBaseNode', () => {
   it('counts a node with a non-spec top-level field', () => {
     const doc = makeDoc(
       [
@@ -100,7 +100,7 @@ describe('top_level_drift — fields outside UPGBaseNode', () => {
           id: 'p1',
           type: 'product' as UPGEntityType,
           title: 'Product',
-          // @ts-expect-error — intentionally non-spec field for the test
+          // @ts-expect-error intentionally non-spec field for the test
           lifecycle_status: 'draft',
         }),
       ],
@@ -128,7 +128,7 @@ describe('top_level_drift — fields outside UPGBaseNode', () => {
   })
 })
 
-describe('lifecycle_drift — invalid status values', () => {
+describe('lifecycle_drift: invalid status values', () => {
   it('counts a product node whose status is not a PRODUCT_LIFECYCLE phase', () => {
     const doc = makeDoc(
       [
@@ -176,13 +176,13 @@ describe('lifecycle_drift — invalid status values', () => {
     const result = computeSchemaDriftSummary(doc)
     // research_study may or may not have a lifecycle; the check is "if no
     // lifecycle, don't flag." If it does have one and 'whatever' isn't valid,
-    // this would count. Either way, lifecycle_drift should be 0 OR 1 — assert
+    // this would count. Either way, lifecycle_drift should be 0 OR 1; assert
     // the test doesn't crash, which is the load-time-safety contract.
     expect(typeof result.lifecycle_drift).toBe('number')
   })
 })
 
-describe('self_referential — source_id/source_type mirror id/type', () => {
+describe('self_referential: source_id/source_type mirror id/type', () => {
   it('counts a node whose source_id and source_type match its id and type', () => {
     const doc = makeDoc(
       [
@@ -218,7 +218,7 @@ describe('self_referential — source_id/source_type mirror id/type', () => {
   })
 })
 
-describe('renderDriftSummary — output shape', () => {
+describe('renderDriftSummary: output shape', () => {
   it('returns null for an all-zeros summary', () => {
     const summary = computeSchemaDriftSummary(makeDoc([], []))
     expect(renderDriftSummary(summary)).toBeNull()

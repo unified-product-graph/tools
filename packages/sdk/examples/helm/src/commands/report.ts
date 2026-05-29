@@ -1,12 +1,12 @@
 /**
- * `helm report` — graph health + structural diagnostics.
+ * `helm report`: graph health + structural diagnostics.
  *
  * Showcases:
- *   - upg.health()                 — single call returns score + rich digest
- *   - upg.verify()                 — integrity report (or null when clean)
- *   - upg.nodes.list()             — type-filtered read for "top N" surfaces
+ *   - upg.health()                 : single call returns score + rich digest
+ *   - upg.verify()                 : integrity report (or null when clean)
+ *   - upg.nodes.list()             : type-filtered read for "top N" surfaces
  *
- * Read-only — no flush, no disk writes. Cheap to call from a cron job, a
+ * Read-only; no flush, no disk writes. Cheap to call from a cron job, a
  * Slack bot, or a CI status check.
  */
 

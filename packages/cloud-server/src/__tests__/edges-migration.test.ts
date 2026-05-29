@@ -67,7 +67,7 @@ describe('PgStore.exportEdges()', () => {
     expect(queries[0].text).toContain('FROM upg.edges')
     expect(queries[0].text).toContain('WHERE product_id = $1')
     expect(queries[0].values[0]).toBe('p1')
-    // No type filter — second param should be null
+    // No type filter; second param should be null
     expect(queries[0].values[1]).toBeNull()
   })
 
@@ -128,7 +128,7 @@ describe('PgStore.renameEdgeType()', () => {
     const affected = await store.renameEdgeType('p1', 'old_type', 'new_type', true)
 
     expect(affected).toBe(5)
-    // Pool.query (not client) is used — no transaction for dry run
+    // Pool.query (not client) is used; no transaction for dry run
     expect(queries.some((q) => q.text.includes('COUNT(*)'))).toBe(true)
     expect(queries.every((q) => !q.text.includes('UPDATE'))).toBe(true)
     expect(mockClient.query).not.toHaveBeenCalled()

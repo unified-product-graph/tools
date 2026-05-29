@@ -2,7 +2,7 @@
  * Tests for the `polymorphic_with_typed_alternative` drift class added by
  *. This class is opt-in via `include_polymorphic_upgrades: true`.
  *
- * Decision context: Captain chose Option B — polymorphic edges are kept as a
+ * Decision context: Captain chose Option B; polymorphic edges are kept as a
  * deliberate feature (they let consumers express connections we haven't yet
  * catalogued), but when a typed alternative exists for the actual
  * source/target pair the validator surfaces it as an advisory "info" hint.
@@ -73,7 +73,7 @@ function makeCtx(store: UPGFileStore): ToolContext {
 
 // ─── Test 1: no typed alternative → no hint ──────────────────────────────────
 
-describe('polymorphic_with_typed_alternative — no typed alternative', () => {
+describe('polymorphic_with_typed_alternative: no typed alternative', () => {
   it('emits no hint when no typed alternative exists for the pair', async () => {
     // node_owned_by_person(persona, person): the pair persona:person has no
     // typed alternative in the catalog (only the polymorphic node:person edge),
@@ -107,7 +107,7 @@ describe('polymorphic_with_typed_alternative — no typed alternative', () => {
 
 // ─── Test 2: typed alternative exists → hint emitted ─────────────────────────
 
-describe('polymorphic_with_typed_alternative — node_relates (via node_informs_node)', () => {
+describe('polymorphic_with_typed_alternative: node_relates (via node_informs_node)', () => {
   it('emits a hint when feature → hypothesis has the typed feature_tests_hypothesis', async () => {
     // node_informs_node(feature, hypothesis): the pair feature:hypothesis has
     // feature_tests_hypothesis as a typed alternative. A hint should fire.
@@ -150,7 +150,7 @@ describe('polymorphic_with_typed_alternative — node_relates (via node_informs_
 
 // ─── Test 3: typed constraint alternative ────────────────────────────────────
 
-describe('polymorphic_with_typed_alternative — node_constrains_node with typed alt', () => {
+describe('polymorphic_with_typed_alternative: node_constrains_node with typed alt', () => {
   it('emits a hint when constraint → feature has constraint_constrains_feature', async () => {
     // node_constrains_node(constraint, feature): the pair constraint:feature has
     // constraint_constrains_feature as a typed alternative.
@@ -191,7 +191,7 @@ describe('polymorphic_with_typed_alternative — node_constrains_node with typed
 
 // ─── Test 4: default call does NOT include polymorphic hints ─────────────────
 
-describe('polymorphic_with_typed_alternative — not included by default', () => {
+describe('polymorphic_with_typed_alternative: not included by default', () => {
   it('default validate_graph call does not include polymorphic_with_typed_alternative', async () => {
     const store = await loadStore(
       makeDoc(
@@ -223,7 +223,7 @@ describe('polymorphic_with_typed_alternative — not included by default', () =>
 
 // ─── Test 5: explicit include_polymorphic_upgrades: true includes hints ───────
 
-describe('polymorphic_with_typed_alternative — explicit opt-in', () => {
+describe('polymorphic_with_typed_alternative: explicit opt-in', () => {
   it('includes hints when include_polymorphic_upgrades: true is passed', async () => {
     const store = await loadStore(
       makeDoc(
@@ -253,9 +253,9 @@ describe('polymorphic_with_typed_alternative — explicit opt-in', () => {
   })
 })
 
-// ─── Test 6: ownership — typed alternative exists ────────────────────────────
+// ─── Test 6: ownership, typed alternative exists ────────────────────────────
 
-describe('polymorphic_with_typed_alternative — owned_by with typed alternative', () => {
+describe('polymorphic_with_typed_alternative: owned_by with typed alternative', () => {
   it('emits a hint when constraint → team has constraint_owned_by_team', async () => {
     // node_owned_by_team(constraint, team): the pair constraint:team has
     // constraint_owned_by_team as a typed alternative.
@@ -295,7 +295,7 @@ describe('polymorphic_with_typed_alternative — owned_by with typed alternative
 
 // ─── Test 7: polymorphic hints are independent from the valid flag ────────────
 
-describe('polymorphic_with_typed_alternative — does not affect valid', () => {
+describe('polymorphic_with_typed_alternative: does not affect valid', () => {
   it('polymorphic_with_typed_alternative count does not change the valid flag', async () => {
     // Build a graph that is otherwise drift-clean. Use a pair that has a typed
     // alternative so the hint fires, then verify that the summary count for
@@ -341,9 +341,9 @@ describe('polymorphic_with_typed_alternative — does not affect valid', () => {
   })
 })
 
-// ─── Test 8: multiple polymorphic edges — only those with typed alts fire ─────
+// ─── Test 8: multiple polymorphic edges, only those with typed alts fire ─────
 
-describe('polymorphic_with_typed_alternative — mixed graph', () => {
+describe('polymorphic_with_typed_alternative: mixed graph', () => {
   it('only emits hints for pairs that have typed alternatives', async () => {
     // 3 edges:
     //   node_informs_node(feature, hypothesis)   → hint (feature_tests_hypothesis exists)

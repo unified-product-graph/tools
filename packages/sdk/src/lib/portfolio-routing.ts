@@ -1,5 +1,5 @@
 /**
- * Portfolio routing helpers —.
+ * Portfolio routing helpers.
  *
  * Portfolio-scoped entity types (`portfolio`, `organization`, `product_area`)
  * belong in `.upg/portfolio.upg` rather than the active product's `nodes[]`.
@@ -84,7 +84,7 @@ export async function openPortfolioStore(
 // ── Write routing ────────────────────────────────────────────────────────────
 
 export interface WritePortfolioNodeArgs {
-  /** Entity type — must satisfy `isPortfolioScopedType`. */
+  /** Entity type; must satisfy `isPortfolioScopedType`. */
   type: string
   /** Title for the new entity (or the organisation). */
   title: string
@@ -161,7 +161,7 @@ export async function writePortfolioScopedNode(
 
   // Mark dirty (the typed mutations above bypass the store's scheduleSave) and
   // flush synchronously so the caller can return a stable response shape.
-  // `setDirty` is not exposed on UPGPortfolioStore — we work around by hand-
+  // `setDirty` is not exposed on UPGPortfolioStore; we work around by hand-
   // writing through the store's existing API. The simplest cross-cutting hook
   // is `addCrossEdge`-style: it sets `dirty = true` internally. Since we
   // mutated `doc` in place via getDocument(), call a no-op flush primitive.
@@ -275,7 +275,7 @@ function setOrganization(
 /**
  * The portfolio store auto-creates a placeholder organization on `loadOrInit`
  * (title "Portfolio", id derived from that title). Treat those records as
- * blank slate — they were never authored by a caller.
+ * blank slate; they were never authored by a caller.
  */
 function isPlaceholderOrganization(
   org: UPGOrganization | undefined | null,
@@ -290,7 +290,7 @@ function isPlaceholderOrganization(
 
 /**
  * Open the portfolio store if one exists. Returns null when there is no
- * workspace and no portfolio document on disk — callers use this to render an
+ * workspace and no portfolio document on disk; callers use this to render an
  * empty list instead of erroring.
  */
 export async function openPortfolioStoreIfExists(
@@ -315,7 +315,7 @@ export async function openPortfolioStoreIfExists(
  * readable listings.
  *
  * If/when the spec adds an explicit `UPGProductReference` type, this shape
- * should migrate to it. The fields are intentionally additive — every field
+ * should migrate to it. The fields are intentionally additive; every field
  * other than `id` is optional so the record stays forward-compatible.
  */
 export interface PortfolioProductReference {
@@ -328,7 +328,7 @@ export interface PortfolioProductReference {
 
 /**
  * Ensure that a product is registered on `portfolio.upg.products[]`. No-op when
- * an entry with the same `id` already exists. Does NOT flush — caller flushes
+ * an entry with the same `id` already exists. Does NOT flush; caller flushes
  * once after registering both source and target products in a single pass.
  *
  * @returns true when a new entry was appended, false when already present.

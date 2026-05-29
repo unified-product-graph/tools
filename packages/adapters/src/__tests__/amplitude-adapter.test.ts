@@ -47,7 +47,7 @@ const adapter = new AmplitudeAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('AmplitudeAdapter — entity_type → UPG type mapping', () => {
+describe('AmplitudeAdapter: entity_type → UPG type mapping', () => {
   it('chart maps to metric with confidence medium', async () => {
     const items: SourceItem[] = [makeItem('c1', 'Weekly Active Users', 'chart')]
     const result = await adapter.convert(items)
@@ -105,7 +105,7 @@ describe('AmplitudeAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skip + warning cases ─────────────────────────────────────────────────────
 
-describe('AmplitudeAdapter — skipped types + warnings', () => {
+describe('AmplitudeAdapter: skipped types + warnings', () => {
   it('event entities are skipped with aggregate warning', async () => {
     const items: SourceItem[] = [
       makeItem('e1', 'Button Clicked', 'event'),
@@ -160,7 +160,7 @@ describe('AmplitudeAdapter — skipped types + warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('AmplitudeAdapter — status normalisation', () => {
+describe('AmplitudeAdapter: status normalisation', () => {
   it("status 'active' normalises to 'active'", async () => {
     const items: SourceItem[] = [makeItem('c1', 'WAU', 'chart', { status: 'active' })]
     const result = await adapter.convert(items)
@@ -188,7 +188,7 @@ describe('AmplitudeAdapter — status normalisation', () => {
 
 // ─── Metric value fields ──────────────────────────────────────────────────────
 
-describe('AmplitudeAdapter — metric value fields', () => {
+describe('AmplitudeAdapter: metric value fields', () => {
   it('chart with current_value, target_value, unit preserved on node', async () => {
     const items: SourceItem[] = [
       makeItem('c1', 'WAU', 'chart', {
@@ -233,7 +233,7 @@ describe('AmplitudeAdapter — metric value fields', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('AmplitudeAdapter — edge emission', () => {
+describe('AmplitudeAdapter: edge emission', () => {
   it('outcome_tracked_by_metric emitted when metric has outcome parent', async () => {
     const items: SourceItem[] = [
       makeItem('out1', 'Increase Activation', 'outcome'),
@@ -305,7 +305,7 @@ describe('AmplitudeAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('AmplitudeAdapter — source_map', () => {
+describe('AmplitudeAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('c1', 'WAU', 'chart'),
@@ -325,7 +325,7 @@ describe('AmplitudeAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('AmplitudeAdapter — external_tool and external_id', () => {
+describe('AmplitudeAdapter: external_tool and external_id', () => {
   it('external_tool is always amplitude', async () => {
     const items: SourceItem[] = [makeItem('c1', 'WAU', 'chart')]
     const result = await adapter.convert(items)

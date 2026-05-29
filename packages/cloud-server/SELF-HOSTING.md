@@ -2,20 +2,20 @@
 
 The cloud server is a **Postgres-backed MCP server**. Unlike the local server
 (`@unified-product-graph/mcp-server`), which reads and writes a single `.upg`
-file, the cloud server stores the graph in Postgres — so a team can share one
+file, the cloud server stores the graph in Postgres, so a team can share one
 source of truth with concurrent, transactional writes, multiple products, an
 audit log, comments, and webhooks.
 
 > **Mental model:** the local server is to Git as the cloud server is to a
-> shared database. Same tools, same UPG semantics — different substrate.
+> shared database. Same tools, same UPG semantics; different substrate.
 
 This guide covers three deployment tiers, from "ready today" to "real SaaS."
 
 | Tier | What you host | Auth model | Effort | Use when |
 |------|---------------|-----------|--------|----------|
-| **1 — Shared DB** | Just Postgres; each client runs the server locally | Connection string = full access | Minutes | A small, trusting team |
-| **2 — Central endpoint** | The server behind a stdio→HTTP bridge + auth proxy | One shared identity, gated by a proxy | A day of ops | One shared endpoint, still one trust domain |
-| **3 — Multi-tenant SaaS** | The server with auth + per-user identity + RLS | Per-user, per-product RBAC | A real build | External / untrusted users |
+| **Tier 1: Shared DB** | Just Postgres; each client runs the server locally | Connection string = full access | Minutes | A small, trusting team |
+| **Tier 2: Central endpoint** | The server behind a stdio→HTTP bridge + auth proxy | One shared identity, gated by a proxy | A day of ops | One shared endpoint, still one trust domain |
+| **Tier 3: Multi-tenant SaaS** | The server with auth + per-user identity + RLS | Per-user, per-product RBAC | A real build | External / untrusted users |
 
 ---
 
@@ -23,9 +23,9 @@ This guide covers three deployment tiers, from "ready today" to "real SaaS."
 
 - **Transport is stdio.** The server speaks MCP over stdin/stdout to a single
   trusted client (Claude Code, Cursor, etc.). There is **no built-in network
-  endpoint** — Tiers 2 and 3 add one.
+  endpoint** (Tiers 2 and 3 add one).
 - **One config knob:** `UPG_DATABASE_URL` (or `--database-url`). The server
-  opens a default `pg.Pool` against it and runs `SELECT 1` at startup — **it
+  opens a default `pg.Pool` against it and runs `SELECT 1` at startup; **it
   exits immediately if the database is unreachable.**
 - **Postgres 13+** is required (the schema uses `gen_random_uuid()`).
 - **RBAC is recorded, not yet enforced.** The schema has an `access` table
@@ -36,14 +36,14 @@ This guide covers three deployment tiers, from "ready today" to "real SaaS."
 
 ---
 
-## Tier 1 — Shared managed Postgres (recommended starting point)
+## Tier 1: Shared managed Postgres (recommended starting point)
 
 Host the **database**; every team member runs the server **locally** against it.
 Production-ready today for a team inside one trust boundary.
 
 ### 1. Provision Postgres
 
-Any Postgres 13+ works — [Neon](https://neon.tech), [Supabase](https://supabase.com),
+Any Postgres 13+ works: [Neon](https://neon.tech), [Supabase](https://supabase.com),
 [Railway](https://railway.app), RDS, or a VM. Grab the connection string:
 
 ```
@@ -66,7 +66,7 @@ The four migrations create the `upg` schema: `products`, `nodes`, `edges`,
 ### 3. Point each member's client at the shared DB
 
 Add an MCP server entry to each member's client config. Keep the connection
-string in **personal / local** config — never a committed file.
+string in **personal / local** config, never a committed file.
 
 ```jsonc
 // If installed from npm (the package ships a `upg-cloud-server` bin):
@@ -97,7 +97,7 @@ The cloud server is **multi-product**, so every tool is scoped by `product_id`:
 2. Pass that `product_id` to `create_node`, `create_edge`, `query`, etc.
 
 Concurrent writes from different members land as atomic Postgres transactions
-with foreign-key integrity — no `.upg` merge conflicts.
+with foreign-key integrity; no `.upg` merge conflicts.
 
 ### Local Postgres for development
 
@@ -112,12 +112,12 @@ docker compose up -d postgres
 
 ---
 
-## Tier 2 — A single shared endpoint (stdio → HTTP bridge)
+## Tier 2: A single shared endpoint (stdio → HTTP bridge)
 
 Centralize the **process** so clients don't run anything locally. Wrap the
 stdio server in an MCP HTTP bridge (e.g. [`supergateway`](https://github.com/supercorp-ai/supergateway)
 or `mcp-proxy`, or swap in the SDK's StreamableHTTP transport) and put an
-**auth proxy in front** — the server itself has no authentication.
+**auth proxy in front** (the server itself has no authentication).
 
 ```
 [client] --HTTPS--> [auth proxy] --> [bridge + upg-cloud-server (stdio)] --> [managed Postgres]
@@ -144,9 +144,9 @@ clients must be isolated from one another.
 
 ---
 
-## Tier 3 — Multi-tenant SaaS (the enforcement tier)
+## Tier 3: Multi-tenant SaaS (the enforcement tier)
 
-The data model is already built for this — `products`, `access` roles,
+The data model is already built for this: `products`, `access` roles,
 `audit_log`, `webhooks`, `cross_product_edges`. What's missing is the
 **enforcement layer**. Reaching genuine per-user multi-tenancy requires:
 
@@ -155,8 +155,8 @@ The data model is already built for this — `products`, `access` roles,
 2. **Identity propagation** into the store, so every query carries the calling
    user (e.g. `SET LOCAL app.user_id = …` per transaction).
 3. **RLS policies** on `upg.*` keyed off that identity and the `access` table,
-   so reads/writes are gated at the database — not by convention.
-4. **Operational scale** — stateless server replicas behind a load balancer,
+   so reads/writes are gated at the database, not by convention.
+4. **Operational scale:** stateless server replicas behind a load balancer,
    connection pooling (e.g. PgBouncer; the server currently opens an untuned
    default `pg.Pool`), and the existing webhook/audit machinery wired to fire
    on mutations.
@@ -164,7 +164,7 @@ The data model is already built for this — `products`, `access` roles,
 Until those land, treat the `access` roles as **advisory metadata**, not a
 security boundary.
 
-> Tracked as a roadmap item — see the UPG issue tracker for "Tier-3 enforcement:
+> Tracked as a roadmap item; see the UPG issue tracker for "Tier-3 enforcement:
 > HTTP transport + per-user identity + RLS."
 
 ---
@@ -181,5 +181,5 @@ security boundary.
 |----------|----------|-------------|
 | `UPG_DATABASE_URL` | Yes | Postgres connection string. Also accepted as `--database-url`. |
 
-The server is intentionally minimal in configuration — everything else lives
+The server is intentionally minimal in configuration; everything else lives
 in the database.

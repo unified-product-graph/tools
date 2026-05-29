@@ -43,7 +43,7 @@ export interface DanglingEdgeReport {
 
 /**
  * Walk `edges` and pick out every edge with at least one endpoint not in
- * `nodeIds`. Pure function — does not mutate inputs. Safe to call many times.
+ * `nodeIds`. Pure function; does not mutate inputs. Safe to call many times.
  */
 export function classifyDanglingEdges(
   edges: readonly UPGEdge[],

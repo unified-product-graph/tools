@@ -1,10 +1,10 @@
 /**
- * `helm capture <type> <title>` — adds a node to the graph.
+ * `helm capture <type> <title>`: adds a node to the graph.
  *
  * Showcases:
- *   - upg.nodes.create()           — the canonical write path
- *   - UnknownEntityTypeError       — the SDK's built-in type validation
- *   - upg.health()                 — quick reward signal after the write
+ *   - upg.nodes.create()           : the canonical write path
+ *   - UnknownEntityTypeError       : the SDK's built-in type validation
+ *   - upg.health()                 : quick reward signal after the write
  *
  * Try:
  *   helm capture decision "We're shipping iOS first, not Android"
@@ -46,7 +46,7 @@ export const captureCommand = new Command('capture')
         console.log(chalk.yellow('  ⚠'), chalk.dim(result.warning))
       }
 
-      // Tiny reward signal — show the graph got healthier (or didn't).
+      // Tiny reward signal: show the graph got healthier (or didn't).
       const { score } = await upg.health()
       console.log(chalk.dim(`\nHealth: ${score}/100`))
     } catch (err) {

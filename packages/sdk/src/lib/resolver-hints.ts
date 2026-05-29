@@ -1,5 +1,5 @@
 /**
- * Resolver enrichment helpers — and.
+ * Resolver enrichment helpers ( and).
  *
  * When the canonical resolver returns `null` for a (source_type, target_type)
  * pair, these helpers surface what the catalog DOES know about, so the failure
@@ -7,19 +7,19 @@
  *
  * Three enrichments:
  *
- * - `buildAnchorHint(source, target)` —: when the target's domain has
+ * - `buildAnchorHint(source, target)`: when the target's domain has
  *   a canonical anchor entity that DIFFERS from the source, surface the
  *   anchor + the domain's creation sequence so the author can route via the
  *   correct entry point ("ideal_customer_profile is anchored in gtm_strategy
- *   — create one of those first").
+ *   create one of those first").
  *
- * - `buildAlternateAnchors(source, target)` —: catalog walk for
+ * - `buildAlternateAnchors(source, target)`: catalog walk for
  *   edges where `target_type === requested_target` AND `source_type !==
  *   requested_source`. Surfaces the OTHER sources the catalog connects to
  *   this target. Sorted by classification: hierarchy > causal > semantic
  *   > cross-domain. Capped at 3.
  *
- * - `buildAdjacentEdges(source)` —: catalog walk for edges where
+ * - `buildAdjacentEdges(source)`: catalog walk for edges where
  *   `source_type === requested_source`. Helps the author discover what they
  *   CAN reach from this source. Capped at 3.
  *
@@ -51,7 +51,7 @@ export interface AdjacentEdge {
   edge_type: string
 }
 
-// Classification rank for sorting alternates — matches the catalog's
+// Classification rank for sorting alternates; matches the catalog's
 // pickCanonicalEdge policy: hierarchy ≻ causal ≻ semantic ≻ cross-domain.
 const CLASSIFICATION_RANK: Record<string, number> = {
   hierarchy: 0,
@@ -61,7 +61,7 @@ const CLASSIFICATION_RANK: Record<string, number> = {
 }
 
 /**
- * — anchor hint.
+ *: anchor hint.
  *
  * When the target type is anchored in a domain different from the source's
  * domain, surface that anchor + the domain's creation sequence. Returns
@@ -88,12 +88,12 @@ export function buildAnchorHint(
   const anchor = guide.anchor_entity ?? guide.creation_sequence[0]
   if (!anchor) return undefined
 
-  // No hint when the source IS the anchor — the author already routed
+  // No hint when the source IS the anchor; the author already routed
   // correctly, the null was for a different reason (true catalog gap).
   if (anchor === sourceType) return undefined
 
   // No hint when the target IS its own anchor AND the source is in the same
-  // domain — the author is reaching across a domain they already entered,
+  // domain; the author is reaching across a domain they already entered,
   // so routing through the anchor again would be circular advice.
   const sourceDomainId = (UPG_ENTITY_TO_DOMAIN as Record<string, string | undefined>)[sourceType]
   if (anchor === targetType && sourceDomainId === targetDomainId) return undefined
@@ -109,7 +109,7 @@ export function buildAnchorHint(
 }
 
 /**
- * — alternate anchors.
+ *: alternate anchors.
  *
  * Walk `UPG_EDGE_CATALOG` for every edge whose `target_type` matches the
  * requested target AND whose `source_type` differs from the requested source.
@@ -118,7 +118,7 @@ export function buildAnchorHint(
  * This converts "no edge from `service` to `external_api`" into "but
  * `bounded_context → external_api` is canonical."
  *
- * Deduplicates by source_type — when the catalog registers multiple edges
+ * Deduplicates by source_type; when the catalog registers multiple edges
  * from the same source to the same target (e.g. semantic + causal), the
  * highest-ranked one wins.
  */
@@ -148,13 +148,13 @@ export function buildAlternateAnchors(
 }
 
 /**
- * — adjacent edges.
+ *: adjacent edges.
  *
  * Walk `UPG_EDGE_CATALOG` for every edge whose `source_type` matches the
  * requested source. Surfaces what the author CAN reach from where they are
  * standing. Sort by classification rank and cap at 3.
  *
- * Skips polymorphic edges (`source_type === '*'`) — those don't teach
+ * Skips polymorphic edges (`source_type === '*'`); those don't teach
  * useful adjacency.
  */
 export function buildAdjacentEdges(sourceType: string): AdjacentEdge[] {
@@ -184,7 +184,7 @@ export function buildAdjacentEdges(sourceType: string): AdjacentEdge[] {
 }
 
 /**
- * Convenience aggregator — emit every applicable enrichment block for a
+ * Convenience aggregator: emit every applicable enrichment block for a
  * failed (source, target) pair. Used by `resolve_edge_for_pair` and
  * `create_edge` / `batch_create_edges` error paths.
  *

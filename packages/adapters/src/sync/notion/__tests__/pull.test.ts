@@ -1,5 +1,5 @@
 /**
- * pull.test.ts — Notion → UPG pull tests
+ * pull.test.ts: Notion → UPG pull tests
  *
  * Verifies that pullFromNotion() produces correct SourceItems given
  * mocked Notion database + page responses.
@@ -134,7 +134,7 @@ describe('classifyDatabase', () => {
   })
 
   it('boosts confidence to high when the database has relation properties', () => {
-    // Features DB has relation properties — should already be high
+    // Features DB has relation properties; should already be high
     const result = classifyDatabase(FEATURES_DB)
     expect(result.confidence).toBe('high')
     expect(result.matched_signals.some((s) => s.includes('relation'))).toBe(true)
@@ -158,7 +158,7 @@ describe('classifyDatabase', () => {
 
 // ─── pullFromNotion tests ─────────────────────────────────────────────────────
 
-describe('pullFromNotion — database discovery', () => {
+describe('pullFromNotion: database discovery', () => {
   it('lists databases from the client when no databaseIds are specified', async () => {
     const client = makeMockClient([FEATURES_DB, OPPORTUNITIES_DB], [])
     const options: PullOptions = {}
@@ -209,7 +209,7 @@ describe('pullFromNotion — database discovery', () => {
   })
 })
 
-describe('pullFromNotion — SourceItem mapping', () => {
+describe('pullFromNotion: SourceItem mapping', () => {
   const featurePage = makeFeaturePage('page-feat-1', 'Quick start wizard')
   const featurePage2 = makeFeaturePage('page-feat-2', 'Onboarding checklist', 'Done')
 
@@ -265,7 +265,7 @@ describe('pullFromNotion — SourceItem mapping', () => {
   })
 })
 
-describe('pullFromNotion — pagination', () => {
+describe('pullFromNotion: pagination', () => {
   it('returns next_cursor from database query when available', async () => {
     const client = makeMockClient([FEATURES_DB], [])
 

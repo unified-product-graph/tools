@@ -1,5 +1,5 @@
 /**
- * Tests for UPGPortfolioStore (Phase 2) — portfolio-document
+ * Tests for UPGPortfolioStore (Phase 2): portfolio-document
  * load/save and cross-edge migration from inline product edges.
  */
 
@@ -176,7 +176,7 @@ describe('UPGPortfolioStore.addCrossEdge', () => {
  expect(() =>
  pStore.addCrossEdge({
  id: 'e_bad',
- source: 'n_111', // bare — not qualified
+ source: 'n_111', // bare, not qualified
  target: 'prod_b/n_222',
  type: 'shares_persona',
  }),
@@ -192,7 +192,7 @@ describe('UPGPortfolioStore.addCrossEdge', () => {
  pStore.addCrossEdge({
  id: 'e_bad',
  source: 'prod_a/n_111',
- target: 'n_222', // bare — not qualified
+ target: 'n_222', // bare, not qualified
  type: 'shares_persona',
  }),
  ).toThrow(/qualified ID/)
@@ -282,7 +282,7 @@ describe('UPGPortfolioStore.migrateCrossEdgesFromDoc', () => {
 
  function makeCrossEdgeDoc() {
  return makeProductDoc('prod_quality', 'Quality Circle', [
- // Cross-product type — should be migrated
+ // Cross-product type: should be migrated
  {
  id: 'e_cross_1',
  source: 'n_aaa',
@@ -296,7 +296,7 @@ describe('UPGPortfolioStore.migrateCrossEdgesFromDoc', () => {
  target: 'n_bbb',
  type: 'shares_competitor',
  },
- // Regular edge — must NOT be migrated
+ // Regular edge: must NOT be migrated
  {
  id: 'e_regular',
  source: 'n_aaa',
@@ -306,7 +306,7 @@ describe('UPGPortfolioStore.migrateCrossEdgesFromDoc', () => {
  ])
  }
 
- it('dry_run: true — reports migrated edges without writing', async () => {
+ it('dry_run: true, reports migrated edges without writing', async () => {
  const portfolioPath = join(cwd, 'portfolio.upg')
  const pStore = new UPGPortfolioStore()
  await pStore.loadOrInit(portfolioPath)
@@ -331,7 +331,7 @@ describe('UPGPortfolioStore.migrateCrossEdgesFromDoc', () => {
  expect(pStore.getAllCrossEdges()).toHaveLength(0)
  })
 
- it('dry_run: false — migrates edges and removes them from source doc', async () => {
+ it('dry_run: false, migrates edges and removes them from source doc', async () => {
  const portfolioPath = join(cwd, 'portfolio.upg')
  const pStore = new UPGPortfolioStore()
  await pStore.loadOrInit(portfolioPath)
@@ -459,7 +459,7 @@ describe('migration: UPGFileStore + UPGPortfolioStore round-trip', () => {
  // The v0.5+ validator rejects cross-product edge types in `edges[]`, so we
  // can't write the legacy "inline cross-product" fixture to disk and load
  // it. Build a loadable product doc, then splice the inline cross-product
- // edge into `liveDoc.edges` post-load — this is the exact graph state the
+ // edge into `liveDoc.edges` post-load; this is the exact graph state the
  // migration tool is meant to clean up.
  const doc = makeProductDoc('prod_main', 'Main Product', [
  {
@@ -496,7 +496,7 @@ describe('migration: UPGFileStore + UPGPortfolioStore round-trip', () => {
  expect(result.skipped).toHaveLength(0)
 
  // migrateCrossEdgesFromDoc mutates doc.edges in-place but can't set the
- // store's dirty flag — call markDirty() before flush so the save goes through.
+ // store's dirty flag; call markDirty() before flush so the save goes through.
  store.markDirty()
 
  // Flush both

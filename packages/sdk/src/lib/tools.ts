@@ -30,7 +30,7 @@ function canonicalType(name: string): string {
 // `resolveEntityType` + `UnknownEntityTypeError` live in
 // `@unified-product-graph/core` so cloud + local + downstream HTTP consumers
 // all run the same alias path (`get_entity_schema('jtbd') → job`) AND share a
-// single `UnknownEntityTypeError` class — an `instanceof` thrown by the SDK
+// single `UnknownEntityTypeError` class; an `instanceof` thrown by the SDK
 // stays true when caught in a server. We import + re-export here so existing
 // consumers (tools/nodes.ts, tools/schema.ts, __tests__/tools.test.ts) keep
 // their import path AND the symbols stay locally bound for use further down
@@ -109,7 +109,7 @@ export const BUSINESS_AREAS: Record<string, { emoji: string; types: string[] }> 
   understanding: { emoji: '👤', types: ['persona', 'job', 'need', 'research_study', 'insight'] },
   // Surface canonical post-split types. `hypothesis` is canonical
   // (re-promoted in v0.4.0 from hypothesis_claim). `hypothesis_evidence`
-  // is deprecated — use `evidence` + hypothesis_has_evidence edge instead.
+  // is deprecated; use `evidence` + hypothesis_has_evidence edge instead.
   // `experiment` remains canonical alongside `experiment_plan` / `experiment_run`.
   discovery: { emoji: '💡', types: ['opportunity', 'solution', 'competitor', 'hypothesis', 'experiment_plan', 'experiment_run', 'learning'] },
   // `validation` overlaps `discovery` semantically but tracks the stage's
@@ -123,7 +123,7 @@ export const BUSINESS_AREAS: Record<string, { emoji: string; types: string[] }> 
   building: { emoji: '📦', types: ['feature', 'user_story', 'epic', 'release', 'user_journey', 'user_flow'] },
   sustaining: { emoji: '🏦', types: ['business_model', 'revenue_stream', 'cost_structure', 'unit_economics', 'pricing_strategy'] },
   learning: { emoji: '📊', types: ['outcome', 'metric', 'objective', 'key_result', 'retrospective'] },
-  // Operations is a maintenance-stage concern — incidents, postmortems, error
+  // Operations is a maintenance-stage concern: incidents, postmortems, error
   // budgets only become coverage-relevant once a product is in `maintenance`.
   // Surfaced informationally at earlier stages.
   operations: { emoji: '🚨', types: ['incident', 'postmortem', 'error_budget'] },
@@ -143,7 +143,7 @@ export const BUSINESS_AREAS: Record<string, { emoji: string; types: string[] }> 
 // Stages widen the counted set as a product matures:
 // concept → validation → build → beta → launch → growth → mature →
 //   maintenance (adds Operations) → sunset (narrowest, only Identity +
-//   Learning — the retrospective).
+//   Learning, the retrospective).
 //
 // Keys MUST exist in `BUSINESS_AREAS` above. The type assertion at the
 // bottom of this module enforces this at compile time.
@@ -156,7 +156,7 @@ export const STAGE_COVERAGE_TARGETS: Record<UPGProductStage, string[]> = {
   growth: ['identity', 'understanding', 'discovery', 'validation', 'building', 'reaching', 'converting', 'sustaining', 'learning'],
   mature: ['identity', 'understanding', 'discovery', 'validation', 'building', 'reaching', 'converting', 'sustaining', 'learning'],
   maintenance: ['identity', 'understanding', 'discovery', 'validation', 'building', 'reaching', 'converting', 'sustaining', 'learning', 'operations'],
-  // Sunset products are winding down — Identity stays (the product still has
+  // Sunset products are winding down; Identity stays (the product still has
   // a name + vision) and Learning becomes the priority (capture the
   // retrospective + reasons for sunsetting). Everything else is informational.
   sunset: ['identity', 'learning'],
@@ -164,7 +164,7 @@ export const STAGE_COVERAGE_TARGETS: Record<UPGProductStage, string[]> = {
 
 /**
  * Resolve the canonical UPGProductStage for digest coverage. Returns
- * `'concept'` as the default when stage is missing or unrecognised — concept
+ * `'concept'` as the default when stage is missing or unrecognised; concept
  * is the narrowest expectation surface, so we under-grade rather than
  * over-grade. Legacy `"idea"` and friends route through `coerceProductStage`
  * (which lives in `@unified-product-graph/core`); the inline `"idea" →
@@ -212,7 +212,7 @@ export const CHAINS = [
   { name: 'feature → user_story', from: 'feature', to: 'user_story', edgePattern: 'user_story' },
 ] as const
 
-// ── Type sort order (for tree rendering — group children by type) ────────────
+// ── Type sort order (for tree rendering: group children by type) ─────────────
 // Follows the natural product thinking hierarchy: who → why → what → how → measure
 const TYPE_SORT_ORDER: string[] = [
   // Identity
@@ -301,7 +301,7 @@ export interface GraphDigest {
    * CoverageRegion>` index lookups stay correct for callers).
    *
    * NOTE: callers iterating `Object.entries(coverage)` should skip the
-   * `stage_summary` key — it carries a different shape.
+   * `stage_summary` key; it carries a different shape.
    */
   coverage: Record<string, CoverageRegion> & { stage_summary?: CoverageStageSummary }
   lifecycle: Record<string, number>
@@ -312,11 +312,11 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   const edges = store.getAllEdges()
   const product = store.getProduct()
 
-  // Counts by type (raw — preserves the type as stored on the node)
+  // Counts by type (raw; preserves the type as stored on the node)
   const byType: Record<string, number> = {}
   for (const n of nodes) byType[n.type] = (byType[n.type] ?? 0) + 1
 
-  // Counts by canonical type — legacy-typed nodes (e.g. `jtbd`) fold into
+  // Counts by canonical type; legacy-typed nodes (e.g. `jtbd`) fold into
   // their canonical replacement (`job`). Source of truth for chain coverage.
   const byCanonicalType: Record<string, number> = {}
   for (const n of nodes) {
@@ -332,7 +332,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   }
   const orphanCount = nodes.filter((n) => !connectedNodes.has(n.id)).length
 
-  // Health metrics — read from canonical counts so legacy types still flow through.
+  // Health metrics: read from canonical counts so legacy types still flow through.
   // (since v0.4.0) `hypothesis` is canonical (reverted from hypothesis_claim).
   // Legacy hypothesis_claim nodes fold into canonical via canonicalType() above.
   // We aggregate plan + run for the experiment count so the headline
@@ -346,7 +346,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   const personaCount = byCanonicalType['persona'] ?? 0
 
   // Chain completeness. Both parentType and edgePattern are matched against
-  // canonical names — a `jtbd` node connected via a `persona_pursues_jtbd`
+  // canonical names; a `jtbd` node connected via a `persona_pursues_jtbd`
   // edge still counts as a `persona → job` chain, because both sides are
   // resolved to their canonical forms before comparison.
   const chainStats = (parentType: string, edgePattern: string) => {
@@ -429,7 +429,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
 
   const personaJob = chainStats('persona', 'job')
   // (2026-05-20): jobs and needs are often connected only via
-  // personas — `job ← persona_pursues_job ← persona → persona_experiences_need
+  // personas: `job ← persona_pursues_job ← persona → persona_experiences_need
   // → need`. Count direct edges OR the persona-bridge path.
   const jobNeed = chainStatsWithBridge(
     'job',
@@ -445,11 +445,11 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   )
   const oppSolution = chainStats('opportunity', 'solution')
   // Hypothesis is canonical (v0.4.0). Legacy hypothesis_claim nodes
-  // still match — `chainStats` runs source types through canonicalType().
+  // still match; `chainStats` runs source types through canonicalType().
   const hypExperiment = chainStats('hypothesis', 'experiment_plan')
   const expLearning = chainStats('experiment_run', 'learning')
 
-  // Business area coverage — fold deprecated types into canonical via the spec
+  // Business area coverage: fold deprecated types into canonical via the spec
   const typeSet = new Set<string>()
   for (const t of Object.keys(byType)) {
     typeSet.add(t)
@@ -459,7 +459,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   // through the legacy-alias coercion path first, then read the list of
   // regions counted toward completeness for that stage. Per-region
   // `types_present` / `types_missing` are populated for ALL regions
-  // regardless of stage — only `counted_toward_stage` and the
+  // regardless of stage; only `counted_toward_stage` and the
   // `stage_summary` aggregate distinguish counted from informational.
   const rawStage = product.stage ?? (nodes.find((n) => n.type === 'product')?.properties as Record<string, unknown> | undefined)?.stage
   const resolvedStage = resolveCoverageStage(rawStage)
@@ -482,7 +482,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
     if (isCounted) countedRegionStats.push({ covered: region.covered, total: region.total })
   }
 
-  // Stage summary — overall_pct is the mean per-region coverage across only
+  // Stage summary: overall_pct is the mean per-region coverage across only
   // the counted regions. We compute per-region pct first (so a region with
   // 1/3 contributes 33, not 1) then average, so adding a tiny new region
   // doesn't tank the headline.
@@ -500,7 +500,7 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
     overall_pct: overallPct,
   }
 
-  // Lifecycle balance — count via canonical types so `hypothesis`
+  // Lifecycle balance: count via canonical types so `hypothesis`
   // (legacy) and `hypothesis_claim` (canonical) don't double-count when both
   // appear in LIFECYCLE_PHASES.validation. We dedupe the canonical set per
   // phase and read from `byCanonicalType` so legacy nodes are surfaced
@@ -595,7 +595,7 @@ export function searchNodes(
 export function computeHealthScore(digest: GraphDigest): number {
   const orphanRate = digest.health.orphan_rate
   const orphanScore = Math.max(0, 100 - orphanRate * 200)
-  // Filter out the special `stage_summary` key — it's an aggregate, not a
+  // Filter out the special `stage_summary` key; it's an aggregate, not a
   // per-region row. Iterating Object.entries(coverage) directly would have
   // counted it as a (zero-coverage) region.
   const regions = Object.entries(digest.coverage)
@@ -848,7 +848,7 @@ export function createNode(
         edge: null,
         warning:
           (warning ? warning + ' | ' : '') +
-          `Parent edge not created — no canonical edge for ${parent.type} → ${canonicalNodeType}.${suggestion}`,
+          `Parent edge not created; no canonical edge for ${parent.type} → ${canonicalNodeType}.${suggestion}`,
       }
     }
     edge = {
@@ -879,7 +879,7 @@ export type CreateEdgeResult =
       error: string
       /**
        * Source/target types when the failure is a "no canonical edge"
-       * resolver miss — surfaced so the MCP handler can attach
+       * resolver miss; surfaced so the MCP handler can attach
        * `anchor_hint` / `alternate_anchors` / `adjacent_edges` enrichment
        * blocks ( +).
        */
@@ -940,7 +940,7 @@ export function createEdge(
   let edgeWarning: string | undefined
 
   if (args.type) {
-    // User-supplied edge type — verify against the catalog's source/target
+    // User-supplied edge type; verify against the catalog's source/target
     // pair when the type is canonical. Non-canonical types fall through
     // (they're still surfaced by validate_graph as edge_drift). Tracked as
     // audit finding F1 (2026-05-20).
@@ -1041,14 +1041,14 @@ export type MoveNodeResult =
       node_id: string
       new_edge: UPGEdge
       removed_edge_id: string | null
-      /** Removed edge object — exposed for caller-driven rollback (e.g. batch). */
+      /** Removed edge object; exposed for caller-driven rollback (e.g. batch). */
       removed_edge?: UPGEdge
       warning?: string
     }
   | { moved: false; error: string }
 
 /**
- * Find the existing parent edge(s) for a node — edges where the node is
+ * Find the existing parent edge(s) for a node: edges where the node is
  * the target and the edge has classification 'hierarchy' in the catalog.
  * Non-canonical edges (not in UPG_EDGE_CATALOG) are skipped.
  */
@@ -1154,7 +1154,7 @@ export function moveNode(store: UPGFileStore, args: MoveNodeArgs): MoveNodeResul
   }
 
   // Atomic swap. removeEdge → addEdge in a single synchronous block. If
-  // addEdge throws (target/source missing — should not happen given checks
+  // addEdge throws (target/source missing; should not happen given checks
   // above), rollback by restoring the old edge.
   if (oldEdge) {
     store.removeEdge(oldEdge.id)
@@ -1163,7 +1163,7 @@ export function moveNode(store: UPGFileStore, args: MoveNodeArgs): MoveNodeResul
     store.addEdge(newEdge)
   } catch (err) {
     if (oldEdge) {
-      // Restore — skipValidation because the old edge was already in the
+      // Restore: skipValidation because the old edge was already in the
       // graph and valid before we touched it.
       store.addEdge(oldEdge, true)
     }
@@ -1183,7 +1183,7 @@ export function moveNode(store: UPGFileStore, args: MoveNodeArgs): MoveNodeResul
   }
 }
 
-// ── batch_move_nodes — atomic, all-or-nothing (cap 50) ──────────────────────
+// ── batch_move_nodes: atomic, all-or-nothing (cap 50) ───────────────────────
 
 export interface BatchMoveNodesResult {
   moves: Array<{ node_id: string; new_edge: UPGEdge; removed_edge_id: string | null }>
@@ -1242,7 +1242,7 @@ export function batchMoveNodes(
   for (let i = 0; i < moves.length; i++) {
     const result = moveNode(store, moves[i])
     if (!result.moved) {
-      // Roll back already-applied moves in reverse order — restore the
+      // Roll back already-applied moves in reverse order: restore the
       // exact old edge objects captured by moveNode so the graph is bit-
       // for-bit identical to where it started.
       for (let j = applied.length - 1; j >= 0; j--) {
@@ -1253,7 +1253,7 @@ export function batchMoveNodes(
         if (a.oldEdge) {
           try {
             store.addEdge(a.oldEdge, true)
-          } catch { /* duplicate id — graph diverged, surface but continue */ }
+          } catch { /* duplicate id; graph diverged, surface but continue */ }
         }
       }
       return { ok: false, error: `Move at index ${i}: ${result.error}`, failed_at_index: i }
@@ -1318,7 +1318,7 @@ export interface BatchCreateFail {
 export type BatchCreateResult = BatchCreateOk | BatchCreateFail
 
 /**
- * Atomic batch creation — nodes plus optional explicit edges in a single
+ * Atomic batch creation: nodes plus optional explicit edges in a single
  * all-or-nothing transaction.
  *
  * Validation pass walks every node and every edge against the canonical
@@ -1365,7 +1365,7 @@ export function batchCreateNodes(
     }
     if (n.parent_ref !== undefined) {
       const match = n.parent_ref.match(/^\$(\d+)$/)
-      if (!match) return { ok: false, error: `Node at index ${i}: invalid parent_ref "${n.parent_ref}" — use "$0", "$1", etc.` }
+      if (!match) return { ok: false, error: `Node at index ${i}: invalid parent_ref "${n.parent_ref}"; use "$0", "$1", etc.` }
       const refIndex = parseInt(match[1], 10)
       if (refIndex >= i) return { ok: false, error: `Node at index ${i}: parent_ref "${n.parent_ref}" must reference an earlier index (0–${i - 1})` }
     }
@@ -1392,7 +1392,7 @@ export function batchCreateNodes(
     if (refMatch) {
       const idx = parseInt(refMatch[1], 10)
       if (idx >= nodes.length) {
-        return { error: `Edge at index ${edgeIndex}: ${label} "${raw}" out of range — only ${nodes.length} nodes in this batch.` }
+        return { error: `Edge at index ${edgeIndex}: ${label} "${raw}" out of range; only ${nodes.length} nodes in this batch.` }
       }
       return { kind: 'ref', index: idx }
     }
@@ -1411,7 +1411,7 @@ export function batchCreateNodes(
     const toResolved = resolveEdgeRef(e.to_ref, 'to_ref', i)
     if ('error' in toResolved) return { ok: false, error: toResolved.error }
 
-    // Self-loop refusal — both sides resolve to the same ref OR the same
+    // Self-loop refusal: both sides resolve to the same ref OR the same
     // pre-existing node id. No canonical UPG edge type is self-referential.
     // F2 (2026-05-20).
     const sameRef =
@@ -1422,7 +1422,7 @@ export function batchCreateNodes(
       return {
         ok: false,
         error:
-          `Edge at index ${i}: self-loop refused — source and target resolve to the same node. ` +
+          `Edge at index ${i}: self-loop refused; source and target resolve to the same node. ` +
           `No canonical UPG edge type is self-referential.`,
       }
     }
@@ -1518,7 +1518,7 @@ export function batchCreateNodes(
               ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
               : ''
             warnings.push(
-              `Node "${newNode.title}": parent edge not created — no canonical edge for ${parent.type} → ${newNode.type}.${suggestion}`,
+              `Node "${newNode.title}": parent edge not created; no canonical edge for ${parent.type} → ${newNode.type}.${suggestion}`,
             )
           }
         }
@@ -1563,7 +1563,7 @@ export function batchCreateNodes(
     explicitCreated.length === 0
   ) {
     warnings.push(
-      `Created ${createdNodes.length} nodes with no edges — they are orphans. ` +
+      `Created ${createdNodes.length} nodes with no edges; they are orphans. ` +
         `Use the edges[] array in this call to link them. ` +
         `See get_entity_schema(<type>) for canonical edges per type.`,
     )
@@ -1580,7 +1580,7 @@ export function batchCreateNodes(
   return result
 }
 
-// ── migrate_node_type — single-node type change ───────────────────
+// ── migrate_node_type: single-node type change ────────────────────
 
 export interface MigrateNodeTypeArgs {
   node_id: string
@@ -1619,7 +1619,7 @@ export function migrateNodeType(
   const node = store.getNode(args.node_id)
   if (!node) return { migrated: false, error: `Node not found: ${args.node_id}` }
 
-  // Resolve new type — alias-aware. Unknown types throw, caught here
+  // Resolve new type (alias-aware). Unknown types throw, caught here
   // and translated to a structured failure so the caller doesn't have to.
   let resolved: EntityTypeResolution
   try {
@@ -1660,7 +1660,7 @@ export function migrateNodeType(
     if (!sourceType || !targetType) {
       return {
         migrated: false,
-        error: `Edge ${e.id} references a missing node — fix graph integrity before migrating.`,
+        error: `Edge ${e.id} references a missing node; fix graph integrity before migrating.`,
       }
     }
     const inference = inferEdgeTypeWithTier(sourceType, targetType)
@@ -1706,9 +1706,9 @@ export function migrateNodeType(
     }
     try {
       store.updateNode(args.node_id, { type: oldType as UPGEntityType })
-    } catch { /* node already gone — graph diverged, surface the original */ }
+    } catch { /* node already gone; graph diverged, surface the original */ }
     for (const r of removed.slice().reverse()) {
-      try { store.addEdge(r, true) } catch { /* duplicate id — surface the original */ }
+      try { store.addEdge(r, true) } catch { /* duplicate id; surface the original */ }
     }
     return {
       migrated: false,

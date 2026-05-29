@@ -89,7 +89,7 @@ async function readProductTitle(filePath: string, fallback: string): Promise<str
       return doc.product.title
     }
   } catch {
-    // Malformed file or unreadable — fall back to filename
+    // Malformed file or unreadable; fall back to filename
   }
   return fallback
 }
@@ -108,13 +108,13 @@ export async function initWorkspace({
     throw new WorkspaceAlreadyExistsError()
   } catch (err) {
     if (err instanceof WorkspaceAlreadyExistsError) throw err
-    // ENOENT — good, no workspace yet
+    // ENOENT: good, no workspace yet
   }
 
   await fsp.mkdir(upgDir, { recursive: true })
 
   // Root-level .upg files that may need moving. Use withFileTypes to filter
-  // out the `.upg` directory entry itself — `'.upg'.endsWith('.upg')` would
+  // out the `.upg` directory entry itself; `'.upg'.endsWith('.upg')` would
   // otherwise match it and trigger a rename of the directory into itself.
   const rootEntries = await fsp.readdir(resolvedCwd, { withFileTypes: true })
   const rootUpgFiles = rootEntries
@@ -122,7 +122,7 @@ export async function initWorkspace({
     .map((e) => e.name)
     .sort()
 
-  // Pre-existing .upg files already living inside .upg/ — they are products
+  // Pre-existing .upg files already living inside .upg/; they are products
   // even if the user never moved them. Register without re-moving.
   let preExistingFiles: string[] = []
   try {
@@ -132,7 +132,7 @@ export async function initWorkspace({
       .map((e) => e.name)
       .sort()
   } catch {
-    // Directory was just created or unreadable — treat as empty
+    // Directory was just created or unreadable; treat as empty
   }
 
   const products: WorkspaceProduct[] = []
@@ -165,13 +165,13 @@ export async function initWorkspace({
 
       // If the destination already exists (user dropped the same file in
       // both root and .upg/), keep the existing one and leave the root copy
-      // alone — non-destructive by default.
+      // alone; non-destructive by default.
       let destExists = false
       try {
         await fsp.access(destPath)
         destExists = true
       } catch {
-        // dest absent — safe to move
+        // dest absent; safe to move
       }
 
       if (!destExists) {
@@ -259,7 +259,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
   const { cwd, store, name, slug: slugArg, description, stage, portfolio_id } = args
   const upgDir = path.resolve(cwd, '.upg')
 
-  // Workspace mode required — single-file mode has no place to put the new sibling.
+  // Workspace mode required; single-file mode has no place to put the new sibling.
   try {
     await fsp.access(path.join(upgDir, 'workspace.json'))
   } catch {
@@ -323,11 +323,11 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
     verified_by: 'upg-mcp-local',
   }
 
-  // Refuse to clobber — should be impossible given collision resolution above
+  // Refuse to clobber; should be impossible given collision resolution above
   // but guard anyway in case of a race against an external writer.
   try {
     await fsp.access(destPath)
-    throw new Error(`File already exists at ${destPath} — slug resolution failed`)
+    throw new Error(`File already exists at ${destPath}; slug resolution failed`)
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }

@@ -47,7 +47,7 @@ const adapter = new SalesforceAdapter()
 
 // ─── Type mapping ─────────────────────────────────────────────────────────────
 
-describe('SalesforceAdapter — object type → entity type mapping', () => {
+describe('SalesforceAdapter: object type → entity type mapping', () => {
   it('account maps to account with confidence high', async () => {
     const items: SourceItem[] = [makeObject('a1', 'Acme Corp', 'account')]
     const result = await adapter.convert(items)
@@ -105,10 +105,10 @@ describe('SalesforceAdapter — object type → entity type mapping', () => {
 
 // ─── CRITICAL: Opportunity name collision ─────────────────────────────────────
 
-describe('SalesforceAdapter — CRITICAL Opportunity name collision', () => {
-  it('opportunity maps to UPG `deal` — NOT `opportunity`', async () => {
+describe('SalesforceAdapter: CRITICAL Opportunity name collision', () => {
+  it('opportunity maps to UPG `deal`, NOT `opportunity`', async () => {
     const items: SourceItem[] = [
-      makeObject('op1', 'Acme Corp — Enterprise Q2', 'opportunity', {
+      makeObject('op1', 'Acme Corp, Enterprise Q2', 'opportunity', {
         stage: 'Qualification',
         amount: 80000,
       }),
@@ -169,7 +169,7 @@ describe('SalesforceAdapter — CRITICAL Opportunity name collision', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('SalesforceAdapter — skipped types with warnings', () => {
+describe('SalesforceAdapter: skipped types with warnings', () => {
   it('campaign is skipped with a warning', async () => {
     const items: SourceItem[] = [
       makeObject('cam1', 'Q2 Email Campaign', 'campaign'),
@@ -205,7 +205,7 @@ describe('SalesforceAdapter — skipped types with warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('SalesforceAdapter — status normalisation', () => {
+describe('SalesforceAdapter: status normalisation', () => {
   it("case status 'new' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeObject('ca1', 'New case', 'case', { status: 'new' })]
     const result = await adapter.convert(items)
@@ -251,7 +251,7 @@ describe('SalesforceAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('SalesforceAdapter — edge emission', () => {
+describe('SalesforceAdapter: edge emission', () => {
   it('account_contains_contact emitted when contact has account parent', async () => {
     const items: SourceItem[] = [
       makeObject('a1', 'Acme Corp', 'account'),
@@ -323,7 +323,7 @@ describe('SalesforceAdapter — edge emission', () => {
     expect(edge?.mapping_confidence).toBe('low')
   })
 
-  it('assertAllEdgesCatalogued — full fixture test', async () => {
+  it('assertAllEdgesCatalogued: full fixture test', async () => {
     const items: SourceItem[] = [
       makeObject('a1', 'Acme Corp', 'account'),
       makeObject('c1', 'Jane Smith', 'contact', { parent_id: 'a1', parent_type: 'account' }),
@@ -346,7 +346,7 @@ describe('SalesforceAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('SalesforceAdapter — source_map', () => {
+describe('SalesforceAdapter: source_map', () => {
   it('source_map contains an entry for each converted object', async () => {
     const items: SourceItem[] = [
       makeObject('a1', 'Acme Corp', 'account'),
@@ -366,7 +366,7 @@ describe('SalesforceAdapter — source_map', () => {
 
 // ─── external_tool / external_id ──────────────────────────────────────────────
 
-describe('SalesforceAdapter — external_tool and external_id', () => {
+describe('SalesforceAdapter: external_tool and external_id', () => {
   it('external_tool is always salesforce', async () => {
     const items: SourceItem[] = [makeObject('a1', 'Acme', 'account')]
     const result = await adapter.convert(items)

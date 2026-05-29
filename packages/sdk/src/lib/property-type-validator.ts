@@ -8,7 +8,7 @@
  * flag the new `property_type_drift` class.
  *
  * Background: the 2026-05-20 adversarial spec audit (F4) confirmed that
- * declared property type violations were silently accepted — writing
+ * declared property type violations were silently accepted; writing
  * `metric.target_value = "not_a_number_lol"` was stored verbatim despite the
  * schema declaring `target_value: number`. This helper closes that gap.
  *
@@ -31,7 +31,7 @@ export interface PropertyTypeViolation {
 
 export interface PropertyTypeCheckResult {
   /** Violations against declared property types. Empty when no declared
-   *  property mismatched — independent of whether undeclared properties
+   *  property mismatched, independent of whether undeclared properties
    *  exist (those are reported separately by checkUnknownProperties). */
   violations: PropertyTypeViolation[]
 }
@@ -60,9 +60,9 @@ export function checkPropertyTypes(
   const violations: PropertyTypeViolation[] = []
   for (const [key, value] of Object.entries(properties)) {
     const def = schema[key]
-    // Undeclared property — out of scope for this helper.
+    // Undeclared property; out of scope for this helper.
     if (!def) continue
-    // Tolerate null / undefined — treat as "field cleared / not set".
+    // Tolerate null / undefined; treat as "field cleared / not set".
     if (value === null || value === undefined) continue
 
     const actualType = describeActualType(value)
@@ -116,7 +116,7 @@ function describeActualType(value: unknown): string {
 }
 
 /**
- * Truncate a value for error messages — JSON.stringify, max 80 chars.
+ * Truncate a value for error messages: JSON.stringify, max 80 chars.
  */
 function describeValue(value: unknown): string {
   try {

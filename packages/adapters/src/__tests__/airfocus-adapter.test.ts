@@ -46,7 +46,7 @@ const adapter = new AirfocusAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('AirfocusAdapter — entity_type → UPG type mapping', () => {
+describe('AirfocusAdapter: entity_type → UPG type mapping', () => {
   it('objective maps to objective with confidence high', async () => {
     const items: SourceItem[] = [makeItem('obj1', 'Grow retention', 'objective')]
     const result = await adapter.convert(items)
@@ -139,7 +139,7 @@ describe('AirfocusAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Priority score preservation ─────────────────────────────────────────────
 
-describe('AirfocusAdapter — priority_score preservation', () => {
+describe('AirfocusAdapter: priority_score preservation', () => {
   it('priority_score is preserved on feature nodes', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Wizard feature', 'feature', { priority_score: 82 }),
@@ -170,7 +170,7 @@ describe('AirfocusAdapter — priority_score preservation', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('AirfocusAdapter — status normalisation', () => {
+describe('AirfocusAdapter: status normalisation', () => {
   it("status 'backlog' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Backlog item', 'feature', { status: 'backlog' })]
     const result = await adapter.convert(items)
@@ -204,7 +204,7 @@ describe('AirfocusAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('AirfocusAdapter — edge emission', () => {
+describe('AirfocusAdapter: edge emission', () => {
   it('objective_achieved_through_key_result emitted when key_result has objective parent', async () => {
     const items: SourceItem[] = [
       makeItem('obj1', 'Grow retention', 'objective'),
@@ -306,7 +306,7 @@ describe('AirfocusAdapter — edge emission', () => {
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-describe('AirfocusAdapter — tags', () => {
+describe('AirfocusAdapter: tags', () => {
   it('tags are set on the node', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Feature with tags', 'feature', { tags: ['q2', 'discovery'] }),
@@ -318,7 +318,7 @@ describe('AirfocusAdapter — tags', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('AirfocusAdapter — source_map', () => {
+describe('AirfocusAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('obj1', 'Objective', 'objective'),

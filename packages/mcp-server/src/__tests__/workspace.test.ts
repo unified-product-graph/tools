@@ -1,5 +1,5 @@
 /**
- * Tests for `init_workspace` — + general workspace bootstrap.
+ * Tests for `init_workspace`: general workspace bootstrap.
  *
  * Each test runs against a real tmp directory so the fs choreography
  * (readdir filtering, rename, copyFile, mkdir) is exercised end-to-end.
@@ -74,7 +74,7 @@ describe('initWorkspace', () => {
     const filePath = join(cwd, '.upg', 'product.upg')
     const store = await makeStoreAt(filePath, makeDoc('Already Inside'))
 
-    // This should NOT throw EINVAL — the old code's readdir filter matched
+    // This should NOT throw EINVAL; the old code's readdir filter matched
     // the literal `.upg` directory entry and tried `rename('.upg', '.upg/.upg')`.
     const result = await initWorkspace({ cwd, store })
 
@@ -153,7 +153,7 @@ describe('initWorkspace', () => {
     }
   })
 
-  it('honours moveExisting: false — registers root files without moving them', async () => {
+  it('honours moveExisting: false (registers root files without moving them)', async () => {
     const filePath = join(cwd, 'product.upg')
     const store = await makeStoreAt(filePath, makeDoc('Stay Put'))
 
@@ -257,7 +257,7 @@ describe('createProduct', () => {
   it('Rejects a non-canonical legacy stage value with a coercion hint', async () => {
     const store = await bootstrapWorkspace()
     await expect(
-      // `discovery` is a known legacy alias — write path must reject and
+      // `discovery` is a known legacy alias; write path must reject and
       // point the caller at the canonical `validation` value.
       createProduct({ cwd, store, name: 'Stage Test', stage: 'discovery' as never }),
     ).rejects.toBeInstanceOf(InvalidProductStageError)
@@ -294,7 +294,7 @@ describe('createProduct', () => {
   })
 
   it('rejects when the workspace is not initialised', async () => {
-    // No bootstrapWorkspace — workspace.json absent
+    // No bootstrapWorkspace: workspace.json absent
     const filePath = join(cwd, 'lone.upg')
     const store = await makeStoreAt(filePath, makeDoc())
 
@@ -331,7 +331,7 @@ describe('createProduct', () => {
     expect(edges[0].type).toBe('portfolio_contains_product')
   })
 
-  it('does not attach to a non-portfolio node — silently skips with portfolio_attached: false', async () => {
+  it('does not attach to a non-portfolio node (silently skips with portfolio_attached: false)', async () => {
     const store = await bootstrapWorkspace()
     const personaId = 'n_persona_1'
     store.addNode({ id: personaId, type: 'persona', title: 'Dev' })

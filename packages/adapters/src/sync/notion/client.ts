@@ -1,5 +1,5 @@
 /**
- * @unified-product-graph/notion-sync — Notion API client wrapper
+ * @unified-product-graph/notion-sync: Notion API client wrapper
  *
  * Wraps @notionhq/client to expose a clean async surface for the push/pull
  * modules. Handles pagination, rate limiting (429 back-off), and
@@ -122,7 +122,7 @@ export class NotionSyncClient {
    *
    * The Notion SDK returns a discriminated union (FullDatabaseObjectResponse |
    * PartialDatabaseObjectResponse). We cast through unknown to access fields
-   * that only exist on the full variant — skipLibCheck is set in tsconfig so
+   * that only exist on the full variant; skipLibCheck is set in tsconfig so
    * internal SDK overloads don't break the build.
    */
   async getDatabase(databaseId: string): Promise<NotionDatabaseInfo> {

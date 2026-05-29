@@ -47,7 +47,7 @@ const adapter = new LatticeAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('LatticeAdapter — entity_type → UPG entity type mapping', () => {
+describe('LatticeAdapter: entity_type → UPG entity type mapping', () => {
   it('goal maps to objective with confidence high (company level)', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Grow ARR by 40%', 'goal', { level: 'company' }),
@@ -134,7 +134,7 @@ describe('LatticeAdapter — entity_type → UPG entity type mapping', () => {
 
 // ─── Individual goal warning ──────────────────────────────────────────────────
 
-describe('LatticeAdapter — individual goal warning', () => {
+describe('LatticeAdapter: individual goal warning', () => {
   it('emits warning when level is individual for goal entity', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Personal growth goal', 'goal', { level: 'individual' }),
@@ -157,7 +157,7 @@ describe('LatticeAdapter — individual goal warning', () => {
 
 // ─── Skipped entities ─────────────────────────────────────────────────────────
 
-describe('LatticeAdapter — skipped entity types', () => {
+describe('LatticeAdapter: skipped entity types', () => {
   it('update, competency, praise, one_on_one are silently batched', async () => {
     const items: SourceItem[] = [
       makeItem('upd1', 'Weekly progress update', 'update'),
@@ -178,7 +178,7 @@ describe('LatticeAdapter — skipped entity types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('LatticeAdapter — status normalisation', () => {
+describe('LatticeAdapter: status normalisation', () => {
   it("status 'draft' normalises to 'draft'", async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Draft goal', 'goal', { status: 'draft', level: 'company' }),
@@ -230,7 +230,7 @@ describe('LatticeAdapter — status normalisation', () => {
 
 // ─── Level tag preservation ───────────────────────────────────────────────────
 
-describe('LatticeAdapter — level tag preservation', () => {
+describe('LatticeAdapter: level tag preservation', () => {
   it('level is preserved as a tag on the node', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Team OKR', 'goal', { level: 'team' }),
@@ -242,7 +242,7 @@ describe('LatticeAdapter — level tag preservation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('LatticeAdapter — edge emission', () => {
+describe('LatticeAdapter: edge emission', () => {
   it('objective_achieved_through_key_result emitted when key_result has goal parent', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Grow ARR', 'goal', { level: 'company' }),
@@ -332,7 +332,7 @@ describe('LatticeAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('LatticeAdapter — source_map', () => {
+describe('LatticeAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Goal', 'goal', { level: 'company' }),
@@ -352,7 +352,7 @@ describe('LatticeAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('LatticeAdapter — external_tool and external_id', () => {
+describe('LatticeAdapter: external_tool and external_id', () => {
   it('external_tool is always lattice', async () => {
     const items: SourceItem[] = [makeItem('g1', 'Goal', 'goal', { level: 'company' })]
     const result = await adapter.convert(items)

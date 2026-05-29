@@ -81,7 +81,7 @@ const canonicalEdgeKeys = new Set<string>(Object.keys(UPG_EDGE_CATALOG))
 // so we can flag deprecated entity types quickly.
 //
 // A type that's both `from` of a migration rule AND present in
-// UPG_TYPES is canonical (e.g. `experiment` — the v0.2.6 split rule is
+// UPG_TYPES is canonical (e.g. `experiment`; the v0.2.6 split rule is
 // retained for legacy data, but the type itself remains canonical
 // alongside its former children). Exclude canonical-and-also-rule-source
 // types from the deprecated set so they're not double-counted as drift.
@@ -99,7 +99,7 @@ for (const rules of Object.values(UPG_SPLIT_MIGRATIONS)) {
 
 // Note: we deliberately do NOT pre-compute a `knownDeprecatedEdgeKeys` set
 // from UPG_EDGE_MIGRATIONS. An edge key that appears as `from` in a migration
-// rule is not necessarily deprecated — the hypothesis family was
+// rule is not necessarily deprecated; the hypothesis family was
 // renamed and then renamed back, so the same key appears as `from` in one
 // version and as `to` (canonical) in another. Canonicality is determined by
 // UPG_EDGE_CATALOG alone; the migration registry is consulted only to suggest
@@ -111,7 +111,7 @@ for (const rules of Object.values(UPG_SPLIT_MIGRATIONS)) {
 // and `drop_when_self_referential` operate on top-level fields, which are
 // covered by other drift classes (top_level_drift, self_referential).
 //
-// Wildcard rules (`type: '*'`) apply to every entity type — materialise them
+// Wildcard rules (`type: '*'`) apply to every entity type; materialise them
 // during the walk against each node's actual type.
 const propertyMigrationKeysByType = new Map<string, Set<string>>()
 const propertyMigrationKeysWildcard = new Set<string>()
@@ -123,7 +123,7 @@ for (const rules of Object.values(UPG_PROPERTY_MIGRATIONS)) {
       for (const key of r.drop_props) addPropertyKey(r.type, key)
     }
     // rename_top_level and drop_when_self_referential touch top-level fields,
-    // not properties — see top_level_drift / self_referential.
+    // not properties; see top_level_drift / self_referential.
   }
 }
 
@@ -177,7 +177,7 @@ export function computeSchemaDriftSummary(doc: UPGDocument): SchemaDriftSummary 
       self_referential++
     }
 
-    // 6. property_drift — count nodes whose properties carry at least one key
+    // 6. property_drift: count nodes whose properties carry at least one key
     // covered by a `lift_property_to_top_level` or `drop_props` rule for their
     // type (or by a wildcard `'*'` rule).
     //
@@ -206,7 +206,7 @@ export function computeSchemaDriftSummary(doc: UPGDocument): SchemaDriftSummary 
   // stale rename rule still references it as `from`. The hypothesis family
   // (late finding 2026-05-21) is the canonical example: v0.2.8
   // renamed `solution_proposes_hypothesis → solution_proposes_hypothesis_claim`,
-  // v0.4.0 renamed it back — both rules are correct history, but both names
+  // v0.4.0 renamed it back; both rules are correct history, but both names
   // appear as `from` in UPG_EDGE_MIGRATIONS. The OR-with-knownDeprecatedEdgeKeys
   // form below would have flagged canonical `solution_proposes_hypothesis` as
   // drift purely because it's still a `from` in a v0.2.8 rule.

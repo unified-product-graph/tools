@@ -100,7 +100,7 @@ export function executeTool(store: UPGFileStore, name: string, args: Record<stri
       ]
       for (const [domain, cov] of Object.entries(digest.coverage)) {
         // `coverage` carries a `stage_summary` (CoverageStageSummary) alongside the
-        // per-region entries; skip it — only CoverageRegion has type coverage fields.
+        // per-region entries; skip it: only CoverageRegion has type coverage fields.
         if (!('types_present' in cov)) continue
         lines.push(`  ${cov.covered > 0 ? '✓' : '✗'} ${domain}: ${cov.types_present.join(', ') || '(empty)'}`)
         if (cov.types_missing.length > 0) lines.push(`    missing: ${cov.types_missing.join(', ')}`)

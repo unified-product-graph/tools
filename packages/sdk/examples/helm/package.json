@@ -1,7 +1,7 @@
 {
   "name": "@upg-examples/helm",
   "version": "0.1.0",
-  "description": "Helm — a tiny PR-coach for product teams, built on @unified-product-graph/sdk. Showcase example.",
+  "description": "Helm: a tiny PR-coach for product teams, built on @unified-product-graph/sdk. Showcase example.",
   "license": "MIT",
   "private": true,
   "type": "module",

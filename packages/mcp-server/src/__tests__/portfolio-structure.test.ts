@@ -1,5 +1,5 @@
 /**
- * — portfolio.upg honours its own structure.
+ *: portfolio.upg honours its own structure.
  *
  * Verifies the MCP write path routes portfolio-scoped entities (`portfolio`,
  * `organization`, `product_area`) to `.upg/portfolio.upg` rather than the
@@ -70,7 +70,7 @@ function makeCtx(store: UPGFileStore): ToolContext {
 interface ParsedResult {
   isError?: boolean
   text: string
-  // Loose body shape — every assertion narrows what it cares about.
+  // Loose body shape; every assertion narrows what it cares about.
   body?: Record<string, unknown>
   error?: string
 }
@@ -348,7 +348,7 @@ describe(' · read tools return empty when no portfolio.upg exists', () => {
     originalCwd = process.cwd()
     cwd = mkdtempSync(join(tmpdir(), 'upg-526-empty-'))
     process.chdir(cwd)
-    // Bare cwd — NO .upg/ directory at all. The product file lives outside
+    // Bare cwd: NO .upg/ directory at all. The product file lives outside
     // the workspace, so portfolio.upg cannot exist.
     const productPath = join(cwd, 'lone.upg')
     store = await makeStoreAt(productPath)

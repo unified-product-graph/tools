@@ -106,7 +106,7 @@ describe('migrateType cloud handler', () => {
       const pool = makePool(() => ({ rows: [{ count: '5' }] }))
       const ctx = makeContext(pool)
 
-      // No dry_run param — should default to true (read-only path)
+      // No dry_run param; should default to true (read-only path)
       const result = await migrateType({
         product_id: 'p1',
         from_type: 'pain_point',

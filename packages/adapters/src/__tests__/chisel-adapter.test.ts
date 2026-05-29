@@ -46,7 +46,7 @@ const adapter = new ChiselAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('ChiselAdapter — entity_type → UPG type mapping', () => {
+describe('ChiselAdapter: entity_type → UPG type mapping', () => {
   it('goal maps to objective with confidence high', async () => {
     const items: SourceItem[] = [makeItem('g1', 'Grow retention', 'goal')]
     const result = await adapter.convert(items)
@@ -152,7 +152,7 @@ describe('ChiselAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Impact and effort score preservation ────────────────────────────────────
 
-describe('ChiselAdapter — impact_score and effort_score on opportunity nodes', () => {
+describe('ChiselAdapter: impact_score and effort_score on opportunity nodes', () => {
   it('impact_score and effort_score are preserved on idea (opportunity) nodes', async () => {
     const items: SourceItem[] = [
       makeItem('i1', 'Onboarding pain', 'idea', {
@@ -178,7 +178,7 @@ describe('ChiselAdapter — impact_score and effort_score on opportunity nodes',
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('ChiselAdapter — status normalisation', () => {
+describe('ChiselAdapter: status normalisation', () => {
   it("status 'new' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('i1', 'New idea', 'idea', { status: 'new' })]
     const result = await adapter.convert(items)
@@ -206,7 +206,7 @@ describe('ChiselAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('ChiselAdapter — edge emission', () => {
+describe('ChiselAdapter: edge emission', () => {
   it('initiative_drives_outcome emitted when goal has pillar parent', async () => {
     const items: SourceItem[] = [
       makeItem('pil1', 'Activation pillar', 'pillar'),
@@ -321,7 +321,7 @@ describe('ChiselAdapter — edge emission', () => {
 
 // ─── Source map and identity ──────────────────────────────────────────────────
 
-describe('ChiselAdapter — source_map and identity', () => {
+describe('ChiselAdapter: source_map and identity', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Goal', 'goal'),

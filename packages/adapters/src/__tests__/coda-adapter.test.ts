@@ -47,7 +47,7 @@ const adapter = new CodaAdapter()
 
 // ─── inferTableType() ─────────────────────────────────────────────────────────
 
-describe('inferTableType — direct matches', () => {
+describe('inferTableType: direct matches', () => {
   it('Opportunities → opportunity', () => {
     expect(inferTableType('Opportunities')).toBe('opportunity')
   })
@@ -81,7 +81,7 @@ describe('inferTableType — direct matches', () => {
   })
 })
 
-describe('inferTableType — singular/plural handling', () => {
+describe('inferTableType: singular/plural handling', () => {
   it('Feature (singular) → feature', () => {
     expect(inferTableType('Feature')).toBe('feature')
   })
@@ -99,7 +99,7 @@ describe('inferTableType — singular/plural handling', () => {
   })
 })
 
-describe('inferTableType — explicitly unmappable tables', () => {
+describe('inferTableType: explicitly unmappable tables', () => {
   it('Views → null (explicitly unmappable)', () => {
     expect(inferTableType('Views')).toBeNull()
   })
@@ -113,7 +113,7 @@ describe('inferTableType — explicitly unmappable tables', () => {
   })
 })
 
-describe('inferTableType — unknown table returns undefined', () => {
+describe('inferTableType: unknown table returns undefined', () => {
   it('unknown table name returns undefined', () => {
     expect(inferTableType('My Random Table')).toBeUndefined()
   })
@@ -125,7 +125,7 @@ describe('inferTableType — unknown table returns undefined', () => {
 
 // ─── Table name → entity type (adapter.convert) ───────────────────────────────
 
-describe('CodaAdapter — table name → entity type', () => {
+describe('CodaAdapter: table name → entity type', () => {
   it('Opportunities table rows map to opportunity with high confidence', async () => {
     const items: SourceItem[] = [makeRow('r1', 'Users struggle with onboarding', 'Opportunities')]
     const result = await adapter.convert(items)
@@ -161,7 +161,7 @@ describe('CodaAdapter — table name → entity type', () => {
 
 // ─── Explicitly unmappable table (views) ─────────────────────────────────────
 
-describe('CodaAdapter — unmappable table types', () => {
+describe('CodaAdapter: unmappable table types', () => {
   it('rows from a Views table are skipped with a warning', async () => {
     const items: SourceItem[] = [
       makeRow('v1', 'Features by status', 'Views'),
@@ -178,7 +178,7 @@ describe('CodaAdapter — unmappable table types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('CodaAdapter — status normalisation', () => {
+describe('CodaAdapter: status normalisation', () => {
   it("'done' normalises to 'complete'", async () => {
     const items: SourceItem[] = [makeRow('r1', 'Shipped feature', 'Features', { status: 'done' })]
     const result = await adapter.convert(items)
@@ -218,7 +218,7 @@ describe('CodaAdapter — status normalisation', () => {
 
 // ─── Metric / key_result numeric field preservation ───────────────────────────
 
-describe('CodaAdapter — metric and key_result value fields', () => {
+describe('CodaAdapter: metric and key_result value fields', () => {
   it('Metrics table preserves current_value, target_value, unit', async () => {
     const items: SourceItem[] = [
       makeRow('m1', 'Activation Rate', 'Metrics', {
@@ -254,7 +254,7 @@ describe('CodaAdapter — metric and key_result value fields', () => {
 
 // ─── Lookup column edge emission ──────────────────────────────────────────────
 
-describe('CodaAdapter — lookup column edge emission', () => {
+describe('CodaAdapter: lookup column edge emission', () => {
   it('feature with Release lookup emits release_contains_feature edge', async () => {
     const items: SourceItem[] = [
       makeRow('rel1', 'v2.0', 'Releases'),
@@ -365,7 +365,7 @@ describe('CodaAdapter — lookup column edge emission', () => {
 
 // ─── Formula / button column warnings ────────────────────────────────────────
 
-describe('CodaAdapter — formula and button column warnings', () => {
+describe('CodaAdapter: formula and button column warnings', () => {
   it('has_formula_columns flag emits a warning once per table', async () => {
     const items: SourceItem[] = [
       makeRow('r1', 'Row 1', 'Features', { has_formula_columns: true }),
@@ -391,7 +391,7 @@ describe('CodaAdapter — formula and button column warnings', () => {
 
 // ─── Source map + external identifiers ───────────────────────────────────────
 
-describe('CodaAdapter — source_map and external identifiers', () => {
+describe('CodaAdapter: source_map and external identifiers', () => {
   it('source_map has an entry for each converted row', async () => {
     const items: SourceItem[] = [
       makeRow('row-001', 'Feature A', 'Features'),
@@ -425,7 +425,7 @@ describe('CodaAdapter — source_map and external identifiers', () => {
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-describe('CodaAdapter — tags', () => {
+describe('CodaAdapter: tags', () => {
   it('tags from metadata are attached to the node', async () => {
     const items: SourceItem[] = [
       makeRow('r1', 'Tagged feature', 'Features', {
@@ -439,7 +439,7 @@ describe('CodaAdapter — tags', () => {
 
 // ─── Full fixture: assertAllEdgesCatalogued ───────────────────────────────────
 
-describe('CodaAdapter — full fixture: all emitted edges are catalogued', () => {
+describe('CodaAdapter: full fixture, all emitted edges are catalogued', () => {
   it('assertAllEdgesCatalogued passes for a realistic multi-table import', async () => {
     const items: SourceItem[] = [
       // Strategy layer
@@ -496,7 +496,7 @@ describe('CodaAdapter — full fixture: all emitted edges are catalogued', () =>
 
 // ─── CODA_TABLE_TYPE_MAP spot-checks ─────────────────────────────────────────
 
-describe('CODA_TABLE_TYPE_MAP — spot checks', () => {
+describe('CODA_TABLE_TYPE_MAP: spot checks', () => {
   it('contains entry for okrs → objective', () => {
     expect(CODA_TABLE_TYPE_MAP['okrs']).toBe('objective')
   })
@@ -512,7 +512,7 @@ describe('CODA_TABLE_TYPE_MAP — spot checks', () => {
 
 // ─── CODA_STATUS_MAP spot-checks ─────────────────────────────────────────────
 
-describe('CODA_STATUS_MAP — spot checks', () => {
+describe('CODA_STATUS_MAP: spot checks', () => {
   it("maps 'done' to 'complete'", () => {
     expect(CODA_STATUS_MAP['done']).toBe('complete')
   })

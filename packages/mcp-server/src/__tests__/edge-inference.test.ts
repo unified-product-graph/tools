@@ -1,5 +1,5 @@
 /**
- * Tests for edge type inference — the tiered system that maps
+ * Tests for edge type inference: the tiered system that maps
  * source/target entity types to canonical edge types.
  *
  * Behaviour change: Tier-3 fabrication is gone. Pairs that don't
@@ -31,7 +31,7 @@ describe('inferEdgeType', () => {
       throw new Error('expected throw')
     } catch (err) {
       expect(err).toBeInstanceOf(InferEdgeTypeError)
-      // Levenshtein-1 should miss for 'widgetx' so suggestions may be empty —
+      // Levenshtein-1 should miss for 'widgetx' so suggestions may be empty;
       // but the reason itself must be present and non-empty.
       expect((err as InferEdgeTypeError).message).toMatch(/No edge type/)
     }
@@ -63,14 +63,14 @@ describe('inferEdgeTypeWithTier', () => {
     }
   })
 
-  it('does not fabricate user_journey_contains_user_flow — the smoking gun', () => {
+  it('does not fabricate user_journey_contains_user_flow (the smoking gun)', () => {
     // The exact case from the agent feedback: user_journey → user_flow is
     // NOT a real catalog edge; canonical is user_journey_contains_journey_step.
     const result = inferEdgeTypeWithTier('user_journey', 'user_flow')
     expect(result.ok).toBe(false)
     if (!result.ok) {
       const fabricated = 'user_journey_contains_user_flow'
-      // Must not appear in suggestions either — only catalog-resolvable pairs.
+      // Must not appear in suggestions either; only catalog-resolvable pairs.
       expect(
         result.suggestions.find((s) => (s.edge_type as string) === fabricated),
       ).toBeUndefined()
@@ -114,7 +114,7 @@ describe('inferEdgeTypeWithTier', () => {
         ]),
       )
     }
-    // No assertion on ok value — depends on whether job → need is in catalog.
+    // No assertion on ok value; depends on whether job → need is in catalog.
     // The point is: when ok, aliasing must be reported.
   })
 

@@ -13,7 +13,7 @@
  *   - Cross-platform: uses Node's fs APIs, no shell-specific tools.
  *   - Run during `prepack` and `build` so local dev and publish both stay in sync.
  *
- * Do NOT edit the copied files in `packages/upg-cli/skills/` — edit the
+ * Do NOT edit the copied files in `packages/upg-cli/skills/`; edit the
  * canonical source in `packages/upg-mcp-server/skills/` instead.
  */
 
@@ -49,7 +49,7 @@ async function main() {
   await rm(destDir, { recursive: true, force: true });
   await mkdir(destDir, { recursive: true });
 
-  // Recursive copy — Node 16.7+ supports fs.cp with recursive.
+  // Recursive copy (Node 16.7+ supports fs.cp with recursive).
   await cp(sourceDir, destDir, { recursive: true });
 
   // Drop a README.md at the root of the copied folder so anyone who

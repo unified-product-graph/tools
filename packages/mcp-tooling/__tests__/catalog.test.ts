@@ -1,5 +1,5 @@
 /**
- * Tests for the shared catalog helpers — alias resolution + the canonical
+ * Tests for the shared catalog helpers: alias resolution + the canonical
  * `get_entity_schema` builder. Pins the contract that every UPG MCP
  * server consumes the same code path.
  */
@@ -20,7 +20,7 @@ describe('resolveEntityType', () => {
   })
 
   it('aliases deprecated synonyms to their canonical replacement', () => {
-    // jtbd → job — pins the canonical alias path.
+    // jtbd → job; pins the canonical alias path.
     const result = resolveEntityType('jtbd')
     expect(result.canonical).toBe('job')
     expect(result.alias).toEqual({ from: 'jtbd', to: 'job' })
@@ -51,7 +51,7 @@ describe('buildEntitySchema', () => {
     expect(schema.type).toBe('persona')
     expect(schema.alias_of).toBeUndefined()
     expect(schema.domain).toBeTruthy()
-    // Persona has outbound edges (e.g. persona_pursues_job) — must be at
+    // Persona has outbound edges (e.g. persona_pursues_job); must be at
     // least one in edges_out via UPG_EDGE_CATALOG.
     expect(schema.edges_out.length).toBeGreaterThan(0)
     for (const edge of schema.edges_out) {
@@ -78,7 +78,7 @@ describe('buildEntitySchema', () => {
 
   it('includes domain_guide by default when one exists for the domain', () => {
     const schema = buildEntitySchema('persona')
-    // persona belongs to a domain with a guide — should be populated.
+    // persona belongs to a domain with a guide; should be populated.
     if (schema.domain) {
       expect(schema.domain_guide).toBeDefined()
       if (schema.domain_guide) {

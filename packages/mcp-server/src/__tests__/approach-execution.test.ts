@@ -6,13 +6,13 @@
  * tests parse those and assert on the structured projection.
  *
  * Coverage:
- *   - prioritise — RICE expression evaluates over candidate properties;
+ *   - prioritise: RICE expression evaluates over candidate properties;
  *     frameworks without an expression fall back to definition_lookup.
- *   - inspect — wraps validate_graph, returns unified violations.
- *   - plan — gap analysis vs canonical creation sequences.
- *   - trace — BFS over a typed path; partial trail + error when canonical
+ *   - inspect: wraps validate_graph, returns unified violations.
+ *   - plan: gap analysis vs canonical creation sequences.
+ *   - trace: BFS over a typed path; partial trail + error when canonical
  *     edge can't resolve.
- *   - reflect — surfaces blind-spot domains when coverage < 30%.
+ *   - reflect: surfaces blind-spot domains when coverage < 30%.
  *   - All five tools return execution_mode: "execution_v0_4_0" (or the
  *     fallback "definition_lookup_v0_4_0" for prioritise-without-expression).
  */
@@ -93,7 +93,7 @@ async function callAsync(
 
 // ─── prioritise ─────────────────────────────────────────────────────
 
-describe('prioritise — executes framework expressions', () => {
+describe('prioritise: executes framework expressions', () => {
   it('ranks RICE candidates by computed score', async () => {
     const store = await loadStore(
       makeDoc(
@@ -234,7 +234,7 @@ describe('prioritise — executes framework expressions', () => {
 
 // ─── inspect ────────────────────────────────────────────────────────
 
-describe('inspect — wraps validate_graph + projects unified violations', () => {
+describe('inspect: wraps validate_graph + projects unified violations', () => {
   it('surfaces anti-pattern violations matching validate_graph', async () => {
     const store = await loadStore(
       makeDoc(
@@ -244,7 +244,7 @@ describe('inspect — wraps validate_graph + projects unified violations', () =>
             type: 'persona' as UPGEntityType,
             title: 'Solo Builder',
           } as UPGBaseNode,
-          // Feature without hypothesis — triggers `features-without-hypotheses`
+          // Feature without hypothesis: triggers `features-without-hypotheses`
           {
             id: 'f1',
             type: 'feature' as UPGEntityType,
@@ -316,7 +316,7 @@ describe('inspect — wraps validate_graph + projects unified violations', () =>
 
 // ─── plan ───────────────────────────────────────────────────────────
 
-describe('plan — gap analysis vs canonical creation sequences', () => {
+describe('plan: gap analysis vs canonical creation sequences', () => {
   it('returns missing entities ordered by creation_sequence position (region scoped)', async () => {
     // user domain creation_sequence: persona, job, need, desired_outcome, job_step, switching_cost
     const store = await loadStore(
@@ -361,7 +361,7 @@ describe('plan — gap analysis vs canonical creation sequences', () => {
     expect(body.covered_count).toBe(0)
   })
 
-  it('handles whole-graph plan (no region) — surfaces missing types across domains', async () => {
+  it('handles whole-graph plan (no region): surfaces missing types across domains', async () => {
     const store = await loadStore(makeDoc([], []))
     const ctx = makeCtx(store)
     const { body } = await callAsync(plan, {}, ctx)
@@ -374,7 +374,7 @@ describe('plan — gap analysis vs canonical creation sequences', () => {
 
 // ─── trace ──────────────────────────────────────────────────────────
 
-describe('trace — BFS over a typed path', () => {
+describe('trace: BFS over a typed path', () => {
   it('walks a 2-hop persona → job → need path', async () => {
     const store = await loadStore(
       makeDoc(
@@ -434,7 +434,7 @@ describe('trace — BFS over a typed path', () => {
       ),
     )
     const ctx = makeCtx(store)
-    // persona → vision has no canonical edge — verified via resolver probe.
+    // persona → vision has no canonical edge; verified via resolver probe.
     const { body } = await callAsync(
       trace,
       { anchor: 'p1', path: ['vision'] },
@@ -461,9 +461,9 @@ describe('trace — BFS over a typed path', () => {
 
 // ─── reflect ────────────────────────────────────────────────────────
 
-describe('reflect — emits structured prompts based on graph topology', () => {
+describe('reflect: emits structured prompts based on graph topology', () => {
   it('blind-spots mode surfaces empty canonical domains', async () => {
-    // Only one persona — most canonical domains are empty.
+    // Only one persona; most canonical domains are empty.
     const store = await loadStore(
       makeDoc(
         [
@@ -576,7 +576,7 @@ describe('reflect — emits structured prompts based on graph topology', () => {
 
 // ─── Cross-cutting: execution_mode contract ─────────────────────────
 
-describe('all 5 approach tools — execution_mode contract', () => {
+describe('all 5 approach tools: execution_mode contract', () => {
   it('plan + inspect + trace + reflect all return execution_mode v0_4_0', async () => {
     const store = await loadStore(
       makeDoc(

@@ -1,5 +1,5 @@
 /**
- * Regression tests for — validator picks wrong migration version.
+ * Regression tests for: validator picks wrong migration version.
  *
  * The bug: `UPG_EDGE_MIGRATIONS` contains TWO rules per re-merged edge family:
  *   - v0.2.8: `solution_proposes_hypothesis → solution_proposes_hypothesis_claim` (split)
@@ -92,9 +92,9 @@ function makeCtx(store: UPGFileStore): ToolContext {
   }
 }
 
-// ─── 1. Negative case — the bug ────────────────────────────────────
+// ─── 1. Negative case: the bug ─────────────────────────────────────
 
-describe(' — canonical edge suppression (Fix B)', () => {
+describe(': canonical edge suppression (Fix B)', () => {
   it('reports edge_drift: 0 for a graph using canonical solution_proposes_hypothesis edges', async () => {
     // Pre-fix: this graph would report edge_drift: 1 with a reversed
     // suggestion (`solution_proposes_hypothesis_claim`, deprecated). The
@@ -131,7 +131,7 @@ describe(' — canonical edge suppression (Fix B)', () => {
       for (const r of rules) fromKeysInMigrations.add(r.from)
     }
     const affected = [...fromKeysInMigrations].filter((k) => canonicalKeys.has(k))
-    // Defensive: if there's no overlap, this test is vacuous — log so
+    // Defensive: if there's no overlap, this test is vacuous; log so
     // future spec evolutions don't silently lose the regression.
     expect(affected.length).toBeGreaterThan(0)
 
@@ -149,9 +149,9 @@ describe(' — canonical edge suppression (Fix B)', () => {
   })
 })
 
-// ─── 2. Positive case — true detection (Fix A) ─────────────────────
+// ─── 2. Positive case: true detection (Fix A) ──────────────────────
 
-describe(' — chain walk lands on canonical (Fix A)', () => {
+describe(': chain walk lands on canonical (Fix A)', () => {
   it('suggests `solution_proposes_hypothesis` (canonical) for deprecated `solution_proposes_hypothesis_claim` edges', async () => {
     // The deprecated alias has TWO rules:
     //   v0.2.8: solution_proposes_hypothesis → solution_proposes_hypothesis_claim
@@ -218,7 +218,7 @@ describe(' — chain walk lands on canonical (Fix A)', () => {
 
 // ─── 3. Multi-hop chain walk ────────────────────────────────────────
 
-describe(' — multi-hop chain walk', () => {
+describe(': multi-hop chain walk', () => {
   it('walks intermediate → canonical (synthetic 3-step chain)', () => {
     // Synthesize a 3-step chain by injecting test data into a temporary
     // local map. We exercise the helper directly rather than through
@@ -268,7 +268,7 @@ describe(' — multi-hop chain walk', () => {
 
 // ─── 4. Inkling regression ─────────────────────────────────────────
 
-describe(' — Inkling graph regression', () => {
+describe(': Inkling graph regression', () => {
   const inklingPath = join(
     process.cwd(),
     '..',
@@ -280,10 +280,10 @@ describe(' — Inkling graph regression', () => {
   it('reports edge_drift: 0 for the Inkling graph after the fix (was 5 before)', async () => {
     if (!existsSync(inklingPath)) {
       // The Inkling fixture lives at repo-root /.upg/inkling.upg. When
-      // running from a different cwd the path won't resolve — skip
+      // running from a different cwd the path won't resolve; skip
       // rather than fail, since this regression depends on a real
       // production graph living in the repo.
-      console.warn(`Inkling regression skipped — fixture not at ${inklingPath}`)
+      console.warn(`Inkling regression skipped: fixture not at ${inklingPath}`)
       return
     }
     const store = await loadStoreFromPath(inklingPath)

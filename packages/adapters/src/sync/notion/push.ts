@@ -1,13 +1,13 @@
 /**
- * @unified-product-graph/notion-sync — UPG → Notion push
+ * @unified-product-graph/notion-sync: UPG to Notion push
  *
  * Executes a NotionWorkspacePlan against the Notion API.
  *
  * The algorithm follows the three-phase sequence from the mapping doc (§6):
  *
- *   Phase 1 — Create databases (schema only, no rows)
- *   Phase 2 — Create pages in each database (property values, no relations yet)
- *   Phase 3 — Populate relation properties (now that all page_ids are known)
+ *   Phase 1: Create databases (schema only, no rows)
+ *   Phase 2: Create pages in each database (property values, no relations yet)
+ *   Phase 3: Populate relation properties (now that all page_ids are known)
  *
  * This ordering avoids circular reference problems: a relation property needs
  * the target page's ID, which won't exist until that page is created. Creating
@@ -74,7 +74,7 @@ export interface NotionDatabaseSchema {
 export interface NotionNodePlan {
   /** UPG node ID */
   node_id: string
-  /** Entity type — determines which database this page goes into */
+  /** Entity type: determines which database this page goes into */
   entity_type: string
   /** Property values to write (title, rich_text, etc.) */
   properties: Record<string, NotionPropertyValue>
@@ -88,12 +88,12 @@ export interface NotionNodePlan {
 /**
  * The complete workspace plan produced by the schema generator.
  *
- * @see @unified-product-graph/adapters — notion-schema-generator
+ * @see @unified-product-graph/adapters notion-schema-generator
  */
 export interface NotionWorkspacePlan {
-  /** Databases to create — one per entity type present in the graph */
+  /** Databases to create, one per entity type present in the graph */
   databases: NotionDatabaseSchema[]
-  /** Nodes to push — one per UPG node */
+  /** Nodes to push, one per UPG node */
   nodes: NotionNodePlan[]
 }
 
@@ -105,7 +105,7 @@ export interface PushOptions {
   /** Dry run: log operations without writing to Notion */
   dryRun?: boolean
   /**
-   * Existing database IDs from a previous push — enables update mode.
+   * Existing database IDs from a previous push; enables update mode.
    * Maps entity_type → existing Notion database_id.
    */
   existingDatabaseIds?: Record<string, string>
@@ -150,7 +150,7 @@ function toApiProperty(value: NotionPropertyValue): unknown {
  *
  * Note: relation properties require the target database_id to already exist,
  * so we omit them here and add them in a schema update pass after all databases
- * are created (Phase 1b — not yet implemented, tracked as TODO below).
+ * are created (Phase 1b, not yet implemented, tracked as TODO below).
  */
 function buildDatabaseCreateParams(
   schema: NotionDatabaseSchema,
@@ -160,7 +160,7 @@ function buildDatabaseCreateParams(
 
   for (const [name, propSchema] of Object.entries(schema.properties)) {
     if (propSchema.type === 'relation') {
-      // Relations need target db IDs — deferred to Phase 1b
+      // Relations need target db IDs; deferred to Phase 1b
       // TODO: add a Phase 1b pass that updates relation properties once all
       // databases exist (requires a notion.databases.update() call per db).
       continue
@@ -201,7 +201,7 @@ function buildDatabaseCreateParams(
         properties[name] = { unique_id: {} }
         break
       default:
-        // Unknown type — skip with a comment
+        // Unknown type: skip with a comment
         break
     }
   }
@@ -298,7 +298,7 @@ export async function pushToNotion(
       continue
     }
 
-    // Build page properties — exclude relations (handled in Phase 3)
+    // Build page properties; exclude relations (handled in Phase 3)
     const pageProperties: Record<string, unknown> = {}
 
     for (const [propName, propValue] of Object.entries(nodePlan.properties)) {

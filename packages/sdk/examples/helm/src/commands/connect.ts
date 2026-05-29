@@ -1,10 +1,10 @@
 /**
- * `helm connect <feature> <job>` — link a feature to the job it addresses.
+ * `helm connect <feature> <job>`: link a feature to the job it addresses.
  *
  * Showcases:
- *   - upg.search()                — type-narrowed read with limit
+ *   - upg.search()                : type-narrowed read with limit
  *   - parallel reads via Promise.all
- *   - upg.edges.connect()         — edge type inference from source + target
+ *   - upg.edges.connect()         : edge type inference from source + target
  *
  * The user types human-readable names; Helm resolves them to IDs and lets
  * the SDK infer the edge type. For (feature → job) the SDK picks the
@@ -15,7 +15,7 @@
  *   helm connect "Saved searches" "Discover unique"
  *   helm connect "Dark mode" "Discover unique" --source-type feature --target-type job
  *
- * Pass --source-type / --target-type to connect any two node kinds —
+ * Pass --source-type / --target-type to connect any two node kinds;
  * the SDK will infer the right edge or fail with a clear "no canonical
  * edge" error if the pair isn't in the catalog.
  */
@@ -54,11 +54,11 @@ export const connectCommand = new Command('connect')
       process.exit(1)
     }
 
-    // SearchResult is { node, score, match_field } — node is the real entity.
+    // SearchResult is { node, score, match_field }; node is the real entity.
     const source = features[0].node
     const target = personas[0].node
 
-    // No `type` passed to connect() — the SDK consults UPG_EDGE_CATALOG and
+    // No `type` passed to connect(); the SDK consults UPG_EDGE_CATALOG and
     // picks the canonical edge type for (source.type → target.type).
     // For (feature → persona) that's `feature_targets_persona`.
     const result = await upg.edges.connect(source.id, target.id)

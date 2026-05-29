@@ -47,7 +47,7 @@ const adapter = new SlackAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('SlackAdapter — entity type mapping', () => {
+describe('SlackAdapter: entity type mapping', () => {
   it('canvas maps to document with high confidence', async () => {
     const items: SourceItem[] = [makeItem('cv1', 'Decision Log', 'canvas')]
     const result = await adapter.convert(items)
@@ -80,7 +80,7 @@ describe('SlackAdapter — entity type mapping', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('SlackAdapter — skip cases', () => {
+describe('SlackAdapter: skip cases', () => {
   it('regular message is skipped and counted in warning', async () => {
     const items: SourceItem[] = [
       makeItem('msg1', 'Hey team', 'message'),
@@ -129,7 +129,7 @@ describe('SlackAdapter — skip cases', () => {
 
 // ─── Message skip warning content ────────────────────────────────────────────
 
-describe('SlackAdapter — message skip warning', () => {
+describe('SlackAdapter: message skip warning', () => {
   it('singular "message" in warning when count is 1', async () => {
     const items: SourceItem[] = [makeItem('msg1', 'One message', 'message')]
     const result = await adapter.convert(items)
@@ -148,7 +148,7 @@ describe('SlackAdapter — message skip warning', () => {
 
 // ─── channel_name tag ─────────────────────────────────────────────────────────
 
-describe('SlackAdapter — channel_name as tag', () => {
+describe('SlackAdapter: channel_name as tag', () => {
   it('channel_name is added as a tag on imported nodes', async () => {
     const items: SourceItem[] = [
       makeItem('cv1', 'Decision Log', 'canvas', { channel_name: 'product' }),
@@ -179,7 +179,7 @@ describe('SlackAdapter — channel_name as tag', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('SlackAdapter — edge emission', () => {
+describe('SlackAdapter: edge emission', () => {
   it('parent-child edges use node_informs_node (Slack structure is flat)', async () => {
     const items: SourceItem[] = [
       makeItem('cv1', 'Decision Log', 'canvas'),
@@ -217,7 +217,7 @@ describe('SlackAdapter — edge emission', () => {
 
 // ─── Source map and external fields ──────────────────────────────────────────
 
-describe('SlackAdapter — source_map, external_tool, external_id', () => {
+describe('SlackAdapter: source_map, external_tool, external_id', () => {
   it('source_map has entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeItem('cv1', 'Canvas 1', 'canvas'),

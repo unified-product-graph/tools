@@ -47,7 +47,7 @@ const adapter = new HubSpotAdapter()
 
 // ─── Type mapping ─────────────────────────────────────────────────────────────
 
-describe('HubSpotAdapter — object type → entity type mapping', () => {
+describe('HubSpotAdapter: object type → entity type mapping', () => {
   it('contact maps to participant with confidence high', async () => {
     const items: SourceItem[] = [makeObject('c1', 'Jane Smith', 'contact')]
     const result = await adapter.convert(items)
@@ -101,8 +101,8 @@ describe('HubSpotAdapter — object type → entity type mapping', () => {
 
 // ─── CRITICAL: Deal name collision ───────────────────────────────────────────
 
-describe('HubSpotAdapter — CRITICAL deal mapping', () => {
-  it('deal maps to UPG `deal` — NOT `opportunity`', async () => {
+describe('HubSpotAdapter: CRITICAL deal mapping', () => {
+  it('deal maps to UPG `deal`, NOT `opportunity`', async () => {
     const items: SourceItem[] = [
       makeObject('d1', 'Acme Corp Enterprise Deal', 'deal', { amount: 50000 }),
     ]
@@ -151,7 +151,7 @@ describe('HubSpotAdapter — CRITICAL deal mapping', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('HubSpotAdapter — skipped types with warnings', () => {
+describe('HubSpotAdapter: skipped types with warnings', () => {
   it('meeting is skipped and a warning is emitted', async () => {
     const items: SourceItem[] = [
       makeObject('m1', 'Product demo call', 'meeting'),
@@ -197,7 +197,7 @@ describe('HubSpotAdapter — skipped types with warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('HubSpotAdapter — status normalisation', () => {
+describe('HubSpotAdapter: status normalisation', () => {
   it("status 'new' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeObject('t1', 'New ticket', 'ticket', { status: 'new' })]
     const result = await adapter.convert(items)
@@ -245,7 +245,7 @@ describe('HubSpotAdapter — status normalisation', () => {
 
 // ─── Tags and lifecycle_stage ─────────────────────────────────────────────────
 
-describe('HubSpotAdapter — tags and lifecycle stage', () => {
+describe('HubSpotAdapter: tags and lifecycle stage', () => {
   it('tags from metadata are applied to node', async () => {
     const items: SourceItem[] = [
       makeObject('c1', 'Jane Smith', 'contact', { tags: ['vip', 'enterprise'] }),
@@ -267,7 +267,7 @@ describe('HubSpotAdapter — tags and lifecycle stage', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('HubSpotAdapter — edge emission', () => {
+describe('HubSpotAdapter: edge emission', () => {
   it('account_contains_contact emitted when contact has company parent', async () => {
     const items: SourceItem[] = [
       makeObject('co1', 'Acme Corp', 'company'),
@@ -325,7 +325,7 @@ describe('HubSpotAdapter — edge emission', () => {
     expect(warnText).toContain('nonexistent-99')
   })
 
-  it('assertAllEdgesCatalogued — full fixture test', async () => {
+  it('assertAllEdgesCatalogued: full fixture test', async () => {
     const items: SourceItem[] = [
       makeObject('co1', 'Acme Corp', 'company'),
       makeObject('c1', 'Jane Smith', 'contact', { parent_id: 'co1', parent_type: 'company' }),
@@ -346,7 +346,7 @@ describe('HubSpotAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('HubSpotAdapter — source_map', () => {
+describe('HubSpotAdapter: source_map', () => {
   it('source_map contains an entry for each converted object', async () => {
     const items: SourceItem[] = [
       makeObject('co1', 'Acme Corp', 'company'),
@@ -366,7 +366,7 @@ describe('HubSpotAdapter — source_map', () => {
 
 // ─── external_tool / external_id ──────────────────────────────────────────────
 
-describe('HubSpotAdapter — external_tool and external_id', () => {
+describe('HubSpotAdapter: external_tool and external_id', () => {
   it('external_tool is always hubspot', async () => {
     const items: SourceItem[] = [makeObject('c1', 'Jane', 'contact')]
     const result = await adapter.convert(items)

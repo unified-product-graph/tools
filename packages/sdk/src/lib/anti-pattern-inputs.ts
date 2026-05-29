@@ -19,7 +19,7 @@ import type { UPGFileStore } from '../store.js'
  * Build the per-graph statistics consumed by `evaluateAntiPatterns`.
  *
  * Single linear pass over `getAllNodes()` plus one over `getAllEdges()`. No
- * caching — the cost is bounded by graph size, and `validate_graph` is
+ * caching; the cost is bounded by graph size, and `validate_graph` is
  * already O(nodes + edges) for schema drift.
  *
  * @param store The loaded UPGFileStore.
@@ -74,7 +74,7 @@ export function collectAntiPatternInputs(
 
     const sourceType = typeById.get(edge.source)
     const targetType = typeById.get(edge.target)
-    // Skip dangling edges (endpoint not in node set) — they don't tell us
+    // Skip dangling edges (endpoint not in node set); they don't tell us
     // anything about (source_type, edge_type, target_type) presence.
     if (!sourceType || !targetType) continue
     const key = `${sourceType}|${edge.type}|${targetType}`

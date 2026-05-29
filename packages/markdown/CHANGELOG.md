@@ -22,13 +22,13 @@ Initial public release.
 
 ### Added
 
-- `parse()` — frontmatter, `[[type:id]]` entity refs, `{{type:id}}` edge refs,
+- `parse()`: frontmatter, `[[type:id]]` entity refs, `{{type:id}}` edge refs,
   and inline properties from `.upg.md` source.
-- `buildIndex()` — flatten parse results into a typed lookup index.
-- `validate()` — resolve refs through an injected lookup function; collect
+- `buildIndex()`: flatten parse results into a typed lookup index.
+- `validate()`: resolve refs through an injected lookup function; collect
   missing-ref diagnostics.
-- `toPlainMarkdown()` / `updateRefs()` — render to plain CommonMark or rewrite
+- `toPlainMarkdown()` / `updateRefs()`: render to plain CommonMark or rewrite
   refs in place.
-- `toTipTapJSON()` / `fromTipTapJSON()` — round-trip with TipTap editor JSON.
+- `toTipTapJSON()` / `fromTipTapJSON()`: round-trip with TipTap editor JSON.
 - `@unified-product-graph/core` (`>=0.5.0`) is an optional peer dependency
   for ref resolution.

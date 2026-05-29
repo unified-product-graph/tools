@@ -54,7 +54,7 @@ function truncate(s: string): string {
 }
 
 async function main() {
-  // 1. Work on a throwaway copy — write tools must never touch the real fixture.
+  // 1. Work on a throwaway copy; write tools must never touch the real fixture.
   const tmp = mkdtempSync(join(tmpdir(), 'upg-capture-'))
   const fixtureCopy = join(tmp, 'fixture.upg')
   copyFileSync(FIXTURE, fixtureCopy)
@@ -112,14 +112,14 @@ async function main() {
     return args
   }
 
-  // Tools that can't meaningfully run against a single local fixture —
+  // Tools that can't meaningfully run against a single local fixture:
   // cloud, multi-product workspace, and portfolio surfaces. No example panel.
   const SKIP = new Set([
-    // Cloud / multi-product / portfolio — not runnable on a single local fixture.
+    // Cloud / multi-product / portfolio, not runnable on a single local fixture.
     'switch_product', 'push_to_cloud', 'apply_pull_changeset',
     'create_cross_product_edge', 'migrate_cross_edges', 'list_portfolio_cross_edges',
     // Mutations that need a valid canonical pair / hierarchy target, or are
-    // overflow-prone — their single-node equivalents (create_node, update_node,
+    // overflow-prone; their single-node equivalents (create_node, update_node,
     // delete_node) are captured, so the patterns are covered.
     'create_edge', 'delete_edge', 'batch_create_edges', 'move_node', 'batch_move_nodes',
     'get_area_graph', 'inspect', 'prioritise', 'get_scale',
@@ -186,7 +186,7 @@ async function main() {
   console.log(`  ✓ ok: ${ok}   ✗ needs-recipe: ${fail - skipped}   ⊘ skipped: ${skipped}`)
   console.log(`  → ${OUT}\n`)
   console.log('Not captured:')
-  for (const r of results.filter((r) => !r.ok)) console.log(`  ${r.note?.startsWith('skipped') ? '⊘' : '✗'} ${r.name} — ${r.note}`)
+  for (const r of results.filter((r) => !r.ok)) console.log(`  ${r.note?.startsWith('skipped') ? '⊘' : '✗'} ${r.name}: ${r.note}`)
 
   console.log('\n─── sample real transcripts ───')
   for (const name of ['get_product_context', 'get_graph_digest', 'search_nodes']) {

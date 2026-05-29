@@ -47,7 +47,7 @@ const adapter = new ProductboardAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('ProductboardAdapter — entity_type → UPG type mapping', () => {
+describe('ProductboardAdapter: entity_type → UPG type mapping', () => {
   it('feature (default) maps to feature with confidence high', async () => {
     const items: SourceItem[] = [makeFeature('f1', 'Dark mode', 'feature')]
     const result = await adapter.convert(items)
@@ -137,7 +137,7 @@ describe('ProductboardAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skip / warning cases ─────────────────────────────────────────────────────
 
-describe('ProductboardAdapter — skip and warning cases', () => {
+describe('ProductboardAdapter: skip and warning cases', () => {
   it('roadmap entity is skipped with a warning', async () => {
     const items: SourceItem[] = [
       makeFeature('rm1', 'Q2 Roadmap View', 'roadmap'),
@@ -177,7 +177,7 @@ describe('ProductboardAdapter — skip and warning cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('ProductboardAdapter — status normalisation', () => {
+describe('ProductboardAdapter: status normalisation', () => {
   it("'new' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeFeature('f1', 'Feature', 'feature', { status: 'new' })]
     const result = await adapter.convert(items)
@@ -223,7 +223,7 @@ describe('ProductboardAdapter — status normalisation', () => {
 
 // ─── Hierarchy edge emission ──────────────────────────────────────────────────
 
-describe('ProductboardAdapter — hierarchy edge emission', () => {
+describe('ProductboardAdapter: hierarchy edge emission', () => {
   it('feature_area_contains_feature emitted when feature has component parent', async () => {
     const items: SourceItem[] = [
       makeFeature('c1', 'Payments', 'component'),
@@ -329,7 +329,7 @@ describe('ProductboardAdapter — hierarchy edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('ProductboardAdapter — source_map', () => {
+describe('ProductboardAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeFeature('f1', 'Feature', 'feature'),
@@ -349,7 +349,7 @@ describe('ProductboardAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('ProductboardAdapter — external_tool and external_id', () => {
+describe('ProductboardAdapter: external_tool and external_id', () => {
   it('external_tool is always productboard', async () => {
     const items: SourceItem[] = [makeFeature('f1', 'Feature', 'feature')]
     const result = await adapter.convert(items)
@@ -365,7 +365,7 @@ describe('ProductboardAdapter — external_tool and external_id', () => {
 
 // ─── Full fixture ─────────────────────────────────────────────────────────────
 
-describe('ProductboardAdapter — full fixture', () => {
+describe('ProductboardAdapter: full fixture', () => {
   it('all emitted edges are in the UPG catalogue (full feature hierarchy)', async () => {
     const items: SourceItem[] = [
       makeFeature('prod1', 'Acme Compass', 'product'),

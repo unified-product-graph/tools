@@ -1,10 +1,10 @@
 /**
- * @unified-product-graph/notion-sync — Persistent cursor for Workers sync
+ * @unified-product-graph/notion-sync: Persistent cursor for Workers sync
  *
  * The cursor tracks the ID mappings between UPG node IDs and Notion page IDs,
  * plus pagination cursors for incremental database polling.
  *
- * CursorStorage is intentionally injectable — implementations can use:
+ * CursorStorage is intentionally injectable; implementations can use:
  * - The file system (CLI usage)
  * - Notion Workers KV store (Workers runtime)
  * - An in-memory map (tests)
@@ -17,13 +17,13 @@
 export interface CursorState {
   /** ISO 8601 timestamp of the last completed sync */
   last_sync_at: string
-  /** Per-database pagination cursors — database_id → Notion pagination cursor */
+  /** Per-database pagination cursors: database_id to Notion pagination cursor */
   database_cursors: Record<string, string | null>
-  /** Forward ID map — UPG node_id → Notion page_id */
+  /** Forward ID map: UPG node_id to Notion page_id */
   node_to_page_id: Record<string, string>
-  /** Reverse ID map — Notion page_id → UPG node_id */
+  /** Reverse ID map: Notion page_id to UPG node_id */
   page_to_node_id: Record<string, string>
-  /** Entity type to Notion database mapping — UPG entity_type → Notion database_id */
+  /** Entity type to Notion database mapping: UPG entity_type to Notion database_id */
   entity_to_database_id: Record<string, string>
 }
 
@@ -33,9 +33,9 @@ export interface CursorState {
  * Storage backend for cursor persistence.
  *
  * Implementors:
- * - FileCursorStorage  — reads/writes a JSON file alongside the .upg file
- * - KVCursorStorage    — wraps Notion Workers KV store (context.kv)
- * - MemoryCursorStorage — in-memory map for tests and dry runs
+ * - FileCursorStorage: reads/writes a JSON file alongside the .upg file
+ * - KVCursorStorage: wraps Notion Workers KV store (context.kv)
+ * - MemoryCursorStorage: in-memory map for tests and dry runs
  */
 export interface CursorStorage {
   get(key: string): Promise<string | null>
@@ -83,7 +83,7 @@ export async function loadCursor(
   try {
     return JSON.parse(raw) as CursorState
   } catch {
-    // Corrupted cursor — start fresh
+    // Corrupted cursor; start fresh
     return null
   }
 }
@@ -92,7 +92,7 @@ export async function loadCursor(
 
 /**
  * Merge push result ID maps into an existing cursor.
- * Returns a new CursorState — does not mutate input.
+ * Returns a new CursorState; does not mutate input.
  */
 export function mergePushIntoCursor(
   cursor: CursorState,
@@ -116,7 +116,7 @@ export function mergePushIntoCursor(
 // ─── Built-in storage implementations ────────────────────────────────────────
 
 /**
- * In-memory cursor storage — useful for tests and dry runs.
+ * In-memory cursor storage, useful for tests and dry runs.
  */
 export class MemoryCursorStorage implements CursorStorage {
   private store = new Map<string, string>()

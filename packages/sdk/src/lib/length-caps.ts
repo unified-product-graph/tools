@@ -1,5 +1,5 @@
 /**
- * Length / size guards for entity payloads. Soft warnings — not refusals.
+ * Length / size guards for entity payloads. Soft warnings, not refusals.
  *
  * Background: the 2026-05-20 adversarial spec audit (F8) noted unbounded
  * payload sizes on titles, descriptions, and property trees are a
@@ -64,7 +64,7 @@ export function checkLengthCaps(args: {
         )
       }
     } catch {
-      // Unserialisable properties (circular refs) — surface as its own warning.
+      // Unserialisable properties (circular refs); surface as its own warning.
       warnings.push(
         `property tree could not be serialised (likely a circular reference). ` +
         `Properties must be plain JSON-compatible objects.`,

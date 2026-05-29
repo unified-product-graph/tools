@@ -36,7 +36,7 @@ describe('detectMcpCommand', () => {
   })
 
   it('returns npx default when no override provided and monorepo dist not present', () => {
-    // In the monorepo the dist file may not exist — this test confirms fallback to npx.
+    // In the monorepo the dist file may not exist; this test confirms fallback to npx.
     // Post-fold: mcp-server lives inside @unified-product-graph/mcp as `upg mcp run`.
     const monoPath = path.join(process.cwd(), 'packages', 'upg-cli', 'dist', 'cli.cjs')
     const exists = fs.existsSync(monoPath)
@@ -199,7 +199,7 @@ describe('mcp setup: --force and existing entry', () => {
       'utf-8',
     )
 
-    // process.stdin.isTTY is false in test runner — promptConfirm returns false.
+    // process.stdin.isTTY is false in test runner; promptConfirm returns false.
     const result = await runMcpSetup({
       scope: 'project',
       force: false,
@@ -209,7 +209,7 @@ describe('mcp setup: --force and existing entry', () => {
 
     expect(result.skipped).toBe(true)
 
-    // File should be unchanged — old command still there.
+    // File should be unchanged; old command still there.
     const raw = await fsp.readFile(settingsPath, 'utf-8')
     const json = JSON.parse(raw)
     expect(json.mcpServers['unified-product-graph'].command).toBe('old')

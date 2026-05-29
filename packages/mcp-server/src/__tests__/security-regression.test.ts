@@ -1,5 +1,5 @@
 /**
- * Security regression tests — replays the 7 exploits surfaced by the
+ * Security regression tests: replays the 7 exploits surfaced by the
  * 2026-05-20 adversarial spec audit. Every attack here was confirmed against
  * `.upg/chaos.upg` before the hardening landed; this file ensures
  * they stay refused / detected forever.
@@ -66,9 +66,9 @@ function makeCtx(store: UPGFileStore): ToolContext {
   }
 }
 
-// ─── F1 — explicit edge type pair mismatch ──────────────────────────
+// ─── F1: explicit edge type pair mismatch ───────────────────────────
 
-describe('F1 — explicit edge type pair mismatch must be refused', () => {
+describe('F1: explicit edge type pair mismatch must be refused', () => {
   it('refuses persona_pursues_job between vision → vulnerability', async () => {
     const { store } = await loadStore(
       makeDoc([
@@ -112,9 +112,9 @@ describe('F1 — explicit edge type pair mismatch must be refused', () => {
   })
 })
 
-// ─── F2 — graph topology self-loops ─────────────────────────────────
+// ─── F2: graph topology self-loops ──────────────────────────────────
 
-describe('F2 — graph-topology self-loops must be refused', () => {
+describe('F2: graph-topology self-loops must be refused', () => {
   it('refuses a vision_guides_objective self-loop on vision → vision', async () => {
     const { store } = await loadStore(
       makeDoc([{ id: 'v1', type: 'vision' as UPGEntityType, title: 'Vision' }]),
@@ -143,9 +143,9 @@ describe('F2 — graph-topology self-loops must be refused', () => {
   })
 })
 
-// ─── F4 — property type violations must be refused ──────────────────
+// ─── F4: property type violations must be refused ───────────────────
 
-describe('F4 — declared property type violations must be refused', () => {
+describe('F4: declared property type violations must be refused', () => {
   it('refuses metric.target_value = "not_a_number_lol" (string instead of number)', async () => {
     const { store } = await loadStore(
       makeDoc([
@@ -188,9 +188,9 @@ describe('F4 — declared property type violations must be refused', () => {
   })
 })
 
-// ─── F5 — rename_edge_type must refuse non-canonical without opt-in ─
+// ─── F5: rename_edge_type must refuse non-canonical without opt-in ──
 
-describe('F5 — rename_edge_type non-canonical target', () => {
+describe('F5: rename_edge_type non-canonical target', () => {
   it('refuses to rename to a fictional edge type by default', async () => {
     const { store } = await loadStore(
       makeDoc(
@@ -220,7 +220,7 @@ describe('F5 — rename_edge_type non-canonical target', () => {
     expect(result.isError).toBe(true)
     expect(result.content[0].text).toContain('UPG_EDGE_CATALOG')
     expect(result.content[0].text).toContain('allow_non_canonical')
-    // Graph stays as it was — original edge type intact.
+    // Graph stays as it was; original edge type intact.
     expect(store.getAllEdges()[0].type).toBe('persona_pursues_job')
   })
 
@@ -256,9 +256,9 @@ describe('F5 — rename_edge_type non-canonical target', () => {
   })
 })
 
-// ─── F6 — migrate_type semantic-nonsense pairs ──────────────────────
+// ─── F6: migrate_type semantic-nonsense pairs ───────────────────────
 
-describe('F6 — migrate_type without registered rule', () => {
+describe('F6: migrate_type without registered rule', () => {
   it('refuses to migrate persona → bug without force', async () => {
     const { store } = await loadStore(
       makeDoc([{ id: 'p1', type: 'persona' as UPGEntityType, title: 'P' }]),
@@ -273,7 +273,7 @@ describe('F6 — migrate_type without registered rule', () => {
     expect(text).toContain('persona')
     expect(text).toContain('bug')
     expect(text).toContain('force')
-    // Graph stays as it was — persona still persona.
+    // Graph stays as it was; persona still persona.
     const node = store.getNode('p1')
     expect(node?.type).toBe('persona')
   })
@@ -306,9 +306,9 @@ describe('F6 — migrate_type without registered rule', () => {
   })
 })
 
-// ─── F7 — create_cross_product_edge requires portfolio ──────────────
+// ─── F7: create_cross_product_edge requires portfolio ───────────────
 
-describe('F7 — create_cross_product_edge without a portfolio document', () => {
+describe('F7: create_cross_product_edge without a portfolio document', () => {
   let workDir: string
   let originalCwd: string
 
@@ -366,12 +366,12 @@ describe('F7 — create_cross_product_edge without a portfolio document', () => 
   })
 })
 
-// ─── — chain analyzer 2-hop persona-bridge ──────────────────
+// ───: chain analyzer 2-hop persona-bridge ───────────────────
 
-describe(' — chain analyzer 2-hop persona-bridged jobs+needs', () => {
+describe(': chain analyzer 2-hop persona-bridged jobs+needs', () => {
   it('counts a job as needing-covered via the persona bridge', async () => {
     // Construct: persona pursues job; persona experiences need.
-    // No direct job_surfaces_need edge — the chain is only satisfied via the
+    // No direct job_surfaces_need edge; the chain is only satisfied via the
     // persona bridge. Pre-fix, job_with_need would be 0.
     const { store } = await loadStore(
       makeDoc(
@@ -453,7 +453,7 @@ describe(' — chain analyzer 2-hop persona-bridged jobs+needs', () => {
 
 describe('validate_graph picks up cleanup-relevant drift after the fact', () => {
   it('reports edge_type_pair_drift for a wrong-pair canonical edge', async () => {
-    // Construct by writing the raw doc directly — the on-disk doc may have
+    // Construct by writing the raw doc directly; the on-disk doc may have
     // been built before the hardening landed.
     const { store } = await loadStore(
       makeDoc(

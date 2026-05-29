@@ -1,5 +1,5 @@
 /**
- * UPGClient — high-level, namespaced facade over UPGFileStore.
+ * UPGClient: high-level, namespaced facade over UPGFileStore.
  *
  * This is the recommended entry point for application code that wants to
  * read or write a `.upg` file. Advanced consumers can drop down to the
@@ -100,7 +100,7 @@ export class UPGClient {
 
   /**
    * Load the .upg file. Called automatically on first operation unless
-   * `{ lazy: true }` was set. Safe to call multiple times — repeated calls
+   * `{ lazy: true }` was set. Safe to call multiple times; repeated calls
    * are coalesced. If load fails (transient I/O, parse error, etc.) the
    * promise is rejected AND the cached promise is cleared, so the next
    * call retries from scratch rather than re-throwing the stale error.
@@ -164,7 +164,7 @@ export class UPGClient {
   }
 
   /**
-   * Diff against a previous version. Not yet implemented — tracked in
+   * Diff against a previous version. Not yet implemented; tracked in
    * follow-up. Will return a structured changeset between the
    * current graph and the named ref (git revision or snapshot id).
    */
@@ -187,7 +187,7 @@ class NodesAPI {
   constructor(private readonly client: UPGClient) {}
 
   /**
-   * Create a node. The `type` is validated against the UPG entity catalog —
+   * Create a node. The `type` is validated against the UPG entity catalog:
    * deprecated aliases are accepted with a warning, genuinely unknown types
    * throw `UnknownEntityTypeError`.
    */

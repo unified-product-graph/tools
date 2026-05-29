@@ -44,7 +44,7 @@ const adapter = new FigmaAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('FigmaAdapter — entity type mapping', () => {
+describe('FigmaAdapter: entity type mapping', () => {
   it('file maps to document with medium confidence', async () => {
     const items: SourceItem[] = [makeItem('f1', 'Product Screens', 'file')]
     const result = await adapter.convert(items)
@@ -84,7 +84,7 @@ describe('FigmaAdapter — entity type mapping', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('FigmaAdapter — skip cases', () => {
+describe('FigmaAdapter: skip cases', () => {
   it('variable is skipped and counted in warning', async () => {
     const items: SourceItem[] = [
       makeItem('v1', 'color/primary', 'variable'),
@@ -130,7 +130,7 @@ describe('FigmaAdapter — skip cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('FigmaAdapter — status normalisation', () => {
+describe('FigmaAdapter: status normalisation', () => {
   it("status 'active' normalises to 'active'", async () => {
     const items: SourceItem[] = [makeItem('fr1', 'Active Screen', 'frame', { status: 'active' })]
     const result = await adapter.convert(items)
@@ -146,7 +146,7 @@ describe('FigmaAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('FigmaAdapter — edge emission', () => {
+describe('FigmaAdapter: edge emission', () => {
   it('product_contains_screen emitted for file → frame', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Product Screens', 'file'),
@@ -210,7 +210,7 @@ describe('FigmaAdapter — edge emission', () => {
 
 // ─── Variable skip warning ────────────────────────────────────────────────────
 
-describe('FigmaAdapter — variable skip warning', () => {
+describe('FigmaAdapter: variable skip warning', () => {
   it('emits a single warning with correct count for multiple variables', async () => {
     const items: SourceItem[] = [
       makeItem('v1', 'color/primary', 'variable'),
@@ -237,7 +237,7 @@ describe('FigmaAdapter — variable skip warning', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('FigmaAdapter — source_map', () => {
+describe('FigmaAdapter: source_map', () => {
   it('source_map has entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Screens', 'file'),
@@ -257,7 +257,7 @@ describe('FigmaAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('FigmaAdapter — external_tool and external_id', () => {
+describe('FigmaAdapter: external_tool and external_id', () => {
   it('external_tool is always figma', async () => {
     const items: SourceItem[] = [makeItem('fr1', 'Screen', 'frame')]
     const result = await adapter.convert(items)

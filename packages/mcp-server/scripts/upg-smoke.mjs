@@ -1,5 +1,5 @@
-// One-shot smoke probe — read a .upg file and dump the anti-pattern evaluation.
-// Not part of the test suite — meant for manual verification during PR review.
+// One-shot smoke probe: read a .upg file and dump the anti-pattern evaluation.
+// Not part of the test suite, meant for manual verification during PR review.
 //
 // Usage:
 //   node scripts/upg-smoke.mjs --file path/to/product.upg

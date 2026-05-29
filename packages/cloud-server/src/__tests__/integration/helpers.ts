@@ -1,7 +1,7 @@
 /**
  * Integration-test harness: a REAL Postgres, not a mocked pool.
  *
- * The mocked unit suite can't see write/trigger paths — which is exactly how
+ * The mocked unit suite can't see write/trigger paths, which is exactly how
  * three bugs shipped invisibly (#1697 UUID ids audit log
  * webhook delivery). These helpers stand up a real database so round-trips are
  * exercised end-to-end. See.
@@ -13,7 +13,7 @@
  * but it may not point at the shared `upg` database.
  *
  * When no Postgres is reachable, `dbAvailable()` returns false and the suites
- * skip via `describe.skipIf` — so the default `npm test` stays green without a DB.
+ * skip via `describe.skipIf`, so the default `npm test` stays green without a DB.
  */
 import { Pool } from 'pg'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS_DIR = join(__dirname, '../../../migrations')
 
-/** The shared dev/MCP database name — tests must never touch it. */
+/** The shared dev/MCP database name; tests must never touch it. */
 const FORBIDDEN_DB = 'upg'
 
 export const TEST_DATABASE_URL =

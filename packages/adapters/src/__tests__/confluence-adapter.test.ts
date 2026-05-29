@@ -43,7 +43,7 @@ const adapter = new ConfluenceAdapter()
 
 // ─── inferConfluencePageType helper ──────────────────────────────────────────
 
-describe('inferConfluencePageType — title + label inference', () => {
+describe('inferConfluencePageType: title + label inference', () => {
   it('label "adr" → decision', () => {
     expect(inferConfluencePageType('Auth redesign', ['adr'])).toBe('decision')
   })
@@ -61,7 +61,7 @@ describe('inferConfluencePageType — title + label inference', () => {
   })
 
   it('title contains "competitor" → competitor', () => {
-    expect(inferConfluencePageType('Competitor analysis — Q3', [])).toBe('competitor')
+    expect(inferConfluencePageType('Competitor analysis, Q3', [])).toBe('competitor')
   })
 
   it('title contains "persona" → persona', () => {
@@ -84,7 +84,7 @@ describe('inferConfluencePageType — title + label inference', () => {
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('ConfluenceAdapter — entity type mapping', () => {
+describe('ConfluenceAdapter: entity type mapping', () => {
   it('plain page maps to document by default', async () => {
     const items: SourceItem[] = [makePage('p1', 'Team handbook')]
     const result = await adapter.convert(items)
@@ -119,7 +119,7 @@ describe('ConfluenceAdapter — entity type mapping', () => {
   })
 
   it('page with "competitor" in title maps to competitor', async () => {
-    const items: SourceItem[] = [makePage('p1', 'Competitor analysis — Notion')]
+    const items: SourceItem[] = [makePage('p1', 'Competitor analysis, Notion')]
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('competitor')
   })
@@ -135,7 +135,7 @@ describe('ConfluenceAdapter — entity type mapping', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('ConfluenceAdapter — skip cases', () => {
+describe('ConfluenceAdapter: skip cases', () => {
   it('comment entity type is skipped', async () => {
     const items: SourceItem[] = [
       {
@@ -178,7 +178,7 @@ describe('ConfluenceAdapter — skip cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('ConfluenceAdapter — status normalisation', () => {
+describe('ConfluenceAdapter: status normalisation', () => {
   it("status 'current' normalises to 'active'", async () => {
     const items: SourceItem[] = [makePage('p1', 'Spec', { status: 'current' })]
     const result = await adapter.convert(items)
@@ -200,7 +200,7 @@ describe('ConfluenceAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('ConfluenceAdapter — edge emission', () => {
+describe('ConfluenceAdapter: edge emission', () => {
   it('document_describes_decision emitted when parent=document, child=decision', async () => {
     const items: SourceItem[] = [
       makePage('doc1', 'Architecture overview'),
@@ -250,7 +250,7 @@ describe('ConfluenceAdapter — edge emission', () => {
 
 // ─── Default document warning ─────────────────────────────────────────────────
 
-describe('ConfluenceAdapter — default document warning', () => {
+describe('ConfluenceAdapter: default document warning', () => {
   it('emits warning when pages are mapped to document by default', async () => {
     const items: SourceItem[] = [
       makePage('p1', 'Team handbook'),
@@ -265,7 +265,7 @@ describe('ConfluenceAdapter — default document warning', () => {
 
 // ─── Source map and external fields ──────────────────────────────────────────
 
-describe('ConfluenceAdapter — source_map, external_tool, external_id', () => {
+describe('ConfluenceAdapter: source_map, external_tool, external_id', () => {
   it('source_map has entry for each converted page', async () => {
     const items: SourceItem[] = [makePage('p1', 'Doc 1'), makePage('p2', 'Doc 2')]
     const result = await adapter.convert(items)

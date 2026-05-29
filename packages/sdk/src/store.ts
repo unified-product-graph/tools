@@ -84,7 +84,7 @@ export class UPGFileStore {
   // Baseline = the raw file hash at the time we loaded or last saved.
   // If disk hash != baseline when we try to save, another process modified the file.
   private baselineFileHash = ''
-  // Snapshot of node/edge IDs at baseline — used for three-way merge
+  // Snapshot of node/edge IDs at baseline, used for three-way merge
   private baselineNodeIds = new Set<string>()
   private baselineEdgeIds = new Set<string>()
   // Last merge result (available to the server for reporting)
@@ -101,7 +101,7 @@ export class UPGFileStore {
 
   // ── Load / Save ──────────────────────────────────────────────────────────
 
-  /** Hash raw file bytes — used for baseline comparison (NOT the same as contentHash) */
+  /** Hash raw file bytes, used for baseline comparison (NOT the same as contentHash) */
   private hashRawContent(raw: string): string {
     return createHash('sha256').update(raw).digest('hex').slice(0, 32)
   }
@@ -130,7 +130,7 @@ export class UPGFileStore {
 
     // Check if integrity stamp exists
     if (!this.doc._integrity) {
-      // First time — no stamp yet. Stamp it now, no quarantine needed.
+      // First time: no stamp yet. Stamp it now, no quarantine needed.
       this.stampIntegrity()
       return report
     }
@@ -138,7 +138,7 @@ export class UPGFileStore {
     // Verify checksum
     const currentChecksum = this.computeIntegrityChecksum()
     if (currentChecksum === this.doc._integrity.checksum) {
-      // File was not modified externally — all good
+      // File was not modified externally; all good
       return report
     }
 
@@ -191,7 +191,7 @@ export class UPGFileStore {
       this.stampIntegrity()
       this.dirty = true
     } else {
-      // Tampered but all entities valid — re-stamp to accept the changes
+      // Tampered but all entities valid; re-stamp to accept the changes
       this.stampIntegrity()
       this.dirty = true
     }
@@ -232,7 +232,7 @@ export class UPGFileStore {
     // existing graphs (e.g. ones with `stage: "idea"` or `"discovery"`)
     // keep loading. Strict validation happens on the WRITE path
     // (`create_product` / future `update_product`); reads stay permissive.
-    // The on-disk file is NOT mutated here — the canonical value is used
+    // The on-disk file is NOT mutated here; the canonical value is used
     // only for in-memory consumers (digest, lifecycle benchmarks, copy
     // surfaces). To persist the migration, run `migrate_properties` /
     // operator equivalent. Mirrors the v0.2.13 properties.stage → status
@@ -247,7 +247,7 @@ export class UPGFileStore {
             `Run \`migrate_properties\` (or update the file) to persist the canonical value. ` +
             `File: ${this.filePath}\n`,
         )
-        // Mutate the in-memory shape only — leaves the on-disk JSON
+        // Mutate the in-memory shape only; leaves the on-disk JSON
         // unchanged so the original value survives until explicit migration.
         this.doc = {
           ...this.doc,
@@ -263,7 +263,7 @@ export class UPGFileStore {
       }
     }
 
-    // Verify integrity — detect external modifications and quarantine invalid entities
+    // Verify integrity: detect external modifications and quarantine invalid entities
     this.lastIntegrityReport = this.verifyIntegrity()
 
     this.rebuildIndexes()
@@ -273,7 +273,7 @@ export class UPGFileStore {
 
     // Classify any dangling edges and surface a structured report on
     // stderr instead of the bare "n dangling edges" line. We do NOT auto-drop
-    // — the agent or operator runs `repair_dangling_edges` for that.
+    // the agent or operator runs `repair_dangling_edges` for that.
     this.lastDanglingReport = classifyDanglingEdges(
       this.doc.edges,
       new Set(this.doc.nodes.map((n) => n.id)),
@@ -281,7 +281,7 @@ export class UPGFileStore {
     const rendered = renderDanglingReport(this.lastDanglingReport, this.filePath)
     if (rendered) process.stderr.write(rendered + '\n')
 
-    // Schema-drift summary on load. Counts only — full per-node
+    // Schema-drift summary on load. Counts only; full per-node
     // breakdown lives in `validate_graph`. Silent when zero drift.
     this.lastDriftSummary = computeSchemaDriftSummary(this.doc)
     const driftRendered = renderDriftSummary(this.lastDriftSummary, this.filePath)
@@ -300,7 +300,7 @@ export class UPGFileStore {
 
   /**
    * Snapshot of the schema-drift summary computed at load time.
-   * Counts only — full per-node breakdown is `validate_graph`.
+   * Counts only; full per-node breakdown is `validate_graph`.
    * Returns null until `load()` has run.
    */
   getDriftSummary(): SchemaDriftSummary | null {
@@ -310,7 +310,7 @@ export class UPGFileStore {
   /**
    * Drop edges matching the given dangling classes from the document. Used by
    * the `repair_dangling_edges` tool with `dry_run: false`. Caller is
-   * responsible for choosing classes — this method does not protect
+   * responsible for choosing classes; this method does not protect
    * `expected` cross-product edges by default; pass an empty array to no-op.
    */
   dropDanglingEdges(classes: ReadonlyArray<DanglingEdgeClass>): { dropped: number; remaining: DanglingEdgeReport } {
@@ -351,21 +351,21 @@ export class UPGFileStore {
     try {
       diskRaw = await fs.readFile(this.filePath, 'utf-8')
     } catch {
-      // File doesn't exist (deleted externally?) — safe to write
+      // File doesn't exist (deleted externally?); safe to write
       diskRaw = ''
     }
 
     const diskHash = diskRaw ? this.hashRawContent(diskRaw) : ''
 
     if (diskHash && diskHash !== this.baselineFileHash) {
-      // ── Layer 2: Another process modified the file — attempt merge ──────
+      // ── Layer 2: Another process modified the file; attempt merge ───────
       this.lastMergeResult = await this.mergeWithDisk(diskRaw)
 
       if (this.lastMergeResult.conflicts.length > 0) {
-        // True conflicts — same node modified differently by both sessions.
+        // True conflicts: same node modified differently by both sessions.
         // Refuse to write. The agent must handle this.
         const conflictDesc = this.lastMergeResult.conflicts
-          .map((c) => `  Node ${c.nodeId}: field "${c.field}" — ours: ${JSON.stringify(c.ours)}, theirs: ${JSON.stringify(c.theirs)}`)
+          .map((c) => `  Node ${c.nodeId}: field "${c.field}": ours: ${JSON.stringify(c.ours)}, theirs: ${JSON.stringify(c.theirs)}`)
           .join('\n')
         throw new Error(
           `CONFLICT: The .upg file was modified by another session.\n` +
@@ -376,7 +376,7 @@ export class UPGFileStore {
         )
       }
 
-      // No conflicts — merge succeeded. Rebuild indexes for the merged doc.
+      // No conflicts; merge succeeded. Rebuild indexes for the merged doc.
       this.rebuildIndexes()
     }
 
@@ -426,7 +426,7 @@ export class UPGFileStore {
     try {
       const parsed = JSON.parse(diskRaw)
       if (!validateUPGDocument(parsed).valid) {
-        // Disk has invalid JSON — can't merge, our version wins
+        // Disk has invalid JSON; can't merge, our version wins
         return { merged: true, nodesAdded: 0, edgesAdded: 0, nodesFromDisk: 0, edgesFromDisk: 0, conflicts: [] }
       }
       diskDoc = parsed as UPGDocument
@@ -446,13 +446,13 @@ export class UPGFileStore {
     // Find nodes added by the other session (in disk, not in baseline)
     for (const [id, diskNode] of diskNodeMap) {
       if (!this.baselineNodeIds.has(id)) {
-        // New node from disk — add to our doc if we don't already have it
+        // New node from disk; add to our doc if we don't already have it
         if (!ourNodeMap.has(id)) {
           this.doc.nodes.push(diskNode)
           nodesFromDisk++
         }
       } else if (ourNodeMap.has(id)) {
-        // Node exists in all three states — check for conflicting modifications
+        // Node exists in all three states; check for conflicting modifications
         const ourNode = ourNodeMap.get(id)!
         // Only flag conflict if BOTH sessions modified it (neither matches baseline)
         // We compare title and status as the most likely conflict fields
@@ -563,15 +563,15 @@ export class UPGFileStore {
           const result = await this.mergeWithDisk(raw)
           this.lastMergeResult = result
           if (result.conflicts.length === 0 && (result.nodesFromDisk > 0 || result.edgesFromDisk > 0)) {
-            // Merge succeeded — rebuild indexes, keep our dirty flag so we save the merged state
+            // Merge succeeded; rebuild indexes, keep our dirty flag so we save the merged state
             this.rebuildIndexes()
             this.computeHash()
             this.baselineFileHash = this.hashRawContent(raw)
-            // Don't clear dirty — we still need to save our changes + the merged entities
+            // Don't clear dirty; we still need to save our changes + the merged entities
           }
-          // If conflicts, keep our state as-is — the next save() will detect and report
+          // If conflicts, keep our state as-is; the next save() will detect and report
         } else {
-          // No unsaved changes — safe to reload from disk
+          // No unsaved changes; safe to reload from disk
           this.doc = parsed as UPGDocument
           this.rebuildIndexes()
           this.computeHash()
@@ -580,7 +580,7 @@ export class UPGFileStore {
           this.dirty = false
         }
       } catch {
-        // External write produced invalid JSON — ignore, keep current state
+        // External write produced invalid JSON; ignore, keep current state
       }
     })
   }
@@ -722,7 +722,7 @@ export class UPGFileStore {
     if (patch.status !== undefined) node.status = patch.status
 
     // Slug change → rotate the old slug into aliases[]. Aliases
-    // patched directly by the caller win — they replace the field outright.
+    // patched directly by the caller win; they replace the field outright.
     if (patch.slug !== undefined && patch.slug !== node.slug) {
       rotateSlug(node, patch.slug)
     }
@@ -742,7 +742,7 @@ export class UPGFileStore {
     const node = this.nodeMap.get(id)
     if (!node) throw new Error(`Node not found: ${id}`)
 
-    // Copy edge IDs before mutation — unindexEdgeForNode modifies the source Set
+    // Copy edge IDs before mutation; unindexEdgeForNode modifies the source Set
     const edgeIds = new Set(this.edgesByNode.get(id) ?? [])
     const removedEdgeIds: string[] = []
     for (const edgeId of edgeIds) {
@@ -807,12 +807,12 @@ export class UPGFileStore {
   } {
     let migratedNodes = 0
 
-    // Migrate nodes first — endpoint guards in UPG_EDGE_MIGRATIONS check
+    // Migrate nodes first; endpoint guards in UPG_EDGE_MIGRATIONS check
     // post-migration node types per the runtime migration contract.
     for (const node of this.doc.nodes) {
       if (node.type === fromType) {
         node.type = toType as UPGEntityType
-        // Merge defaults — existing values take precedence
+        // Merge defaults; existing values take precedence
         if (defaults && Object.keys(defaults).length > 0) {
           node.properties = { ...defaults, ...(node.properties ?? {}) }
         }
@@ -823,7 +823,7 @@ export class UPGFileStore {
     // Edge migration: catalog-aware via UPG_EDGE_MIGRATIONS,
     // replacing the legacy substring substitution. Renames retarget edges,
     // drops remove them, flips swap source/target. Edges whose type has no
-    // corresponding rule are left alone — caller can detect unmapped legacy
+    // corresponding rule are left alone; caller can detect unmapped legacy
     // keys by comparing edge types against UPG_EDGE_CATALOG keys post-call.
     const edgeResult = this.applyEdgeMigrations('0.0.0', UPG_VERSION)
 
@@ -838,13 +838,13 @@ export class UPGFileStore {
   /**
    * Exact-match rename of every edge whose `type === from` to `to`. Optionally
    * flips `source`/`target` for each affected edge. The catalog is intentionally
-   * NOT consulted here — this is the low-level primitive backing
+   * NOT consulted here; this is the low-level primitive backing
    * `rename_edge_type`. Catalog awareness lives in the wrappers
    * tracked separately.
    *
    * Returns the IDs of every edge that was actually mutated. The internal
    * `edgesByNode` index is keyed by node id, so a flip does not require
-   * re-indexing — both endpoints are already tracked for the same edge id.
+   * re-indexing; both endpoints are already tracked for the same edge id.
    */
   renameEdgeType(
     from: string,
@@ -872,7 +872,7 @@ export class UPGFileStore {
    * canonical edge registry) to the loaded graph.
    * Renames retarget the edge type; flipped renames swap source/target;
    * dropped edges are removed entirely. Endpoint guards in the migration
-   * rules check post-migration node types — so callers should run any
+   * rules check post-migration node types; so callers should run any
    * needed `migrateType` / `applySplit` pass on nodes BEFORE calling this.
    *
    * Wave 3 of the MCP edge-primitives cascade.
@@ -886,7 +886,7 @@ export class UPGFileStore {
   } {
     const renamed: Array<{ id: string; from: string; to: string; flipped: boolean }> = []
     const dropped: Array<{ id: string; from: string }> = []
-    // Snapshot edge IDs first — drops mutate the underlying array mid-walk.
+    // Snapshot edge IDs first; drops mutate the underlying array mid-walk.
     const edgeIds = this.doc.edges.map((e) => e.id)
     for (const id of edgeIds) {
       const edge = this.edgeMap.get(id)
@@ -962,7 +962,7 @@ export class UPGFileStore {
 
 // ─── UPGPortfolioStore ──────────────────────────────────────────────
 //
-// Manages a single `.portfolio.upg` file that holds the portfolio document —
+// Manages a single `.portfolio.upg` file that holds the portfolio document,
 // the canonical home for cross-product edges. A portfolio document lives
 // alongside product `.upg` files in `.upg/` (e.g. `.upg/portfolio.upg`).
 //
@@ -973,7 +973,7 @@ export class UPGFileStore {
 // A dedicated class keeps each concern clean and independently testable.
 //
 // The store keeps the portfolio doc in memory and flushes on mutation.
-// It does NOT watch the file — portfolio files are expected to be written
+// It does NOT watch the file; portfolio files are expected to be written
 // only by this server, so watcher overhead is unnecessary.
 
 export interface PortfolioLoadResult {
@@ -1023,7 +1023,7 @@ export class UPGPortfolioStore {
       raw = await fs.readFile(this.filePath, 'utf-8')
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
-      // File does not exist — create a minimal valid portfolio document
+      // File does not exist; create a minimal valid portfolio document
       this.doc = this.makeEmptyPortfolio(orgTitle)
       this.dirty = true
       await this.flush()
@@ -1185,7 +1185,7 @@ export class UPGPortfolioStore {
    * Migrate inline cross-product edges from a product document into this
    * portfolio document.
    *
-   * **Does not flush** — caller is responsible for calling `.flush()` after
+   * **Does not flush**: caller is responsible for calling `.flush()` after
    * inspecting the result and, for non-dry-run, also saving `sourceDoc`.
    */
   migrateCrossEdgesFromDoc(
@@ -1214,7 +1214,7 @@ export class UPGPortfolioStore {
       // target: if in sourceDoc, use same product; else use provided targetProductId
       let qualifiedTarget: string
       if (sourceNodeIds.has(edge.target)) {
-        // target is also in the same product — unusual but structurally valid
+        // target is also in the same product; unusual but structurally valid
         qualifiedTarget = `${sourceProductId}/${edge.target}`
       } else if (targetProductId) {
         qualifiedTarget = `${targetProductId}/${edge.target}`
@@ -1223,7 +1223,7 @@ export class UPGPortfolioStore {
           id: edge.id,
           reason:
             `Target node "${edge.target}" is not in the source product and no ` +
-            `targetProductId was provided — cannot determine qualified target ID`,
+            `targetProductId was provided; cannot determine qualified target ID`,
         })
         continue
       }

@@ -1,5 +1,5 @@
 /**
- * @unified-product-graph/notion-sync — Internal sync types
+ * @unified-product-graph/notion-sync: Internal sync types
  *
  * SyncState, SyncResult, CursorState and related shapes used across
  * the push / pull / sync / cursor modules.
@@ -22,7 +22,7 @@ export interface SyncOptions {
   parentPageId: string
   /** Notion integration token */
   authToken: string
-  /** Persistent cursor storage — defaults to in-memory if omitted */
+  /** Persistent cursor storage (defaults to in-memory if omitted) */
   cursorStorage?: import('./cursor.js').CursorStorage
   /** Log what would happen without writing to Notion */
   dryRun?: boolean

@@ -1,5 +1,5 @@
 /**
- * UPG × Notion — Notion Workers Sync Entry Point
+ * UPG × Notion: Notion Workers Sync Entry Point
  *
  * Deploys via: ntn deploy worker
  *
@@ -10,10 +10,10 @@
  * humans are visible in the UPG graph on the next pull cycle.
  *
  * Runtime environment:
- *   context.env.AUTH         — Notion integration token
- *   context.env.PARENT_PAGE_ID — Notion page ID for database container
- *   context.env.UPG_GRAPH    — JSON-serialised UPG graph (for now)
- *   context.kv               — Notion Workers KV store (cursor persistence)
+ *   context.env.AUTH: Notion integration token
+ *   context.env.PARENT_PAGE_ID: Notion page ID for database container
+ *   context.env.UPG_GRAPH: JSON-serialised UPG graph (for now)
+ *   context.kv: Notion Workers KV store (cursor persistence)
  *
  * TODO: Notion Workers Beta API shape was not fully stabilised as of May 2026.
  *   The `syncs`, `WorkerContext`, and `context.kv` patterns below follow the
@@ -27,7 +27,7 @@
 import { sync, loadUPGGraph } from '../sync.js'
 import type { CursorStorage } from '../cursor.js'
 
-// ─── Notion Workers types (Beta — stubs) ──────────────────────────────────────
+// ─── Notion Workers types (Beta stubs) ────────────────────────────────────────
 //
 // TODO: Replace with the official @notionhq/workers-sdk types once published.
 // The Notion Workers Beta runtime provides these via the execution context.
@@ -39,7 +39,7 @@ interface WorkerEnv {
   /** Notion page ID where UPG databases are created */
   PARENT_PAGE_ID: string
   /**
-   * JSON-serialised UPG graph — temporary approach.
+   * JSON-serialised UPG graph (temporary approach).
    * TODO: Replace with a Notion Workers KV read or Supabase API call once
    * the cloud MCP layer (@unified-product-graph/cloud-server) exposes a graph export endpoint.
    */
@@ -58,7 +58,7 @@ interface WorkerEnv {
 interface WorkerContext {
   env: WorkerEnv
   /**
-   * Notion Workers KV store — persistent key-value storage available to
+   * Notion Workers KV store: persistent key-value storage available to
    * the worker across invocations. Used for cursor persistence.
    *
    * TODO: Confirm the exact KV API shape. Assuming get/set as per the
@@ -141,7 +141,7 @@ const worker: WorkerModule = {
         let graphSource: Parameters<typeof loadUPGGraph>[0]
 
         if (UPG_GRAPH) {
-          // Graph serialised into env var — useful for small graphs in dev/test
+          // Graph serialised into env var; useful for small graphs in dev/test
           try {
             graphSource = JSON.parse(UPG_GRAPH) as unknown as Parameters<typeof loadUPGGraph>[0]
           } catch {
@@ -183,7 +183,7 @@ const worker: WorkerModule = {
         const push = result.push
         if (push) {
           const summary =
-            `Sync complete in ${result.duration_ms}ms — ` +
+            `Sync complete in ${result.duration_ms}ms: ` +
             `${push.databases_created} db(s) created, ` +
             `${push.databases_updated} db(s) updated, ` +
             `${push.pages_created} page(s) created, ` +

@@ -1,11 +1,11 @@
 /**
- * @unified-product-graph/notion-sync — Bidirectional sync coordinator
+ * @unified-product-graph/notion-sync: Bidirectional sync coordinator
  *
  * Orchestrates push, pull, and cursor persistence.
  * Called by the Workers runtime entry point and the CLI.
  *
  * Design principles:
- * - The coordinator is thin — it wires push/pull/cursor together and
+ * - The coordinator is thin: it wires push/pull/cursor together and
  *   returns a SyncResult. Business logic lives in push.ts and pull.ts.
  * - Cursor is always updated, even on partial success.
  * - Errors from push/pull surface in the result, not as thrown exceptions
@@ -152,7 +152,7 @@ export async function sync(
     dryRun = false,
   } = options
 
-  // Resolve storage — fall back to in-memory if not provided
+  // Resolve storage; fall back to in-memory if not provided
   const storage: CursorStorage = cursorStorage ?? new MemoryCursorStorage()
 
   // Load or initialise the cursor

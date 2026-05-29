@@ -4,12 +4,12 @@
  *
  * Two surfaces under test:
  *
- *  1. The standalone `migrate_status` tool — rewrites legacy status values
+ *  1. The standalone `migrate_status` tool: rewrites legacy status values
  *     to canonical lifecycle phases via `UPG_STATUS_MIGRATIONS`. Mirrors
  *     the dry-run / commit envelope from `migrate_type` and
  *     `migrate_properties`.
  *
- *  2. The `validate_graph` lifecycle_drift entries — now include
+ *  2. The `validate_graph` lifecycle_drift entries: now include
  *     `suggested_migration` pointing at `migrate_status` when the
  *     registry resolves the (type, status) pair, omitted otherwise.
  */
@@ -85,9 +85,9 @@ const node = (
   status,
 })
 
-// ─── migrate_status — dry-run ───────────────────────────────────────
+// ─── migrate_status: dry-run ───────────────────────────────────────
 
-describe('migrate_status — dry-run', () => {
+describe('migrate_status: dry-run', () => {
   it('reports planned mutations without writing', async () => {
     const store = await loadStore(
       makeDoc([
@@ -122,7 +122,7 @@ describe('migrate_status — dry-run', () => {
       makeDoc([
         // service:active has a migration (→ production).
         node('s1', 'service', 'active'),
-        // service:totally_invalid has no migration registered — skipped.
+        // service:totally_invalid has no migration registered; skipped.
         node('s2', 'service', 'totally_invalid'),
       ]),
     )
@@ -152,9 +152,9 @@ describe('migrate_status — dry-run', () => {
   })
 })
 
-// ─── migrate_status — apply ─────────────────────────────────────────
+// ─── migrate_status: apply ─────────────────────────────────────────
 
-describe('migrate_status — apply', () => {
+describe('migrate_status: apply', () => {
   it('actually rewrites status values when dry_run: false', async () => {
     const store = await loadStore(
       makeDoc([
@@ -173,7 +173,7 @@ describe('migrate_status — apply', () => {
     expect(store.getNode('f1')?.status).toBe('shipped')
   })
 
-  it('idempotent on retry — second commit reports zero changes', async () => {
+  it('idempotent on retry: second commit reports zero changes', async () => {
     const store = await loadStore(makeDoc([node('s1', 'service', 'active')]))
     const ctx = makeCtx(store)
 
@@ -189,9 +189,9 @@ describe('migrate_status — apply', () => {
   })
 })
 
-// ─── migrate_status — filters ───────────────────────────────────────
+// ─── migrate_status: filters ───────────────────────────────────────
 
-describe('migrate_status — filters', () => {
+describe('migrate_status: filters', () => {
   it('entity_type narrows the rewrite scope', async () => {
     const store = await loadStore(
       makeDoc([
@@ -250,7 +250,7 @@ describe('migrate_status — filters', () => {
 
 // ─── validate_graph lifecycle_drift suggested_migration enrichment ──
 
-describe('validate_graph — lifecycle_drift suggested_migration', () => {
+describe('validate_graph: lifecycle_drift suggested_migration', () => {
   it('attaches suggested_migration when UPG_STATUS_MIGRATIONS resolves', async () => {
     const store = await loadStore(
       makeDoc([node('s1', 'service', 'active', 'My Service')]),

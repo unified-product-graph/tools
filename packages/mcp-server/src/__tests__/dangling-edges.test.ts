@@ -53,7 +53,7 @@ async function loadStore(doc: UPGDocument): Promise<UPGFileStore> {
 /**
  * Build a store whose loaded document contains inline cross-product edges.
  * The on-disk validator (v0.5+) rejects cross-product edge types in `edges[]`
- * — they must live in `portfolio.cross_edges[]`. To exercise the
+ * they must live in `portfolio.cross_edges[]`. To exercise the
  * load-time dangling-edge classification for cross-product edges (the path
  * the classifier was designed for), we:
  *   1. Load a clean fixture through the validator (no cross-product edges).
@@ -192,7 +192,7 @@ describe('UPGFileStore.getDanglingReport', () => {
 
  it('captures the load-time classification', async () => {
  // Mixed legacy fixture: one valid intra-product edge (loadable) plus one
- // cross-product edge with a missing endpoint (injected post-load — the
+ // cross-product edge with a missing endpoint (injected post-load; the
  // validator now rejects cross-product types in `edges[]`, see
  // loadStoreWithCrossEdges).
  const { store } = await loadStoreWithCrossEdges(

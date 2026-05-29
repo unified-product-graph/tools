@@ -3,7 +3,7 @@
  *
  * Programmatic SDK for reading and writing .upg product knowledge graphs.
  *
- * The high-level entry point is `UPGClient` — a namespaced facade over the
+ * The high-level entry point is `UPGClient`, a namespaced facade over the
  * lower-level primitives (`UPGFileStore`, `createNode`, `createEdge`, etc.)
  * that are also re-exported here for advanced use.
  *

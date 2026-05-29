@@ -1,5 +1,5 @@
 /**
- * Approach execution helpers — pure functions powering the five approach
+ * Approach execution helpers: pure functions powering the five approach
  * verb tools (`plan`, `inspect`, `prioritise`, `trace`, `reflect`).
  *
  * Each helper consumes the live graph (via `UPGFileStore`) plus the spec
@@ -8,7 +8,7 @@
  * and wrap the result in the family-resemblance envelope.
  *
  * Why a separate module:
- *   - Keeps `tools/spec.ts` slim — handler authoring stays declarative.
+ *   - Keeps `tools/spec.ts` slim; handler authoring stays declarative.
  *   - Lets the executors be unit-tested directly without the MCP envelope.
  *   - Provides a clear contract: every function returns the structured
  *     projection the verb's `signature_hint` documents.
@@ -59,7 +59,7 @@ export interface PrioritiseFallbackResult {
 /**
  * Execute a framework's first numeric `computed_properties` expression over a
  * candidate set. Returns either ranked rows (when the framework defines an
- * expression) or a fallback envelope (when it doesn't — caller should
+ * expression) or a fallback envelope (when it doesn't; caller should
  * surface the framework's slots / classification as LLM substrate).
  *
  * Resolution per candidate:
@@ -67,7 +67,7 @@ export interface PrioritiseFallbackResult {
  *     "node not found" rationale.
  *   - Resolve each identifier in the expression as a numeric property:
  *     `node.properties[key]` (coerced via Number()). Top-level numeric fields
- *     like `node.title` are NOT consulted — formulas address property keys.
+ *     like `node.title` are NOT consulted; formulas address property keys.
  *   - Evaluate via `evaluateExpression`; on success append to ranked with the
  *     computed score; on failure record the missing variables.
  *
@@ -96,7 +96,7 @@ export function executePrioritise(
 
   const ranked: PrioritiseRankedRow[] = []
   // Probe the expression once with an empty scope to enumerate required
-  // identifiers — used both for diagnostics and to compute the per-candidate
+  // identifiers, used both for diagnostics and to compute the per-candidate
   // missing-property lists without re-tokenising.
   const probe = evaluateExpression(computed.expression, {})
   const requiredProperties =
@@ -219,7 +219,7 @@ export interface PlanResult {
  *
  * When `region` is provided, the expected set is that region's entity
  * memberships. When omitted, the expected set is every type listed across all
- * domain guides' creation sequences (the union — that's the "whole-graph"
+ * domain guides' creation sequences (the union, that's the "whole-graph"
  * planning surface).
  *
  * Ordering: missing entities are sorted by position in their domain's
@@ -284,7 +284,7 @@ function collectExpectedTypes(regionId?: string): ExpectedTypeRow[] {
     if (region) {
       domainsInScope = [...region.composes_atomic_domains]
     } else {
-      // Unknown region — return empty expected set so caller surfaces 0 coverage.
+      // Unknown region; return empty expected set so caller surfaces 0 coverage.
       return rows
     }
   }
@@ -318,7 +318,7 @@ function buildPlanHint(
   anchor: string,
 ): string {
   if (position === 0) {
-    return `Author the anchor ${type} for the ${domain} domain — everything else hangs from it.`
+    return `Author the anchor ${type} for the ${domain} domain; everything else hangs from it.`
   }
   return `Add ${type} (step ${position + 1} in the ${domain} sequence; typically attached under ${anchor}).`
 }
@@ -392,7 +392,7 @@ export function executeInspect(
     })
   }
 
-  // Drift rows from validate_graph — wrap each into the unified shape.
+  // Drift rows from validate_graph: wrap each into the unified shape.
   for (const drift of validateResult.entity_drift ?? []) {
     if (entitySet && !entitySet.has(drift.id)) continue
     if (regionEntityTypes && !regionEntityTypes.has(drift.type)) continue
@@ -499,7 +499,7 @@ function driftFixHint(
     return `Run migrate_type to split → [${(migration.to as string[]).join(', ')}]. Source: ${migration.via ?? 'unknown'}.`
   }
   if (migration.kind === 'drop') {
-    return `Drop this edge — no canonical replacement. Source: ${migration.via ?? 'unknown'}.`
+    return `Drop this edge; no canonical replacement. Source: ${migration.via ?? 'unknown'}.`
   }
   return 'No automated migration available; remove or update manually.'
 }
@@ -507,7 +507,7 @@ function driftFixHint(
 function entityTypesIntersect(_entitySet: Set<string>, _type: string): boolean {
   // Phase 1: anti-pattern target_entities are TYPES not IDs (per evaluator.ts).
   // We can't tell whether an id-scoped set intersects a type-keyed pattern
-  // without resolving every id's type — caller passes store to do that.
+  // without resolving every id's type; caller passes store to do that.
   // For now keep all anti-pattern violations when entity scope is given; they
   // get refined when target_entities migrates to ids in Phase 1.x.
   return true
@@ -519,7 +519,7 @@ function getRegionEntityTypes(regionId: string): Set<string> | null {
   return new Set(region.entities.map((e) => e.type))
 }
 
-// Subset of validate_graph's response shape — only what executeInspect needs.
+// Subset of validate_graph's response shape; only what executeInspect needs.
 // Local to avoid a hard import cycle with @unified-product-graph/mcp-tooling.
 export interface ValidateGraphBody {
   anti_pattern_violations?: Array<{
@@ -561,7 +561,7 @@ export interface TraceTrailRow {
 export interface TraceResult {
   trail: TraceTrailRow[]
   reached: string[]
-  /** Set when traversal halts early — e.g. no canonical edge for a hop. */
+  /** Set when traversal halts early, e.g. no canonical edge for a hop. */
   error?: string
   /** Depth at which the trace halted, if it stopped early. */
   halted_at_depth?: number
@@ -578,7 +578,7 @@ export interface TraceResult {
  * carries every reached node at every depth.
  *
  * Halts when no canonical edge can be resolved for a hop AND no override is
- * supplied — returning a partial trail + `error` + `halted_at_depth`. This
+ * supplied; it returns a partial trail + `error` + `halted_at_depth`. This
  * gives the caller enough signal to either supply an override or rewrite
  * the path.
  */
@@ -623,7 +623,7 @@ export function executeTrace(
     let resolverError: string | null = null
 
     if (!edgeType) {
-      // The frontier may carry mixed types after deeper hops — but path is
+      // The frontier may carry mixed types after deeper hops, but path is
       // typed-shorthand, so all frontier entries share the SAME type at every
       // step. Use the first to resolve.
       const sourceType = frontier[0].type
@@ -701,19 +701,19 @@ export interface ReflectResult {
 /**
  * Emit structured reflection prompts based on graph topology + mode.
  *
- * - "assumptions" — find entities of type `assumption` or drafted hypotheses;
+ * - "assumptions": find entities of type `assumption` or drafted hypotheses;
  *   one prompt per entity asks the author to surface evidence / falsification.
- * - "alternatives" — find parents with multiple siblings of the same type and
+ * - "alternatives": find parents with multiple siblings of the same type and
  *   prompt "did you consider…" alternatives.
- * - "blind-spots" — find atomic domains with zero entities and prompt
+ * - "blind-spots": find atomic domains with zero entities and prompt
  *   the author to explain why that surface is empty.
- * - "load-bearing" — find entities with the highest incoming-edge counts and
+ * - "load-bearing": find entities with the highest incoming-edge counts and
  *   prompt "if this changes, what depends on it?"
- * - No mode (open) — pick the most informative single category based on the
+ * - No mode (open): pick the most informative single category based on the
  *   graph's actual state; never empty unless the graph itself is empty.
  *
  * Prompts are capped at a sensible per-mode limit so the response stays
- * digestible — the agent calls again with a tighter mode if it wants more.
+ * digestible; the agent calls again with a tighter mode if it wants more.
  */
 export function executeReflect(
   store: UPGFileStore,
@@ -792,7 +792,7 @@ function reflectAlternatives(
   edges: ReadonlyArray<{ source: string; target: string; type: string }>,
   detailed: boolean,
 ): ReflectPrompt[] {
-  // Group target nodes by (source, source_type, edge_type) — siblings.
+  // Group target nodes by (source, source_type, edge_type): siblings.
   const siblingMap = new Map<string, Array<{ id: string; type: string; title: string }>>()
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
   for (const e of edges) {
@@ -847,7 +847,7 @@ function reflectBlindSpots(
     if (prompts.length >= limit) break
     prompts.push({
       kind: 'blind_spot',
-      question: `No entities in the "${domain}" domain — is that intentional or unmodeled?`,
+      question: `No entities in the "${domain}" domain; is that intentional or unmodeled?`,
     })
   }
   return prompts

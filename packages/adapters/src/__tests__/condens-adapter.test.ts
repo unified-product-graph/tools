@@ -47,7 +47,7 @@ const adapter = new CondensAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('CondensAdapter — entity_type → UPG type mapping', () => {
+describe('CondensAdapter: entity_type → UPG type mapping', () => {
   it('project maps to research_study with confidence high', async () => {
     const items: SourceItem[] = [makeItem('p1', 'Onboarding Study', 'project')]
     const result = await adapter.convert(items)
@@ -123,7 +123,7 @@ describe('CondensAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skipped types ────────────────────────────────────────────────────────────
 
-describe('CondensAdapter — skipped types', () => {
+describe('CondensAdapter: skipped types', () => {
   it('tag is skipped and a warning is emitted', async () => {
     const items: SourceItem[] = [
       makeItem('tag1', 'navigation', 'tag'),
@@ -152,7 +152,7 @@ describe('CondensAdapter — skipped types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('CondensAdapter — status normalisation', () => {
+describe('CondensAdapter: status normalisation', () => {
   it("status 'draft' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Project', 'project', { status: 'draft' })]
     const result = await adapter.convert(items)
@@ -180,7 +180,7 @@ describe('CondensAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('CondensAdapter — edge emission', () => {
+describe('CondensAdapter: edge emission', () => {
   it('research_study_captures_observation emitted when note has project parent', async () => {
     const items: SourceItem[] = [
       makeItem('p1', 'Onboarding Study', 'project'),
@@ -300,7 +300,7 @@ describe('CondensAdapter — edge emission', () => {
 
 // ─── Insight warning ──────────────────────────────────────────────────────────
 
-describe('CondensAdapter — insight → opportunity warning', () => {
+describe('CondensAdapter: insight → opportunity warning', () => {
   it('emits warning when insight nodes are created', async () => {
     const items: SourceItem[] = [makeItem('i1', 'Users find nav confusing', 'insight')]
     const result = await adapter.convert(items)
@@ -320,7 +320,7 @@ describe('CondensAdapter — insight → opportunity warning', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('CondensAdapter — source_map', () => {
+describe('CondensAdapter: source_map', () => {
   it('source_map contains an entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeItem('p1', 'Project', 'project'),
@@ -340,7 +340,7 @@ describe('CondensAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('CondensAdapter — external_tool and external_id', () => {
+describe('CondensAdapter: external_tool and external_id', () => {
   it('external_tool is always condens', async () => {
     const items: SourceItem[] = [makeItem('p1', 'Project', 'project')]
     const result = await adapter.convert(items)
@@ -356,7 +356,7 @@ describe('CondensAdapter — external_tool and external_id', () => {
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-describe('CondensAdapter — tags', () => {
+describe('CondensAdapter: tags', () => {
   it('tags array is preserved on the node', async () => {
     const items: SourceItem[] = [
       makeItem('n1', 'Note with tags', 'note', { tags: ['navigation', 'onboarding'] }),
@@ -368,7 +368,7 @@ describe('CondensAdapter — tags', () => {
 
 // ─── Empty input ──────────────────────────────────────────────────────────────
 
-describe('CondensAdapter — empty input', () => {
+describe('CondensAdapter: empty input', () => {
   it('returns empty result with warning when no items provided', async () => {
     const result = await adapter.convert([])
     expect(result.nodes).toHaveLength(0)

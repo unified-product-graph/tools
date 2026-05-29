@@ -1,5 +1,5 @@
 /**
- * Spec Examples — Round-Trip Validity Test
+ * Spec Examples: Round-Trip Validity Test
  *
  * When the canonical UPG spec examples are available as a sibling package
  * (`@unified-product-graph/core`'s `spec/examples/` directory), this suite
@@ -29,7 +29,7 @@ const exampleFiles = existsSync(EXAMPLES_DIR)
   ? readdirSync(EXAMPLES_DIR).filter((f) => f.endsWith('.upg.md'))
   : []
 
-describe.skipIf(exampleFiles.length === 0)('spec examples — round-trip validity', () => {
+describe.skipIf(exampleFiles.length === 0)('spec examples: round-trip validity', () => {
   it('discovers at least 3 worked examples (spec §10 minimum)', () => {
     expect(exampleFiles.length).toBeGreaterThanOrEqual(3)
   })

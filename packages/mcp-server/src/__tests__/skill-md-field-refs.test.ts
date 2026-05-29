@@ -1,10 +1,10 @@
 /**
- * — Every `chains.X` / `health.X` / `lens_digest.X` reference in a
+ *: Every `chains.X` / `health.X` / `lens_digest.X` reference in a
  * canonical SKILL.md must resolve against the real `get_graph_digest` output.
  *
  * Why this exists: PR #1679's `/upg-impact` density gate referenced
  * `chains.feature_with_no_blockers`, a field that doesn't exist. The gate
- * compiled in markdown but never fired at runtime — caught only by Ro
+ * compiled in markdown but never fired at runtime; caught only by Ro
  * Laren grepping the codebase mid-audit. This test pins the contract so
  * any future drift fails CI.
  *
@@ -21,7 +21,7 @@ import { join, resolve } from 'node:path'
 //
 // These sets are the source of truth for what fields exist in a runtime
 // `get_graph_digest` response. When you add a new chains/health/lens_digest
-// field in `tools/context.ts` or `lib/tools.ts`, add it here too — that's
+// field in `tools/context.ts` or `lib/tools.ts`, add it here too; that's
 // the explicit contract between the digest computation and the skills that
 // reference it.
 
@@ -82,7 +82,7 @@ function listSkillMdFiles(): string[] {
     try {
       if (statSync(skillMd).isFile()) out.push(skillMd)
     } catch {
-      // Directory without SKILL.md — skip
+      // Directory without SKILL.md: skip
     }
   }
   return out.sort()
@@ -96,7 +96,7 @@ function listSkillMdFiles(): string[] {
  * accidentally matching `chains.persona_with_job` as a prefix.
  *
  * Excludes obvious template placeholders like `chains.X` (single letter)
- * and `chains.<something>` (angle brackets) — those are documentation
+ * and `chains.<something>` (angle brackets); those are documentation
  * shorthand, not real refs.
  */
 const REF_PATTERN = /\b(chains|health|lens_digest)\.([a-z_]{2,}[a-z0-9_]*)\b/g
@@ -139,10 +139,10 @@ function isValidReference(ref: Reference): boolean {
 
 // ── The contract ────────────────────────────────────────────────────────────
 
-describe(' — SKILL.md digest field refs must resolve against real fields', () => {
+describe(': SKILL.md digest field refs must resolve against real fields', () => {
   it('every chains.X / health.X / lens_digest.X reference in any SKILL.md is a real field', () => {
     const files = listSkillMdFiles()
-    expect(files.length).toBeGreaterThan(0) // sanity — there's at least one SKILL.md
+    expect(files.length).toBeGreaterThan(0) // sanity: there's at least one SKILL.md
 
     const allRefs = files.flatMap(extractReferences)
     const invalid = allRefs.filter((r) => !isValidReference(r))
@@ -169,14 +169,14 @@ describe(' — SKILL.md digest field refs must resolve against real fields', () 
       throw new Error(
         `\n${invalid.length} invalid digest field reference(s) found in SKILL.md files:\n${report}\n\n` +
           `Valid fields for the namespaces used:\n${validForEach}\n\n` +
-          `Either fix the SKILL.md to reference a real field, or — if this is a new field — add it to the digest computation (lib/tools.ts / tools/context.ts) AND to the VALID_*_KEYS sets in this test (src/__tests__/skill-md-field-refs.test.ts).`,
+          `Either fix the SKILL.md to reference a real field, or, if this is a new field, add it to the digest computation (lib/tools.ts / tools/context.ts) AND to the VALID_*_KEYS sets in this test (src/__tests__/skill-md-field-refs.test.ts).`,
       )
     }
   })
 
   it('detects the historical bug (chains.feature_with_no_blockers) in a synthetic SKILL.md', () => {
     // Sanity-check the detector against the exact failure mode it's guarding
-    // against. We don't write a real file — just run the extractor against a
+    // against. We don't write a real file; just run the extractor against a
     // synthetic string with the regex's behaviour.
     const synthetic = `
       ### Graph Readiness Check

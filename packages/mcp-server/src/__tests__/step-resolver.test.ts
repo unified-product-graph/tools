@@ -107,7 +107,7 @@ describe('resolveStep', () => {
  })
 })
 
-describe('resolveStep — representative domain playbooks', () => {
+describe('resolveStep: representative domain playbooks', () => {
  it.each([
  ['market_intelligence', 'competitive_analysis'],
  ['strategy', 'outcome'],

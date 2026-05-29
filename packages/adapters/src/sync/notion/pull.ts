@@ -1,5 +1,5 @@
 /**
- * @unified-product-graph/notion-sync — Notion → UPG pull
+ * @unified-product-graph/notion-sync: Notion to UPG pull
  *
  * Reads Notion databases and pages, returns SourceItems compatible with
  * NotionAdapter.convert() from @unified-product-graph/adapters.
@@ -32,7 +32,7 @@ export type ClassificationConfidence = 'high' | 'medium' | 'low'
 export interface DatabaseClassification {
   database_id: string
   database_title: string
-  /** Best-match UPG entity type — 'unknown' if we can't classify */
+  /** Best-match UPG entity type ('unknown' if we can't classify) */
   entity_type: string
   confidence: ClassificationConfidence
   /** Matched signals (for debugging / user review) */
@@ -241,7 +241,7 @@ export interface PullOptions {
   databaseIds?: string[]
   /** Search for databases under this parent page */
   parentPageId?: string
-  /** Fetch block content (expensive — off by default) */
+  /** Fetch block content (expensive, off by default) */
   includeBlocks?: boolean
   /** Pagination cursor for incremental pulls */
   cursor?: string
@@ -272,7 +272,7 @@ export async function pullFromNotion(
   let databases: NotionDatabaseInfo[]
 
   if (databaseIds && databaseIds.length > 0) {
-    // Explicit database list — fetch each
+    // Explicit database list: fetch each
     databases = await Promise.all(databaseIds.map((id) => client.getDatabase(id)))
   } else {
     // Discover databases under the parent page (or workspace-wide)

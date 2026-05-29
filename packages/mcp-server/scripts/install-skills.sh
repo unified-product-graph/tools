@@ -129,7 +129,7 @@ for t in "${SELECTED_TARGETS[@]}"; do
   if [ -n "$dir" ]; then
     VALID_TARGETS+=("$t")
   else
-    echo "Warning: Unknown target '$t' — skipping"
+    echo "Warning: Unknown target '$t', skipping"
   fi
 done
 
@@ -205,7 +205,7 @@ if [ "$NO_CLAUDEMD" = false ]; then
 
   # Check if snippet already exists
   if [ -f "$CLAUDEMD_PATH" ] && grep -q "## Unified Product Graph" "$CLAUDEMD_PATH" 2>/dev/null; then
-    echo "  CLAUDE.md already has UPG awareness — skipping"
+    echo "  CLAUDE.md already has UPG awareness, skipping"
     CLAUDEMD_UPDATED=true
   else
     printf "Add UPG awareness to your CLAUDE.md? [Y/n] "
@@ -213,7 +213,7 @@ if [ "$NO_CLAUDEMD" = false ]; then
 
     if [ "${answer:-Y}" != "n" ] && [ "${answer:-Y}" != "N" ]; then
       if [ ! -f "$SNIPPET_FILE" ]; then
-        echo "Warning: Snippet file not found at $SNIPPET_FILE — skipping"
+        echo "Warning: Snippet file not found at $SNIPPET_FILE, skipping"
       else
         # Create CLAUDE.md if it doesn't exist
         if [ ! -f "$CLAUDEMD_PATH" ]; then
@@ -251,9 +251,9 @@ if [ "$CLAUDEMD_UPDATED" = true ]; then
 fi
 echo ""
 echo "Quick start:"
-echo "  /upg          — see your product graph"
-echo "  /upg-init     — bootstrap a new graph (~5 min)"
-echo "  /upg-journey  — guided product journey"
+echo "  /upg:          see your product graph"
+echo "  /upg-init:     bootstrap a new graph (~5 min)"
+echo "  /upg-journey:  guided product journey"
 echo ""
-echo "Skills are symlinked — edits in the source are live immediately."
+echo "Skills are symlinked; edits in the source are live immediately."
 echo ""

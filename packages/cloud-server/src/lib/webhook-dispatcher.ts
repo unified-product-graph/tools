@@ -3,7 +3,7 @@
  *
  * Mutations emit `WebhookEvent`s (via `PgStore`'s event sink); this dispatcher
  * looks up the active webhooks registered for that product + event and POSTs
- * the payload to each — async, HMAC-signed, with bounded retry/backoff and
+ * the payload to each, async, HMAC-signed, with bounded retry/backoff and
  * auto-disable on a permanent 4xx.
  *
  * Delivery is fire-and-forget from the mutation's perspective (`emit`): it runs
@@ -105,7 +105,7 @@ export class WebhookDispatcher {
       // Transient (5xx / 429 / network): back off and retry.
       if (attempt < this.maxAttempts) await sleep(this.backoffMs * 2 ** (attempt - 1))
     }
-    // Retries exhausted on a transient error — leave active for the next event.
+    // Retries exhausted on a transient error; leave active for the next event.
   }
 
   private async disable(id: string): Promise<void> {

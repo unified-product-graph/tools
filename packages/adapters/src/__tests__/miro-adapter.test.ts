@@ -44,7 +44,7 @@ const adapter = new MiroAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('MiroAdapter — entity type mapping', () => {
+describe('MiroAdapter: entity type mapping', () => {
   it('sticky_note without frame label maps to observation', async () => {
     const items: SourceItem[] = [makeItem('s1', 'Users struggle with login', 'sticky_note')]
     const result = await adapter.convert(items)
@@ -68,7 +68,7 @@ describe('MiroAdapter — entity type mapping', () => {
 
 // ─── Frame-label override ─────────────────────────────────────────────────────
 
-describe('MiroAdapter — frame_label override for sticky notes', () => {
+describe('MiroAdapter: frame_label override for sticky notes', () => {
   it('sticky_note in "opportunities" frame maps to opportunity', async () => {
     const items: SourceItem[] = [
       makeItem('s1', 'Users need faster search', 'sticky_note', {
@@ -118,13 +118,13 @@ describe('MiroAdapter — frame_label override for sticky notes', () => {
 
   it('sticky_note in "personas" frame maps to persona', async () => {
     const items: SourceItem[] = [
-      makeItem('s1', 'Power user — technical', 'sticky_note', { frame_label: 'Personas' }),
+      makeItem('s1', 'Power user, technical', 'sticky_note', { frame_label: 'Personas' }),
     ]
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('persona')
   })
 
-  it('card type is not overridden by frame_label — stays task', async () => {
+  it('card type is not overridden by frame_label; stays task', async () => {
     // frame_label override only applies to sticky_note and mindmap_node
     const items: SourceItem[] = [
       makeItem('c1', 'Build feature', 'card', { frame_label: 'Opportunities' }),
@@ -136,7 +136,7 @@ describe('MiroAdapter — frame_label override for sticky notes', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('MiroAdapter — skip cases', () => {
+describe('MiroAdapter: skip cases', () => {
   it('connector is skipped and counted in warning', async () => {
     const items: SourceItem[] = [
       makeItem('conn1', 'Arrow', 'connector'),
@@ -171,7 +171,7 @@ describe('MiroAdapter — skip cases', () => {
 
 // ─── Color tag ────────────────────────────────────────────────────────────────
 
-describe('MiroAdapter — color tag', () => {
+describe('MiroAdapter: color tag', () => {
   it('sticky note color is added as a tag', async () => {
     const items: SourceItem[] = [
       makeItem('s1', 'Observation', 'sticky_note', { color: 'yellow' }),
@@ -183,7 +183,7 @@ describe('MiroAdapter — color tag', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('MiroAdapter — edge emission', () => {
+describe('MiroAdapter: edge emission', () => {
   it('parent-child edge is emitted as node_informs_node (Miro structure is heuristic)', async () => {
     const items: SourceItem[] = [
       makeItem('fr1', 'Insights frame', 'frame'),
@@ -193,7 +193,7 @@ describe('MiroAdapter — edge emission', () => {
         frame_label: 'insights',
       }),
     ]
-    // Note: frame itself is skipped — parent not in sourceMap — edge also skipped with warning
+    // Note: frame itself is skipped; parent not in sourceMap; edge also skipped with warning
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'MiroAdapter edges')
   })
@@ -212,7 +212,7 @@ describe('MiroAdapter — edge emission', () => {
 
 // ─── Unmatched frame label warning ────────────────────────────────────────────
 
-describe('MiroAdapter — unmatched frame label warning', () => {
+describe('MiroAdapter: unmatched frame label warning', () => {
   it('emits warning for sticky notes without a recognized frame label', async () => {
     const items: SourceItem[] = [
       makeItem('s1', 'Some note', 'sticky_note'), // no frame_label
@@ -226,7 +226,7 @@ describe('MiroAdapter — unmatched frame label warning', () => {
 
 // ─── Source map and external fields ──────────────────────────────────────────
 
-describe('MiroAdapter — source_map, external_tool, external_id', () => {
+describe('MiroAdapter: source_map, external_tool, external_id', () => {
   it('source_map has entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeItem('s1', 'Note 1', 'sticky_note'),

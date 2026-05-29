@@ -2,7 +2,7 @@
  * Portfolio family + repair_dangling_edges unit tests.
  *
  * Tests store methods and tool handlers for cross-product edges. Uses the
- * same mock-pool pattern as pg-store.test.ts — no real Postgres needed.
+ * same mock-pool pattern as pg-store.test.ts; no real Postgres needed.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -41,7 +41,7 @@ function makeContext(pool: Pool): CloudContext {
 
 // ── Store: cross-product edge methods ─────────────────────────────────────
 
-describe('UPGPgStore — cross-product edges', () => {
+describe('UPGPgStore: cross-product edges', () => {
   describe('listCrossProductEdges()', () => {
     it('queries by created_by_product_id and returns edges', async () => {
       const edgeRows = [

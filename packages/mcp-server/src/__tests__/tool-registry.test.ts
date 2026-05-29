@@ -1,5 +1,5 @@
 /**
- * Tool registry smoke tests — locks Stage B (handler extraction).
+ * Tool registry smoke tests: locks Stage B (handler extraction).
  *
  * The registry is the single source of truth: every tool name from the
  * declarations array MUST resolve to a real handler, every handler must
@@ -68,7 +68,7 @@ function makeCtx(store: UPGFileStore): ToolContext {
   }
 }
 
-describe('Tool registry — completeness', () => {
+describe('Tool registry: completeness', () => {
   it('every declared tool has a bound handler', () => {
     const missing: string[] = []
     for (const def of TOOL_DEFINITIONS) {
@@ -94,7 +94,7 @@ describe('Tool registry — completeness', () => {
     //   list_domain_rings, get_domain_ring. → 88
     // + 1 anti-pattern evaluation tool:
     //   get_anti_pattern_violations_for. (validate_graph already shipped
-    //   on local at v0.3.0 — extends it in place rather than
+    //   on local at v0.3.0; extends it in place rather than
     //   adding a second tool.)
     //   → 89.
     // + 1 additional tool added for v0.5.0. → 90.
@@ -105,7 +105,7 @@ describe('Tool registry — completeness', () => {
   })
 })
 
-describe('Tool registry — dispatch parity', () => {
+describe('Tool registry: dispatch parity', () => {
   let store: UPGFileStore
   let ctx: ToolContext
 

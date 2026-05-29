@@ -36,7 +36,7 @@ function makeBigGraph(nodeCount: number, edgesPerNode: number): UPGDocument {
     nodes.push({
       id: `n_${i}`,
       type: 'persona' as UPGEntityType,
-      title: `Persona ${i} — verbose title that costs bytes on the wire`,
+      title: `Persona ${i}, verbose title that costs bytes on the wire`,
       description:
         'A reasonably-long description so that per-node bytes match the estimator heuristic in real-world graphs.',
       tags: ['guardrail-fixture', 'large-graph', 'payload-test'],

@@ -57,7 +57,7 @@ export type EdgeInferenceOk = {
 export type EdgeInferenceFail = {
   ok: false
   reason: string
-  /** Pairs that DO resolve in the catalog — best-effort near-misses. */
+  /** Pairs that DO resolve in the catalog; best-effort near-misses. */
   suggestions: EdgeInferenceSuggestion[]
   /** Source/target after deprecation resolution, for diagnostics. */
   resolved: { source_type: string; target_type: string }
@@ -171,7 +171,7 @@ export function inferEdgeTypeWithTier(
     }
   }
 
-  // Reject — no fabrication. Surface near-miss pairs that DO resolve.
+  // Reject: no fabrication. Surface near-miss pairs that DO resolve.
   return {
     ok: false,
     reason: `No edge type in UPG_EDGE_CATALOG for source=${canonicalSource}, target=${canonicalTarget}.`,

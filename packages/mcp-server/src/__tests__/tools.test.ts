@@ -480,7 +480,7 @@ describe('computeGraphDigest', () => {
  createNode(store, { type: 'pain_point' as never, title: 'Slow build' })
 
  const digest = computeGraphDigest(store)
- // BUSINESS_AREAS.understanding lists "need" — pain_point should resolve in.
+ // BUSINESS_AREAS.understanding lists "need"; pain_point should resolve in.
  expect(digest.coverage.understanding.types_present).toContain('need')
  })
 
@@ -504,7 +504,7 @@ describe('computeGraphDigest', () => {
 
  it('surfaces canonical post-split types in coverage.discovery', async () => {
  // v0.4.0 re-promoted hypothesis_claim back to canonical `hypothesis`
- // (the "claim" suffix was redundant — see UPG_MIGRATIONS['0.4.0']).
+ // (the "claim" suffix was redundant; see UPG_MIGRATIONS['0.4.0']).
  // The digest folds hypothesis_claim → hypothesis via canonicalType, so a
  // graph that contains hypothesis_claim still surfaces under `hypothesis`.
  const store = await makeStore()
@@ -514,7 +514,7 @@ describe('computeGraphDigest', () => {
  const digest = computeGraphDigest(store)
  expect(digest.coverage.discovery.types_present).toContain('hypothesis')
  expect(digest.coverage.discovery.types_present).toContain('experiment_plan')
- // The deprecated names must not appear in `types_missing` lists either —
+ // The deprecated names must not appear in `types_missing` lists either;
  // they are not what we expect users to create today.
  expect(digest.coverage.discovery.types_missing).not.toContain('hypothesis_claim')
  expect(digest.coverage.discovery.types_missing).not.toContain('experiment')
@@ -671,7 +671,7 @@ describe('moveNode', () => {
  title: 'W',
  parent_id: portfolio.node.id,
  })
- // Try to attach product under persona via portfolio_contains_product —
+ // Try to attach product under persona via portfolio_contains_product;
  // catalog says source must be 'portfolio', not 'persona'.
  const result = moveNode(store, {
  node_id: product.id,
@@ -695,7 +695,7 @@ describe('moveNode', () => {
  title: 'W',
  parent_id: portfolioA.node.id,
  })
- // Add a SECOND parent edge from B (manually — bypasses the
+ // Add a SECOND parent edge from B (manually, bypassing the
  // single-parent assumption to exercise the disambiguation path).
  createEdge(store, {
  source_id: portfolioB.node.id,
@@ -728,7 +728,7 @@ describe('moveNode', () => {
  // feature → persona has no edge in UPG_EDGE_CATALOG in either direction,
  // so inference rejects. (persona → product, used by the earlier version of
  // this test, now resolves to `persona_anti_fit_for_product`, which is
- // semantic — moveNode now succeeds when no hierarchy edge is mandated.)
+ // semantic, so moveNode now succeeds when no hierarchy edge is mandated.)
  const feature = createNode(store, { type: 'feature', title: 'F' })
  const portfolio = createNode(store, { type: 'portfolio', title: 'PF' })
  const { node: persona } = createNode(store, {
@@ -736,7 +736,7 @@ describe('moveNode', () => {
  title: 'P',
  })
  // Place persona under portfolio first so it has a parent, then attempt
- // a move to feature — which should reject (no canonical feature → persona
+ // a move to feature, which should reject (no canonical feature → persona
  // edge in the catalog).
  const result = moveNode(store, {
  node_id: persona.id,
@@ -873,7 +873,7 @@ describe('createNode entity-type validation', () => {
  expect(result.warning).toMatch(/aliased to canonical 'job'/)
  })
 
- it('throws UnknownEntityTypeError for unknown types — no orphan node lands', async () => {
+ it('throws UnknownEntityTypeError for unknown types: no orphan node lands', async () => {
  const store = await makeStore()
  const before = store.getAllNodes().length
  expect(() =>
@@ -1003,7 +1003,7 @@ describe('migrateNodeType', () => {
  })
 })
 
-// ── batchCreateNodes — atomic nodes + edges ───────────────────────
+// ── batchCreateNodes: atomic nodes + edges ────────────────────────
 
 describe('batchCreateNodes', () => {
  it('creates nodes with parent_ref chains as before', async () => {
@@ -1060,7 +1060,7 @@ describe('batchCreateNodes', () => {
  }
  })
 
- it('rejects unknown entity type — NO orphan node lands', async () => {
+ it('rejects unknown entity type: NO orphan node lands', async () => {
  const store = await makeStore()
  const before = store.getAllNodes().length
  const result = batchCreateNodes(store, {

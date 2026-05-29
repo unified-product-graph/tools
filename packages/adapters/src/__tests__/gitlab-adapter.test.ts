@@ -224,7 +224,7 @@ describe('inferIssueType', () => {
 
 // ─── Issue entity type mapping ────────────────────────────────────────────────
 
-describe('GitLabAdapter — issue type mapping via labels', () => {
+describe('GitLabAdapter: issue type mapping via labels', () => {
   it('issue with "bug" label maps to bug', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Crash on save', ['bug'])])
     expect(result.nodes[0].type).toBe('bug')
@@ -268,7 +268,7 @@ describe('GitLabAdapter — issue type mapping via labels', () => {
 
 // ─── Native Epic mapping ──────────────────────────────────────────────────────
 
-describe('GitLabAdapter — native Epic mapping', () => {
+describe('GitLabAdapter: native Epic mapping', () => {
   it('GitLab native Epic maps to epic with high confidence', async () => {
     const result = await adapter.convert([makeEpic('ep-1', 'Auth system epic')])
     expect(result.nodes[0].type).toBe('epic')
@@ -284,7 +284,7 @@ describe('GitLabAdapter — native Epic mapping', () => {
 
 // ─── Milestone → release ──────────────────────────────────────────────────────
 
-describe('GitLabAdapter — milestone → release', () => {
+describe('GitLabAdapter: milestone → release', () => {
   it('milestone maps to release', async () => {
     const result = await adapter.convert([makeMilestone('ms-1', 'v2.0')])
     expect(result.nodes[0].type).toBe('release')
@@ -294,7 +294,7 @@ describe('GitLabAdapter — milestone → release', () => {
 
 // ─── Group / subgroup → product / feature_area ───────────────────────────────
 
-describe('GitLabAdapter — group/subgroup mapping', () => {
+describe('GitLabAdapter: group/subgroup mapping', () => {
   it('top-level group maps to product', async () => {
     const result = await adapter.convert([makeGroup('g-1', 'my-org')])
     expect(result.nodes[0].type).toBe('product')
@@ -316,7 +316,7 @@ describe('GitLabAdapter — group/subgroup mapping', () => {
 
 // ─── Merge request + pipeline skipping ───────────────────────────────────────
 
-describe('GitLabAdapter — merge request skipping', () => {
+describe('GitLabAdapter: merge request skipping', () => {
   it('merge request is skipped with warning', async () => {
     const result = await adapter.convert([makeMR('mr-1', 'Fix login bug')])
     expect(result.nodes).toHaveLength(0)
@@ -346,7 +346,7 @@ describe('GitLabAdapter — merge request skipping', () => {
   })
 })
 
-describe('GitLabAdapter — pipeline skipping', () => {
+describe('GitLabAdapter: pipeline skipping', () => {
   it('pipeline is skipped with warning', async () => {
     const result = await adapter.convert([makePipeline('pl-1', 'main pipeline')])
     expect(result.nodes).toHaveLength(0)
@@ -369,7 +369,7 @@ describe('GitLabAdapter — pipeline skipping', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('GitLabAdapter — status normalisation', () => {
+describe('GitLabAdapter: status normalisation', () => {
   it('opened issue maps to active status', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Open issue', [], { state: 'opened' })])
     expect(result.nodes[0].status).toBe('active')
@@ -393,7 +393,7 @@ describe('GitLabAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('GitLabAdapter — edge emission', () => {
+describe('GitLabAdapter: edge emission', () => {
   it('release_contains_feature emitted when issue with feature label has milestone_id', async () => {
     const items: SourceItem[] = [
       makeMilestone('ms-1', 'v1.0'),
@@ -495,7 +495,7 @@ describe('GitLabAdapter — edge emission', () => {
 
 // ─── Full fixture: assertAllEdgesCatalogued ───────────────────────────────────
 
-describe('GitLabAdapter — full fixture: all edges are in the UPG catalogue', () => {
+describe('GitLabAdapter: full fixture, all edges are in the UPG catalogue', () => {
   it('all emitted edges pass the catalogue guard', async () => {
     const items: SourceItem[] = [
       makeGroup('g-1', 'acme-org'),
@@ -524,7 +524,7 @@ describe('GitLabAdapter — full fixture: all edges are in the UPG catalogue', (
 
 // ─── Source map, external_tool, external_id ───────────────────────────────────
 
-describe('GitLabAdapter — source_map, external_tool, external_id', () => {
+describe('GitLabAdapter: source_map, external_tool, external_id', () => {
   it('source_map has entries for all converted items', async () => {
     const result = await adapter.convert([
       makeIssue('i-1', 'Feature', ['feature']),
@@ -554,7 +554,7 @@ describe('GitLabAdapter — source_map, external_tool, external_id', () => {
 
 // ─── Exported maps ────────────────────────────────────────────────────────────
 
-describe('GitLabAdapter — exported constants', () => {
+describe('GitLabAdapter: exported constants', () => {
   it('GITLAB_ISSUE_LABEL_MAP includes expected labels', () => {
     expect(GITLAB_ISSUE_LABEL_MAP['bug']).toBe('bug')
     expect(GITLAB_ISSUE_LABEL_MAP['enhancement']).toBe('user_story')
@@ -585,7 +585,7 @@ describe('GitLabAdapter — exported constants', () => {
 
 // ─── list() throws ────────────────────────────────────────────────────────────
 
-describe('GitLabAdapter — list()', () => {
+describe('GitLabAdapter: list()', () => {
   it('throws an error directing user to /upg-import', async () => {
     await expect(adapter.list({})).rejects.toThrow('GitLab adapter requires GitLab API access')
   })
@@ -593,7 +593,7 @@ describe('GitLabAdapter — list()', () => {
 
 // ─── Edge cases ───────────────────────────────────────────────────────────────
 
-describe('GitLabAdapter — edge cases', () => {
+describe('GitLabAdapter: edge cases', () => {
   it('returns empty-nodes warning for empty input', async () => {
     const result = await adapter.convert([])
     expect(result.nodes).toHaveLength(0)

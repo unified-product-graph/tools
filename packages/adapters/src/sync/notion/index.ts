@@ -5,12 +5,12 @@
  *
  * Primary exports:
  *
- *   NotionSyncClient  — Notion API client wrapper
- *   pushToNotion      — Execute a NotionWorkspacePlan against Notion
- *   pullFromNotion    — Read Notion databases → SourceItems
- *   sync              — Bidirectional sync coordinator
- *   emptyCursor / saveCursor / loadCursor — Cursor persistence
- *   MemoryCursorStorage — In-memory cursor storage (tests + dry runs)
+ *   NotionSyncClient: Notion API client wrapper
+ *   pushToNotion: Execute a NotionWorkspacePlan against Notion
+ *   pullFromNotion: Read Notion databases to SourceItems
+ *   sync: Bidirectional sync coordinator
+ *   emptyCursor / saveCursor / loadCursor: Cursor persistence
+ *   MemoryCursorStorage: In-memory cursor storage (tests + dry runs)
  *
  * Workers entry point: workers/sync-worker.ts
  */

@@ -371,7 +371,7 @@ describe('real example: enterprise-pilot-results.upg.md', () => {
   it.skipIf(!source)('parses without errors', () => {
     const result = parse(source)
     expect(result.errors).toHaveLength(0)
-    expect(result.frontmatter.title).toBe('Enterprise Pilot Results — Q2 2026')
+    expect(result.frontmatter.title).toBe('Enterprise Pilot Results: Q2 2026')
     expect(result.frontmatter.upg_product).toBeTruthy()
     expect(result.frontmatter.composition_pattern).toBe('experiment_report')
   })

@@ -1,5 +1,5 @@
 /**
- * Tests for `validate_graph` — full per-node schema-drift report.
+ * Tests for `validate_graph`: full per-node schema-drift report.
  *
  * Pairs with the load-time drift summary (, lib/schema-drift.ts) but
  * returns per-class arrays of node IDs with suggested actions.
@@ -52,7 +52,7 @@ function makeCtx(store: UPGFileStore): ToolContext {
  }
 }
 
-describe('validate_graph — clean graph', () => {
+describe('validate_graph: clean graph', () => {
  it('returns all-zero summary and empty arrays for a canonical graph', async () => {
  const store = await loadStore(
  makeDoc(
@@ -74,7 +74,7 @@ describe('validate_graph — clean graph', () => {
  })
 })
 
-describe('validate_graph — entity_drift', () => {
+describe('validate_graph: entity_drift', () => {
  it('flags deprecated types with suggested rename', async () => {
  const store = await loadStore(
  makeDoc(
@@ -99,11 +99,11 @@ describe('validate_graph — entity_drift', () => {
  })
 })
 
-describe('validate_graph — entity_drift split suggestions', () => {
+describe('validate_graph: entity_drift split suggestions', () => {
  it('treats canonical user_story as NOT drift; flags deprecated story_statement as rename → user_story', async () => {
  // v0.7.0/: user_story is canonical again (the templated promise), so a
  // user_story node must NOT surface as entity_drift even though it remains the
- // historical split source in UPG_SPLIT_MIGRATIONS['0.2.7'] — canonicality is the
+ // historical split source in UPG_SPLIT_MIGRATIONS['0.2.7']; canonicality is the
  // authoritative signal (same as `experiment`). The deprecated alias
  // story_statement is the type that now drifts: a 1→1 rename to user_story.
  const store = await loadStore(
@@ -135,7 +135,7 @@ describe('validate_graph — entity_drift split suggestions', () => {
  })
 })
 
-describe('validate_graph — edge_drift', () => {
+describe('validate_graph: edge_drift', () => {
  it('flags non-canonical edges with suggested rename or drop', async () => {
  const store = await loadStore(
  makeDoc(
@@ -163,7 +163,7 @@ describe('validate_graph — edge_drift', () => {
  })
 })
 
-describe('validate_graph — top_level_drift', () => {
+describe('validate_graph: top_level_drift', () => {
  it('flags nodes with non-spec top-level fields', async () => {
  const store = await loadStore(
  makeDoc(
@@ -187,7 +187,7 @@ describe('validate_graph — top_level_drift', () => {
  })
 })
 
-describe('validate_graph — self_referential', () => {
+describe('validate_graph: self_referential', () => {
  it('flags nodes whose source_id/source_type mirror id/type', async () => {
  const store = await loadStore(
  makeDoc(
@@ -212,7 +212,7 @@ describe('validate_graph — self_referential', () => {
  })
 })
 
-describe('validate_graph — scope filter', () => {
+describe('validate_graph: scope filter', () => {
  it('returns only the requested scope arrays', async () => {
  const store = await loadStore(makeDoc([], []))
  const ctx = makeCtx(store)
@@ -232,7 +232,7 @@ describe('validate_graph — scope filter', () => {
  })
 })
 
-describe('validate_graph — doctrine fixes', () => {
+describe('validate_graph: doctrine fixes', () => {
  it('does not flag canonical `experiment` for split (reinstated as canonical sibling alongside experiment_plan / experiment_run)', async () => {
  // The v0.2.6 split rule for `experiment` is retained for legacy data,
  // but added `experiment` back to UPG_TYPES. Canonical types
@@ -312,7 +312,7 @@ describe('validate_graph — doctrine fixes', () => {
  })
 })
 
-describe('validate_graph — if_changed_since short-circuit', () => {
+describe('validate_graph: if_changed_since short-circuit', () => {
  it('returns { changed: false } when hash matches', async () => {
  const store = await loadStore(makeDoc([], []))
  const ctx = makeCtx(store)
@@ -324,7 +324,7 @@ describe('validate_graph — if_changed_since short-circuit', () => {
  })
 })
 
-describe('validate_graph — F4: property_drift resolves deprecated type aliases', () => {
+describe('validate_graph: F4: property_drift resolves deprecated type aliases', () => {
  it('surfaces property_drift entries for a `kpi` node carrying deprecated quality_* props (kpi → metric alias)', async () => {
  // The `kpi` type is a deprecated alias for `metric`. The UPG_PROPERTY_MIGRATIONS
  // `drop_props` rule is keyed on `metric`, not `kpi`. Without alias resolution the

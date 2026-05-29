@@ -1,5 +1,5 @@
 /**
- * Tool-reference generator — `@unified-product-graph/mcp-server` consumer shim.
+ * Tool-reference generator, `@unified-product-graph/mcp-server` consumer shim.
  *
  * Delegates the actual walking/auditing/emitting to
  * `@unified-product-graph/mcp-tooling`, the shared catalog tooling used by
@@ -73,7 +73,7 @@ const DOMAIN_BLURBS: Record<string, string> = {
 // ─── Symbol → tool-name map (mirrors HANDLERS in tool-registry.ts) ─────────
 //
 // Kept in sync by hand because the registry exports the binding map as a
-// non-exported `const`. If a handler is renamed, update both places — the
+// non-exported `const`. If a handler is renamed, update both places; the
 // audit will surface mismatches as "no JSDoc block found".
 
 const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
@@ -135,7 +135,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getPlaybook: 'get_playbook',
   listApproaches: 'list_approaches',
   getApproach: 'get_approach',
-  // spec round 4 — approach verbs
+  // spec round 4, approach verbs
   plan: 'plan',
   inspect: 'inspect',
   prioritise: 'prioritise',

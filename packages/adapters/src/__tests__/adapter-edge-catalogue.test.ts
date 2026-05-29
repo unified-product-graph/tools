@@ -69,7 +69,7 @@ describe('resolveContainmentEdge', () => {
 
 // ─── Markdown adapter ─────────────────────────────────────────────────────────
 
-describe('MarkdownAdapter — edges are all catalogued', () => {
+describe('MarkdownAdapter: edges are all catalogued', () => {
   const adapter = new MarkdownAdapter()
 
   it('emits only catalogued edge types for a flat product→feature tree', async () => {
@@ -144,7 +144,7 @@ describe('MarkdownAdapter — edges are all catalogued', () => {
 
 // ─── Notion adapter ───────────────────────────────────────────────────────────
 
-describe('NotionAdapter — edges are all catalogued', () => {
+describe('NotionAdapter: edges are all catalogued', () => {
   const adapter = new NotionAdapter()
 
   const makeItem = (
@@ -200,7 +200,7 @@ describe('NotionAdapter — edges are all catalogued', () => {
 
 // ─── Linear adapter ───────────────────────────────────────────────────────────
 
-describe('LinearAdapter — edges are all catalogued', () => {
+describe('LinearAdapter: edges are all catalogued', () => {
   const adapter = new LinearAdapter()
 
   it('emits only catalogued edge types for project → issues hierarchy', async () => {
@@ -279,7 +279,7 @@ describe('LinearAdapter — edges are all catalogued', () => {
 
 // ─── GitHub adapter ───────────────────────────────────────────────────────────
 
-describe('GitHubAdapter — edges are all catalogued', () => {
+describe('GitHubAdapter: edges are all catalogued', () => {
   const adapter = new GitHubAdapter()
 
   it('emits only catalogued edge types for milestone → issue linkage', async () => {
@@ -350,7 +350,7 @@ describe('GitHubAdapter — edges are all catalogued', () => {
       },
     ]
     const result = await adapter.convert(items)
-    // release_contains_feature is in the catalogue — adapter emits it directly.
+    // release_contains_feature is in the catalogue; adapter emits it directly.
     expect(result.edges.length).toBe(1)
     const releaseEdge = result.edges[0]
     expect(releaseEdge.type).toBe('release_contains_feature')

@@ -25,7 +25,7 @@ Format proposals belong on the specification repository.
 
 GitHub Issues for:
 
-- Bug reports — include a minimal `.upg.md` snippet.
+- Bug reports: include a minimal `.upg.md` snippet.
 - API ergonomics feedback.
 - Documentation gaps.
 

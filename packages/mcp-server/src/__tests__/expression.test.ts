@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateExpression } from '@unified-product-graph/sdk'
 
-describe('evaluateExpression — happy path', () => {
+describe('evaluateExpression: happy path', () => {
   it('evaluates RICE: (reach * impact * confidence) / effort', () => {
     const r = evaluateExpression('(reach * impact * confidence) / effort', {
       reach: 8,
@@ -97,7 +97,7 @@ describe('evaluateExpression — happy path', () => {
   })
 })
 
-describe('evaluateExpression — failure modes', () => {
+describe('evaluateExpression: failure modes', () => {
   it('reports missing variables with a list', () => {
     const r = evaluateExpression('reach * impact', { reach: 5 })
     expect(r.ok).toBe(false)
@@ -138,7 +138,7 @@ describe('evaluateExpression — failure modes', () => {
   })
 })
 
-describe('evaluateExpression — security', () => {
+describe('evaluateExpression: security', () => {
   it('does NOT invoke functions even if scope has function values', () => {
     // Function values aren't numeric → treated as missing.
     const r = evaluateExpression('exec', {

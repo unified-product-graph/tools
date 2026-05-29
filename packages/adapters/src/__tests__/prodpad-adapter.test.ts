@@ -46,7 +46,7 @@ const adapter = new ProdpadAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('ProdpadAdapter — entity_type → UPG type mapping', () => {
+describe('ProdpadAdapter: entity_type → UPG type mapping', () => {
   it('idea maps to feature_request with confidence high', async () => {
     const items: SourceItem[] = [makeItem('id1', 'Add dark mode', 'idea')]
     const result = await adapter.convert(items)
@@ -137,7 +137,7 @@ describe('ProdpadAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Vote count preservation ──────────────────────────────────────────────────
 
-describe('ProdpadAdapter — vote_count preservation', () => {
+describe('ProdpadAdapter: vote_count preservation', () => {
   it('vote_count is preserved on idea (feature_request) nodes', async () => {
     const items: SourceItem[] = [
       makeItem('id1', 'Add dark mode', 'idea', { vote_count: 142 }),
@@ -167,7 +167,7 @@ describe('ProdpadAdapter — vote_count preservation', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('ProdpadAdapter — status normalisation', () => {
+describe('ProdpadAdapter: status normalisation', () => {
   it("status 'active' normalises to 'active'", async () => {
     const items: SourceItem[] = [makeItem('id1', 'Active idea', 'idea', { status: 'active' })]
     const result = await adapter.convert(items)
@@ -195,7 +195,7 @@ describe('ProdpadAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('ProdpadAdapter — edge emission', () => {
+describe('ProdpadAdapter: edge emission', () => {
   it('initiative_drives_outcome emitted when objective has initiative parent', async () => {
     const items: SourceItem[] = [
       makeItem('init1', 'Activation initiative', 'initiative'),
@@ -282,7 +282,7 @@ describe('ProdpadAdapter — edge emission', () => {
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-describe('ProdpadAdapter — tags', () => {
+describe('ProdpadAdapter: tags', () => {
   it('tags are set on the node', async () => {
     const items: SourceItem[] = [
       makeItem('id1', 'Idea with tags', 'idea', { tags: ['mobile', 'q3'] }),
@@ -294,7 +294,7 @@ describe('ProdpadAdapter — tags', () => {
 
 // ─── Source map and identity ──────────────────────────────────────────────────
 
-describe('ProdpadAdapter — source_map and identity', () => {
+describe('ProdpadAdapter: source_map and identity', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('init1', 'Initiative', 'initiative'),

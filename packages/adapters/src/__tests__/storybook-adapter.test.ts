@@ -47,7 +47,7 @@ const adapter = new StorybookAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('StorybookAdapter — entity_type → UPG entity type mapping', () => {
+describe('StorybookAdapter: entity_type → UPG entity type mapping', () => {
   it('component maps to design_component with confidence high', async () => {
     const items: SourceItem[] = [makeItem('btn', 'Button', 'component')]
     const result = await adapter.convert(items)
@@ -75,7 +75,7 @@ describe('StorybookAdapter — entity_type → UPG entity type mapping', () => {
     expect(result.nodes[0].mapping_confidence).toBe('high')
   })
 
-  it('story and component both emit design_component — same entity type', async () => {
+  it('story and component both emit design_component (same entity type)', async () => {
     const items: SourceItem[] = [
       makeItem('card', 'Card', 'component'),
       makeItem('card-default', 'Card/Default', 'story', { component_id: 'card' }),
@@ -89,7 +89,7 @@ describe('StorybookAdapter — entity_type → UPG entity type mapping', () => {
 
 // ─── Platform entity skipping ─────────────────────────────────────────────────
 
-describe('StorybookAdapter — skipped platform entity types', () => {
+describe('StorybookAdapter: skipped platform entity types', () => {
   it('addon is skipped with no node emitted', async () => {
     const items: SourceItem[] = [
       makeItem('addon1', '@storybook/addon-docs', 'addon'),
@@ -119,7 +119,7 @@ describe('StorybookAdapter — skipped platform entity types', () => {
 
 // ─── No status on nodes ───────────────────────────────────────────────────────
 
-describe('StorybookAdapter — no status field on nodes', () => {
+describe('StorybookAdapter: no status field on nodes', () => {
   it('component node has no status property', async () => {
     const items: SourceItem[] = [makeItem('btn', 'Button', 'component')]
     const result = await adapter.convert(items)
@@ -143,7 +143,7 @@ describe('StorybookAdapter — no status field on nodes', () => {
 
 // ─── Story → component edge emission ─────────────────────────────────────────
 
-describe('StorybookAdapter — story → component edge emission', () => {
+describe('StorybookAdapter: story → component edge emission', () => {
   it('node_informs_node emitted from story to component when component_id present', async () => {
     const items: SourceItem[] = [
       makeItem('btn', 'Button', 'component'),
@@ -204,7 +204,7 @@ describe('StorybookAdapter — story → component edge emission', () => {
 
 // ─── Component traceability warning ──────────────────────────────────────────
 
-describe('StorybookAdapter — component traceability warning', () => {
+describe('StorybookAdapter: component traceability warning', () => {
   it('emits traceability warning when component or story is converted', async () => {
     const items: SourceItem[] = [makeItem('btn', 'Button', 'component')]
     const result = await adapter.convert(items)
@@ -229,7 +229,7 @@ describe('StorybookAdapter — component traceability warning', () => {
 
 // ─── Tags and story_kind ──────────────────────────────────────────────────────
 
-describe('StorybookAdapter — tags and story_kind', () => {
+describe('StorybookAdapter: tags and story_kind', () => {
   it('tags from metadata are preserved on the node', async () => {
     const items: SourceItem[] = [
       makeItem('btn', 'Button', 'component', {
@@ -254,7 +254,7 @@ describe('StorybookAdapter — tags and story_kind', () => {
 
 // ─── All edges catalogued fixture ────────────────────────────────────────────
 
-describe('StorybookAdapter — full design system fixture', () => {
+describe('StorybookAdapter: full design system fixture', () => {
   it('all emitted edges are in the UPG catalogue (full fixture)', async () => {
     const items: SourceItem[] = [
       makeItem('btn', 'Button', 'component', { story_kind: 'Components/Atoms', tags: ['atoms'] }),
@@ -277,7 +277,7 @@ describe('StorybookAdapter — full design system fixture', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('StorybookAdapter — source_map', () => {
+describe('StorybookAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('btn', 'Button', 'component'),
@@ -297,7 +297,7 @@ describe('StorybookAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('StorybookAdapter — external_tool and external_id', () => {
+describe('StorybookAdapter: external_tool and external_id', () => {
   it('external_tool is always storybook', async () => {
     const items: SourceItem[] = [makeItem('btn', 'Button', 'component')]
     const result = await adapter.convert(items)

@@ -47,7 +47,7 @@ const adapter = new IntercomAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('IntercomAdapter — entity_type → UPG type mapping', () => {
+describe('IntercomAdapter: entity_type → UPG type mapping', () => {
   it('conversation maps to support_ticket with confidence high', async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Help with billing', 'conversation')]
     const result = await adapter.convert(items)
@@ -104,7 +104,7 @@ describe('IntercomAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skip + warning cases ─────────────────────────────────────────────────────
 
-describe('IntercomAdapter — skipped types + warnings', () => {
+describe('IntercomAdapter: skipped types + warnings', () => {
   it('news_item and series entities are skipped with aggregate outbound warning', async () => {
     const items: SourceItem[] = [
       makeItem('n1', 'Product Update', 'news_item'),
@@ -148,7 +148,7 @@ describe('IntercomAdapter — skipped types + warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('IntercomAdapter — status normalisation', () => {
+describe('IntercomAdapter: status normalisation', () => {
   it("status 'open' normalises to 'active'", async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Help request', 'conversation', { status: 'open' })]
     const result = await adapter.convert(items)
@@ -182,7 +182,7 @@ describe('IntercomAdapter — status normalisation', () => {
 
 // ─── Conversation rating ──────────────────────────────────────────────────────
 
-describe('IntercomAdapter — conversation_rating', () => {
+describe('IntercomAdapter: conversation_rating', () => {
   it('conversation_rating preserved on support_ticket nodes', async () => {
     const items: SourceItem[] = [
       makeItem('conv1', 'Billing issue', 'conversation', { conversation_rating: 5 }),
@@ -204,7 +204,7 @@ describe('IntercomAdapter — conversation_rating', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('IntercomAdapter — edge emission', () => {
+describe('IntercomAdapter: edge emission', () => {
   it('customer_feedback_becomes_feature_request emitted when support_ticket has feature_request parent', async () => {
     const items: SourceItem[] = [
       makeItem('fr1', 'Add CSV export', 'feature_request'),
@@ -296,7 +296,7 @@ describe('IntercomAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('IntercomAdapter — source_map', () => {
+describe('IntercomAdapter: source_map', () => {
   it('source_map contains entries for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('conv1', 'Help request', 'conversation'),
@@ -316,7 +316,7 @@ describe('IntercomAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('IntercomAdapter — external_tool and external_id', () => {
+describe('IntercomAdapter: external_tool and external_id', () => {
   it('external_tool is always intercom', async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Help request', 'conversation')]
     const result = await adapter.convert(items)

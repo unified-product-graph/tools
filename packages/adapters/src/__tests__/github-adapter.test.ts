@@ -115,7 +115,7 @@ describe('inferIssueType', () => {
 
 // ─── Issue entity type mapping ────────────────────────────────────────────────
 
-describe('GitHubAdapter — issue type mapping via labels', () => {
+describe('GitHubAdapter: issue type mapping via labels', () => {
   it('issue with "bug" label maps to bug', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Crash on launch', ['bug'])])
     expect(result.nodes[0].type).toBe('bug')
@@ -162,7 +162,7 @@ describe('GitHubAdapter — issue type mapping via labels', () => {
 
 // ─── Pull request skipping ────────────────────────────────────────────────────
 
-describe('GitHubAdapter — pull request skipping', () => {
+describe('GitHubAdapter: pull request skipping', () => {
   it('pull request is skipped with warning', async () => {
     const result = await adapter.convert([makePR('pr-1', 'Fix login bug')])
     expect(result.nodes).toHaveLength(0)
@@ -194,7 +194,7 @@ describe('GitHubAdapter — pull request skipping', () => {
 
 // ─── Non-issue entity types ───────────────────────────────────────────────────
 
-describe('GitHubAdapter — non-issue entity type mapping', () => {
+describe('GitHubAdapter: non-issue entity type mapping', () => {
   it('milestone maps to milestone', async () => {
     const result = await adapter.convert([makeMilestone('ms-1', 'v1.0')])
     expect(result.nodes[0].type).toBe('milestone')
@@ -264,7 +264,7 @@ describe('GitHubAdapter — non-issue entity type mapping', () => {
 
 // ─── Cross-domain edge emission ───────────────────────────────────────────────
 
-describe('GitHubAdapter — cross-domain edge emission', () => {
+describe('GitHubAdapter: cross-domain edge emission', () => {
   it('milestone_gates_release edge emitted when release has milestone_id', async () => {
     const items: SourceItem[] = [
       makeMilestone('ms-1', 'v1.0 milestone'),
@@ -337,7 +337,7 @@ describe('GitHubAdapter — cross-domain edge emission', () => {
 
 // ─── Status mapping ───────────────────────────────────────────────────────────
 
-describe('GitHubAdapter — issue state mapping', () => {
+describe('GitHubAdapter: issue state mapping', () => {
   it('open issue maps to active status', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Open issue', [], { state: 'open' })])
     expect(result.nodes[0].status).toBe('active')
@@ -351,7 +351,7 @@ describe('GitHubAdapter — issue state mapping', () => {
 
 // ─── Label filtering ──────────────────────────────────────────────────────────
 
-describe('GitHubAdapter — label filtering from tags', () => {
+describe('GitHubAdapter: label filtering from tags', () => {
   it('type-indicator labels are not included in node.tags', async () => {
     const result = await adapter.convert([
       makeIssue('i-1', 'Auth crash', ['bug', 'priority-high', 'auth-team']),
@@ -372,7 +372,7 @@ describe('GitHubAdapter — label filtering from tags', () => {
 
 // ─── list() throws the right error ───────────────────────────────────────────
 
-describe('GitHubAdapter — list()', () => {
+describe('GitHubAdapter: list()', () => {
   it('requires config.token / owner / repo when not provided', async () => {
     await expect(adapter.list({})).rejects.toThrow('GitHub adapter requires config.token')
   })
@@ -380,7 +380,7 @@ describe('GitHubAdapter — list()', () => {
 
 // ─── Edge cases ───────────────────────────────────────────────────────────────
 
-describe('GitHubAdapter — edge cases', () => {
+describe('GitHubAdapter: edge cases', () => {
   it('returns empty-nodes warning for empty input', async () => {
     const result = await adapter.convert([])
     expect(result.nodes).toHaveLength(0)

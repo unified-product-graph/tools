@@ -1,7 +1,7 @@
 /**
  * Unit tests for the pre-flight payload-size estimator.
  *
- * The estimator is heuristic — these tests assert monotonicity, threshold
+ * The estimator is heuristic; these tests assert monotonicity, threshold
  * behaviour at the soft/hard boundaries, and env-var overrides. The
  * end-to-end refusal-via-tool-handler check lives in
  * `read-tool-guardrail.test.ts`.

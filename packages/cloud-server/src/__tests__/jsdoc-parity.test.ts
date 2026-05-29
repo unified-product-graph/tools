@@ -10,7 +10,7 @@
  * Why the floor and not the ceiling: `@see` cross-links are judgment
  * calls (some tools have no kin), `@throws` is conditional on validation
  * paths, `@warning` is reserved for surprise behaviour. `@returns` +
- * `@atomicity` are universal — every handler returns a shape and has an
+ * `@atomicity` are universal: every handler returns a shape and has an
  * atomicity story.
  */
 

@@ -157,7 +157,7 @@ export const batchCreateNodes: ToolHandler = async (args, { store }) => {
           // pair has no canonical edge, matching create_node.
           const inference = inferEdgeTypeWithTier(parentType, nodeType)
           if (!inference.ok) {
-            warnings.push(`Node "${newId}": parent edge not created — no canonical edge for ${parentType} → ${nodeType}.`)
+            warnings.push(`Node "${newId}": parent edge not created; no canonical edge for ${parentType} → ${nodeType}.`)
           } else {
             const eid = edgeId()
             await client.query(
@@ -395,7 +395,7 @@ export const batchDeleteNodes: ToolHandler = async (args, { store }) => {
  *   pair has no canonical edge. Any such failure rejects the whole batch
  *   before BEGIN.
  * @atomicity atomic-with-rollback (BEGIN / COMMIT / ROLLBACK).
- * @warning Inference is catalog-strict — an unmapped pair is refused rather
+ * @warning Inference is catalog-strict: an unmapped pair is refused rather
  *   than fabricating a `${source}_contains_${target}` edge. Pass an explicit
  *   `type` (resolved via `resolve_edge_for_pair`) for non-catalog edges.
  * @see create_edge
@@ -413,7 +413,7 @@ export const batchCreateEdges: ToolHandler = async (args, { store }) => {
 
   // Pre-validate all edges before opening the transaction. Catalog-strict:
   // resolve every edge type up front and reject the whole batch on the first
-  // invalid pair / unmapped inference — no `_contains_` fabrication.
+  // invalid pair / unmapped inference; no `_contains_` fabrication.
   const resolvedEdgeTypes: string[] = []
   for (let i = 0; i < edges.length; i++) {
     const e = edges[i]
@@ -581,7 +581,7 @@ export const batchMoveNodes: ToolHandler = async (args, { store }) => {
 
   // Pre-validate all moves before opening the transaction. Catalog-strict:
   // resolve each new containment edge up front and reject the whole batch on a
-  // non-canonical pair — no `_contains_` fabrication.
+  // non-canonical pair; no `_contains_` fabrication.
   const resolvedMoveEdgeTypes: string[] = []
   for (let i = 0; i < moves.length; i++) {
     const m = moves[i]

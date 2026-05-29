@@ -47,7 +47,7 @@ const adapter = new CraftioAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('CraftioAdapter — entity_type → UPG type mapping', () => {
+describe('CraftioAdapter: entity_type → UPG type mapping', () => {
   it('objective maps to objective with confidence high', async () => {
     const items: SourceItem[] = [makeItem('obj1', 'Grow retention', 'objective')]
     const result = await adapter.convert(items)
@@ -150,7 +150,7 @@ describe('CraftioAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('CraftioAdapter — status normalisation', () => {
+describe('CraftioAdapter: status normalisation', () => {
   it("status 'draft' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Draft feature', 'feature', { status: 'draft' })]
     const result = await adapter.convert(items)
@@ -184,7 +184,7 @@ describe('CraftioAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('CraftioAdapter — edge emission', () => {
+describe('CraftioAdapter: edge emission', () => {
   it('objective_achieved_through_key_result emitted when key_result has objective parent', async () => {
     const items: SourceItem[] = [
       makeItem('obj1', 'Grow retention', 'objective'),
@@ -287,7 +287,7 @@ describe('CraftioAdapter — edge emission', () => {
 
 // ─── Source map and identity ──────────────────────────────────────────────────
 
-describe('CraftioAdapter — source_map and identity', () => {
+describe('CraftioAdapter: source_map and identity', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('obj1', 'Objective', 'objective'),

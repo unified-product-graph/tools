@@ -47,7 +47,7 @@ const adapter = new PostHogAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('PostHogAdapter — entity_type → UPG type mapping', () => {
+describe('PostHogAdapter: entity_type → UPG type mapping', () => {
   it('feature_flag maps to feature with confidence high', async () => {
     const items: SourceItem[] = [makeItem('ff1', 'new-onboarding', 'feature_flag')]
     const result = await adapter.convert(items)
@@ -119,7 +119,7 @@ describe('PostHogAdapter — entity_type → UPG type mapping', () => {
 
 // ─── SPECIAL: hypothesis field ────────────────────────────────────────────────
 
-describe('PostHogAdapter — hypothesis field on experiments', () => {
+describe('PostHogAdapter: hypothesis field on experiments', () => {
   it('experiment with hypothesis creates an extra hypothesis_claim node', async () => {
     const items: SourceItem[] = [
       makeItem('exp1', 'Wizard vs Checklist', 'experiment', {
@@ -184,7 +184,7 @@ describe('PostHogAdapter — hypothesis field on experiments', () => {
 
 // ─── Skip + warning cases ─────────────────────────────────────────────────────
 
-describe('PostHogAdapter — skipped types + warnings', () => {
+describe('PostHogAdapter: skipped types + warnings', () => {
   it('event entities are skipped with aggregate warning', async () => {
     const items: SourceItem[] = [
       makeItem('e1', 'button_click', 'event'),
@@ -232,7 +232,7 @@ describe('PostHogAdapter — skipped types + warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('PostHogAdapter — status normalisation', () => {
+describe('PostHogAdapter: status normalisation', () => {
   it("status 'running' normalises to 'active'", async () => {
     const items: SourceItem[] = [makeItem('exp1', 'Test', 'experiment', { status: 'running' })]
     const result = await adapter.convert(items)
@@ -260,7 +260,7 @@ describe('PostHogAdapter — status normalisation', () => {
 
 // ─── Metric value fields ──────────────────────────────────────────────────────
 
-describe('PostHogAdapter — metric value fields', () => {
+describe('PostHogAdapter: metric value fields', () => {
   it('insight with metric value fields preserved on node', async () => {
     const items: SourceItem[] = [
       makeItem('ins1', 'WAU', 'insight', {
@@ -279,7 +279,7 @@ describe('PostHogAdapter — metric value fields', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('PostHogAdapter — edge emission', () => {
+describe('PostHogAdapter: edge emission', () => {
   it('outcome_tracked_by_metric emitted when metric has outcome parent', async () => {
     const items: SourceItem[] = [
       makeItem('out1', 'Improve Activation', 'outcome'),
@@ -323,7 +323,7 @@ describe('PostHogAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('PostHogAdapter — source_map', () => {
+describe('PostHogAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('ff1', 'Flag', 'feature_flag'),
@@ -343,7 +343,7 @@ describe('PostHogAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('PostHogAdapter — external_tool and external_id', () => {
+describe('PostHogAdapter: external_tool and external_id', () => {
   it('external_tool is always posthog', async () => {
     const items: SourceItem[] = [makeItem('ff1', 'Flag', 'feature_flag')]
     const result = await adapter.convert(items)

@@ -46,7 +46,7 @@ const adapter = new VistalyAdapter()
 
 // ─── Card type mapping ────────────────────────────────────────────────────────
 
-describe('VistalyAdapter — card_type → entity type mapping', () => {
+describe('VistalyAdapter: card_type → entity type mapping', () => {
   it('vision card maps to vision with confidence high', async () => {
     const items: SourceItem[] = [makeCard('v1', 'Our Vision', 'vision')]
     const result = await adapter.convert(items)
@@ -169,7 +169,7 @@ describe('VistalyAdapter — card_type → entity type mapping', () => {
 
 // ─── Sprint card skipped ──────────────────────────────────────────────────────
 
-describe('VistalyAdapter — sprint card skipped with warning', () => {
+describe('VistalyAdapter: sprint card skipped with warning', () => {
   it('sprint card is skipped and a warning is emitted', async () => {
     const items: SourceItem[] = [
       makeCard('sp1', 'Sprint 12', 'sprint'),
@@ -188,7 +188,7 @@ describe('VistalyAdapter — sprint card skipped with warning', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('VistalyAdapter — status normalisation', () => {
+describe('VistalyAdapter: status normalisation', () => {
   it("status 'released' normalises to 'complete'", async () => {
     const items: SourceItem[] = [makeCard('o1', 'Shipped outcome', 'outcome', { status: 'released' })]
     const result = await adapter.convert(items)
@@ -228,7 +228,7 @@ describe('VistalyAdapter — status normalisation', () => {
 
 // ─── Hierarchy edge emission ──────────────────────────────────────────────────
 
-describe('VistalyAdapter — edge emission', () => {
+describe('VistalyAdapter: edge emission', () => {
   it('opportunity_pursues_outcome emitted when opportunity has outcome parent', async () => {
     const items: SourceItem[] = [
       makeCard('out1', 'Increase activation', 'outcome'),
@@ -356,7 +356,7 @@ describe('VistalyAdapter — edge emission', () => {
 
 // ─── Tags + labels ────────────────────────────────────────────────────────────
 
-describe('VistalyAdapter — tags and labels', () => {
+describe('VistalyAdapter: tags and labels', () => {
   it('tags and labels are merged into node tags', async () => {
     const items: SourceItem[] = [
       makeCard('op1', 'Opportunity with labels', 'opportunity', {
@@ -371,7 +371,7 @@ describe('VistalyAdapter — tags and labels', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('VistalyAdapter — source_map', () => {
+describe('VistalyAdapter: source_map', () => {
   it('source_map contains an entry for each converted card', async () => {
     const items: SourceItem[] = [
       makeCard('v1', 'Vision', 'vision'),
@@ -393,7 +393,7 @@ describe('VistalyAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('VistalyAdapter — external_tool and external_id', () => {
+describe('VistalyAdapter: external_tool and external_id', () => {
   it('external_tool is always vistaly', async () => {
     const items: SourceItem[] = [makeCard('v1', 'Vision', 'vision')]
     const result = await adapter.convert(items)

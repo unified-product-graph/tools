@@ -66,7 +66,7 @@ function makeContext(pool: Pool) {
 
 // ── Validation guards ─────────────────────────────────────────────────────────
 
-describe('deduplicate_nodes — input validation', () => {
+describe('deduplicate_nodes: input validation', () => {
   it('returns error when product_id is missing', async () => {
     const { pool } = makePool()
     const result = await deduplicateNodes({ canonical_id: 'n1', duplicate_ids: ['n2'] }, makeContext(pool))
@@ -110,7 +110,7 @@ describe('deduplicate_nodes — input validation', () => {
 
 // ── Ownership validation ──────────────────────────────────────────────────────
 
-describe('deduplicate_nodes — ownership validation', () => {
+describe('deduplicate_nodes: ownership validation', () => {
   it('returns error when canonical node does not exist', async () => {
     const { pool } = makePool({
       // getNode for any id returns empty
@@ -164,7 +164,7 @@ describe('deduplicate_nodes — ownership validation', () => {
 
 // ── Dry-run preview ───────────────────────────────────────────────────────────
 
-describe('deduplicate_nodes — dry_run: true (default)', () => {
+describe('deduplicate_nodes: dry_run: true (default)', () => {
   it('returns preview without touching data', async () => {
     let getNodeCallCount = 0
     const pool = {
@@ -217,7 +217,7 @@ describe('deduplicate_nodes — dry_run: true (default)', () => {
       connect: vi.fn(),
     } as unknown as Pool
 
-    // No dry_run param — should default to true
+    // No dry_run param; should default to true
     const result = await deduplicateNodes(
       { product_id: 'p1', canonical_id: 'n1', duplicate_ids: ['n2'] },
       makeContext(pool),
@@ -230,7 +230,7 @@ describe('deduplicate_nodes — dry_run: true (default)', () => {
 
 // ── Full merge (dry_run: false) ───────────────────────────────────────────────
 
-describe('deduplicate_nodes — dry_run: false', () => {
+describe('deduplicate_nodes: dry_run: false', () => {
   /**
    * Build a mock pool where ownership checks pass, then delegate the
    * transaction to a separately-controlled client.
@@ -372,7 +372,7 @@ describe('deduplicate_nodes — dry_run: false', () => {
 
 // ── pg-store.deduplicateNodes SQL contract ────────────────────────────────────
 
-describe('UPGPgStore.deduplicateNodes — SQL shape', () => {
+describe('UPGPgStore.deduplicateNodes: SQL shape', () => {
   it('issues rebind UPDATEs with correct parameters for each duplicate', async () => {
     const capturedQueries: Array<{ sql: string; values: unknown[] }> = []
 
@@ -397,7 +397,7 @@ describe('UPGPgStore.deduplicateNodes — SQL shape', () => {
     expect(sourceUpdates).toHaveLength(2) // one per duplicate
     expect(targetUpdates).toHaveLength(2)
 
-    // Verify parameter binding — canonical is $1, duplicate is $2, product is $3
+    // Verify parameter binding: canonical is $1, duplicate is $2, product is $3
     for (const q of sourceUpdates) {
       expect(q.values[0]).toBe('n1')   // canonical_id
       expect(q.values[2]).toBe('p1')   // product_id
@@ -451,7 +451,7 @@ describe('UPGPgStore.deduplicateNodes — SQL shape', () => {
     expect(dedupEdgeDelete!.values[0]).toBe('p1')
   })
 
-  it('issues property merge UPDATE with jsonb_object_agg — canonical wins', async () => {
+  it('issues property merge UPDATE with jsonb_object_agg (canonical wins)', async () => {
     const capturedQueries: Array<{ sql: string; values: unknown[] }> = []
 
     const client = {

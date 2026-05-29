@@ -5,7 +5,7 @@
  * prototype_tests_hypothesis warning), insight warning, skip cases, and the
  * full catalog check.
  *
- * IMPORTANT: insight_informs_opportunity is NEVER auto-emitted — always a warning.
+ * IMPORTANT: insight_informs_opportunity is NEVER auto-emitted; always a warning.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -47,7 +47,7 @@ const adapter = new MazeAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('MazeAdapter — entity type mapping', () => {
+describe('MazeAdapter: entity type mapping', () => {
   it('maze maps to research_study with high confidence', async () => {
     const items: SourceItem[] = [makeItem('m1', 'Onboarding usability test', 'maze')]
     const result = await adapter.convert(items)
@@ -110,7 +110,7 @@ describe('MazeAdapter — entity type mapping', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('MazeAdapter — skip cases', () => {
+describe('MazeAdapter: skip cases', () => {
   it('clip is skipped with warning', async () => {
     const items: SourceItem[] = [
       makeItem('cl1', 'Session recording', 'clip'),
@@ -132,7 +132,7 @@ describe('MazeAdapter — skip cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('MazeAdapter — status normalisation', () => {
+describe('MazeAdapter: status normalisation', () => {
   it("status 'draft' → 'draft'", async () => {
     const items: SourceItem[] = [makeItem('m1', 'Planned test', 'maze', { status: 'draft' })]
     const result = await adapter.convert(items)
@@ -160,7 +160,7 @@ describe('MazeAdapter — status normalisation', () => {
 
 // ─── Insight warning (NEVER auto-emits insight_informs_opportunity) ───────────
 
-describe('MazeAdapter — insight_informs_opportunity is never auto-emitted', () => {
+describe('MazeAdapter: insight_informs_opportunity is never auto-emitted', () => {
   it('insight node emits PM-judgment warning, not insight_informs_opportunity edge', async () => {
     const items: SourceItem[] = [makeItem('i1', 'Users drop off at step 3', 'insight')]
     const result = await adapter.convert(items)
@@ -176,7 +176,7 @@ describe('MazeAdapter — insight_informs_opportunity is never auto-emitted', ()
 
 // ─── prototype_tests_hypothesis warning ──────────────────────────────────────
 
-describe('MazeAdapter — prototype_tests_hypothesis requires PM judgment', () => {
+describe('MazeAdapter: prototype_tests_hypothesis requires PM judgment', () => {
   it('prototype with prototype_url emits warning to create the link manually', async () => {
     const items: SourceItem[] = [
       makeItem('p1', 'Checkout prototype v2', 'prototype', {
@@ -192,7 +192,7 @@ describe('MazeAdapter — prototype_tests_hypothesis requires PM judgment', () =
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('MazeAdapter — edge emission', () => {
+describe('MazeAdapter: edge emission', () => {
   it('research_study_enrolls_participant emitted when tester has maze parent', async () => {
     const items: SourceItem[] = [
       makeItem('m1', 'Test study', 'maze'),
@@ -245,7 +245,7 @@ describe('MazeAdapter — edge emission', () => {
 
 // ─── Source map and external fields ──────────────────────────────────────────
 
-describe('MazeAdapter — source_map, external_tool, external_id', () => {
+describe('MazeAdapter: source_map, external_tool, external_id', () => {
   it('source_map has entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeItem('m1', 'Study', 'maze'),

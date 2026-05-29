@@ -46,7 +46,7 @@ const adapter = new ZendeskAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('ZendeskAdapter — entity_type → UPG entity type mapping', () => {
+describe('ZendeskAdapter: entity_type → UPG entity type mapping', () => {
   it('ticket maps to support_ticket with confidence high', async () => {
     const items: SourceItem[] = [makeItem('t1', 'Cannot login', 'ticket')]
     const result = await adapter.convert(items)
@@ -114,7 +114,7 @@ describe('ZendeskAdapter — entity_type → UPG entity type mapping', () => {
 
 // ─── Skipped entities ─────────────────────────────────────────────────────────
 
-describe('ZendeskAdapter — skipped entity types', () => {
+describe('ZendeskAdapter: skipped entity types', () => {
   it('section is skipped with no node emitted', async () => {
     const items: SourceItem[] = [
       makeItem('sec1', 'Getting Started', 'section'),
@@ -147,7 +147,7 @@ describe('ZendeskAdapter — skipped entity types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('ZendeskAdapter — status normalisation', () => {
+describe('ZendeskAdapter: status normalisation', () => {
   it("status 'new' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'New ticket', 'ticket', { status: 'new' })]
     const result = await adapter.convert(items)
@@ -187,7 +187,7 @@ describe('ZendeskAdapter — status normalisation', () => {
 
 // ─── Satisfaction score preservation ─────────────────────────────────────────
 
-describe('ZendeskAdapter — satisfaction_score preservation', () => {
+describe('ZendeskAdapter: satisfaction_score preservation', () => {
   it('satisfaction_score good is preserved on customer_feedback node', async () => {
     const items: SourceItem[] = [
       makeItem('csat1', 'CSAT rating', 'satisfaction_rating', {
@@ -213,7 +213,7 @@ describe('ZendeskAdapter — satisfaction_score preservation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('ZendeskAdapter — edge emission', () => {
+describe('ZendeskAdapter: edge emission', () => {
   it('node_owned_by_team emitted when entity has group parent', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Enterprise Support', 'group'),
@@ -278,7 +278,7 @@ describe('ZendeskAdapter — edge emission', () => {
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-describe('ZendeskAdapter — tags', () => {
+describe('ZendeskAdapter: tags', () => {
   it('tags from metadata are preserved on the node', async () => {
     const items: SourceItem[] = [
       makeItem('t1', 'Tagged ticket', 'ticket', {
@@ -292,7 +292,7 @@ describe('ZendeskAdapter — tags', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('ZendeskAdapter — source_map', () => {
+describe('ZendeskAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('t1', 'Ticket', 'ticket'),
@@ -312,7 +312,7 @@ describe('ZendeskAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('ZendeskAdapter — external_tool and external_id', () => {
+describe('ZendeskAdapter: external_tool and external_id', () => {
   it('external_tool is always zendesk', async () => {
     const items: SourceItem[] = [makeItem('t1', 'Ticket', 'ticket')]
     const result = await adapter.convert(items)

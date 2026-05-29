@@ -47,8 +47,8 @@ const adapter = new PendoAdapter()
 
 // ─── Type mapping ─────────────────────────────────────────────────────────────
 
-describe('PendoAdapter — entity type → UPG type mapping', () => {
-  it('feature maps to feature with confidence high — the unique direct match', async () => {
+describe('PendoAdapter: entity type → UPG type mapping', () => {
+  it('feature maps to feature with confidence high: the unique direct match', async () => {
     const items: SourceItem[] = [makeEntity('f1', 'CSV Export Button', 'feature')]
     const result = await adapter.convert(items)
     expect(result.nodes).toHaveLength(1)
@@ -100,9 +100,9 @@ describe('PendoAdapter — entity type → UPG type mapping', () => {
   })
 })
 
-// ─── Feature adoption data — unique to Pendo ─────────────────────────────────
+// ─── Feature adoption data: unique to Pendo ──────────────────────────────────
 
-describe('PendoAdapter — feature adoption data', () => {
+describe('PendoAdapter: feature adoption data', () => {
   it('adoption_rate is preserved on feature nodes', async () => {
     const items: SourceItem[] = [
       makeEntity('f1', 'CSV Export Button', 'feature', { adoption_rate: 23.5 }),
@@ -152,7 +152,7 @@ describe('PendoAdapter — feature adoption data', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('PendoAdapter — skipped types with warnings', () => {
+describe('PendoAdapter: skipped types with warnings', () => {
   it('guide is skipped with a warning', async () => {
     const items: SourceItem[] = [
       makeEntity('g1', 'Onboarding tour', 'guide'),
@@ -190,7 +190,7 @@ describe('PendoAdapter — skipped types with warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('PendoAdapter — status normalisation', () => {
+describe('PendoAdapter: status normalisation', () => {
   it("status 'active' normalises to 'active'", async () => {
     const items: SourceItem[] = [makeEntity('f1', 'Feature', 'feature', { status: 'active' })]
     const result = await adapter.convert(items)
@@ -216,7 +216,7 @@ describe('PendoAdapter — status normalisation', () => {
 
 // ─── avg_time_on_page tag ─────────────────────────────────────────────────────
 
-describe('PendoAdapter — avg_time_on_page tag on screen nodes', () => {
+describe('PendoAdapter: avg_time_on_page tag on screen nodes', () => {
   it('avg_time_on_page is preserved as a tag on screen nodes', async () => {
     const items: SourceItem[] = [
       makeEntity('p1', 'Dashboard', 'page', { avg_time_on_page: 45 }),
@@ -229,7 +229,7 @@ describe('PendoAdapter — avg_time_on_page tag on screen nodes', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('PendoAdapter — edge emission', () => {
+describe('PendoAdapter: edge emission', () => {
   it('product_contains_screen emitted when page has portfolio parent', async () => {
     const items: SourceItem[] = [
       makeEntity('port1', 'My App', 'portfolio'),
@@ -316,7 +316,7 @@ describe('PendoAdapter — edge emission', () => {
     expect(edge?.mapping_confidence).toBe('low')
   })
 
-  it('assertAllEdgesCatalogued — full fixture test', async () => {
+  it('assertAllEdgesCatalogued: full fixture test', async () => {
     const items: SourceItem[] = [
       makeEntity('app1', 'Analytics App', 'app'),
       makeEntity('p1', 'Dashboard', 'page', { parent_id: 'app1', parent_type: 'app' }),
@@ -338,7 +338,7 @@ describe('PendoAdapter — edge emission', () => {
 
 // ─── Source map and external fields ───────────────────────────────────────────
 
-describe('PendoAdapter — source_map and external fields', () => {
+describe('PendoAdapter: source_map and external fields', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeEntity('app1', 'My App', 'app'),

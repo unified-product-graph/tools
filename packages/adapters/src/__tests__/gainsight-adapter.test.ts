@@ -46,7 +46,7 @@ const adapter = new GainsightAdapter()
 
 // ─── Type mapping ─────────────────────────────────────────────────────────────
 
-describe('GainsightAdapter — entity type → UPG type mapping', () => {
+describe('GainsightAdapter: entity type → UPG type mapping', () => {
   it('account maps to account with confidence high', async () => {
     const items: SourceItem[] = [makeEntity('a1', 'Acme Corp', 'account')]
     const result = await adapter.convert(items)
@@ -73,21 +73,21 @@ describe('GainsightAdapter — entity type → UPG type mapping', () => {
   })
 
   it('success_plan maps to initiative with confidence medium', async () => {
-    const items: SourceItem[] = [makeEntity('sp1', 'Q2 Success Plan — Acme', 'success_plan')]
+    const items: SourceItem[] = [makeEntity('sp1', 'Q2 Success Plan, Acme', 'success_plan')]
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('initiative')
     expect(result.nodes[0].mapping_confidence).toBe('medium')
   })
 
   it('cta maps to task with confidence medium', async () => {
-    const items: SourceItem[] = [makeEntity('cta1', 'Check in — health drop', 'cta')]
+    const items: SourceItem[] = [makeEntity('cta1', 'Check in: health drop', 'cta')]
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('task')
     expect(result.nodes[0].mapping_confidence).toBe('medium')
   })
 
   it('timeline_activity maps to observation with confidence medium', async () => {
-    const items: SourceItem[] = [makeEntity('ta1', 'QBR call — Q1 review', 'timeline_activity')]
+    const items: SourceItem[] = [makeEntity('ta1', 'QBR call, Q1 review', 'timeline_activity')]
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('observation')
   })
@@ -116,7 +116,7 @@ describe('GainsightAdapter — entity type → UPG type mapping', () => {
 
 // ─── Health score metric preservation ────────────────────────────────────────
 
-describe('GainsightAdapter — health score metric fields', () => {
+describe('GainsightAdapter: health score metric fields', () => {
   it('health_score maps to metric with confidence high', async () => {
     const items: SourceItem[] = [
       makeEntity('hs1', 'Acme Health Score', 'health_score', { health_score: 72 }),
@@ -146,7 +146,7 @@ describe('GainsightAdapter — health score metric fields', () => {
     expect(node.current_value).toBe(0)
   })
 
-  it('health_score without health_score value — no metric fields emitted', async () => {
+  it('health_score without health_score value: no metric fields emitted', async () => {
     const items: SourceItem[] = [makeEntity('hs1', 'Health Score', 'health_score')]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
@@ -157,7 +157,7 @@ describe('GainsightAdapter — health score metric fields', () => {
 
 // ─── NPS score tag preservation ───────────────────────────────────────────────
 
-describe('GainsightAdapter — NPS score as tag', () => {
+describe('GainsightAdapter: NPS score as tag', () => {
   it('nps_score is preserved as a tag on customer_feedback nodes', async () => {
     const items: SourceItem[] = [
       makeEntity('nps1', 'NPS response', 'nps_response', { nps_score: 9 }),
@@ -170,7 +170,7 @@ describe('GainsightAdapter — NPS score as tag', () => {
 
 // ─── Skip cases ───────────────────────────────────────────────────────────────
 
-describe('GainsightAdapter — skipped types with warnings', () => {
+describe('GainsightAdapter: skipped types with warnings', () => {
   it('risk is skipped with a warning', async () => {
     const items: SourceItem[] = [
       makeEntity('r1', 'Churn risk flag', 'risk'),
@@ -215,7 +215,7 @@ describe('GainsightAdapter — skipped types with warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('GainsightAdapter — status normalisation', () => {
+describe('GainsightAdapter: status normalisation', () => {
   it("status 'new' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeEntity('sp1', 'New plan', 'success_plan', { status: 'new' })]
     const result = await adapter.convert(items)
@@ -263,7 +263,7 @@ describe('GainsightAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('GainsightAdapter — edge emission', () => {
+describe('GainsightAdapter: edge emission', () => {
   it('objective_achieved_through_key_result emitted when success_plan has objective parent', async () => {
     const items: SourceItem[] = [
       makeEntity('obj1', 'Reduce onboarding time', 'objective'),
@@ -321,7 +321,7 @@ describe('GainsightAdapter — edge emission', () => {
     expect(edge?.mapping_confidence).toBe('low')
   })
 
-  it('assertAllEdgesCatalogued — full fixture test', async () => {
+  it('assertAllEdgesCatalogued: full fixture test', async () => {
     const items: SourceItem[] = [
       makeEntity('a1', 'Acme Corp', 'account'),
       makeEntity('obj1', 'Reduce onboarding time', 'objective'),
@@ -342,7 +342,7 @@ describe('GainsightAdapter — edge emission', () => {
 
 // ─── Source map and external fields ───────────────────────────────────────────
 
-describe('GainsightAdapter — source_map and external fields', () => {
+describe('GainsightAdapter: source_map and external fields', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeEntity('a1', 'Acme Corp', 'account'),

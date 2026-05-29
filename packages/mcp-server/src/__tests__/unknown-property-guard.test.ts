@@ -64,9 +64,9 @@ async function parseResult(result: ReturnType<typeof createNode> | ReturnType<ty
   return JSON.parse(r.content[0].text)
 }
 
-// ── create_node — warn mode ───────────────────────────────────────────────────
+// ── create_node: warn mode ────────────────────────────────────────────────────
 
-describe('create_node — unknown-property guard', () => {
+describe('create_node: unknown-property guard', () => {
   let store: UPGFileStore
   let ctx: ToolContext
 
@@ -80,7 +80,7 @@ describe('create_node — unknown-property guard', () => {
       createNode(
         {
           type: 'persona',
-          title: 'Sarah — PM',
+          title: 'Sarah, PM',
           properties: { context: 'B2B SaaS startup', motivation: 'Ship fast' },
         },
         ctx,
@@ -96,7 +96,7 @@ describe('create_node — unknown-property guard', () => {
       createNode(
         {
           type: 'persona',
-          title: 'Marcus — Designer',
+          title: 'Marcus, Designer',
           properties: { context: 'Freelance', goals: ['Ship beautiful UI'], frustrations: ['Slow tools'] },
         },
         ctx,
@@ -114,7 +114,7 @@ describe('create_node — unknown-property guard', () => {
       createNode(
         {
           type: 'persona',
-          title: 'Priya — Founder',
+          title: 'Priya, Founder',
           properties: { goals: ['Build fast'] },
           strict: true,
         },
@@ -126,7 +126,7 @@ describe('create_node — unknown-property guard', () => {
     expect(result.error).toMatch(/goals/)
     // Node must NOT have been created
     const nodes = store.getAllNodes()
-    expect(nodes.find((n) => n.title === 'Priya — Founder')).toBeUndefined()
+    expect(nodes.find((n) => n.title === 'Priya, Founder')).toBeUndefined()
   })
 
   it('strict mode: creates a persona with canonical properties (no rejection)', async () => {
@@ -134,7 +134,7 @@ describe('create_node — unknown-property guard', () => {
       createNode(
         {
           type: 'persona',
-          title: 'Felix — Solo Founder',
+          title: 'Felix, Solo Founder',
           properties: { context: 'Pre-seed', is_primary: true },
           strict: true,
         },
@@ -147,9 +147,9 @@ describe('create_node — unknown-property guard', () => {
   })
 })
 
-// ── update_node — warn mode ───────────────────────────────────────────────────
+// ── update_node: warn mode ────────────────────────────────────────────────────
 
-describe('update_node — unknown-property guard', () => {
+describe('update_node: unknown-property guard', () => {
   let store: UPGFileStore
   let ctx: ToolContext
   let personaId: string

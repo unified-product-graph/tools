@@ -32,7 +32,7 @@ function readNames(path: string): string[] {
 
 /**
  * Cloud tools that are intentionally absent from local. Each entry is a
- * category error if reproduced on local — multi-tenant primitives, RBAC,
+ * category error if reproduced on local: multi-tenant primitives, RBAC,
  * webhooks, and Postgres-side analytics belong on the server.
  */
 const LOCAL_NA = new Set([
@@ -56,7 +56,7 @@ const LOCAL_NA = new Set([
 ])
 
 /**
- * Local tools that are intentionally absent from cloud — split into
+ * Local tools that are intentionally absent from cloud, split into
  * "N/A" (category-mismatched) vs "deferred" (could be added later). The
  * test treats them the same way: they're allowed to be local-only.
  */
@@ -70,7 +70,7 @@ const CLOUD_NA = new Set([
   // process-local session state (the cloud server is stateless per request)
   'get_session_context',
   'update_session_context',
-  // sync — the cloud IS the destination, so it doesn't push/pull to itself
+  // sync: the cloud IS the destination, so it doesn't push/pull to itself
   'apply_pull_changeset',
   'get_sync_state',
   'push_to_cloud',
@@ -85,7 +85,7 @@ const CLOUD_NA = new Set([
   'migrate_status',
 ])
 
-describe('MCP parity audit — @unified-product-graph/cloud-server ↔ @unified-product-graph/mcp-server', () => {
+describe('MCP parity audit: @unified-product-graph/cloud-server vs @unified-product-graph/mcp-server', () => {
   it('both tool manifests exist on disk (run npm run build first)', () => {
     expect(existsSync(CLOUD_MANIFEST), `missing ${CLOUD_MANIFEST}`).toBe(true)
     expect(existsSync(LOCAL_MANIFEST), `missing ${LOCAL_MANIFEST}`).toBe(true)
@@ -126,7 +126,7 @@ describe('MCP parity audit — @unified-product-graph/cloud-server ↔ @unified-
   })
 
   it('every entry in LOCAL_NA / CLOUD_NA is registered on its own server', () => {
-    // Otherwise the set entry is meaningless — it's not an "asymmetry" if
+    // Otherwise the set entry is meaningless; it's not an "asymmetry" if
     // the tool doesn't exist anywhere.
     const cloud = new Set(readNames(CLOUD_MANIFEST))
     const local = new Set(readNames(LOCAL_MANIFEST))

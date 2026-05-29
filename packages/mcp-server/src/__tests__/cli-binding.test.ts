@@ -1,5 +1,5 @@
 /**
- * CLI playbook binding tests (— was workflow binding) — validates the
+ * CLI playbook binding tests (was workflow binding): validates the
  * structure/experience split end to end: `@unified-product-graph/core` types
  * compose with the CLI binding stub without any coupling between structure
  * and surface.

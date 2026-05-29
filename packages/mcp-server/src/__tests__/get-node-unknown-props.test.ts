@@ -2,7 +2,7 @@
  * Tests for `get_node` unknown-property warnings (F5).
  *
  * added unknown-property warnings on write paths (create_node,
- * update_node, file load). `get_node` did not surface them — a node loaded
+ * update_node, file load). `get_node` did not surface them; a node loaded
  * from a legacy .upg file with deprecated inline properties (e.g. persona
  * `goals` / `frustrations`) would return silently clean.
  *
@@ -61,7 +61,7 @@ function makeCtx(store: UPGFileStore): ToolContext {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('get_node — F5: unknown-property warnings on read', () => {
+describe('get_node: F5: unknown-property warnings on read', () => {
  let store: UPGFileStore
  let ctx: ToolContext
 
@@ -70,7 +70,7 @@ describe('get_node — F5: unknown-property warnings on read', () => {
  {
  id: 'rt_persona_legacy',
  type: 'persona' as UPGEntityType,
- title: 'Lior — Legacy Persona',
+ title: 'Lior, Legacy Persona',
  properties: {
  goals: ['Ship product without losing the plot', 'Stay close to the work'],
  frustrations: ['Tools that hide structure', 'Disposable AI output'],
@@ -79,7 +79,7 @@ describe('get_node — F5: unknown-property warnings on read', () => {
  {
  id: 'rt_persona_chain',
  type: 'persona' as UPGEntityType,
- title: 'Mira — Chain Persona',
+ title: 'Mira, Chain Persona',
  description:
  'Persona authored with the canonical v0.2.7+ chain model. No inline goals/frustrations.',
  } as UPGBaseNode,

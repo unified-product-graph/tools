@@ -1,7 +1,7 @@
 /**
  * Helm's one-and-only UPGClient.
  *
- * Constructing a UPGClient is cheap — it doesn't read the file until you
+ * Constructing a UPGClient is cheap; it doesn't read the file until you
  * call something on it. So we can export a singleton and share it across
  * every command without worrying about init order or load races.
  *

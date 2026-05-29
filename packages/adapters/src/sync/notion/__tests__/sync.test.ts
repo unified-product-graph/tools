@@ -1,5 +1,5 @@
 /**
- * sync.test.ts — Bidirectional sync coordinator tests
+ * sync.test.ts: Bidirectional sync coordinator tests
  *
  * Verifies that sync() correctly orchestrates push/pull and maintains
  * cursor state across invocations.
@@ -67,7 +67,7 @@ vi.mock('../client.js', () => {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('sync — cursor persistence', () => {
+describe('sync: cursor persistence', () => {
   it('returns a cursor even on the first run', async () => {
     const storage = new MemoryCursorStorage()
     const options: SyncOptions = {
@@ -198,6 +198,6 @@ describe('emptyCursor', () => {
   it('returns a cursor with a valid last_sync_at', () => {
     const cursor = emptyCursor()
     const date = new Date(cursor.last_sync_at)
-    expect(date.getFullYear()).toBe(1970) // epoch — never synced
+    expect(date.getFullYear()).toBe(1970) // epoch: never synced
   })
 })

@@ -1,6 +1,6 @@
 /**
  * Real-Postgres round-trips for the write/trigger paths the mocked unit suite
- * can't see. Each assertion would have failed before its corresponding fix —
+ * can't see. Each assertion would have failed before its corresponding fix;
  * these are the regression guards for the scaffold-vs-wired class.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'

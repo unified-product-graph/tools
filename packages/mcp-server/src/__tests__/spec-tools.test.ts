@@ -1,5 +1,5 @@
 /**
- * Spec-introspection tools — (round 1) + (round 2) +
+ * Spec-introspection tools: (round 1) + (round 2) +
  * (round 3) + (approach verbs) + (round 5).
  *
  * Verifies that the spec tools faithfully surface the canonical
@@ -9,7 +9,7 @@
  * anti-patterns, benchmarks, product stages) and behave correctly on
  * filter / lookup / pagination edge cases.: also exercises the
  * five bare-verb approach handlers (plan / inspect / prioritise / trace /
- * reflect) — definition lookups at v0.3.0 returning the family-resemblance
+ * reflect): definition lookups at v0.3.0 returning the family-resemblance
  * envelope.
  */
 import { describe, it, expect } from 'vitest'
@@ -113,7 +113,7 @@ function call(
  handler: (args: Record<string, unknown>, ctx: ToolContext) => ToolResult | Promise<ToolResult>,
  args: Record<string, unknown> = {},
 ): { ok: boolean; body: unknown; raw: ToolResult } {
- // Most spec tools ignore ctx entirely — they read from the spec catalog.
+ // Most spec tools ignore ctx entirely; they read from the spec catalog.
  // Sync approach verbs (plan/prioritise/trace/reflect) need a store for
  // counts/walks; the dedicated approach-execution test file exercises async
  // inspect + rich execution behavior with real fixtures. Spec-tools tests
@@ -142,7 +142,7 @@ function makeEmptyCtx(): ToolContext {
  }
  writeFileSync(filePath, JSON.stringify(doc, null, 2))
  const store = new UPGFileStore()
- // Load synchronously is unsupported — return a synchronous shim via init.
+ // Load synchronously is unsupported; return a synchronous shim via init.
  // For tests, the dedicated approach-execution test file uses async setup.
  ;(store as unknown as { doc: UPGDocument; nodeMap: Map<string, unknown>; edgeMap: Map<string, unknown>; edgesByNode: Map<string, Set<string>>; contentHash: string }).doc = doc
  ;(store as unknown as { nodeMap: Map<string, unknown> }).nodeMap = new Map()
@@ -183,7 +183,7 @@ describe('list_playbooks / get_playbook', () => {
  expect(b.playbooks).toHaveLength(7)
  })
 
- it('list_playbooks filters by canonical_only (W1 invariant — exactly 10)', () => {
+ it('list_playbooks filters by canonical_only (W1 invariant: exactly 10)', () => {
  const { body } = call(listPlaybooks, { canonical_only: true })
  const b = body as { count: number; playbooks: Array<{ is_canonical?: boolean }> }
  expect(b.count).toBe(UPG_REGIONS.length)
@@ -291,11 +291,11 @@ describe('list_approaches / get_approach', () => {
  })
 })
 
-// ── Approach verbs — envelope shape only ─────────────────────────────
+// ── Approach verbs: envelope shape only ──────────────────────────────
 // Rich execution behavior (real scores, real violations, real trails) is
 // covered in `approach-execution.test.ts` which uses real graph fixtures.
 
-describe('plan / inspect / prioritise / trace / reflect — envelope shape', () => {
+describe('plan / inspect / prioritise / trace / reflect: envelope shape', () => {
  it('plan returns the family-resemblance envelope with the Plan approach', () => {
  const { ok, body } = call(plan, { region: 'users_needs' })
  expect(ok).toBe(true)
@@ -688,9 +688,9 @@ describe('resolve_edge_for_pair', () => {
  })
  const b = body as { edge_type: string | null }
  // The resolver may return any edge that matches the pair (containment or
- // semantic) — assert it's a valid catalog key for this pair via the helper.
+ // semantic); assert it's a valid catalog key for this pair via the helper.
  expect(b.edge_type).toBe(resolveContainmentEdge(def.source_type, def.target_type))
- // Sanity — at minimum, the catalog entry for `type` shares the pair.
+ // Sanity: at minimum, the catalog entry for `type` shares the pair.
  expect(typeof type).toBe('string')
  })
 
@@ -843,9 +843,9 @@ describe('get_valid_children', () => {
  })
 })
 
-// ── Domains — extended ────────────────────────────────────────────
+// ── Domains: extended ─────────────────────────────────────────────
 
-describe('list_domains — with_guide_only', () => {
+describe('list_domains: with_guide_only', () => {
  it('with_guide_only: false returns every atomic domain', () => {
  const { ok, body } = call(listDomains, { with_guide_only: false })
  expect(ok).toBe(true)
@@ -955,7 +955,7 @@ describe('list_entity_types / get_entity_meta', () => {
  const { body } = call(listEntityTypes, { limit: 5 })
  const b = body as { types: Array<{ name: string; domain_id: string | null }> }
  for (const t of b.types) {
- // domain_id is either a string or null — never undefined.
+ // domain_id is either a string or null, never undefined.
  expect(t.domain_id === null || typeof t.domain_id === 'string').toBe(true)
  }
  })
@@ -1265,7 +1265,7 @@ describe('list_lifecycles / get_lifecycle', () => {
  it('list_lifecycles lifecycle_only omits free/planned lists', () => {
  // post-fix the handler omits free_types + planned_types
  // entirely (matching the wire-shape `description`). Pre-fix it
- // returned empty arrays — the keys-present-but-empty shape is what
+ // returned empty arrays; the keys-present-but-empty shape is what
  // this test used to assert via `.toHaveLength(0)`. Pinning the new
  // omit shape here so it can't drift back.
  const { body } = call(listLifecycles, { lifecycle_only: true })

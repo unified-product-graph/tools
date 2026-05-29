@@ -1,5 +1,5 @@
 /**
- * — `skill_audit` reports source-vs-deployed status for UPG skills.
+ *: `skill_audit` reports source-vs-deployed status for UPG skills.
  *
  * Surfaces the exact failure mode caught in a 2026-05-23 QA E2E
  * audit: deployed `.claude/skills/<name>/SKILL.md` files diverging silently
@@ -71,7 +71,7 @@ description: "A healthy fixture skill"
 user-invocable: true
 ---
 
-# /ro-healthy — Healthy Fixture
+# /ro-healthy: Healthy Fixture
 
 A skill body.
 `
@@ -84,9 +84,9 @@ audience: advanced
 category: schema
 ---
 
-> ⚠️ **Advanced skill** — for UPG contributors only.
+> ⚠️ **Advanced skill** (for UPG contributors only).
 
-# /ro-mutation — Mutation Fixture
+# /ro-mutation: Mutation Fixture
 
 A skill body.
 `
@@ -97,12 +97,12 @@ description: "STALE copy from an earlier era"
 user-invocable: true
 ---
 
-# /ro-mutation — STALE Fixture
+# /ro-mutation: STALE Fixture
 
 OLD body.
 `
 
-describe(' — skill_audit reports source-vs-deployed status', () => {
+describe(': skill_audit reports source-vs-deployed status', () => {
   let fixtureRoot: string
   let originalCwd: string
 
@@ -145,7 +145,7 @@ describe(' — skill_audit reports source-vs-deployed status', () => {
     expect(s.is_symlink).toBe(true)
     expect(s.in_sync).toBe(true)
     expect(s.deployed_frontmatter).toMatchObject({ name: 'ro-healthy', 'user-invocable': true })
-    expect(s.deployed_first_heading).toBe('# /ro-healthy — Healthy Fixture')
+    expect(s.deployed_first_heading).toBe('# /ro-healthy: Healthy Fixture')
     expect(s.issues).toEqual([])
   })
 
@@ -162,7 +162,7 @@ describe(' — skill_audit reports source-vs-deployed status', () => {
     expect(s.issues).toContain(
       'Deployed SKILL.md differs from canonical source; symlink is stale or broken',
     )
-    // The deployed frontmatter reflects the STALE file, not the canonical one — that's the whole point
+    // The deployed frontmatter reflects the STALE file, not the canonical one; that's the whole point
     expect(s.deployed_frontmatter).toMatchObject({ 'user-invocable': true })
   })
 

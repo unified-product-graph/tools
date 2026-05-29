@@ -47,7 +47,7 @@ const adapter = new LookbackAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('LookbackAdapter — entity_type → UPG type mapping', () => {
+describe('LookbackAdapter: entity_type → UPG type mapping', () => {
   it('project maps to research_study with confidence high', async () => {
     const items: SourceItem[] = [makeItem('p1', 'Checkout Flow Study', 'project')]
     const result = await adapter.convert(items)
@@ -95,7 +95,7 @@ describe('LookbackAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skipped types ────────────────────────────────────────────────────────────
 
-describe('LookbackAdapter — skipped types', () => {
+describe('LookbackAdapter: skipped types', () => {
   it('recording is skipped with warning about binary data', async () => {
     const items: SourceItem[] = [
       makeItem('r1', 'Session Recording', 'recording'),
@@ -147,7 +147,7 @@ describe('LookbackAdapter — skipped types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('LookbackAdapter — status normalisation', () => {
+describe('LookbackAdapter: status normalisation', () => {
   it("status 'draft' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Project', 'project', { status: 'draft' })]
     const result = await adapter.convert(items)
@@ -175,7 +175,7 @@ describe('LookbackAdapter — status normalisation', () => {
 
 // ─── Timestamp preservation ───────────────────────────────────────────────────
 
-describe('LookbackAdapter — timestamp_seconds on moment nodes', () => {
+describe('LookbackAdapter: timestamp_seconds on moment nodes', () => {
   it('timestamp_seconds is preserved on moment (quote) nodes', async () => {
     const items: SourceItem[] = [
       makeItem('m1', 'User said "this is confusing"', 'moment', { timestamp_seconds: 142 }),
@@ -208,7 +208,7 @@ describe('LookbackAdapter — timestamp_seconds on moment nodes', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('LookbackAdapter — edge emission', () => {
+describe('LookbackAdapter: edge emission', () => {
   it('research_study_captures_observation emitted when note has session parent', async () => {
     const items: SourceItem[] = [
       makeItem('s1', 'Session 1', 'session'),
@@ -292,7 +292,7 @@ describe('LookbackAdapter — edge emission', () => {
 
 // ─── Insight warning ──────────────────────────────────────────────────────────
 
-describe('LookbackAdapter — insight → opportunity warning', () => {
+describe('LookbackAdapter: insight → opportunity warning', () => {
   it('emits warning when insight nodes are created', async () => {
     const items: SourceItem[] = [makeItem('i1', 'Checkout confuses users', 'insight')]
     const result = await adapter.convert(items)
@@ -311,7 +311,7 @@ describe('LookbackAdapter — insight → opportunity warning', () => {
 
 // ─── Source map and external fields ──────────────────────────────────────────
 
-describe('LookbackAdapter — source_map and external fields', () => {
+describe('LookbackAdapter: source_map and external fields', () => {
   it('source_map contains entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeItem('p1', 'Project', 'project'),
@@ -343,7 +343,7 @@ describe('LookbackAdapter — source_map and external fields', () => {
 
 // ─── Empty input ──────────────────────────────────────────────────────────────
 
-describe('LookbackAdapter — empty input', () => {
+describe('LookbackAdapter: empty input', () => {
   it('returns empty result with warning when no items provided', async () => {
     const result = await adapter.convert([])
     expect(result.nodes).toHaveLength(0)

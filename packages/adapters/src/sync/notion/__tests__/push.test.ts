@@ -1,5 +1,5 @@
 /**
- * push.test.ts — UPG → Notion push tests
+ * push.test.ts: UPG → Notion push tests
  *
  * Verifies that pushToNotion() makes the correct Notion API calls given a
  * minimal NotionWorkspacePlan, using a mocked NotionSyncClient.
@@ -112,7 +112,7 @@ function makeMockClient(): NotionSyncClient {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('pushToNotion — database creation', () => {
+describe('pushToNotion: database creation', () => {
   it('creates one database per entity type in the plan', async () => {
     const client = makeMockClient()
     const options: PushOptions = { parentPageId: PARENT_PAGE_ID }
@@ -155,7 +155,7 @@ describe('pushToNotion — database creation', () => {
   })
 })
 
-describe('pushToNotion — page creation', () => {
+describe('pushToNotion: page creation', () => {
   it('creates one page per node in the plan', async () => {
     const client = makeMockClient()
     const options: PushOptions = { parentPageId: PARENT_PAGE_ID }
@@ -194,7 +194,7 @@ describe('pushToNotion — page creation', () => {
   })
 })
 
-describe('pushToNotion — relation wiring (Phase 3)', () => {
+describe('pushToNotion: relation wiring (Phase 3)', () => {
   it('calls updatePage to wire relation properties', async () => {
     const client = makeMockClient()
     const options: PushOptions = { parentPageId: PARENT_PAGE_ID }
@@ -228,7 +228,7 @@ describe('pushToNotion — relation wiring (Phase 3)', () => {
   })
 })
 
-describe('pushToNotion — dry run mode', () => {
+describe('pushToNotion: dry run mode', () => {
   it('does not call any write APIs in dry-run mode', async () => {
     const client = makeMockClient()
     const options: PushOptions = { parentPageId: PARENT_PAGE_ID, dryRun: true }
@@ -252,7 +252,7 @@ describe('pushToNotion — dry run mode', () => {
   })
 })
 
-describe('pushToNotion — error handling', () => {
+describe('pushToNotion: error handling', () => {
   it('records errors and continues when a database creation fails', async () => {
     const client = makeMockClient()
     let callCount = 0

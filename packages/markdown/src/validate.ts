@@ -1,6 +1,6 @@
 /**
  * Resolves refs against a graph via an injected lookup function.
- * Decoupled from parsing — the same parse result can run against many graphs.
+ * Decoupled from parsing; the same parse result can run against many graphs.
  */
 
 import type { ReferenceIndex, ValidationOptions, ValidationResult } from './types.js'

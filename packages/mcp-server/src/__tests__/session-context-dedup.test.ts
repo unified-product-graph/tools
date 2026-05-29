@@ -1,5 +1,5 @@
 /**
- * — `get_session_context` exposes `recommendations_to_avoid` as a
+ *: `get_session_context` exposes `recommendations_to_avoid` as a
  * deduped string array of every recommendation given this session.
  *
  * The point: move cross-skill dedup from prose ("pick a recommendation
@@ -63,7 +63,7 @@ function readSession(ctx: ToolContext): Record<string, unknown> {
   return JSON.parse(block.text) as Record<string, unknown>
 }
 
-describe(' — recommendations_to_avoid on get_session_context', () => {
+describe(': recommendations_to_avoid on get_session_context', () => {
   it('returns an empty array on a fresh session', async () => {
     const store = await loadStore(makeDoc())
     const ctx = makeCtx(store)

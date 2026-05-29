@@ -111,7 +111,7 @@ describe('validateGraph cloud handler', () => {
         query: vi.fn(async (sql: string) => {
           if (sql.includes('SELECT id, title, description, stage FROM upg.products WHERE id'))
             return { rows: [{ id: productId, title: 'Deprecated', description: null, stage: 'build' }] }
-          // Entity drift query — must be checked before the generic COUNT(*) match
+          // Entity drift query: must be checked before the generic COUNT(*) match
           if (sql.includes('FROM upg.nodes') && sql.includes('type NOT IN'))
             return { rows: [{ type: 'pain_point', count: '2' }] }
           if (sql.includes('FROM upg.edges') && sql.includes('type NOT IN'))

@@ -1,7 +1,7 @@
 /**
  * @unified-product-graph/sdk/logic
  *
- * Pure, storage-agnostic graph logic — edge inference, validators, id
+ * Pure, storage-agnostic graph logic: edge inference, validators, id
  * generators, classification. Depends only on `@unified-product-graph/core`
  * and pulls in **no** file-system or file-watching code.
  *

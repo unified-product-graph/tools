@@ -137,7 +137,7 @@ export interface MigrateStatusNodeChange {
  * `migrated_nodes` is the total mutated count. `skipped_no_migration` is
  * the count of nodes whose current status is invalid (per the type's
  * lifecycle) but for which `UPG_STATUS_MIGRATIONS` has no registered
- * replacement — surfaced so callers can decide to operator-handle the
+ * replacement; surfaced so callers can decide to operator-handle the
  * residue rather than silently leave drift.
  */
 export interface MigrateStatusResult {
@@ -214,7 +214,7 @@ export interface ValidateGraphTopLevelDrift {
  * (and the replacement differs from the current value). Lets the caller
  * chain into `migrate_status` without re-deriving the plan.
  *
- * `via` is the registry symbol the suggestion was sourced from — kept as a
+ * `via` is the registry symbol the suggestion was sourced from, kept as a
  * string for consistency with the entity/edge/property suggestions on the
  * same envelope.
  */
@@ -232,7 +232,7 @@ export interface ValidateGraphLifecycleDrift {
   /**
    * Optional canonical replacement target from `UPG_STATUS_MIGRATIONS`.
    * Absent when no automated migration is registered for the
-   * (type, status) pair — surface to the operator.
+   * (type, status) pair; surface to the operator.
    */
   suggested_migration?: ValidateGraphLifecycleSuggestion
 }

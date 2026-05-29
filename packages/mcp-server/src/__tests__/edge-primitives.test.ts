@@ -177,7 +177,7 @@ describe('rename_edge_type', () => {
     expect(types.filter((t) => t === 'persona_pursues_job')).toHaveLength(0)
   })
 
-  it('uses exact match — never substring (regression vs migrate_type)', async () => {
+  it('uses exact match, never substring (regression vs migrate_type)', async () => {
     // Adding a persona_relates_to_persona edge that includes 'persona' as a
     // substring. A substring matcher would mangle it; an exact matcher leaves
     // it alone.

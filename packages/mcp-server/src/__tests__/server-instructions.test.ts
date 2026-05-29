@@ -3,7 +3,7 @@
  *
  * The instructions are public API: every connecting client reads them in the
  * initialise handshake and uses them to learn how to call the server. A casual
- * edit shouldn't drift the wording — if you're intentionally updating it, also
+ * edit shouldn't drift the wording; if you're intentionally updating it, also
  * update `__fixtures__/server-instructions.txt`.
  */
 

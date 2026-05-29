@@ -46,7 +46,7 @@ const adapter = new QuantiveAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('QuantiveAdapter — entity_type → UPG type mapping', () => {
+describe('QuantiveAdapter: entity_type → UPG type mapping', () => {
   it('objective maps to objective with confidence high', async () => {
     const items: SourceItem[] = [makeEntity('obj1', 'Grow retention', 'objective')]
     const result = await adapter.convert(items)
@@ -127,7 +127,7 @@ describe('QuantiveAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Key Result value fields ──────────────────────────────────────────────────
 
-describe('QuantiveAdapter — key_result value fields', () => {
+describe('QuantiveAdapter: key_result value fields', () => {
   it('current_value, target_value, start_value, and unit are preserved on key_result', async () => {
     const items: SourceItem[] = [
       makeEntity('kr1', 'Activation Rate', 'key_result', {
@@ -172,7 +172,7 @@ describe('QuantiveAdapter — key_result value fields', () => {
 
 // ─── Session / check-in skipped ───────────────────────────────────────────────
 
-describe('QuantiveAdapter — session and check-in skipped with warnings', () => {
+describe('QuantiveAdapter: session and check-in skipped with warnings', () => {
   it('session entities are skipped and batch warning emitted', async () => {
     const items: SourceItem[] = [
       makeEntity('s1', 'Q1 2026', 'session'),
@@ -223,7 +223,7 @@ describe('QuantiveAdapter — session and check-in skipped with warnings', () =>
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('QuantiveAdapter — status normalisation', () => {
+describe('QuantiveAdapter: status normalisation', () => {
   it("status 'not_started' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeEntity('obj1', 'Upcoming objective', 'objective', { status: 'not_started' })]
     const result = await adapter.convert(items)
@@ -293,7 +293,7 @@ describe('QuantiveAdapter — status normalisation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('QuantiveAdapter — edge emission', () => {
+describe('QuantiveAdapter: edge emission', () => {
   it('objective_achieved_through_key_result emitted when key_result has objective parent', async () => {
     const items: SourceItem[] = [
       makeEntity('obj1', 'Grow retention', 'objective'),
@@ -434,7 +434,7 @@ describe('QuantiveAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('QuantiveAdapter — source_map', () => {
+describe('QuantiveAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeEntity('obj1', 'Objective', 'objective'),
@@ -454,7 +454,7 @@ describe('QuantiveAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('QuantiveAdapter — external_tool and external_id', () => {
+describe('QuantiveAdapter: external_tool and external_id', () => {
   it('external_tool is always quantive', async () => {
     const items: SourceItem[] = [makeEntity('obj1', 'Objective', 'objective')]
     const result = await adapter.convert(items)

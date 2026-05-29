@@ -3,14 +3,14 @@
  *
  * The server only starts when it detects that it is the process entrypoint.
  * The original check compared `process.argv[1]` to `fileURLToPath(import.meta.url)`
- * as raw strings — but `argv[1]` is the literal invocation path while
+ * as raw strings, but `argv[1]` is the literal invocation path while
  * `import.meta.url` is symlink-resolved by the ESM loader. Any symlink in the
  * path (npx `.bin` shims, macOS `/tmp` → `/private/tmp`, global installs) made
  * the strings diverge, so the server silently exited 0 instead of starting and
  * MCP clients reported "Failed to connect".
  *
- * This test spawns the *built* binary through a symlink — the precise scenario
- * that broke `npx @unified-product-graph/mcp-server` — and asserts it boots.
+ * This test spawns the *built* binary through a symlink: the precise scenario
+ * that broke `npx @unified-product-graph/mcp-server`, and asserts it boots.
  * It skips gracefully when `dist/` isn't built (CI runs `test` after `^build`,
  * so the artifact is present there).
  */
@@ -25,7 +25,7 @@ const DIST_ENTRY = resolve(__dirname, '../../dist/index.js')
 
 describe('mcp-server entrypoint detection (symlinked invocation)', () => {
   if (!existsSync(DIST_ENTRY)) {
-    it.skip('dist/index.js not built — skipping (run `npm run build` first)', () => {})
+    it.skip('dist/index.js not built; skipping (run `npm run build` first)', () => {})
     return
   }
 

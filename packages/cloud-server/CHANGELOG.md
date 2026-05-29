@@ -6,7 +6,7 @@ This package co-versions with `@unified-product-graph/core` and `@unified-produc
 
 ## 0.6.0 · 2026-05-22 · Launch train alignment
 
-Aligned with `@unified-product-graph/core@0.6.0`. Bumped `@unified-product-graph/core` dep to `^0.6.0`. No cloud-server surface changes — co-versioned for the launch train.
+Aligned with `@unified-product-graph/core@0.6.0`. Bumped `@unified-product-graph/core` dep to `^0.6.0`. No cloud-server surface changes; co-versioned for the launch train.
 
 ## 0.5.0 · 2026-05-19 · Inaugural public release
 

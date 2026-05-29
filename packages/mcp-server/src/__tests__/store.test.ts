@@ -1,5 +1,5 @@
 /**
- * Tests for UPGFileStore — the in-memory store backed by .upg files.
+ * Tests for UPGFileStore: the in-memory store backed by .upg files.
  *
  * Tests cover: load/parse, node CRUD, edge operations, content hash, and type migration.
  */
@@ -65,7 +65,7 @@ async function loadStore(doc: UPGDocument): Promise<UPGFileStore> {
 
 // ── Load / Parse ──────────────────────────────────────────────────────────────
 
-describe('UPGFileStore — load/parse', () => {
+describe('UPGFileStore: load/parse', () => {
   it('loads a valid .upg file', async () => {
     const doc = makeDoc({
       nodes: [makeNode({ id: 'n_1', title: 'Alice' })],
@@ -119,7 +119,7 @@ describe('UPGFileStore — load/parse', () => {
 
     expect(store.getProduct().stage).toBe('concept')
 
-    // The on-disk file is NOT mutated by coercion — the original value
+    // The on-disk file is NOT mutated by coercion; the original value
     // survives until an explicit migration sweep.
     const onDisk = JSON.parse(readFileSync(filePath, 'utf-8')) as UPGDocument
     expect(onDisk.product.stage).toBe('idea')
@@ -151,7 +151,7 @@ describe('UPGFileStore — load/parse', () => {
 
   it('Keeps unknown stage values as-is and does not crash', async () => {
     // Truly unknown values fall through with a stderr warning. The on-disk
-    // representation is preserved verbatim — readers should not silently
+    // representation is preserved verbatim; readers should not silently
     // invent a value where coercion has no documented target.
     const doc = makeDoc({
       product: { id: 'p1', title: 'Unknown Stage', stage: 'xyz' as never },
@@ -167,7 +167,7 @@ describe('UPGFileStore — load/parse', () => {
 
 // ── Node CRUD ─────────────────────────────────────────────────────────────────
 
-describe('UPGFileStore — node CRUD', () => {
+describe('UPGFileStore: node CRUD', () => {
   let store: UPGFileStore
 
   beforeEach(async () => {
@@ -243,7 +243,7 @@ describe('UPGFileStore — node CRUD', () => {
 
 // ── Edge Operations ───────────────────────────────────────────────────────────
 
-describe('UPGFileStore — edge operations', () => {
+describe('UPGFileStore: edge operations', () => {
   let store: UPGFileStore
 
   beforeEach(async () => {
@@ -300,7 +300,7 @@ describe('UPGFileStore — edge operations', () => {
 
 // ── Content Hash ──────────────────────────────────────────────────────────────
 
-describe('UPGFileStore — content hash', () => {
+describe('UPGFileStore: content hash', () => {
   it('has a non-empty hash after load', async () => {
     const store = await loadStore(makeDoc())
     expect(store.getContentHash()).toBeTruthy()
@@ -323,7 +323,7 @@ describe('UPGFileStore — content hash', () => {
 
 // ── Type Migration ────────────────────────────────────────────────────────────
 
-describe('UPGFileStore — migrateType', () => {
+describe('UPGFileStore: migrateType', () => {
   it('migrates node types from old to new', async () => {
     const store = await loadStore(
       makeDoc({
@@ -345,7 +345,7 @@ describe('UPGFileStore — migrateType', () => {
 
   it('leaves an unmapped legacy edge type untouched (no substring substitution)', async () => {
     // Regression: pre-v0.2.10, migrate_type substring-substituted
-    // `jtbd_has_pain_point` to `jtbd_has_need` — neither of which is in
+    // `jtbd_has_pain_point` to `jtbd_has_need`; neither of which is in
     // UPG_EDGE_CATALOG. The catalog-aware path leaves unmapped edges alone
     // (the tool layer surfaces them under `unmapped_legacy_edges`).
     const nodes = [
@@ -364,7 +364,7 @@ describe('UPGFileStore — migrateType', () => {
 
     expect(result.edgeRenames).toHaveLength(0)
     expect(result.edgeDrops).toHaveLength(0)
-    // Edge type left as-is — caller must hand-migrate via rename_edge_type
+    // Edge type left as-is; caller must hand-migrate via rename_edge_type
     expect(store.getEdge('e_jp')?.type).toBe('jtbd_has_pain_point')
   })
 
@@ -402,7 +402,7 @@ describe('UPGFileStore — migrateType', () => {
 
 // ── Change Log ────────────────────────────────────────────────────────────────
 
-describe('UPGFileStore — change log', () => {
+describe('UPGFileStore: change log', () => {
   it('logs node creation', async () => {
     const store = await loadStore(makeDoc())
     store.addNode(makeNode({ id: 'n_log', title: 'Logged' }))

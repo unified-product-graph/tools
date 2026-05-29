@@ -36,7 +36,7 @@ export type EdgePairValidationResult = EdgePairValidationOk | EdgePairValidation
  * expectation and the actual node types so the caller can render a single
  * clear error message.
  *
- * Unknown edge types (not in `UPG_EDGE_CATALOG`) return `{ valid: true }` —
+ * Unknown edge types (not in `UPG_EDGE_CATALOG`) return `{ valid: true }`;
  * the legacy / non-canonical edge surface is not this helper's concern.
  * Callers that care about catalog membership should check that upstream.
  */

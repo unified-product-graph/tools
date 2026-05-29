@@ -11,7 +11,7 @@ export default defineConfig({
     js: '#!/usr/bin/env node',
   },
   // @unified-product-graph/mcp-tooling is an internal workspace package
-  // (private, not published to npm) — bundling keeps the published
+  // (private, not published to npm); bundling keeps the published
   // cloud-server self-contained.
   noExternal: ['@unified-product-graph/mcp-tooling'],
 })

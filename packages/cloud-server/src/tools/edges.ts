@@ -38,8 +38,8 @@ function edgeResolverError(message: string, sourceType: string, targetType: stri
 /**
  * Create a relationship between two existing nodes. Edge type is inferred
  * from the source/target types when `type` is omitted. Inference is
- * catalog-strict — an unmapped pair is refused (with resolver hints) rather
- * than fabricating a `${source}_contains_${target}` edge — matching the
+ * catalog-strict: an unmapped pair is refused (with resolver hints) rather
+ * than fabricating a `${source}_contains_${target}` edge, matching the
  * local MCP server's `create_edge`.
  *
  * @returns JSON: `{ edge: { id, source, target, type }, warning? }`.

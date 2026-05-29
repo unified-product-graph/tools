@@ -327,7 +327,7 @@ export const createNode: ToolHandler = async (args, { store }) => {
   if (!args.type) return textError(`Missing required parameter: type`)
   if (!args.title) return textError(`Missing required parameter: title`)
 
-  // Entity-type validation — resolve aliases to canonical, refuse uncatalogued
+  // Entity-type validation: resolve aliases to canonical, refuse uncatalogued
   // types before the write lands. Matches the local MCP server's create_node.
   let resolvedType: ReturnType<typeof resolveEntityType>
   try {
@@ -352,14 +352,14 @@ export const createNode: ToolHandler = async (args, { store }) => {
   const nId = newNode.id
   const properties = newNode.properties
 
-  // Property type validation — refuse declared-but-mismatched-type values
+  // Property type validation: refuse declared-but-mismatched-type values
   // before the write lands. Matches the local MCP server's create_node.
   const { violations } = checkPropertyTypes(nodeType, properties)
   if (violations.length > 0) {
     return textError(renderPropertyTypeWarning(nodeType, violations)!)
   }
 
-  // Length caps — soft warnings only, never refusals.
+  // Length caps: soft warnings only, never refusals.
   const { warnings: lengthWarnings } = checkLengthCaps({
     title: args.title as string,
     description: args.description as string | undefined,
@@ -368,7 +368,7 @@ export const createNode: ToolHandler = async (args, { store }) => {
 
   const warnings: string[] = [...lengthWarnings]
   if (resolvedType.alias) {
-    warnings.push(`Type "${resolvedType.alias.from}" is deprecated — using canonical "${resolvedType.alias.to}".`)
+    warnings.push(`Type "${resolvedType.alias.from}" is deprecated; using canonical "${resolvedType.alias.to}".`)
   }
   if (args.status) {
     newNode.status = args.status as string
@@ -400,7 +400,7 @@ export const createNode: ToolHandler = async (args, { store }) => {
         const suggestion = inference.suggestions.length > 0
           ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
           : ''
-        warnings.push(`Parent edge not created — no canonical edge for ${parent.type} → ${nodeType}.${suggestion}`)
+        warnings.push(`Parent edge not created; no canonical edge for ${parent.type} → ${nodeType}.${suggestion}`)
       } else {
         edge = { id: edgeId(), source: parentId, target: nId, type: inference.edgeType }
         await store.addEdge(productId, edge as Parameters<typeof store.addEdge>[1])
@@ -460,14 +460,14 @@ export const updateNode: ToolHandler = async (args, { store }) => {
   }
 
   if (args.properties !== undefined && entityType) {
-    // Property type validation — refuse declared-but-mismatched-type values.
+    // Property type validation: refuse declared-but-mismatched-type values.
     const { violations } = checkPropertyTypes(entityType, args.properties as Record<string, unknown>)
     if (violations.length > 0) {
       return textError(renderPropertyTypeWarning(entityType, violations)!)
     }
   }
 
-  // Length caps — soft warnings only, never refusals.
+  // Length caps: soft warnings only, never refusals.
   const { warnings: lengthWarnings } = checkLengthCaps({
     title: args.title as string | undefined,
     description: args.description as string | undefined,

@@ -4,7 +4,7 @@
  * The types in `src/atomicity-contracts.ts` are the canonical envelopes for
  * `migrate_type`, `migrate_properties`, `validate_graph`, `rename_edge_type`,
  * and `export_edges`. Every UPG MCP server conforms to these. This test
- * pins the shape — if a future PR mutates a field name, the test fails
+ * pins the shape; if a future PR mutates a field name, the test fails
  * before any consumer rebuilds.
  */
 
@@ -18,7 +18,7 @@ import type {
 } from '../src/atomicity-contracts.js'
 
 describe('atomicity contracts', () => {
-  it('MigrateTypeResult — minimal apply envelope type-checks', () => {
+  it('MigrateTypeResult: minimal apply envelope type-checks', () => {
     const fixture: MigrateTypeResult = {
       migrated_nodes: 3,
       migrated_edges: 2,
@@ -34,7 +34,7 @@ describe('atomicity contracts', () => {
     expect(fixture.dry_run).toBe(false)
   })
 
-  it('MigrateTypeResult — dry-run envelope and null defaults type-check', () => {
+  it('MigrateTypeResult: dry-run envelope and null defaults type-check', () => {
     const fixture: MigrateTypeResult = {
       migrated_nodes: 0,
       migrated_edges: 0,
@@ -47,7 +47,7 @@ describe('atomicity contracts', () => {
     expect(fixture.defaults_applied).toBeNull()
   })
 
-  it('RenameEdgeTypeResult — dry-run + apply branches discriminate cleanly', () => {
+  it('RenameEdgeTypeResult: dry-run + apply branches discriminate cleanly', () => {
     const dryRun: RenameEdgeTypeResult = {
       dry_run: true,
       from: 'old_type',
@@ -68,7 +68,7 @@ describe('atomicity contracts', () => {
     if (!apply.dry_run) expect(apply.renamed).toBe(5)
   })
 
-  it('ExportEdgesResult — types echo + optional mapping_confidence type-check', () => {
+  it('ExportEdgesResult: types echo + optional mapping_confidence type-check', () => {
     const fixture: ExportEdgesResult = {
       edges: [
         { id: 'e1', source: 'a', target: 'b', type: 'persona_pursues_job' },
@@ -90,7 +90,7 @@ describe('atomicity contracts', () => {
     expect(fixture.edges[1].mapping_confidence).toBe('high')
   })
 
-  it('ValidateGraphResult — entity / edge / property drift suggestions discriminate', () => {
+  it('ValidateGraphResult: entity / edge / property drift suggestions discriminate', () => {
     const fixture: ValidateGraphResult = {
       summary: {
         spec_version: '0.2.14',
@@ -148,7 +148,7 @@ describe('atomicity contracts', () => {
     expect(fixture._payload_bytes).toBe(142_000)
   })
 
-  it('MigratePropertiesResult — stub envelope type-checks ahead of implementation', () => {
+  it('MigratePropertiesResult: stub envelope type-checks ahead of implementation', () => {
     const fixture: MigratePropertiesResult = {
       migrated_nodes: 1,
       migrated_properties: 1,

@@ -1,5 +1,5 @@
 /**
- * — JSDoc parity guard.
+ * JSDoc parity guard.
  *
  * Locks in 100% `@returns` + `@atomicity` coverage on every advertised tool
  * handler. The richness sweep added `@see`/`@throws`/`@warning` lines on top;
@@ -9,7 +9,7 @@
  * Why the floor and not the ceiling: `@see` cross-links are judgment calls
  * (some tools have no kin), `@throws` is conditional on validation paths,
  * `@warning` is reserved for surprise behaviour. `@returns` + `@atomicity`
- * are universal — every handler returns a shape and has an atomicity story.
+ * are universal: every handler returns a shape and has an atomicity story.
  *
  * The test reads each `tools/*.ts` source file directly (no AST), looks at
  * the JSDoc block immediately preceding every `export const <name>:
@@ -76,7 +76,7 @@ describe('JSDoc parity floor on tool handlers', () => {
   const allExports = files.flatMap(extractExports)
 
   it('discovers a non-trivial number of exported handlers', () => {
-    // Floor sanity check — if this drops below 60 we've lost half the surface.
+    // Floor sanity check: if this drops below 60 we've lost half the surface.
     expect(allExports.length).toBeGreaterThanOrEqual(60)
   })
 

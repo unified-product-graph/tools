@@ -47,7 +47,7 @@ const adapter = new AhaAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('AhaAdapter — entity_type → UPG type mapping', () => {
+describe('AhaAdapter: entity_type → UPG type mapping', () => {
   it('initiative maps to initiative with confidence high', async () => {
     const items: SourceItem[] = [makeItem('init1', 'Platform modernisation', 'initiative')]
     const result = await adapter.convert(items)
@@ -157,7 +157,7 @@ describe('AhaAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skip / warning cases ─────────────────────────────────────────────────────
 
-describe('AhaAdapter — skip and warning cases', () => {
+describe('AhaAdapter: skip and warning cases', () => {
   it('product_line is skipped with a warning about no UPG equivalent', async () => {
     const items: SourceItem[] = [
       makeItem('pl1', 'Platform Portfolio', 'product_line'),
@@ -195,7 +195,7 @@ describe('AhaAdapter — skip and warning cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('AhaAdapter — status normalisation', () => {
+describe('AhaAdapter: status normalisation', () => {
   it("'new' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature', { status: 'new' })]
     const result = await adapter.convert(items)
@@ -243,7 +243,7 @@ describe('AhaAdapter — status normalisation', () => {
 
 // ─── Idea → stub opportunity pattern ─────────────────────────────────────────
 
-describe('AhaAdapter — idea → stub opportunity pattern', () => {
+describe('AhaAdapter: idea → stub opportunity pattern', () => {
   it('a stub opportunity node is created when idea has idea_promoted_to_feature_id', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Calendar sync feature', 'feature'),
@@ -307,7 +307,7 @@ describe('AhaAdapter — idea → stub opportunity pattern', () => {
 
 // ─── Hierarchy edge emission ──────────────────────────────────────────────────
 
-describe('AhaAdapter — hierarchy edge emission', () => {
+describe('AhaAdapter: hierarchy edge emission', () => {
   it('initiative_drives_outcome emitted when goal has initiative parent', async () => {
     const items: SourceItem[] = [
       makeItem('init1', 'Platform modernisation', 'initiative'),
@@ -436,7 +436,7 @@ describe('AhaAdapter — hierarchy edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('AhaAdapter — source_map', () => {
+describe('AhaAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Feature', 'feature'),
@@ -467,7 +467,7 @@ describe('AhaAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('AhaAdapter — external_tool and external_id', () => {
+describe('AhaAdapter: external_tool and external_id', () => {
   it('external_tool is always aha', async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature')]
     const result = await adapter.convert(items)
@@ -483,7 +483,7 @@ describe('AhaAdapter — external_tool and external_id', () => {
 
 // ─── Full fixture ─────────────────────────────────────────────────────────────
 
-describe('AhaAdapter — full fixture', () => {
+describe('AhaAdapter: full fixture', () => {
   it('all emitted edges are in the UPG catalogue (full strategy + delivery tree)', async () => {
     const items: SourceItem[] = [
       makeItem('prod1', 'Acme Compass', 'product'),

@@ -5,7 +5,7 @@
  * to confirm the tool returns the new shape and that anti-pattern
  * evaluation surfaces fires on a real graph.
  *
- * The test isn't pinned to a specific count of fires — only to "the
+ * The test isn't pinned to a specific count of fires; only to "the
  * wiring works." Set `UPG_SMOKE_FIXTURE` to point at any `.upg` file;
  * the test skips gracefully if no fixture is available.
  */
@@ -32,7 +32,7 @@ const SMOKE_FIXTURE = process.env.UPG_SMOKE_FIXTURE
 
 describe('Smoke test against a real .upg graph', () => {
   if (!existsSync(SMOKE_FIXTURE)) {
-    it.skip('no smoke fixture available — skipping', () => {})
+    it.skip('no smoke fixture available: skipping', () => {})
     return
   }
 
@@ -50,18 +50,18 @@ describe('Smoke test against a real .upg graph', () => {
     expect(result.isError).toBeUndefined()
     const body = JSON.parse(result.content[0].text)
 
-    // New shape — `valid`, anti_pattern_violations, summary counts.
+    // New shape: `valid`, anti_pattern_violations, summary counts.
     expect(typeof body.valid).toBe('boolean')
     expect(Array.isArray(body.anti_pattern_violations)).toBe(true)
     expect(typeof body.summary.anti_pattern_violations_high).toBe('number')
     expect(typeof body.summary.anti_pattern_violations_medium).toBe('number')
     expect(typeof body.summary.anti_pattern_violations_low).toBe('number')
 
-    // Existing shape preserved — schema drift fields still present.
+    // Existing shape preserved: schema drift fields still present.
     expect(typeof body.summary.entity_drift).toBe('number')
     expect(typeof body.summary.edge_drift).toBe('number')
 
-    // Surface what fired — useful for visual confirmation in CI logs.
+    // Surface what fired; useful for visual confirmation in CI logs.
     const fires = body.anti_pattern_violations.map(
       (v: { anti_pattern_id: string; severity: string }) =>
         `${v.severity}: ${v.anti_pattern_id}`,
@@ -107,7 +107,7 @@ describe('Smoke test against a real .upg graph', () => {
     }
     const firstNode = store.getAllNodes()[0]
     if (!firstNode) {
-      // Empty graph — skip.
+      // Empty graph: skip.
       return
     }
     const result = await getAntiPatternViolationsFor({ entity_id: firstNode.id }, ctx)

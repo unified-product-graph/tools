@@ -47,7 +47,7 @@ const adapter = new CannyAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('CannyAdapter — entity_type → UPG type mapping', () => {
+describe('CannyAdapter: entity_type → UPG type mapping', () => {
   it('post maps to feature_request with confidence high', async () => {
     const items: SourceItem[] = [makeItem('p1', 'Add dark mode', 'post')]
     const result = await adapter.convert(items)
@@ -76,7 +76,7 @@ describe('CannyAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skip + warning cases ─────────────────────────────────────────────────────
 
-describe('CannyAdapter — skipped types + warnings', () => {
+describe('CannyAdapter: skipped types + warnings', () => {
   it('board entities are skipped with per-entity warning about category container', async () => {
     const items: SourceItem[] = [
       makeItem('b1', 'Feature Requests', 'board'),
@@ -147,7 +147,7 @@ describe('CannyAdapter — skipped types + warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('CannyAdapter — status normalisation', () => {
+describe('CannyAdapter: status normalisation', () => {
   it("status 'open' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Add dark mode', 'post', { status: 'open' })]
     const result = await adapter.convert(items)
@@ -187,7 +187,7 @@ describe('CannyAdapter — status normalisation', () => {
 
 // ─── Vote count and board_name ────────────────────────────────────────────────
 
-describe('CannyAdapter — vote_count and board_name', () => {
+describe('CannyAdapter: vote_count and board_name', () => {
   it('vote_count is preserved on feature_request nodes', async () => {
     const items: SourceItem[] = [
       makeItem('p1', 'Add dark mode', 'post', { vote_count: 247 }),
@@ -230,7 +230,7 @@ describe('CannyAdapter — vote_count and board_name', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('CannyAdapter — edge emission', () => {
+describe('CannyAdapter: edge emission', () => {
   it('feature_request_creates_opportunity emitted when feature_request has opportunity parent', async () => {
     const items: SourceItem[] = [
       makeItem('opp1', 'Users need faster export', 'opportunity'),
@@ -296,7 +296,7 @@ describe('CannyAdapter — edge emission', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('CannyAdapter — source_map', () => {
+describe('CannyAdapter: source_map', () => {
   it('source_map contains entries for each converted entity', async () => {
     const items: SourceItem[] = [
       makeItem('p1', 'Dark mode', 'post'),
@@ -316,7 +316,7 @@ describe('CannyAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('CannyAdapter — external_tool and external_id', () => {
+describe('CannyAdapter: external_tool and external_id', () => {
   it('external_tool is always canny', async () => {
     const items: SourceItem[] = [makeItem('p1', 'Dark mode', 'post')]
     const result = await adapter.convert(items)

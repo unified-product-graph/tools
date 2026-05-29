@@ -65,7 +65,7 @@ const adapter = new ShortcutAdapter()
 
 // ─── Story type discrimination ────────────────────────────────────────────────
 
-describe('ShortcutAdapter — story_type discrimination', () => {
+describe('ShortcutAdapter: story_type discrimination', () => {
   it('story with story_type "feature" maps to user_story with confidence high', async () => {
     const result = await adapter.convert([makeStory('s1', 'Add dark mode', 'feature')])
     expect(result.nodes).toHaveLength(1)
@@ -99,7 +99,7 @@ describe('ShortcutAdapter — story_type discrimination', () => {
 
 // ─── Non-story entity type mapping ───────────────────────────────────────────
 
-describe('ShortcutAdapter — entity type mapping', () => {
+describe('ShortcutAdapter: entity type mapping', () => {
   it('epic maps to epic with confidence high', async () => {
     const result = await adapter.convert([makeEntity('e1', 'Auth revamp', 'epic')])
     expect(result.nodes[0].type).toBe('epic')
@@ -159,7 +159,7 @@ describe('ShortcutAdapter — entity type mapping', () => {
 
 // ─── Iteration skipping ───────────────────────────────────────────────────────
 
-describe('ShortcutAdapter — iteration skipping', () => {
+describe('ShortcutAdapter: iteration skipping', () => {
   it('iteration is skipped and a warning is emitted with count', async () => {
     const items: SourceItem[] = [
       makeEntity('it1', 'Sprint 12', 'iteration'),
@@ -196,7 +196,7 @@ describe('ShortcutAdapter — iteration skipping', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('ShortcutAdapter — status normalisation', () => {
+describe('ShortcutAdapter: status normalisation', () => {
   it('"unstarted" normalises to "draft"', async () => {
     const result = await adapter.convert([makeStory('s1', 'Not started', 'feature', { status: 'unstarted' })])
     expect(result.nodes[0].status).toBe('draft')
@@ -250,7 +250,7 @@ describe('ShortcutAdapter — status normalisation', () => {
 
 // ─── Key Result value fields ──────────────────────────────────────────────────
 
-describe('ShortcutAdapter — key_result value field preservation', () => {
+describe('ShortcutAdapter: key_result value field preservation', () => {
   it('current_value, target_value, and unit are preserved on key_result nodes', async () => {
     const result = await adapter.convert([
       makeEntity('kr1', 'Reduce churn by 10%', 'key_result', {
@@ -292,7 +292,7 @@ describe('ShortcutAdapter — key_result value field preservation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('ShortcutAdapter — edge emission', () => {
+describe('ShortcutAdapter: edge emission', () => {
   it('objective_achieved_through_key_result emitted when key_result has objective parent', async () => {
     const items: SourceItem[] = [
       makeEntity('o1', 'Grow retention', 'objective'),
@@ -414,9 +414,9 @@ describe('ShortcutAdapter — edge emission', () => {
   })
 })
 
-// ─── Full fixture — assertAllEdgesCatalogued ──────────────────────────────────
+// ─── Full fixture: assertAllEdgesCatalogued ───────────────────────────────────
 
-describe('ShortcutAdapter — full fixture catalogue check', () => {
+describe('ShortcutAdapter: full fixture catalogue check', () => {
   it('all edges in a complete OKR + delivery chain are catalogued', async () => {
     const items: SourceItem[] = [
       makeEntity('o1', 'Grow retention', 'objective'),
@@ -454,7 +454,7 @@ describe('ShortcutAdapter — full fixture catalogue check', () => {
 
 // ─── Source map ───────────────────────────────────────────────────────────────
 
-describe('ShortcutAdapter — source_map', () => {
+describe('ShortcutAdapter: source_map', () => {
   it('source_map contains an entry for each converted entity', async () => {
     const items: SourceItem[] = [
       makeEntity('o1', 'Objective', 'objective'),
@@ -474,7 +474,7 @@ describe('ShortcutAdapter — source_map', () => {
 
 // ─── External tool / external_id ──────────────────────────────────────────────
 
-describe('ShortcutAdapter — external_tool and external_id', () => {
+describe('ShortcutAdapter: external_tool and external_id', () => {
   it('external_tool is always "shortcut"', async () => {
     const result = await adapter.convert([makeStory('s1', 'Feature', 'feature')])
     expect(result.nodes[0].external_tool).toBe('shortcut')
@@ -488,7 +488,7 @@ describe('ShortcutAdapter — external_tool and external_id', () => {
 
 // ─── Labels as tags ───────────────────────────────────────────────────────────
 
-describe('ShortcutAdapter — labels as tags', () => {
+describe('ShortcutAdapter: labels as tags', () => {
   it('metadata.labels are merged into node tags', async () => {
     const result = await adapter.convert([
       makeStory('s1', 'Tagged story', 'feature', { labels: ['customer-requested', 'q2'] }),
@@ -499,7 +499,7 @@ describe('ShortcutAdapter — labels as tags', () => {
 
 // ─── list() throws ────────────────────────────────────────────────────────────
 
-describe('ShortcutAdapter — list()', () => {
+describe('ShortcutAdapter: list()', () => {
   it('throws an error directing user to /upg-import', async () => {
     await expect(adapter.list({})).rejects.toThrow('Shortcut adapter requires Shortcut API connection')
   })
@@ -507,7 +507,7 @@ describe('ShortcutAdapter — list()', () => {
 
 // ─── Empty input ──────────────────────────────────────────────────────────────
 
-describe('ShortcutAdapter — edge cases', () => {
+describe('ShortcutAdapter: edge cases', () => {
   it('returns empty-nodes warning for empty input', async () => {
     const result = await adapter.convert([])
     expect(result.nodes).toHaveLength(0)

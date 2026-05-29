@@ -1,5 +1,5 @@
 /**
- * Regression tests for `get_entity_schema` —.
+ * Regression tests for `get_entity_schema`.
  *
  * Deprecated entity-type aliases (jtbd → job, pain_point → need, kpi → metric)
  * must resolve to the canonical type's schema rather than returning empty.
@@ -41,7 +41,7 @@ describe('get_entity_schema', () => {
  expect(pain.domain).toEqual(need.domain)
  })
 
- it('returns experiment schema with no alias_of (— experiment is canonical)', () => {
+ it('returns experiment schema with no alias_of (experiment is canonical)', () => {
  const experiment = callSchema('experiment')
  expect(experiment.type).toBe('experiment')
  expect(experiment.alias_of).toBeUndefined()

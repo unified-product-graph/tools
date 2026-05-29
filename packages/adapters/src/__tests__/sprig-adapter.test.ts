@@ -48,7 +48,7 @@ const adapter = new SprigAdapter()
 
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
-describe('SprigAdapter — entity_type → UPG type mapping', () => {
+describe('SprigAdapter: entity_type → UPG type mapping', () => {
   it('study maps to research_study with confidence high', async () => {
     const items: SourceItem[] = [makeItem('st1', 'Onboarding NPS Survey', 'study')]
     const result = await adapter.convert(items)
@@ -103,7 +103,7 @@ describe('SprigAdapter — entity_type → UPG type mapping', () => {
 
 // ─── Skipped types ────────────────────────────────────────────────────────────
 
-describe('SprigAdapter — skipped types', () => {
+describe('SprigAdapter: skipped types', () => {
   it('question is skipped with warning about survey instrument', async () => {
     const items: SourceItem[] = [
       makeItem('q1', 'How satisfied are you?', 'question'),
@@ -144,7 +144,7 @@ describe('SprigAdapter — skipped types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('SprigAdapter — status normalisation', () => {
+describe('SprigAdapter: status normalisation', () => {
   it("status 'draft' normalises to 'draft'", async () => {
     const items: SourceItem[] = [makeItem('st1', 'Study', 'study', { status: 'draft' })]
     const result = await adapter.convert(items)
@@ -178,7 +178,7 @@ describe('SprigAdapter — status normalisation', () => {
 
 // ─── Quantitative field preservation ─────────────────────────────────────────
 
-describe('SprigAdapter — quantitative field preservation', () => {
+describe('SprigAdapter: quantitative field preservation', () => {
   it('response_count is preserved on research_study nodes', async () => {
     const items: SourceItem[] = [
       makeItem('st1', 'Onboarding NPS', 'study', { response_count: 247 }),
@@ -218,7 +218,7 @@ describe('SprigAdapter — quantitative field preservation', () => {
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
-describe('SprigAdapter — edge emission', () => {
+describe('SprigAdapter: edge emission', () => {
   it('research_study_enrolls_participant emitted when respondent has study parent', async () => {
     const items: SourceItem[] = [
       makeItem('st1', 'Study', 'study'),
@@ -305,7 +305,7 @@ describe('SprigAdapter — edge emission', () => {
 
 // ─── Insight warning ──────────────────────────────────────────────────────────
 
-describe('SprigAdapter — insight → opportunity warning', () => {
+describe('SprigAdapter: insight → opportunity warning', () => {
   it('emits warning when insight nodes are created', async () => {
     const items: SourceItem[] = [makeItem('i1', 'Pricing confuses users', 'insight')]
     const result = await adapter.convert(items)
@@ -331,7 +331,7 @@ describe('SprigAdapter — insight → opportunity warning', () => {
 
 // ─── Source map and external fields ──────────────────────────────────────────
 
-describe('SprigAdapter — source_map and external fields', () => {
+describe('SprigAdapter: source_map and external fields', () => {
   it('source_map contains entry for each converted item', async () => {
     const items: SourceItem[] = [
       makeItem('st1', 'Study', 'study'),
@@ -363,7 +363,7 @@ describe('SprigAdapter — source_map and external fields', () => {
 
 // ─── Empty input ──────────────────────────────────────────────────────────────
 
-describe('SprigAdapter — empty input', () => {
+describe('SprigAdapter: empty input', () => {
   it('returns empty result with warning when no items provided', async () => {
     const result = await adapter.convert([])
     expect(result.nodes).toHaveLength(0)

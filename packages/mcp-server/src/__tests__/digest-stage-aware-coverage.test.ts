@@ -1,5 +1,5 @@
 /**
- * / Finding 9 — stage-aware coverage targets in `get_graph_digest`.
+ * / Finding 9: stage-aware coverage targets in `get_graph_digest`.
  *
  * The digest used to grade every product against the full 8-region
  * completeness model regardless of `UPGProductStage`. A concept-stage
@@ -11,7 +11,7 @@
  *      `stage_summary.overall_pct`. Other regions appear with
  *      `counted_toward_stage: false`.
  *   2. launch-stage → Sustaining is counted (along with everything earlier).
- *   3. The informational view — `types_present` / `types_missing` — stays
+ *   3. The informational view (`types_present` / `types_missing`) stays
  *      populated for every region regardless of stage.
  *
  * Baseline before these tests: 436/436. After: 439/439.
@@ -52,7 +52,7 @@ async function makeStore(stage: UPGProductStage): Promise<UPGFileStore> {
   return store
 }
 
-describe('computeGraphDigest — stage-aware coverage', () => {
+describe('computeGraphDigest: stage-aware coverage', () => {
   it('concept-stage product surfaces Sustaining as informational (not counted)', async () => {
     const store = await makeStore('concept')
     // Populate the three regions a concept-stage graph is graded on.
@@ -63,7 +63,7 @@ describe('computeGraphDigest — stage-aware coverage', () => {
     const digest = computeGraphDigest(store)
 
     // The sustaining row is present (informational) but not counted toward
-    // overall_pct — a concept-stage product shouldn't be graded on revenue
+    // overall_pct: a concept-stage product shouldn't be graded on revenue
     // streams or unit economics it doesn't have yet.
     expect(digest.coverage.sustaining).toBeDefined()
     expect(digest.coverage.sustaining.counted_toward_stage).toBe(false)
@@ -106,7 +106,7 @@ describe('computeGraphDigest — stage-aware coverage', () => {
     expect(digest.coverage.reaching.counted_toward_stage).toBe(true)
     expect(digest.coverage.converting.counted_toward_stage).toBe(true)
     expect(digest.coverage.building.counted_toward_stage).toBe(true)
-    // Learning + Operations are still ahead — growth + maintenance respectively.
+    // Learning + Operations are still ahead: growth + maintenance respectively.
     expect(digest.coverage.learning.counted_toward_stage).toBe(false)
     expect(digest.coverage.operations.counted_toward_stage).toBe(false)
 
@@ -119,7 +119,7 @@ describe('computeGraphDigest — stage-aware coverage', () => {
   it('populates types_present / types_missing for all 8+ regions regardless of stage', async () => {
     const store = await makeStore('concept')
     createNode(store, { type: 'product', title: 'Concept Product' })
-    // Add nodes from regions that aren't counted at concept stage — they
+    // Add nodes from regions that aren't counted at concept stage; they
     // should still appear in `types_present` even though
     // `counted_toward_stage: false`. This is the informational view.
     createNode(store, { type: 'business_model', title: 'SaaS' })
@@ -159,7 +159,7 @@ describe('computeGraphDigest — stage-aware coverage', () => {
   })
 
   it('coerces legacy "idea" stage to concept for coverage targeting', async () => {
-    // Defensive — `coerceProductStage` from @unified-product-graph/core
+    // Defensive: `coerceProductStage` from @unified-product-graph/core
     // remaps `idea → concept` at .upg load, but this asserts the digest
     // honours that mapping for STAGE_COVERAGE_TARGETS lookup even if a
     // raw legacy value sneaks through.

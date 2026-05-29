@@ -7,7 +7,7 @@
  *
  * `appendAudit` MUST be called with a **transaction-scoped client**, in the
  * same transaction as the mutation it records, so the audit row commits or
- * rolls back atomically with the write — important for the batch tools'
+ * rolls back atomically with the write; important for the batch tools'
  * all-or-nothing semantics.
  *
  * `userId` is `null` on the stdio path until request-level auth context is

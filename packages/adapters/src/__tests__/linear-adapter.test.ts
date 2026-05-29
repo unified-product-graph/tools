@@ -59,7 +59,7 @@ const makeCycle = (id: string, title: string): SourceItem => ({
 
 // ─── Issue type mapping ───────────────────────────────────────────────────────
 
-describe('LinearAdapter — issue type mapping (via issue_type)', () => {
+describe('LinearAdapter: issue type mapping (via issue_type)', () => {
   it('feature issue maps to feature entity', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Dark mode', 'feature')])
     expect(result.nodes).toHaveLength(1)
@@ -119,7 +119,7 @@ describe('LinearAdapter — issue type mapping (via issue_type)', () => {
 
 // ─── Non-issue entity types ───────────────────────────────────────────────────
 
-describe('LinearAdapter — non-issue entity types', () => {
+describe('LinearAdapter: non-issue entity types', () => {
   it('initiative maps to initiative', async () => {
     const result = await adapter.convert([makeInitiative('init-1', 'Grow retention')])
     expect(result.nodes[0].type).toBe('initiative')
@@ -156,7 +156,7 @@ describe('LinearAdapter — non-issue entity types', () => {
 
 // ─── Cycle skipping ───────────────────────────────────────────────────────────
 
-describe('LinearAdapter — cycle skipping', () => {
+describe('LinearAdapter: cycle skipping', () => {
   it('cycle item is skipped with warning', async () => {
     const result = await adapter.convert([makeCycle('cy-1', 'Sprint 42')])
     expect(result.nodes).toHaveLength(0)
@@ -187,7 +187,7 @@ describe('LinearAdapter — cycle skipping', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('LinearAdapter — status normalisation', () => {
+describe('LinearAdapter: status normalisation', () => {
   it('"Done" state normalises to complete', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Done thing', undefined, { state: 'Done' })])
     expect(result.nodes[0].status).toBe('complete')
@@ -233,7 +233,7 @@ describe('LinearAdapter — status normalisation', () => {
 
 // ─── Cross-domain edges ───────────────────────────────────────────────────────
 
-describe('LinearAdapter — cross-domain edge emission', () => {
+describe('LinearAdapter: cross-domain edge emission', () => {
   it('project_implements_initiative edge is emitted when initiative_id is present', async () => {
     const result = await adapter.convert([
       makeInitiative('init-1', 'Grow retention'),
@@ -249,7 +249,7 @@ describe('LinearAdapter — cross-domain edge emission', () => {
   })
 
   it('project_implements_initiative is NOT emitted when initiative is not in the batch', async () => {
-    // initiative-999 not in items — should silently skip the edge
+    // initiative-999 not in items; should silently skip the edge
     const result = await adapter.convert([
       makeProject('proj-1', 'Auth system', { initiative_id: 'initiative-999' }),
     ])
@@ -285,7 +285,7 @@ describe('LinearAdapter — cross-domain edge emission', () => {
   })
 
   it('bug_affects_feature is NOT emitted when bug parent_id resolves to a non-feature', async () => {
-    // Parent is an epic, not a feature — edge should not fire
+    // Parent is an epic, not a feature; edge should not fire
     const items: SourceItem[] = [
       makeIssue('epic-1', 'Auth epic', 'epic'),
       makeIssue('bug-1', 'Auth crash', 'bug', { parent_id: 'epic-1' }),
@@ -302,7 +302,7 @@ describe('LinearAdapter — cross-domain edge emission', () => {
 
 // ─── list() throws the right error ───────────────────────────────────────────
 
-describe('LinearAdapter — list()', () => {
+describe('LinearAdapter: list()', () => {
   it('requires config.api_key when not provided', async () => {
     await expect(adapter.list({})).rejects.toThrow('Linear adapter requires config.api_key')
   })
@@ -310,7 +310,7 @@ describe('LinearAdapter — list()', () => {
 
 // ─── Edge cases ───────────────────────────────────────────────────────────────
 
-describe('LinearAdapter — edge cases', () => {
+describe('LinearAdapter: edge cases', () => {
   it('returns empty-nodes warning for empty input', async () => {
     const result = await adapter.convert([])
     expect(result.nodes).toHaveLength(0)
@@ -321,7 +321,7 @@ describe('LinearAdapter — edge cases', () => {
     const result = await adapter.convert([
       makeIssue('i-1', 'Feature', 'feature'),
       makeIssue('i-2', 'Bug', 'bug'),
-      makeCycle('cy-1', 'Sprint'), // skipped — should NOT be in source_map
+      makeCycle('cy-1', 'Sprint'), // skipped; should NOT be in source_map
     ])
     expect(Object.keys(result.source_map)).toHaveLength(2)
     expect(result.source_map['cy-1']).toBeUndefined()
