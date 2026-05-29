@@ -3,7 +3,7 @@
  *
  * `skill_audit` reports source-vs-deployed status for every UPG skill. Agents
  * use it to verify that a SKILL.md they're about to recommend is actually the
- * file users will see — closes the source/deployed divergence trust gap.
+ * file users will see; closes the source/deployed divergence trust gap.
  */
 
 import { existsSync, lstatSync, readlinkSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
@@ -30,7 +30,7 @@ export interface SkillAuditRecord {
   in_sync: boolean
   /** Parsed YAML frontmatter from the DEPLOYED file (the source of truth for runtime). */
   deployed_frontmatter: Record<string, unknown> | null
-  /** First heading line (e.g. `# /upg-trace — Walk a Path…`). */
+  /** First heading line (e.g. `# /upg-trace: Walk a Path…`). */
   deployed_first_heading: string | null
   /** Human-readable list of problems. Empty array means everything's healthy. */
   issues: string[]
@@ -67,7 +67,7 @@ function deployedSkillsDir(): string {
  *
  * Returns `null` if the file has no frontmatter block. Anything that requires
  * real YAML (nested objects, arrays, multiline strings) is intentionally not
- * supported — SKILL.md frontmatter is flat by convention.
+ * supported; SKILL.md frontmatter is flat by convention.
  */
 function parseFrontmatter(body: string): Record<string, unknown> | null {
   if (!body.startsWith('---\n')) return null
@@ -112,7 +112,7 @@ function auditOne(name: string): SkillAuditRecord {
   const deployedExists = existsSync(deployedPath)
 
   if (!sourceExists) issues.push('Canonical source SKILL.md is missing')
-  if (!deployedExists) issues.push('Deployed SKILL.md is missing — run ./scripts/link-skills.sh')
+  if (!deployedExists) issues.push('Deployed SKILL.md is missing; run ./scripts/link-skills.sh')
 
   let isSymlink = false
   let symlinkTarget: string | null = null
@@ -121,7 +121,7 @@ function auditOne(name: string): SkillAuditRecord {
     isSymlink = stat.isSymbolicLink()
     if (isSymlink) {
       symlinkTarget = readlinkSync(deployedDir)
-      // Canonicalise both sides before comparing — on macOS, /tmp ↔ /private/tmp
+      // Canonicalise both sides before comparing; on macOS, /tmp ↔ /private/tmp
       // and other symlink-in-path situations make a string compare unreliable.
       const targetReal = canonicalisePath(symlinkTarget)
       const expectedReal = canonicalisePath(sourceDir)
@@ -129,7 +129,7 @@ function auditOne(name: string): SkillAuditRecord {
         issues.push(`Symlink points to ${symlinkTarget}, expected ${sourceDir}`)
       }
     } else if (deployedExists) {
-      issues.push('Deployed entry is a real directory, not a symlink — stale copy will not pick up source updates; run ./scripts/link-skills.sh')
+      issues.push('Deployed entry is a real directory, not a symlink; stale copy will not pick up source updates; run ./scripts/link-skills.sh')
     }
   }
 
@@ -143,7 +143,7 @@ function auditOne(name: string): SkillAuditRecord {
     deployedFrontmatter = parseFrontmatter(deployedBody)
     deployedFirstHeading = firstHeading(deployedBody)
     if (!inSync) {
-      issues.push('Deployed SKILL.md differs from canonical source — symlink is stale or broken')
+      issues.push('Deployed SKILL.md differs from canonical source; symlink is stale or broken')
     }
   } else if (deployedExists) {
     const deployedBody = readFileSync(deployedPath, 'utf8')
@@ -179,7 +179,7 @@ function allSkillNames(): string[] {
 /**
  * Audit one or every UPG skill for source-vs-deployed integrity.
  *
- * Use before recommending a skill to a user — confirms `.claude/skills/<name>/SKILL.md`
+ * Use before recommending a skill to a user; confirms `.claude/skills/<name>/SKILL.md`
  * is a symlink to canonical source and the bodies match. When `in_sync: false`,
  * what the runner read from `packages/upg-mcp-server/skills/` is NOT what the
  * user will experience.

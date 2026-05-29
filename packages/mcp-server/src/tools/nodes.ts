@@ -67,7 +67,7 @@ function checkUnknownProperties(
   }
   const schema = getPropertySchema(entityType)
   if (!schema) {
-    // No schema registered for this type — all properties are allowed.
+    // No schema registered for this type; all properties are allowed.
     return { unknown_properties: [], warning: undefined }
   }
   const unknown = Object.keys(properties).filter((k) => !(k in schema))
@@ -170,7 +170,7 @@ export const listNodes: ToolHandler = (args, ctx): ToolResult => {
           name: 'truncate_at_count_auto',
           apply: () => {
             if (workingNodes.length <= 5) return false
-            // Slice straight to the largest count that fits under soft —
+            // Slice straight to the largest count that fits under soft;
             // soft / initialBytes is the survival ratio. Apply a 0.85 safety
             // factor so the post-truncate estimate lands clearly under.
             const soft = getSoftLimit()
@@ -623,16 +623,16 @@ export const query: ToolHandler = (args, ctx): ToolResult => {
 }
 
 /**
- * — first-use schema hints.
+ *; first-use schema hints.
  *
  * Build a compact hints block when the caller has just created their FIRST
  * node of a given type in this graph. Pulls anti-patterns, the next entity
  * in the domain's creation sequence, and canonical out-edges from
  * `buildEntitySchema`. Intentionally caps the hint surface at the
- * highest-leverage signals — total response stays under ~500 tokens.
+ * highest-leverage signals; total response stays under ~500 tokens.
  *
  * Returns `undefined` when the type has no usable schema slice (no domain
- * guide, no edges out) — silence beats noise.
+ * guide, no edges out); silence beats noise.
  */
 function buildFirstUseHints(canonicalType: string): Record<string, unknown> | undefined {
   let schema: ReturnType<typeof buildEntitySchema>
@@ -679,7 +679,7 @@ function buildFirstUseHints(canonicalType: string): Record<string, unknown> | un
  * `organization`, or `product_area`, the entity is written to
  * `.upg/portfolio.upg` (the portfolio document), NOT to the active product's
  * `nodes[]`. The portfolio document is created on demand. `organization` is a
- * singleton — pass `overwrite_organization: true` to replace an existing one.
+ * singleton; pass `overwrite_organization: true` to replace an existing one.
  * `parent_id` is currently ignored for portfolio-scoped writes (the portfolio
  * document has its own parent edges modelled inside each typed record, e.g.
  * `parent_portfolio_id`).
@@ -743,14 +743,14 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
     )
   }
 
-  // Property type validation — refuses declared-but-mismatched-type values.
+  // Property type validation; refuses declared-but-mismatched-type values.
   // F4 (2026-05-20). Undeclared properties are handled separately above.
   const { violations } = checkPropertyTypes(entityType, properties)
   if (violations.length > 0) {
     return textError(renderPropertyTypeWarning(entityType, violations)!)
   }
 
-  // Length caps — soft warnings only, never refusals. F8 (2026-05-20).
+  // Length caps; soft warnings only, never refusals. F8 (2026-05-20).
   const { warnings: lengthWarnings } = checkLengthCaps({
     title: args.title as string,
     description: args.description as string | undefined,
@@ -767,7 +767,7 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
       .getAllNodes()
       .some((n) => n.type === canonicalTypeForCheck)
   } catch {
-    // Unknown type — let createNodeLib raise the canonical error below.
+    // Unknown type; let createNodeLib raise the canonical error below.
   }
 
 
@@ -889,7 +889,7 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
     }
     if (propWarning) warnings.push(propWarning)
 
-    // Property type validation — refuses declared-but-mismatched-type values.
+    // Property type validation; refuses declared-but-mismatched-type values.
     // F4 (2026-05-20).
     const { violations } = checkPropertyTypes(
       effectiveType,
@@ -900,7 +900,7 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
     }
   }
 
-  // Length caps — soft warnings only, never refusals. F8 (2026-05-20).
+  // Length caps; soft warnings only, never refusals. F8 (2026-05-20).
   const { warnings: lengthWarnings } = checkLengthCaps({
     title: args.title as string | undefined,
     description: args.description as string | undefined,
@@ -1149,7 +1149,7 @@ export const migrateType: ToolHandler = (args, ctx): ToolResult => {
       `No UPG_MIGRATIONS rule for (${fromType} → ${toType}).` +
       availableHint +
       ` Refusing by default to prevent semantic-nonsense type rewrites. ` +
-      `Pass \`force: true\` to override — be aware that all type-specific properties will be carried verbatim and may not match the new type's schema.`,
+      `Pass \`force: true\` to override; be aware that all type-specific properties will be carried verbatim and may not match the new type's schema.`,
     )
   }
 

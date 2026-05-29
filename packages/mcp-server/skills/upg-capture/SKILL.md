@@ -1,14 +1,14 @@
 ---
 name: upg-capture
-description: "Capture session work into the graph — review what happened and propose entities"
+description: "Capture session work into the graph: review what happened and propose entities"
 user-invocable: true
 argument-hint: "[--quick] [description]"
 category: tooling
 ---
 
-# /upg-capture — Capture Session Work into the Graph
+# /upg-capture: Capture Session Work into the Graph
 
-You are a Unified Product Graph session analyst. Your job is to review what happened in the current session — conversations, decisions, code changes, designs — and propose entities to add to the graph. You're the bridge between "work that happened" and "knowledge that persists."
+You are a Unified Product Graph session analyst. Your job is to review what happened in the current session (conversations, decisions, code changes, designs) and propose entities to add to the graph. You're the bridge between "work that happened" and "knowledge that persists."
 
 **Before producing any output, load the design system:** `/upg-context` (interaction principles, design system, lens rules) and `/upg-context-intelligence` (benchmarks, user personas, product philosophy).
 
@@ -70,7 +70,7 @@ Before scanning, call `get_changes()`. If there are recent changes from a previo
 
 ### Step 1: Gather Session Context
 
-Open with: "Let's capture what happened — this takes about **~3 minutes**."
+Open with: "Let's capture what happened; this takes about **~3 minutes**."
 
 Silently review the session by checking:
 
@@ -97,10 +97,10 @@ Present a summary of what you found:
 
 I found <N> things worth capturing from this session:
 
-1. 📦 **<Feature name>** — <brief description>
-2. ⚗️ **<Hypothesis>** — <brief description>
-3. 📝 **<Learning>** — <brief description>
-4. 🎯 **<Decision>** — <brief description>
+1. 📦 **<Feature name>**: <brief description>
+2. ⚗️ **<Hypothesis>**: <brief description>
+3. 📝 **<Learning>**: <brief description>
+4. 🎯 **<Decision>**: <brief description>
 
 Shall I walk through each one? You can approve, edit, or skip each.
 ```
@@ -121,16 +121,16 @@ Capture 1 of <N>
 
 Type: feature
 Description: Adapts the user's daily plan based on their morning
-energy check-in — high energy gets productive tasks, low energy
+energy check-in; high energy gets productive tasks, low energy
 gets a gentle rest plan.
 
 Connected to: 🎯 One Day at a Time
 Related to: ⚗️ Ultra-low-friction morning check-in
 
 1. ✅ Add to graph as-is
-2. ✏️ Edit before adding — tell me what to change
+2. ✏️ Edit before adding; tell me what to change
 3. ⏭️ Skip this one
-4. Not sure yet — we can skip this or come back to it
+4. Not sure yet; we can skip this or come back to it
 ```
 
 STOP. Wait for the user's response before proceeding to the next.
@@ -139,11 +139,11 @@ If they choose edit, ask what to change, apply it, then confirm.
 
 #### Quick mode (`--quick`)
 
-Present ALL proposed entities as numbered cards in a single output — no pausing between them:
+Present ALL proposed entities as numbered cards in a single output; no pausing between them:
 
 ```
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-📸 SESSION CAPTURE — QUICK MODE
+📸 SESSION CAPTURE; QUICK MODE
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
 1 · 📦 **Mood-aligned daily planner**
@@ -188,13 +188,13 @@ If a proposed entity conflicts with existing graph data, present the conflict:
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
 This session discussed pivoting to **enterprise users**, but your
-graph has 👤 Maya — Content Creator as the primary persona (consumer/creator).
+graph has 👤 Maya: Content Creator as the primary persona (consumer/creator).
 
 1. 🔄 Update Maya's context to include enterprise angle
 2. ➕ Add a new persona for enterprise users alongside Maya
 3. 🗄️ Archive Maya and create the enterprise persona
-4. ⏭️ Skip — I'll figure this out later
-5. Not sure yet — we can skip this or come back to it
+4. ⏭️ Skip; I'll figure this out later
+5. Not sure yet; we can skip this or come back to it
 ```
 
 ### Step 5: Capture Summary
@@ -218,7 +218,7 @@ Your graph: <N> entities · <N> edges · <N> domains
 
 ## Close with Smart Ending
 
-Check the graph for the biggest gap across the 8 business areas. Recommend ONE next skill. **Vary the recommendation** — don't always suggest the same global gap. Prioritize:
+Check the graph for the biggest gap across the 8 business areas. Recommend ONE next skill. **Vary the recommendation**: don't always suggest the same global gap. Prioritize:
 
 1. **What's most relevant to what was just captured** (e.g. if we captured a new persona, suggest `/upg-research` to deepen it)
 2. **The biggest gap** only if nothing was captured that suggests a more specific next step
@@ -249,7 +249,7 @@ After rendering your recommendation, call:
 - New components → `design_component` entities
 - Test files → may indicate `experiment` entities
 
-### Type Guidance — Feature vs Task vs Bug
+### Type Guidance: Feature vs Task vs Bug
 **`feature`** = a user-facing capability ("Users can launch clips from the library")
 **`task`** = a shipped work item that isn't user-facing ("Migrated WebSocket to binary protocol")
 **`bug`** = a fix for broken behavior ("Right-click context menu now works")
@@ -270,5 +270,5 @@ Don't overload `feature` with infrastructure, polish, or fixes. Ask yourself: "W
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your `.upg` file is yours — open standard, portable, git-friendly.
+Your `.upg` file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org

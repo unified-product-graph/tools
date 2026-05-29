@@ -3,7 +3,7 @@ name: upg-okr-detail
 description: "Detailed OKR builder discovery flow"
 ---
 
-# /upg-okr — Discovery Flow Detail
+# /upg-okr: Discovery Flow Detail
 
 ## Discovery Flow
 
@@ -37,7 +37,7 @@ Want to add a new objective, or work on key results for an existing one?
 
 ### Step 1: Timeframe
 
-> **Phase 1 of 5 — Setting the timeframe** (~8 minutes total)
+> **Phase 1 of 5: Setting the timeframe** (~8 minutes total)
 
 Ask: **"What timeframe are these OKRs for?"**
 
@@ -49,14 +49,14 @@ Ask: **"What timeframe are these OKRs for?"**
 5. H1 (Jan-Jun)
 6. H2 (Jul-Dec)
 7. Annual (full year)
-8. Different timeframe — tell me
+8. Different timeframe; tell me
 ```
 
 STOP. Wait for the answer.
 
 ### Step 2: The Objective
 
-React to the timeframe, then ask: **"What's the objective? This should be qualitative and inspiring — the 'what' you want to achieve, not the number."**
+React to the timeframe, then ask: **"What's the objective? This should be qualitative and inspiring; the 'what' you want to achieve, not the number."**
 
 Check the graph for context to make smart suggestions:
 
@@ -72,13 +72,13 @@ Offer objective options based on what's in the graph:
 1. "<objective based on highest-priority outcome>"
 2. "<objective based on a strategic theme>"
 3. "<objective based on a top opportunity>"
-4. "<objective based on product stage — e.g., 'Prove product-market fit'>"
-5. Something else — what's the big goal?
+4. "<objective based on product stage; e.g., 'Prove product-market fit'>"
+5. Something else; what's the big goal?
 ```
 
 > A great objective is qualitative and inspiring. Not "Increase retention to 65%" (that's a key result). Instead: "Deliver an onboarding experience users love." The objective is the *why*, the key results are the *how we measure*.
 
-Coach if they give a metric as an objective: **"That sounds like a key result — a measurable number. What's the bigger, qualitative goal that number supports?"**
+Coach if they give a metric as an objective: **"That sounds like a key result; a measurable number. What's the bigger, qualitative goal that number supports?"**
 
 STOP. Wait for the answer. Then create the objective:
 
@@ -99,17 +99,17 @@ create_node({
 
 Confirm: "**Your objective is set.** Now let's make it measurable."
 
-### Step 3: Key Results — One at a Time
+### Step 3: Key Results: One at a Time
 
-Ask: **"How will you know you achieved '<Objective>'? Give me the first key result — a specific metric with a target."**
+Ask: **"How will you know you achieved '<Objective>'? Give me the first key result; a specific metric with a target."**
 
 Offer key result options based on the objective and graph context:
 
 ```
-1. "<metric> from <current> to <target>" — <why this measures the objective>
+1. "<metric> from <current> to <target>"; <why this measures the objective>
 2. "<another metric> from <current> to <target>"
 3. "<a leading indicator> from <current> to <target>"
-4. Different metric — tell me what you'd measure
+4. Different metric; tell me what you'd measure
 ```
 
 STOP. Wait for the answer.
@@ -124,7 +124,7 @@ If the user didn't provide specific numbers, ask: **"What's the current value, a
 3. Let me give you the numbers
 ```
 
-> OKR scoring guide: if you achieve 70% of a key result, that's a good outcome. Set targets that are a stretch — if you hit 100% every quarter, your OKRs aren't ambitious enough.
+> OKR scoring guide: if you achieve 70% of a key result, that's a good outcome. Set targets that are a stretch; if you hit 100% every quarter, your OKRs aren't ambitious enough.
 
 STOP. Wait for the answer.
 
@@ -188,10 +188,10 @@ If related entities exist:
 ```
 You have initiatives and features in your graph that might drive this:
 
-1. 🎯 <Existing initiative> — link it to this key result
-2. 📦 <Existing feature> — link it to this key result
+1. 🎯 <Existing initiative>; link it to this key result
+2. 📦 <Existing feature>; link it to this key result
 3. Create a new initiative
-4. Skip — I'll connect initiatives later
+4. Skip; I'll connect initiatives later
 ```
 
 If creating a new initiative:
@@ -230,8 +230,8 @@ create_edge({
 After all key results and initiatives are linked for an objective, ask: **"Any other metrics you want to track alongside these KRs? Think input metrics, guardrail metrics, or health metrics that aren't key results but are important to watch."**
 
 ```
-1. Yes — I have metrics to add
-2. No — the key results cover it
+1. Yes; I have metrics to add
+2. No; the key results cover it
 ```
 
 STOP. Wait for the answer. If they say no, skip to Step 6.
@@ -241,11 +241,11 @@ If yes, ask: **"What metric do you want to track?"**
 Offer metric options based on the objective and key results:
 
 ```
-1. 📊 <input metric> — a leading indicator that feeds into <KR>
-2. 📊 <guardrail metric> — guardrail metrics (things that should NOT get worse while you pursue the objective)
-3. 📊 <health metric> — overall product/team health signal
-4. 📊 <counter-metric> — counter-metrics (the opposite signal — if this moves, something went wrong)
-5. Different metric — tell me what you want to track
+1. 📊 <input metric>; a leading indicator that feeds into <KR>
+2. 📊 <guardrail metric>; guardrail metrics (things that should NOT get worse while you pursue the objective)
+3. 📊 <health metric>; overall product/team health signal
+4. 📊 <counter-metric>; counter-metrics (the opposite signal; if this moves, something went wrong)
+5. Different metric; tell me what you want to track
 ```
 
 STOP. Wait for the answer.
@@ -289,8 +289,8 @@ Ask: **"Any more metrics to track?"** If yes, repeat. If no, move to Step 6.
 Ask: **"Want to add another objective for <timeframe>? Most teams have 2-4 per quarter."**
 
 ```
-1. Yes — I have another objective
-2. That's enough — show me the full OKR set
+1. Yes; I have another objective
+2. That's enough; show me the full OKR set
 ```
 
 If yes, loop back to Step 2. If no, proceed to the summary.
@@ -300,7 +300,7 @@ If yes, loop back to Step 2. If no, proceed to the summary.
 Display the complete OKR set with grade-ability assessment:
 
 ```
-### OKRs — <Timeframe> <Year>
+### OKRs: <Timeframe> <Year>
 
 🎯 <Objective 1>
 ├─ 🎯 <KR 1.1>: <current> → <target>               ⚪ 0%
@@ -313,8 +313,8 @@ Display the complete OKR set with grade-ability assessment:
 │  └─ 🎯 <Initiative>                               🔵 planned
 │
 └─ 📊 Tracked Metrics                                (if created)
-   ├─ 📊 <input metric> — <direction> <unit>         (input)
-   └─ 📊 <guardrail metric> — <direction> <unit>     (guardrail)
+   ├─ 📊 <input metric>; <direction> <unit>         (input)
+   └─ 📊 <guardrail metric>; <direction> <unit>     (guardrail)
 
 🎯 <Objective 2>
 ├─ 🎯 <KR 2.1>: <current> → <target>               ⚪ 0%

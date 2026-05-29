@@ -1,12 +1,12 @@
 ---
 name: upg-migrate
-description: "Migrate deprecated entity types to their replacements — preview changes, then apply safely"
+description: "Migrate deprecated entity types to their replacements: preview changes, then apply safely"
 user-invocable: true
 argument-hint: "[from_type]"
 category: tooling
 ---
 
-# /upg-migrate — Migrate Deprecated Entity Types
+# /upg-migrate: Migrate Deprecated Entity Types
 
 You are a Unified Product Graph migration tool. Your job is to scan the graph for deprecated entity types, show what needs migrating, preview the exact changes, and execute the migration atomically. Nothing happens without a preview first.
 
@@ -20,7 +20,7 @@ Use `mcp__unified-product-graph__get_graph_digest` to confirm final state.
 
 ## Deprecation Table
 
-This mirrors `UPG_MIGRATIONS` in `packages/upg-spec/src/grammar/migrations.ts` — the authoritative source.
+This mirrors `UPG_MIGRATIONS` in `packages/upg-spec/src/grammar/migrations.ts`; the authoritative source.
 
 ### v0.1.0 migrations
 
@@ -32,7 +32,7 @@ This mirrors `UPG_MIGRATIONS` in `packages/upg-spec/src/grammar/migrations.ts` �
 | `north_star_metric` | `metric` | `designation: "north_star"` |
 | `input_metric` | `metric` | `designation: "input"` |
 | `metric_definition` | `metric` | `has_implementation: false` |
-| `research_insight` | `insight` | — |
+| `research_insight` | `insight` | |
 | `finding` | `insight` | `insight_level: "finding"` |
 | `ux_insight` | `insight` | `source_domain: "ux"` |
 | `highlight` | `observation` | `is_highlighted: true` |
@@ -43,27 +43,27 @@ This mirrors `UPG_MIGRATIONS` in `packages/upg-spec/src/grammar/migrations.ts` �
 | `security_incident` | `incident` | `incident_type: "security"` |
 | `defect_report` | `support_ticket` | `ticket_designation: "defect"` |
 | `onboarding_flow` | `user_flow` | `flow_type: "onboarding"` |
-| `nps_score` | `nps_campaign` | — |
+| `nps_score` | `nps_campaign` | |
 
 ### v0.2.0 migrations
 
 | Deprecated | Replacement | Default Properties |
 |---|---|---|
-| `jtbd` | `job` | — |
-| `how_might_we` | `design_question` | — |
+| `jtbd` | `job` | |
+| `how_might_we` | `design_question` | |
 | `architecture_decision` | `decision` | `layer: "engineering"` |
 | `design_decision` | `decision` | `layer: "design"` |
 | `product_decision` | `decision` | `layer: "product"` |
-| `sli` | `service_level_indicator` | — |
-| `slo` | `service_level_objective` | — |
-| `sla` | `service_level_agreement` | — |
-| `customer_segment_bm` | `market_segment` | — |
-| `target_customer_segment` | `market_segment` | — |
+| `sli` | `service_level_indicator` | |
+| `slo` | `service_level_objective` | |
+| `sla` | `service_level_agreement` | |
+| `customer_segment_bm` | `market_segment` | |
+| `target_customer_segment` | `market_segment` | |
 | `channel_bm` | `distribution_channel` | `phase: "delivery"` |
-| `campaign` | `growth_campaign` | — |
-| `segment` | `behavioral_segment` | — |
-| `package` | `pricing_tier` | — |
-| `internal_doc` | `document` | — |
+| `campaign` | `growth_campaign` | |
+| `segment` | `behavioral_segment` | |
+| `package` | `pricing_tier` | |
+| `internal_doc` | `document` | |
 
 ## Flow
 
@@ -75,7 +75,7 @@ Silently call `list_nodes({ limit: 200 })`. Check each node's type against the d
 
 **If no deprecated types found:**
 ```
-✅ Your graph is up to date — no deprecated types found.
+✅ Your graph is up to date; no deprecated types found.
 ```
 Then show the standard footer and stop.
 
@@ -136,11 +136,11 @@ Your graph is now using the latest UPG type names.
 
 - **Preview before acting.** Always show what will change. The dry run option exists for a reason.
 - **Atomic per type.** Each type migration is one MCP call. If one fails, the others still work.
-- **Show edge renames.** This is the part users cannot figure out themselves — make it visible.
+- **Show edge renames.** This is the part users cannot figure out themselves; make it visible.
 - **Mention the defaults.** When `pain_point` becomes `need` with `valence: "pain"`, explain what that property means.
 - **Suggest /upg-snapshot.** After a migration, save a checkpoint.
 - **One question.** Pick a plan, execute, done. Not 49 individual confirmations.
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org

@@ -1,12 +1,12 @@
 ---
 name: upg-workspace
-description: "Manage your UPG workspace — list products, switch between them, add new ones"
+description: "Manage your UPG workspace: list products, switch between them, add new ones"
 user-invocable: true
 argument-hint: "[list|switch|add|init]"
 category: tooling
 ---
 
-# /upg-workspace — Manage Your Product Workspace
+# /upg-workspace: Manage Your Product Workspace
 
 Manage multiple product graphs. Fast, direct, sub-commands keep it tight. Read `/upg-context` before producing output.
 
@@ -20,13 +20,13 @@ Manage multiple product graphs. Fast, direct, sub-commands keep it tight. Read `
 
 Check if `.upg/workspace.json` exists (Bash). Call `list_local_products` for entity counts.
 
-**Workspace mode** (workspace.json exists) — read `default_product` to mark active:
+**Workspace mode** (workspace.json exists); read `default_product` to mark active:
 ```
 ## Your UPG Workspace
   📁 .upg/ (workspace mode)
-  1. ● My SaaS (active) — 42 entities, mvp stage
-  2. ○ Client Project — 12 entities, idea stage
-  3. ○ Internal Tools — 8 entities, idea stage
+  1. ● My SaaS (active); 42 entities, mvp stage
+  2. ○ Client Project; 12 entities, idea stage
+  3. ○ Internal Tools; 8 entities, idea stage
   Switch: /upg-workspace switch <number>
   Add:    /upg-workspace add
 ```
@@ -35,7 +35,7 @@ Check if `.upg/workspace.json` exists (Bash). Call `list_local_products` for ent
 ```
 ## Your UPG Workspace
   📄 Single-file mode (product.upg)
-  ● My SaaS — 42 entities, mvp stage
+  ● My SaaS; 42 entities, mvp stage
   Want multiple products? Run /upg-workspace init
 ```
 If multiple loose files, number them and suggest `init`. If zero files, point to `/upg-init`.
@@ -52,7 +52,7 @@ If multiple loose files, number them and suggest `init`. If zero files, point to
 
 ## `add`
 
-1. Ask: **"What's the name of the new product?"** — one question, STOP, wait.
+1. Ask: **"What's the name of the new product?"**: one question, STOP, wait.
 2. Create blank .upg file via Bash. Path: `.upg/<kebab-slug>.upg` if workspace mode, else `<kebab-slug>.upg` in cwd. Generate id: `node -e "import('nanoid').then(m => console.log(m.nanoid(16)))"`. File structure:
    ```json
    { "upg_version": "0.5.0", "exported_at": "<now>",
@@ -60,8 +60,8 @@ If multiple loose files, number them and suggest `init`. If zero files, point to
      "product": { "id": "<nanoid>", "title": "<title>", "stage": "idea" },
      "nodes": [], "edges": [] }
    ```
-3. If workspace mode, update workspace.json — add to `products` array.
-4. Confirm: `✓ Created **Client Project** (.upg/client-project.upg)` — then ask "Switch to it now? [Y/n]". If yes, run switch logic.
+3. If workspace mode, update workspace.json; add to `products` array.
+4. Confirm: `✓ Created **Client Project** (.upg/client-project.upg)`, then ask "Switch to it now? [Y/n]". If yes, run switch logic.
 
 ---
 
@@ -93,11 +93,11 @@ Otherwise:
 - Active product = `●` filled dot. Others = `○` open dot.
 - Number products starting at 1. Users switch by number, not file path.
 - Show entity count (nodes) and stage for each product.
-- No unnecessary questions — `list` and `switch` need zero extra input.
+- No unnecessary questions: `list` and `switch` need zero extra input.
 - Standard footer on every output:
 
 ```
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 ```

@@ -7,7 +7,7 @@ category: cognitive
 approaches: [inspect]
 ---
 
-# /upg-tree — Framework-Aware Tree View
+# /upg-tree: Framework-Aware Tree View
 
 You are a Unified Product Graph tree renderer. Your job is to display the product graph as a hierarchical tree, optionally filtered through a named framework pattern. You know the frameworks and can render any tree archetype.
 
@@ -20,49 +20,49 @@ Use `mcp__unified-product-graph__query` for tree fetching (one call per tree) an
 ## Usage
 
 ```
-/upg-tree              — Auto-detect best tree based on graph contents
-/upg-tree ost          — Opportunity Solution Tree
-/upg-tree okr          — Objectives & Key Results
-/upg-tree user         — Persona → JTBD → Pain Point chain
-/upg-tree product      — Product → Feature → Epic → User Story
-/upg-tree validation   — Hypothesis → Experiment → Learning
-/upg-tree strategy     — Vision → Mission → Strategic Theme → Initiative → Outcome
+/upg-tree: Auto-detect best tree based on graph contents
+/upg-tree ost: Opportunity Solution Tree
+/upg-tree okr: Objectives & Key Results
+/upg-tree user: Persona → JTBD → Pain Point chain
+/upg-tree product: Product → Feature → Epic → User Story
+/upg-tree validation: Hypothesis → Experiment → Learning
+/upg-tree strategy: Vision → Mission → Strategic Theme → Initiative → Outcome
 ```
 
 ## Named Tree Patterns
 
-### `ost` — Opportunity Solution Tree
+### `ost`: Opportunity Solution Tree
 
 **Origin:** Teresa Torres, *"Continuous Discovery Habits"*, 2021
 **Question:** "How do we discover the best path from outcome to solution?"
 **Chain:** 🎯 outcome → 💡 opportunity → 🔧 solution → ⚗️ hypothesis → 🧪 experiment_plan
 **Edges:** outcome_reveals_opportunity → opportunity_drives_solution → solution_proposes_hypothesis → hypothesis_requires_experiment_plan
 
-### `okr` — Objectives & Key Results
+### `okr`: Objectives & Key Results
 
 **Origin:** John Doerr, adapted from Andy Grove (Intel), 1999
 **Question:** "What are we trying to achieve, and how do we know?"
 **Chain:** 🎯 objective → 🎯 key_result → 🎯 initiative
 
-### `user` — User Discovery Tree
+### `user`: User Discovery Tree
 
 **Origin:** Clayton Christensen, Jobs-to-be-Done theory, 2003
 **Question:** "Who are our users, what jobs are they hiring us for, and where does it hurt?"
 **Chain:** 👤 persona → 💼 job → 🔥 need
 
-### `product` — Product Breakdown Tree
+### `product`: Product Breakdown Tree
 
 **Origin:** Standard agile product management
 **Question:** "What are we shipping, and how is it broken down?"
 **Chain:** 🎯 product → 📦 feature → 📋 epic → 📄 user_story
 
-### `validation` — Validation Tree
+### `validation`: Validation Tree
 
 **Origin:** Eric Ries, *"The Lean Startup"*, 2011
 **Question:** "What are we betting, how are we testing, and what have we learned?"
 **Chain:** ⚗️ hypothesis → 🧪 experiment → 📝 learning
 
-### `strategy` — Strategic Cascade
+### `strategy`: Strategic Cascade
 
 **Origin:** Roger Martin, *"Playing to Win"*, 2013
 **Question:** "How does the vision cascade down to measurable outcomes?"
@@ -147,7 +147,7 @@ Example rendering (OST):
 │
 ├─ 💡 Users don't get value in first 5 min
 │     reach ● ● ● ● ●   pain ● ● ● ● ○   freq ● ● ● ○ ○
-│     (no solutions — /upg-explore a solution)
+│     (no solutions; /upg-explore a solution)
 │
 └─ 💡 Onboarding asks for too much upfront
       reach ● ● ● ● ○   pain ● ● ● ○ ○   freq ● ● ● ● ○
@@ -157,7 +157,7 @@ Example rendering (OST):
 Example rendering (User tree):
 
 ```
-👤 Sarah Chen — Senior PM at Series B Startup
+👤 Sarah Chen: Senior PM at Series B Startup
 │
 ├─ 💼 Track decisions on mobile
 │  │  type: functional
@@ -195,7 +195,7 @@ After the tree, display outside the code block:
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-*<Framework Name>* — <Creator>, <Year>
+*<Framework Name>*; <Creator>, <Year>
 
 **<N>** entities shown · **<N>** levels deep · <breakdown by type emojis>
 
@@ -227,7 +227,7 @@ If the graph is empty or has no entities matching the requested pattern:
 ## Key Principles
 
 - **Framework attribution matters.** Always credit the framework's creator.
-- **Show properties, not just titles.** A tree of titles is useless — show the data.
+- **Show properties, not just titles.** A tree of titles is useless; show the data.
 - **Auto-detect when possible.** If the user just says `/upg-tree`, pick the most informative view.
 - **Suggest other views.** After rendering one tree, mention the other available patterns.
 - **Follow the design system.** Entity emojis, score dots, filled bars, nested blocks, annotation arrows.

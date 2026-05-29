@@ -45,12 +45,12 @@ async function discoverUPGFile(explicitFile?: string): Promise<string | null> {
             p.file === workspace.default_product,
         )?.title ?? workspace.default_product
       process.stderr.write(
-        `UPG workspace — loading "${title}"\n`,
+        `UPG workspace: loading "${title}"\n`,
       )
       return filePath
     }
   } catch {
-    // No workspace.json — check if .upg/ dir has .upg files and auto-create workspace.json
+    // No workspace.json; check if .upg/ dir has .upg files and auto-create workspace.json
     const upgDir = path.join(cwd, '.upg')
     try {
       const dirEntries = await fs.readdir(upgDir)
@@ -74,14 +74,14 @@ async function discoverUPGFile(explicitFile?: string): Promise<string | null> {
         }
         await fs.writeFile(workspacePath, JSON.stringify(workspace, null, 2) + '\n', 'utf-8')
         process.stderr.write(
-          `UPG workspace — auto-created workspace.json (${upgFiles.length} product${upgFiles.length > 1 ? 's' : ''})\n`,
+          `UPG workspace: auto-created workspace.json (${upgFiles.length} product${upgFiles.length > 1 ? 's' : ''})\n`,
         )
         const filePath = path.join(upgDir, upgFiles[0])
-        process.stderr.write(`UPG workspace — loading "${products[0].title}"\n`)
+        process.stderr.write(`UPG workspace: loading "${products[0].title}"\n`)
         return filePath
       }
     } catch {
-      // .upg/ dir doesn't exist — continue to Tier 3
+      // .upg/ dir doesn't exist; continue to Tier 3
     }
   }
 
@@ -94,12 +94,12 @@ async function discoverUPGFile(explicitFile?: string): Promise<string | null> {
     }
     if (upgFiles.length > 1) {
       process.stderr.write(
-        `Found ${upgFiles.length} .upg files — loading ${upgFiles[0]}. Use --file to pick a specific one.\n`,
+        `Found ${upgFiles.length} .upg files: loading ${upgFiles[0]}. Use --file to pick a specific one.\n`,
       )
       return path.resolve(upgFiles[0])
     }
   } catch {
-    // readdir failed — continue to Tier 4
+    // readdir failed; continue to Tier 4
   }
 
   // Tier 4: nothing found
@@ -203,7 +203,7 @@ export async function runMcpServer() {
   const server = createServer(store)
   await server.start()
 
-  process.stderr.write(`UPG MCP server running — ${resolvedPath}\n`)
+  process.stderr.write(`UPG MCP server running: ${resolvedPath}\n`)
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -222,11 +222,11 @@ export async function runMcpServer() {
 //
 // We compare *realpaths*, not the raw strings. `process.argv[1]` is the literal
 // invocation path, while `import.meta.url` is symlink-resolved by the ESM
-// loader. They diverge whenever a symlink sits anywhere in the path — npx
+// loader. They diverge whenever a symlink sits anywhere in the path; npx
 // `.bin` shims, macOS `/tmp` → `/private/tmp`, and global installs all do this.
 // A raw-string compare would then evaluate false, the server would never start,
 // and `node dist/index.js` / `npx @unified-product-graph/mcp-server` would
-// silently exit 0 — which surfaces to MCP clients as "Failed to connect".
+// silently exit 0, which surfaces to MCP clients as "Failed to connect".
 import { fileURLToPath } from 'node:url'
 import { realpathSync } from 'node:fs'
 

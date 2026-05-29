@@ -73,13 +73,13 @@ function makeCtx(store: UPGFileStore): ToolContext {
   }
 }
 
-function parseBody(result: ToolResult | Promise<ToolResult>): unknown {
-  const r = result as ToolResult
+async function parseBody(result: ToolResult | Promise<ToolResult>): Promise<unknown> {
+  const r = (await result) as ToolResult
   return JSON.parse(r.content[0].text)
 }
 
-function isErrorResult(result: ToolResult | Promise<ToolResult>): boolean {
-  return (result as ToolResult).isError === true
+async function isErrorResult(result: ToolResult | Promise<ToolResult>): Promise<boolean> {
+  return ((await result) as ToolResult).isError === true
 }
 
 // ── — batch_create_nodes silent orphans ──────────────────────────────
@@ -152,13 +152,13 @@ describe(' — batch_create_nodes orphan warning', () => {
 // ── — resolve_edge_for_pair anchor hint on null ──────────────────────
 
 describe(' — resolve_edge_for_pair anchor_hint', () => {
-  it('returns anchor_hint with domain_anchor when target is anchored cross-domain', () => {
+  it('returns anchor_hint with domain_anchor when target is anchored cross-domain', async () => {
     // product → ideal_customer_profile: ICP is anchored in gtm_strategy.
     const result = resolveEdgeForPair(
       { source_type: 'product', target_type: 'ideal_customer_profile' },
       {} as never,
     )
-    const body = parseBody(result) as Record<string, unknown>
+    const body = await parseBody(result) as Record<string, unknown>
     expect(body.edge_type).toBeNull()
     expect(body.anchor_hint).toBeDefined()
     const hint = body.anchor_hint as Record<string, unknown>
@@ -170,20 +170,20 @@ describe(' — resolve_edge_for_pair anchor_hint', () => {
     expect((hint.hint as string).includes('gtm_strategy')).toBe(true)
   })
 
-  it('omits anchor_hint when edge_type resolves canonically', () => {
+  it('omits anchor_hint when edge_type resolves canonically', async () => {
     // persona → job: persona_pursues_job is canonical.
     const result = resolveEdgeForPair(
       { source_type: 'persona', target_type: 'job' },
       {} as never,
     )
-    const body = parseBody(result) as Record<string, unknown>
+    const body = await parseBody(result) as Record<string, unknown>
     expect(body.edge_type).toBeTruthy()
     expect(body.anchor_hint).toBeUndefined()
     expect(body.alternate_anchors).toBeUndefined()
     expect(body.adjacent_edges).toBeUndefined()
   })
 
-  it('returns no anchor_hint when the target is its own anchor and the source shares its domain', () => {
+  it('returns no anchor_hint when the target is its own anchor and the source shares its domain', async () => {
     // job → desired_outcome with persona as the user-domain anchor — the
     // hint logic suppresses circular advice when source is already in the
     // anchored domain. (Note: job→desired_outcome IS canonical, so we use a
@@ -196,12 +196,12 @@ describe(' — resolve_edge_for_pair anchor_hint', () => {
 // ── — alternate_anchors + adjacent_edges ─────────────────────────────
 
 describe(' — resolver UX alternates', () => {
-  it('returns non-empty alternate_anchors + adjacent_edges for product → ideal_customer_profile', () => {
+  it('returns non-empty alternate_anchors + adjacent_edges for product → ideal_customer_profile', async () => {
     const result = resolveEdgeForPair(
       { source_type: 'product', target_type: 'ideal_customer_profile' },
       {} as never,
     )
-    const body = parseBody(result) as Record<string, unknown>
+    const body = await parseBody(result) as Record<string, unknown>
 
     // alternate_anchors: edges INTO ideal_customer_profile from a source !== product.
     expect(Array.isArray(body.alternate_anchors)).toBe(true)
@@ -227,7 +227,7 @@ describe(' — resolver UX alternates', () => {
     }
   })
 
-  it('buildAlternateAnchors returns entries sorted hierarchy → cross-domain', () => {
+  it('buildAlternateAnchors returns entries sorted hierarchy → cross-domain', async () => {
     // Pick a target known to have multiple incoming sources at different
     // classifications. `need` has both hierarchy and cross-domain incoming
     // edges.
@@ -239,7 +239,7 @@ describe(' — resolver UX alternates', () => {
     expect(new Set(sourceTypes).size).toBe(sourceTypes.length)
   })
 
-  it('buildAdjacentEdges returns at most 3 rows from a high-degree source', () => {
+  it('buildAdjacentEdges returns at most 3 rows from a high-degree source', async () => {
     // `product` is the spine of the catalog — many outgoing edges.
     const rows = buildAdjacentEdges('product')
     expect(rows.length).toBeGreaterThan(0)
@@ -248,7 +248,7 @@ describe(' — resolver UX alternates', () => {
     for (const r of rows) expect(r.source_type).toBe('product')
   })
 
-  it('skips polymorphic wildcards in alternate_anchors', () => {
+  it('skips polymorphic wildcards in alternate_anchors', async () => {
     // No wildcard ('*') source/target should leak into the results.
     const rows = buildAlternateAnchors('product', 'persona')
     for (const r of rows) expect(r.source_type).not.toBe('*')
@@ -259,10 +259,10 @@ describe(' — resolver UX alternates', () => {
     // for the createEdgeLib to reach the inference step.
     const store = await makeStore()
     const ctx = makeCtx(store)
-    const productNode = parseBody(
+    const productNode = await parseBody(
       createNode({ type: 'product', title: 'P' }, ctx),
     ) as { node: { id: string } }
-    const icpNode = parseBody(
+    const icpNode = await parseBody(
       createNode({ type: 'ideal_customer_profile', title: 'ICP' }, ctx),
     ) as { node: { id: string } }
 
@@ -270,8 +270,8 @@ describe(' — resolver UX alternates', () => {
       { source_id: productNode.node.id, target_id: icpNode.node.id },
       ctx,
     )
-    expect(isErrorResult(result)).toBe(true)
-    const body = parseBody(result) as Record<string, unknown>
+    expect(await isErrorResult(result)).toBe(true)
+    const body = await parseBody(result) as Record<string, unknown>
     expect(body.error).toBeDefined()
     expect(body.source_type).toBe('product')
     expect(body.target_type).toBe('ideal_customer_profile')
@@ -282,10 +282,10 @@ describe(' — resolver UX alternates', () => {
   it('batch_create_edges surfaces enrichment hints on a "no canonical edge" failure', async () => {
     const store = await makeStore()
     const ctx = makeCtx(store)
-    const productNode = parseBody(
+    const productNode = await parseBody(
       createNode({ type: 'product', title: 'P' }, ctx),
     ) as { node: { id: string } }
-    const icpNode = parseBody(
+    const icpNode = await parseBody(
       createNode({ type: 'ideal_customer_profile', title: 'ICP' }, ctx),
     ) as { node: { id: string } }
 
@@ -295,8 +295,8 @@ describe(' — resolver UX alternates', () => {
       },
       ctx,
     )
-    expect(isErrorResult(result)).toBe(true)
-    const body = parseBody(result) as Record<string, unknown>
+    expect(await isErrorResult(result)).toBe(true)
+    const body = await parseBody(result) as Record<string, unknown>
     expect(body.error).toBeDefined()
     expect(body.source_type).toBe('product')
     expect(body.target_type).toBe('ideal_customer_profile')
@@ -315,8 +315,8 @@ describe(' — create_node first-use hints', () => {
     ctx = makeCtx(store)
   })
 
-  it('attaches hints with anti_patterns on the FIRST node of a type', () => {
-    const result = parseBody(createNode({ type: 'vision', title: 'V1' }, ctx)) as Record<
+  it('attaches hints with anti_patterns on the FIRST node of a type', async () => {
+    const result = await parseBody(createNode({ type: 'vision', title: 'V1' }, ctx)) as Record<
       string,
       unknown
     >
@@ -331,26 +331,26 @@ describe(' — create_node first-use hints', () => {
     expect((hints.canonical_edges_out as unknown[]).length).toBeGreaterThan(0)
   })
 
-  it('omits hints on the second-and-later node of the same type', () => {
-    parseBody(createNode({ type: 'vision', title: 'V1' }, ctx))
-    const second = parseBody(createNode({ type: 'vision', title: 'V2' }, ctx)) as Record<
+  it('omits hints on the second-and-later node of the same type', async () => {
+    await parseBody(createNode({ type: 'vision', title: 'V1' }, ctx))
+    const second = await parseBody(createNode({ type: 'vision', title: 'V2' }, ctx)) as Record<
       string,
       unknown
     >
     expect(second.hints).toBeUndefined()
   })
 
-  it('emits hints again for a different type even after another type was seeded', () => {
-    parseBody(createNode({ type: 'vision', title: 'V1' }, ctx))
-    const personaResult = parseBody(
+  it('emits hints again for a different type even after another type was seeded', async () => {
+    await parseBody(createNode({ type: 'vision', title: 'V1' }, ctx))
+    const personaResult = await parseBody(
       createNode({ type: 'persona', title: 'Maya' }, ctx),
     ) as Record<string, unknown>
     expect(personaResult.hints).toBeDefined()
   })
 
-  it('honours canonical resolution: alias-typed first node hints against the canonical schema', () => {
+  it('honours canonical resolution: alias-typed first node hints against the canonical schema', async () => {
     // `jtbd` is an alias for `job`. The hints should reference `job`.
-    const result = parseBody(
+    const result = await parseBody(
       createNode({ type: 'jtbd', title: 'Ship faster' }, ctx),
     ) as Record<string, unknown>
     if (result.hints) {
@@ -358,7 +358,7 @@ describe(' — create_node first-use hints', () => {
       expect((hints.schema_call as string).includes('job')).toBe(true)
     }
     // Second `job` call should not get hints.
-    const second = parseBody(
+    const second = await parseBody(
       createNode({ type: 'job', title: 'Save time' }, ctx),
     ) as Record<string, unknown>
     expect(second.hints).toBeUndefined()

@@ -104,7 +104,7 @@ import {
   type UPGLifecycle,
   type UPGScaleDefinition,
   type UPGDomainRing,
-  // Framework catalog — sourced from core's CANONICAL surface (34), not the
+  // Framework catalog; sourced from core's CANONICAL surface (34), not the
   // internal @unified-product-graph/frameworks research library (216). The
   // public tool surface advertises only the curated canonical set; research
   // frameworks are promoted into canonical.ts incrementally as reviewed.
@@ -141,7 +141,7 @@ function clampLimit(raw: unknown, def: number, max: number): number {
 
 function decodeCursor(raw: unknown): number {
   if (typeof raw !== 'string' || raw.length === 0) return 0
-  // Cursor format: base64-encoded "offset:N". Tolerant — fall back to 0 on
+  // Cursor format: base64-encoded "offset:N". Tolerant; fall back to 0 on
   // malformed input rather than erroring (matches `list_nodes` UX).
   try {
     const decoded = Buffer.from(raw, 'base64').toString('utf-8')
@@ -332,25 +332,25 @@ export const getApproach: ToolHandler = (args): ToolResult => {
 
 // ── Approach verb handlers ────────────────────────────────────────
 //
-// Five bare-verb handlers — `plan`, `inspect`, `prioritise`, `trace`,
-// `reflect` — exposed as direct MCP tools (no `apply_*` prefix). Each
+// Five bare-verb handlers; `plan`, `inspect`, `prioritise`, `trace`,
+// `reflect`; exposed as direct MCP tools (no `apply_*` prefix). Each
 // handler validates inputs, walks the live graph + spec catalog to compute
 // the structured projection promised by the approach's `signature_hint`,
 // and wraps the result in the family-resemblance envelope
 // `{ approach_id, scope, generated_at, approach, ...payload }`.
 //
 // Execution semantics (per tool):
-//   - `prioritise` — evaluates the framework's `computed_properties`
+//   - `prioritise`: evaluates the framework's `computed_properties`
 //     expression for each candidate (RICE, ICE, WSJF, …). Falls back to
 //     `execution_mode: "definition_lookup_v0_4_0"` for frameworks without a
 //     formula (kano-model, moscow, …) so the LLM can synthesise.
-//   - `inspect` — wraps `validate_graph` + filters by scope (region or
+//   - `inspect`: wraps `validate_graph` + filters by scope (region or
 //     entities). Returns a flat severity-ordered violations array.
-//   - `plan` — gap analysis from canonical creation sequences vs current
+//   - `plan`: gap analysis from canonical creation sequences vs current
 //     coverage; emits a missing-entities backlog with hints.
-//   - `trace` — pure BFS walker over the typed path; halts with a partial
+//   - `trace`: pure BFS walker over the typed path; halts with a partial
 //     trail when no canonical edge resolves for a hop.
-//   - `reflect` — emits structured prompts based on graph topology +
+//   - `reflect`: emits structured prompts based on graph topology +
 //     mode (assumptions / alternatives / blind-spots / load-bearing).
 //
 // Executors live in `lib/approach-execution.ts` so the verb handlers stay
@@ -386,7 +386,7 @@ function approachEnvelope(
  * already populated in the graph, and returns an ordered missing-entities
  * backlog plus a coverage ratio.
  *
- * Ordering follows `creation_sequence` position — foundational gaps surface
+ * Ordering follows `creation_sequence` position; foundational gaps surface
  * before late-stage ones. Each row carries `entity_type`, `domain`,
  * `position_in_sequence`, `typical_parent_type`, and a `hint` the LLM can
  * relay verbatim or rewrite.
@@ -440,9 +440,9 @@ export const plan: ToolHandler = (args, ctx): ToolResult => {
  * Rows are ordered severity high → medium → low.
  *
  * Scope filters:
- *   - `region` — drops violations whose target entity types fall outside
+ *   - `region`: drops violations whose target entity types fall outside
  *     the region's entity memberships.
- *   - `entities` — drops drift rows whose `id` isn't in the candidate set
+ *   - `entities`: drops drift rows whose `id` isn't in the candidate set
  *     (anti-pattern violations match by type so they pass through).
  *
  * @returns JSON envelope: `{ approach_id, scope, generated_at, approach,
@@ -545,7 +545,7 @@ export const prioritise: ToolHandler = (args, ctx): ToolResult => {
     })
   }
 
-  // Fallback: framework has no computed expression — surface the LLM hint.
+  // Fallback: framework has no computed expression; surface the LLM hint.
   return approachEnvelope('prioritise', candidates, {
     params: { candidates, framework_id: frameworkId },
     framework_resolved: execResult.framework_used,
@@ -636,13 +636,13 @@ export const trace: ToolHandler = (args, ctx): ToolResult => {
  *
  * Emits structured reflection prompts based on graph topology + mode:
  *
- *   - `assumptions` — find `assumption` entities + drafted hypotheses; one
+ *   - `assumptions`: find `assumption` entities + drafted hypotheses; one
  *     prompt per asks for falsification evidence.
- *   - `alternatives` — find parents with multiple siblings of the same type
+ *   - `alternatives`: find parents with multiple siblings of the same type
  *     and prompt "did you consider alternatives outside this set?"
- *   - `blind-spots` — find canonical domains with zero entities and prompt
+ *   - `blind-spots`: find canonical domains with zero entities and prompt
  *     "is that intentional or unmodeled?"
- *   - `load-bearing` — surface the top entities by incoming-edge count and
+ *   - `load-bearing`: surface the top entities by incoming-edge count and
  *     prompt "if this changes, what depends on it?"
  *
  * Omitting `mode` returns an open-reflection mix: the most informative 1–3
@@ -756,7 +756,7 @@ export const getDomainGuide: ToolHandler = (args): ToolResult => {
 // ── Frameworks ──────────────────────────────────────────────────────────────
 
 /**
- * List the canonical UPGFramework definitions — the 34 curated, famous
+ * List the canonical UPGFramework definitions; the 34 curated, famous
  * frameworks that anchor the public catalog (spanning strategy, discovery,
  * prioritisation, design, growth, engineering, and the reflection classics).
  * Paginated (default `limit: 50`, max 200).
@@ -1017,12 +1017,12 @@ export const getSpecVersion: ToolHandler = (): ToolResult => {
  * with up to three hint blocks so the failure boundary becomes a teaching
  * moment:
  *
- * - `anchor_hint` — the target's domain anchor + creation sequence, so the
+ * - `anchor_hint`: the target's domain anchor + creation sequence, so the
  *   author can route via the correct entry point (e.g. `gtm_strategy` for
  *   `ideal_customer_profile`).
- * - `alternate_anchors` — up to 3 other source types in the catalog that
+ * - `alternate_anchors`: up to 3 other source types in the catalog that
  *   reach the requested target. Sorted hierarchy → cross-domain.
- * - `adjacent_edges` — up to 3 edges that DO start from the requested
+ * - `adjacent_edges`: up to 3 edges that DO start from the requested
  *   source. Helps the author discover what they CAN reach.
  *
  * @returns JSON: `{ source_type, target_type, edge_type: string | null,
@@ -1715,7 +1715,7 @@ export const listLifecycles: ToolHandler = (args): ToolResult => {
 
   // when `lifecycle_only` is true, omit the free/planned blocks
   // entirely (matches the wire-shape `description`). Previously returned
-  // empty arrays — wire bloat that callers asking for lifecycle-only
+  // empty arrays; wire bloat that callers asking for lifecycle-only
   // didn't want. Identical fix landed on cloud + downstream HTTP MCP for
   // tri-server parity.
   return text(

@@ -29,7 +29,7 @@ export const CLI_PLAYBOOK_BINDING = {
   renderer: 'text-prompt' as const,
 }
 
-/** Render a single step as a plain-text prompt — structure resolved to text only. */
+/** Render a single step as a plain-text prompt; structure resolved to text only. */
 export function renderCliStep(step: Step): string {
   const header = `[step ${step.order} · ${step.phase}]`
   switch (step.kind) {
@@ -49,7 +49,7 @@ export function renderCliStep(step: Step): string {
 }
 
 /**
- * Minimal in-memory runtime backed by a playbook registry. No persistence —
+ * Minimal in-memory runtime backed by a playbook registry. No persistence;
  * reference implementation for the shared contract. Real runs write through
  * to the `.upg` store.
  */
@@ -123,7 +123,7 @@ export function createInMemoryCliRuntime(
 
 /**
  * The CLI runtime backed by the canonical playbook registry shipped in
- * `@unified-product-graph/core`. This is what `/upg-explore` reaches for —
+ * `@unified-product-graph/core`. This is what `/upg-explore` reaches for;
  * any playbook in the registry becomes instantly runnable on the CLI surface
  * with no extra code.
  */

@@ -29,7 +29,7 @@ export type ResolvedStep =
         target_domain: string
         when: string
       }[]
-      /** Common mistakes agents make — surface to the user. */
+      /** Common mistakes agents make; surface to the user. */
       anti_patterns: readonly string[]
     }
   | {
@@ -66,7 +66,7 @@ const _guideByDomain = new Map(
  *
  * For `domain_guide` steps, looks up the `DomainUsageGuide` and returns the
  * creation sequence, required bridges, and anti-patterns. Throws if the
- * referenced domain has no guide — that would be a spec drift bug.
+ * referenced domain has no guide; that would be a spec drift bug.
  *
  * For other kinds, the resolver is a near-identity: the step's own fields
  * are the runtime instructions.
@@ -100,7 +100,7 @@ export function resolveStep(step: Step): ResolvedStep {
           when: b.when,
         })),
         // UPGAntiPattern carries name/description/affected_entity/remediation;
-        // ResolvedStep keeps the legacy string[] shape — project to description.
+        // ResolvedStep keeps the legacy string[] shape; project to description.
         anti_patterns: guide.anti_patterns.map((a) => a.description),
       }
     }
@@ -117,5 +117,5 @@ export function resolveStep(step: Step): ResolvedStep {
   }
 }
 
-/** Re-export for convenience — step-kind helpers live in @unified-product-graph/core. */
+/** Re-export for convenience; step-kind helpers live in @unified-product-graph/core. */
 export { isDomainGuideStep }

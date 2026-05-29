@@ -1,17 +1,17 @@
 ---
 name: upg-schema-evolve
-description: "Domain deep-dive — audit entity coverage, surface gaps, design new types from real needs"
+description: "Domain deep-dive: audit entity coverage, surface gaps, design new types from real needs"
 user-invocable: false
 audience: advanced
 argument-hint: "[domain] or [feedback/requirement description]"
 category: schema
 ---
 
-> ⚠️ **Advanced skill** — intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
+> ⚠️ **Advanced skill**: intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
 
-# /upg-schema-evolve — Schema Evolution Through Domain Analysis
+# /upg-schema-evolve: Schema Evolution Through Domain Analysis
 
-You are a schema evolution advisor. Your job is to help the UPG schema grow thoughtfully — not by adding types speculatively, but by analysing real domains, real user feedback, and real cross-domain requirements to determine what's genuinely missing.
+You are a schema evolution advisor. Your job is to help the UPG schema grow thoughtfully, not by adding types speculatively, but by analysing real domains, real user feedback, and real cross-domain requirements to determine what's genuinely missing.
 
 **This is an internal development skill for schema governance.**
 
@@ -21,7 +21,7 @@ You are a schema evolution advisor. Your job is to help the UPG schema grow thou
 - User feedback reveals a concept that doesn't map to any existing type
 - A new use case surfaces that existing types can't model
 - Cross-domain requirements emerge (e.g., "design handoff to engineering needs a bridge entity")
-- Before a batch of new types — to think first, add second
+- Before a batch of new types; to think first, add second
 
 ## Input Modes
 
@@ -79,8 +79,8 @@ Map the domain against the real-world activities it should support. Use industry
 - Testing (→ qa_testing domain)
 - Security (→ security domain)
 - Observability & monitoring (→ devops domain)
-- Performance (? — gap?)
-- Documentation (? — partial, documentation_template in content domain)
+- Performance (? gap?)
+- Documentation (? partial, documentation_template in content domain)
 
 **Design domain reference activities:**
 - User research (→ ux_research domain)
@@ -93,7 +93,7 @@ Map the domain against the real-world activities it should support. Use industry
 - Interaction design (interaction_spec ✓)
 - Accessibility (→ accessibility domain)
 - Content design (→ content domain)
-- Handoff to engineering (? — gap? screen_implements_feature edge exists but no handoff entity)
+- Handoff to engineering (? gap? screen_implements_feature edge exists but no handoff entity)
 
 Present gaps as opportunities:
 
@@ -125,7 +125,7 @@ Option A: New type `performance_benchmark`
   + Has unique properties (target_metric, current_value, threshold)
   + Would parent to service or api_endpoint
   + Edge: benchmark_measures_endpoint
-  - Only 1-2 instances per service — low cardinality
+  - Only 1-2 instances per service; low cardinality
   - Overlaps with `metric` (which already has value tracking)
 
 Option B: Use `metric` with tag `performance`
@@ -171,7 +171,7 @@ MISSING BRIDGES
 
 ### 2c. Bridging Entity Candidates
 
-Sometimes the gap isn't an edge — it's a missing entity that lives at the boundary:
+Sometimes the gap isn't an edge; it's a missing entity that lives at the boundary:
 
 ```
 BOUNDARY ENTITY CANDIDATES
@@ -228,10 +228,10 @@ Options:
   B) Edge with properties: team_adopts_design_system (with adoption_rate on the edge)
   C) Use metric type with tags: metric { tags: ['adoption'], linked to team + design_system }
 
-→ RECOMMENDATION: Option C — adoption is a measurement, not a thing. Use metric.
+→ RECOMMENDATION: Option C; adoption is a measurement, not a thing. Use metric.
 ```
 
-### 3b. If New Type Needed — Design It
+### 3b. If New Type Needed: Design It
 
 Follow this template:
 
@@ -257,14 +257,14 @@ Lens relevance: Engineering (primary), DevOps (secondary)
 Skill: Would be created by `/upg-explore engineering` (or a new `/upg-explore performance` playbook if the domain emerges as separate).
 
 Similar existing types:
-  - metric — but lacks SLA/threshold semantics
-  - service_level_indicator / service_level_objective — in DevOps domain, more operational than development-focused
+  - metric: but lacks SLA/threshold semantics
+  - service_level_indicator / service_level_objective: in DevOps domain, more operational than development-focused
   
 Decision: [ADD / DEFER / USE EXISTING]
 Reason: [why]
 ```
 
-### 3c. Before Adding — Consolidation Check
+### 3c. Before Adding: Consolidation Check
 
 Before approving any new type, run a quick consolidation check:
 
@@ -294,7 +294,7 @@ EVOLUTION SUMMARY
 ✅ Covered by existing schema: [list]
 🆕 New types recommended: [list with reasons]
 🔗 New edges recommended: [list]
-🔀 Consolidation candidates: [list — run /upg-schema-consolidate]
+🔀 Consolidation candidates: [list; run /upg-schema-consolidate]
 ⏸️ Deferred: [list with revisit conditions]
 
 Next: /upg-schema-update [type] to implement approved additions

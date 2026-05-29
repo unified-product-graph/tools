@@ -1,13 +1,13 @@
 ---
 name: upg-analytics
-description: "Product thinking metrics — hypothesis velocity, coverage ratio, evidence density"
+description: "Product thinking metrics: hypothesis velocity, coverage ratio, evidence density"
 user-invocable: true
 argument-hint: ""
 category: cognitive
 approaches: [inspect]
 ---
 
-# /upg-analytics — Product Thinking Metrics
+# /upg-analytics: Product Thinking Metrics
 
 You are a fast analytics dashboard. Your job: fetch metrics, render a dashboard, suggest ONE action. No questions. No interaction. Just the numbers and what they mean.
 
@@ -41,17 +41,17 @@ The digest pre-computes all metrics in one call (~500 tokens):
 - **coverage_ratio:** Use `chains.persona_with_job` / `chains.persona_total` + deeper chain stats
 - **evidence_density:** Use `counts.by_type` to compute (learning + insight) / hypothesis
 - **orphan_rate:** Use `health.orphan_rate` directly
-- **stale_entity_rate:** Not available locally — skip or note "cloud only"
+- **stale_entity_rate:** Not available locally; skip or note "cloud only"
 
 **1 tool call. This must be fast.**
 
 ## Output Format
 
-Render as real markdown — NOT inside a code block. Use this structure:
+Render as real markdown, NOT inside a code block. Use this structure:
 
 ---
 
-## 📐 Graph Analytics — [Product Name]
+## 📐 Graph Analytics: [Product Name]
 
 ### Hypothesis Velocity
 
@@ -62,7 +62,7 @@ Show each status with its status dot and count, then a filled bar for % resolved
   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░ 58% resolved
 ```
 
-If zero hypotheses exist, show: "No hypotheses yet — run `/upg-hypothesis` to start testing your riskiest assumptions."
+If zero hypotheses exist, show: "No hypotheses yet; run `/upg-hypothesis` to start testing your riskiest assumptions."
 
 ### Coverage Ratio
 
@@ -73,7 +73,7 @@ Show persona count with complete chains out of total, plus a filled bar:
   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░ 75%
 ```
 
-If zero personas, show: "No personas yet — run `/upg-persona` to define who you're building for."
+If zero personas, show: "No personas yet; run `/upg-persona` to define who you're building for."
 
 ### Evidence Density
 
@@ -86,7 +86,7 @@ Show evidence counts and ratio:
 
 Interpret the ratio:
 - 0.0 = "no evidence yet"
-- < 0.5 = "thin — most hypotheses lack evidence"
+- < 0.5 = "thin; most hypotheses lack evidence"
 - 0.5–1.0 = "growing"
 - 1.0+ = "healthy"
 - 2.0+ = "evidence-rich"
@@ -115,20 +115,20 @@ Show orphan rate as a filled bar:
 One short paragraph: what stands out, and what's the single fastest win? End with a specific command suggestion.
 
 Example:
-> Your hypothesis pipeline is moving — 58% resolved. But 4 are still untested. The fastest win is picking one and designing an experiment.
+> Your hypothesis pipeline is moving: 58% resolved. But 4 are still untested. The fastest win is picking one and designing an experiment.
 > → `/upg-hypothesis` to test your riskiest assumption
 
 ## Key Principles
 
 - **FAST.** 2-3 tool calls. No interaction. No questions. Just the dashboard.
-- **Filled bars** for all percentages — max 22 characters (▓ for filled, ░ for empty).
+- **Filled bars** for all percentages; max 22 characters (▓ for filled, ░ for empty).
 - **Interpret, don't just report.** "1.08 evidence per hypothesis <- healthy" beats "ratio: 1.08".
 - **ONE recommendation.** Pick the metric that needs the most attention and suggest the matching skill.
 - **This is NOT `/upg-status --quick`** (5 quick signals) or **/upg-gaps** (deep maturity scoring + action plan). This is the quantitative dashboard.
 - **Follow the design system.** Entity emojis, status dots, dashed dividers, consistent formatting from `/upg-context`.
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 
 After rendering your recommendation, call:

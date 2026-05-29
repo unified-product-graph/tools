@@ -1,6 +1,6 @@
 ---
 name: upg-design-system
-description: "UPG Visual Design System — shared reference for all /upg-* skills"
+description: "UPG Visual Design System: shared reference for all /upg-* skills"
 user-invocable: false
 category: meta
 ---
@@ -11,7 +11,7 @@ This is the shared design reference for all `/upg-*` skills. Every skill that pr
 
 ## Brand
 
-- **Name:** Always write "Unified Product Graph" in full — never just "UPG" in user-facing text
+- **Name:** Always write "Unified Product Graph" in full; never just "UPG" in user-facing text
 - **Logo mark:** Use on key screens (`/upg`, `/upg-status`, `/upg-export`)
 - **Standard URL:** unifiedproductgraph.org
 
@@ -26,7 +26,7 @@ The dot cluster logo in a code block, followed by a bold H1 for the name:
 ```
 # Unified Product Graph
 
-The logo is the dot cluster (renders in monospace). The name is a markdown H1 (renders large and bold). Use at the top of `/upg`, `/upg-status`, and `/upg-export`. Other skills don't need the logo — keep it special.
+The logo is the dot cluster (renders in monospace). The name is a markdown H1 (renders large and bold). Use at the top of `/upg`, `/upg-status`, and `/upg-export`. Other skills don't need the logo; keep it special.
 
 ## Section Dividers
 
@@ -201,32 +201,32 @@ After creating entities, the skill should:
 ✓ Added business model to your graph.
 
 Your graph now covers 6 of 8 business areas.
-The biggest gap: 📣 Reaching — you haven't thought about how people find your product.
+The biggest gap: 📣 Reaching; you haven't thought about how people find your product.
 
 → Run /upg-launch to define your positioning and channels.
 
 Or /upg-journey to see your full progress across all 7 phases.
 ```
 
-**Bad ending (menu dump — DON'T DO THIS):**
+**Bad ending (menu dump; DON'T DO THIS):**
 ```
 Next steps:
-- /upg-persona — Add more personas
-- /upg-discover — Run a discovery session
-- /upg-hypothesis — Structure a bet
-- /upg-gaps — Check for gaps
-- /upg-status — Health dashboard
+- /upg-persona: Add more personas
+- /upg-discover: Run a discovery session
+- /upg-hypothesis: Structure a bet
+- /upg-gaps: Check for gaps
+- /upg-status: Health dashboard
 ```
 
 The business areas to check (in priority order):
-1. 🎯 **Identity** — product, vision, mission
-2. 👤 **Understanding** — persona, job, need, research_study, insight
-3. 💡 **Discovery** — opportunity, solution, competitor, hypothesis, experiment, learning
-4. 📣 **Reaching** — ideal_customer_profile, positioning, messaging, acquisition_channel, content_strategy
-5. 💰 **Converting** — value_proposition, pricing_tier, funnel, funnel_step
-6. 📦 **Building** — feature, user_story, epic, release, user_journey, user_flow
-7. 🏦 **Sustaining** — business_model, revenue_stream, cost_structure, unit_economics, pricing_strategy
-8. 📊 **Learning** — outcome, metric, objective, key_result, retrospective
+1. 🎯 **Identity**: product, vision, mission
+2. 👤 **Understanding**: persona, job, need, research_study, insight
+3. 💡 **Discovery**: opportunity, solution, competitor, hypothesis, experiment, learning
+4. 📣 **Reaching**: ideal_customer_profile, positioning, messaging, acquisition_channel, content_strategy
+5. 💰 **Converting**: value_proposition, pricing_tier, funnel, funnel_step
+6. 📦 **Building**: feature, user_story, epic, release, user_journey, user_flow
+7. 🏦 **Sustaining**: business_model, revenue_stream, cost_structure, unit_economics, pricing_strategy
+8. 📊 **Learning**: outcome, metric, objective, key_result, retrospective
 
 Map each empty/thin area to a skill:
 - Identity → `/upg-strategy`
@@ -246,7 +246,7 @@ After the smart ending, add the standard footer with a dashed divider:
 
 ```
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 ```
 
@@ -258,8 +258,8 @@ can show patterns the CLI can't. → /upg-push to sync
 
 ## Tone
 
-- Warm, encouraging, exciting — never dry or clinical
-- Product coach voice — direct, specific, actionable
+- Warm, encouraging, exciting: never dry or clinical
+- Product coach voice: direct, specific, actionable
 - "You're asking the right questions" not "Your graph is incomplete"
 - Celebrate progress, highlight gaps as opportunities
 - The CLI should feel like a delightful tool, not a spreadsheet

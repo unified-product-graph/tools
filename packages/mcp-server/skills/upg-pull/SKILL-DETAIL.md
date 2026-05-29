@@ -3,7 +3,7 @@ name: upg-pull-detail
 description: "Detailed pull flow, merge logic, incremental sync"
 ---
 
-# /upg-pull — Pull Flow Detail
+# /upg-pull: Pull Flow Detail
 
 ## Pull Flow
 
@@ -49,11 +49,11 @@ Once the user selects a product, check the local state to determine which pull f
 
 | .upg-sync exists? | Matches selected product_id? | .upg exists? | Flow |
 |---|---|---|---|
-| No | — | No | **First-time pull** (Step 4A) |
-| No | — | Yes | **Overwrite warning** (Step 4B) |
+| No | | No | **First-time pull** (Step 4A) |
+| No | | Yes | **Overwrite warning** (Step 4B) |
 | Yes | Yes | Yes | **Incremental pull** (Step 4C) |
 | Yes | No | Yes | **Different product warning** (Step 4B) |
-| Yes | Yes | No | **First-time pull** — sync file is stale, treat as fresh (Step 4A) |
+| Yes | Yes | No | **First-time pull**: sync file is stale, treat as fresh (Step 4A) |
 
 ---
 
@@ -151,7 +151,7 @@ Pulled "<Product Name>" from The Product Creator cloud.
   Connections: <N>
   Domains: <N> covered
 
-Your graph is now local. It's a .upg file — portable, git-friendly, yours.
+Your graph is now local. It's a .upg file; portable, git-friendly, yours.
 ```
 
 Then show the "What You Can Do Now" section (Step 6).
@@ -223,11 +223,11 @@ Stop here. No changes needed.
 
 Compare the current cloud graph against what was synced last time. Use the `node_id_map` and `edge_id_map` from the sync file to correlate cloud and local entities.
 
-**Cloud nodes — categorise each one:**
+**Cloud nodes: categorise each one:**
 
-- **New on cloud:** Cloud node ID is NOT in any value of `node_id_map` — this entity was created on the cloud since last sync.
+- **New on cloud:** Cloud node ID is NOT in any value of `node_id_map`; this entity was created on the cloud since last sync.
 - **Updated on cloud:** Cloud node ID IS in `node_id_map`, and the node's content (title, description, type, properties, status, tags) differs from the corresponding local node.
-- **Deleted on cloud:** A cloud ID exists in `node_id_map` values, but that cloud node no longer exists in the cloud graph response — it was deleted on the cloud since last sync.
+- **Deleted on cloud:** A cloud ID exists in `node_id_map` values, but that cloud node no longer exists in the cloud graph response; it was deleted on the cloud since last sync.
 - **Unchanged:** Cloud node ID is in `node_id_map` and content matches local. No action needed.
 
 Do the same for edges using `edge_id_map`.
@@ -236,10 +236,10 @@ Do the same for edges using `edge_id_map`.
 
 Check if any node that is "updated on cloud" was ALSO modified locally since last sync. To detect local modifications:
 
-- Compare the current local `.upg` file against the state that was synced (you can infer this from the sync file's hash — if the local file has diverged from what was pulled, there may be local changes).
+- Compare the current local `.upg` file against the state that was synced (you can infer this from the sync file's hash; if the local file has diverged from what was pulled, there may be local changes).
 - A pragmatic v1 approach: if a node appears in the "updated on cloud" set, check if the local version of that same node (via ID map) differs from what the cloud had at last sync time. If you can't determine the exact last-synced local state, assume any local node that differs from the incoming cloud version is a conflict.
 
-**Conflict resolution (v1 — last write wins, cloud takes precedence):**
+**Conflict resolution (v1; last write wins, cloud takes precedence):**
 - Apply the cloud version.
 - But track and report the conflict count to the user.
 
@@ -248,7 +248,7 @@ Check if any node that is "updated on cloud" was ALSO modified locally since las
 ```
 ## Incoming Changes from Cloud
 
-Pulling "<Product Name>" — changes since <last_synced_at>:
+Pulling "<Product Name>"; changes since <last_synced_at>:
 
   + <N> new entities (<breakdown>)
   ~ <N> updated entities
@@ -319,7 +319,7 @@ Read the current `.upg` file, then apply each change:
 #### 8. Report results
 
 ```
-## Pull Complete — Incremental Sync
+## Pull Complete: Incremental Sync
 
 Merged cloud changes into "<Product Name>".
 
@@ -359,7 +359,7 @@ This is a large graph (<N> entities). The pull may take a moment...
 Use pagination if needed from the cloud API.
 
 **Node type mapping:**
-Cloud uses the same entity types as local (`@unified-product-graph/core` shared ontology), so types map directly. Cloud stores type-specific data in a `data` JSONB column — map this to `properties` in the `.upg` format.
+Cloud uses the same entity types as local (`@unified-product-graph/core` shared ontology), so types map directly. Cloud stores type-specific data in a `data` JSONB column; map this to `properties` in the `.upg` format.
 
 ---
 
@@ -370,12 +370,12 @@ Show this section after every successful pull (full or incremental):
 ```
 ### What You Can Do Now
 
-  /upg-status     — See your graph health dashboard
-  /upg-tree       — View through framework lenses (ost, user, validation...)
-  /upg-gaps       — Find strategic gaps and get action plans
-  /upg-explore     — Add new entities locally
-  /upg-discover   — Run a guided discovery session
-  /upg-push       — Push local changes back to the cloud
+  /upg-status: See your graph health dashboard
+  /upg-tree: View through framework lenses (ost, user, validation...)
+  /upg-gaps: Find strategic gaps and get action plans
+  /upg-explore: Add new entities locally
+  /upg-discover: Run a guided discovery session
+  /upg-push: Push local changes back to the cloud
 
 ### Version Control
 
@@ -383,7 +383,7 @@ Show this section after every successful pull (full or incremental):
   git commit -m "Pull <product name> graph from cloud"
 
   Now you have full git history of your product thinking.
-  Branch, diff, review — your graph is just data.
+  Branch, diff, review; your graph is just data.
 
 ### Stay in Sync
 
@@ -392,7 +392,7 @@ Show this section after every successful pull (full or incremental):
   The .upg file is your source of truth for local work.
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 ```
 

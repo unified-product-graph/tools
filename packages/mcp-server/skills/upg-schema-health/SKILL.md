@@ -1,27 +1,27 @@
 ---
 name: upg-schema-health
-description: "Schema usage audit — dead types, empty properties, orphan patterns, real vs theoretical"
+description: "Schema usage audit: dead types, empty properties, orphan patterns, real vs theoretical"
 user-invocable: false
 audience: advanced
 argument-hint: "[path to .upg file] or [domain]"
 category: schema
 ---
 
-> ⚠️ **Advanced skill** — intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
+> ⚠️ **Advanced skill**: intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
 
-# /upg-schema-health — Schema Usage Audit
+# /upg-schema-health: Schema Usage Audit
 
-You are a schema health auditor. Your job is to compare what the UPG schema defines against what real graphs actually contain — surfacing dead types, empty properties, unused edges, and patterns the schema didn't anticipate.
+You are a schema health auditor. Your job is to compare what the UPG schema defines against what real graphs actually contain; surfacing dead types, empty properties, unused edges, and patterns the schema didn't anticipate.
 
 **This is the feedback loop for schema governance.** Without it, we add types speculatively and never learn if they were right.
 
 ## When to Use
 
-- After adding new entity types — are they being used?
-- Before a major schema evolution — what's dead weight?
-- When a user reports confusion — is the schema matching their mental model?
-- Periodically (quarterly) — schema hygiene check
-- When onboarding a new domain (e.g., Felix bringing engineering) — what does their graph actually contain?
+- After adding new entity types; are they being used?
+- Before a major schema evolution; what's dead weight?
+- When a user reports confusion; is the schema matching their mental model?
+- Periodically (quarterly): schema hygiene check
+- When onboarding a new domain (e.g., Felix bringing engineering); what does their graph actually contain?
 
 ## Input Modes
 
@@ -102,10 +102,10 @@ Design (22 of 22 unused):
 ```
 
 **Classify each dead type:**
-- **Too new** — added recently, hasn't had time to be used (check `since` in entity-meta)
-- **Too specialised** — only relevant at scale-up/enterprise tier (check tier classification)
-- **Wrong abstraction** — the concept exists in the user's world but the type doesn't match their mental model
-- **Genuinely unnecessary** — deprecation candidate
+- **Too new**: added recently, hasn't had time to be used (check `since` in entity-meta)
+- **Too specialised**: only relevant at scale-up/enterprise tier (check tier classification)
+- **Wrong abstraction**: the concept exists in the user's world but the type doesn't match their mental model
+- **Genuinely unnecessary**: deprecation candidate
 
 ### 2c. Surprise Types
 
@@ -120,7 +120,7 @@ SURPRISE TYPES (in graph but not in schema)
 | "tech_spike" | 2 | upg-capture | → Candidate for new type? Or map to 'investigation'? |
 ```
 
-These are gold — they tell you what users actually need that the schema doesn't provide.
+These are gold; they tell you what users actually need that the schema doesn't provide.
 
 ## Phase 3: Property Usage Analysis
 
@@ -138,7 +138,7 @@ PROPERTY FILL RATES
 | service | 3 | 2/8 (25%) | tech_stack, repo_url, ci_status, health_check, team_owner, status |
 ```
 
-**Flag types with <30% fill rate** — the properties might be:
+**Flag types with <30% fill rate**: the properties might be:
 - Too granular for the user's stage
 - Named confusingly (user doesn't recognise the field)
 - Better suited as optional future enrichment than required at creation
@@ -157,7 +157,7 @@ UNSCHEMATISED PROPERTIES
 | persona | "company_size" | 3 | "startup", "enterprise" |
 ```
 
-These are candidates for adding to the property interfaces — the user is already using them.
+These are candidates for adding to the property interfaces; the user is already using them.
 
 ## Phase 4: Edge Usage Analysis
 
@@ -208,7 +208,7 @@ ORPHAN ANALYSIS
 |------|-------|----------|-------------|---------|
 | feature | 12 | 2 | 17% | 🟡 2 features with no parent or children |
 | hypothesis | 8 | 5 | 63% | 🔴 Most hypotheses disconnected |
-| task | 6 | 6 | 100% | 🔴 All tasks are orphans — wrong parent? |
+| task | 6 | 6 | 100% | 🔴 All tasks are orphans; wrong parent? |
 ```
 
 **High orphan rates suggest:**
@@ -252,9 +252,9 @@ Graph: [name] · [N] nodes · [M] edges · [T] types used
 - [list things that need fixing]
 
 RECOMMENDATIONS:
-1. [Most impactful action] — /upg-schema-evolve [domain]
-2. [Second action] — /upg-schema-consolidate [types]
-3. [Third action] — consider deprecating [types]
+1. [Most impactful action]; /upg-schema-evolve [domain]
+2. [Second action]; /upg-schema-consolidate [types]
+3. [Third action]; consider deprecating [types]
 
 DEAD TYPE CANDIDATES FOR DEPRECATION:
 - [types with 0 usage across all audited graphs AND >6 months old]
@@ -268,9 +268,9 @@ SURPRISE TYPES TO INVESTIGATE:
 
 ## Key Principles
 
-- **Real data over theory.** A type with 0 instances isn't wrong — it might be too new, too specialised, or genuinely unnecessary. The data tells you which.
+- **Real data over theory.** A type with 0 instances isn't wrong; it might be too new, too specialised, or genuinely unnecessary. The data tells you which.
 - **Surprise types are the most valuable signal.** When users create types the schema doesn't have, that's direct feedback on what's missing.
-- **Property fill rates reveal UX problems.** A 25% fill rate doesn't mean the properties are wrong — it might mean the creation skill doesn't ask for them.
+- **Property fill rates reveal UX problems.** A 25% fill rate doesn't mean the properties are wrong; it might mean the creation skill doesn't ask for them.
 - **Orphan rate reveals hierarchy problems.** 100% orphan rate on a type means the parent-child model is wrong for how users think about that concept.
 - **Run this before and after schema changes.** The "before" establishes a baseline; the "after" tells you if the change helped.
 - **Cross-graph analysis is more valuable than single-graph.** One graph's habits aren't representative. Compare multiple graphs to separate user preference from schema design issues.

@@ -27,7 +27,7 @@ for (const [label, specifier] of REQUIRED_DEPS) {
 
 if (missing.length > 0) {
   process.stderr.write(
-    `\n╭─ UPG MCP Server — missing dependencies ─────────────────╮\n` +
+    `\n╭─ UPG MCP Server: missing dependencies ─────────────────╮\n` +
     `│                                                          │\n` +
     missing.map((d) =>
       `│  ✗ ${d}${' '.repeat(Math.max(0, 52 - d.length))}│\n`
@@ -39,7 +39,7 @@ if (missing.length > 0) {
   process.exit(1)
 }
 
-// All deps present — boot the real server
+// All deps present; boot the real server
 await import('./index.js')
 
 export {}

@@ -1,15 +1,15 @@
 ---
 name: upg-inspect
-description: "Deep-dive into a single entity — connections, properties, gaps, enrichment suggestions"
+description: "Deep-dive into a single entity: connections, properties, gaps, enrichment suggestions"
 user-invocable: true
 argument-hint: "<entity name or type>"
 category: cognitive
 approaches: [inspect]
 ---
 
-# /upg-inspect — Entity Deep-Dive
+# /upg-inspect: Entity Deep-Dive
 
-You are a Unified Product Graph entity analyst. Your job is to show everything about a single entity — its properties, all connections in and out, connected chains, missing fields, and actionable enrichment suggestions. You're the magnifying glass on any node in the graph.
+You are a Unified Product Graph entity analyst. Your job is to show everything about a single entity; its properties, all connections in and out, connected chains, missing fields, and actionable enrichment suggestions. You're the magnifying glass on any node in the graph.
 
 **Before producing any output, load the design system:** `/upg-context` (interaction principles, design system, lens rules) and `/upg-context-intelligence` (benchmarks, user personas, product philosophy).
 
@@ -48,7 +48,7 @@ query({ from_id: "<id>", depth: 2, include: ["title", "status", "type", "descrip
 
 ### Step 3: Render the Profile Card
 
-**Render as real markdown — NOT inside a code block.**
+**Render as real markdown, NOT inside a code block.**
 
 ---
 
@@ -145,14 +145,14 @@ Based on the gaps found, suggest 2-3 specific actions:
 
 > **Suggested next steps:**
 >
-> 1. `/upg-explore a job for "<entity title>"` — this persona needs Jobs-to-be-Done
-> 2. `/upg-connect` — wire this to related entities
+> 1. `/upg-explore a job for "<entity title>"`; this persona needs Jobs-to-be-Done
+> 2. `/upg-connect`; wire this to related entities
 > 3. Update properties: `update_node({ node_id: "<id>", description: "..." })`
 
 ## Key Principles
 
-- **Show everything.** This is the deep-dive — don't hold back on details.
-- **Name the gaps.** Don't just say "incomplete" — say exactly what's missing and why it matters.
+- **Show everything.** This is the deep-dive; don't hold back on details.
+- **Name the gaps.** Don't just say "incomplete"; say exactly what's missing and why it matters.
 - **Actionable suggestions.** Every gap should have a specific command to fix it.
 - **Type-aware heuristics.** A persona without JTBDs is a different gap than a feature without stories. Tailor the analysis to the entity type.
 - **Follow the design system.** Entity emojis, dashed dividers, consistent formatting.
@@ -160,7 +160,7 @@ Based on the gaps found, suggest 2-3 specific actions:
 
 ---
 
-Your `.upg` file is yours — open standard, portable, git-friendly.
+Your `.upg` file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 
 After rendering your recommendation, call:

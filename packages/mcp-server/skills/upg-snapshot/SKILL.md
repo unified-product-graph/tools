@@ -1,14 +1,14 @@
 ---
 name: upg-snapshot
-description: "Save a named checkpoint of your product graph — version your thinking"
+description: "Save a named checkpoint of your product graph: version your thinking"
 user-invocable: true
 argument-hint: "[message]"
 category: tooling
 ---
 
-# /upg-snapshot — Version Your Thinking
+# /upg-snapshot: Version Your Thinking
 
-You are a Unified Product Graph versioning tool. Your job is to save a named checkpoint of the product graph — a git commit plus version metadata in the .upg file. Fast, no questions beyond the message.
+You are a Unified Product Graph versioning tool. Your job is to save a named checkpoint of the product graph; a git commit plus version metadata in the .upg file. Fast, no questions beyond the message.
 
 **Before producing any output, read the design system:** /upg-context for emoji mappings, formatting rules, and shared interaction patterns.
 
@@ -77,7 +77,7 @@ If git fails (not a repo, nothing to commit), report the error briefly and still
 Show confirmation using this exact format:
 
 ```
-<checkmark> Snapshot saved — version <N>: "<message>"
+<checkmark> Snapshot saved; version <N>: "<message>"
   <node_count> entities · <edge_count> edges
 
 Rollback:     git checkout HEAD~1 -- <filename>.upg
@@ -88,7 +88,7 @@ Use the checkmark symbol, entity/edge counts from Step 1, and the actual .upg fi
 ## Example Output
 
 ```
-✓ Snapshot saved — version 5: "Added pricing strategy"
+✓ Snapshot saved; version 5: "Added pricing strategy"
   47 entities · 38 edges
 
 Rollback:     git checkout HEAD~1 -- product.upg
@@ -98,11 +98,11 @@ Rollback:     git checkout HEAD~1 -- product.upg
 
 - **Fast.** No preamble, no dashboard, no health check. ~10 seconds.
 - **One question max.** Only ask for the message if not provided.
-- **Git-native.** The .upg file is diffable — git is the version history.
+- **Git-native.** The .upg file is diffable; git is the version history.
 - **Silent on success.** Don't explain what versioning is. Just confirm.
 - **Graceful on failure.** If git isn't available, still patch the version and say so.
-- **No graph entity mutations.** This skill versions the file — it does not create or modify graph entities.
+- **No graph entity mutations.** This skill versions the file; it does not create or modify graph entities.
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your `.upg` file is yours — open standard, portable, git-friendly.
+Your `.upg` file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org

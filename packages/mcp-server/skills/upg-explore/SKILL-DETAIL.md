@@ -3,7 +3,7 @@ name: upg-explore-detail
 description: "Full property schemas and edge type reference for /upg-explore"
 ---
 
-# /upg-explore — Property Schemas & Edge Types (Detail)
+# /upg-explore: Property Schemas & Edge Types (Detail)
 
 This file contains the full property schemas and edge type reference for entity creation. It is loaded on demand by /upg-explore when the agent needs to know the specific properties or valid connections for an entity type.
 
@@ -30,7 +30,7 @@ Ask: "What's the timeline for this outcome?"
   "range_max": 100
 }
 ```
-Ask: "What's the current value? What's the target? What unit?" (KPIs are `metric` nodes with `designation: "kpi"` — the `kpi` type was consolidated into `metric` in v0.1.0.)
+Ask: "What's the current value? What's the target? What unit?" (KPIs are `metric` nodes with `designation: "kpi"`; the `kpi` type was consolidated into `metric` in v0.1.0.)
 
 ### objective
 ```json
@@ -165,7 +165,7 @@ Ask: "How often does this happen (1-5)? How bad is it (1-5)? Is this a pain, gap
   "status": "draft | validated | active | pivoting"
 }
 ```
-Ask: "What type of canvas is this — lean, BMC, or custom? Who are the customer segments? What are the key activities?"
+Ask: "What type of canvas is this; lean, BMC, or custom? Who are the customer segments? What are the key activities?"
 
 ### value_proposition
 ```json
@@ -200,7 +200,7 @@ Ask: "What's the target market? Is this product-led, sales-led, or community-led
   "industry": "Target industry",
   "budget_range": "Typical budget",
   "buying_triggers": ["What causes them to look for a solution"],
-  "disqualifiers": ["Red flags — who is NOT a fit"],
+  "disqualifiers": ["Red flags; who is NOT a fit"],
   "decision_makers": ["Roles involved in the buying decision"]
 }
 ```
@@ -245,7 +245,7 @@ Ask: "Which persona takes this journey? What's the scenario? What stages does it
   "decided_on": "ISO date"
 }
 ```
-Ask: "What's the context — why was this decision needed? What was decided? What alternatives were considered? Which layer does this belong to — engineering, design, or product?" (`architecture_decision`, `design_decision`, and `product_decision` were consolidated into the single `decision` type with a `layer` property in v0.2.0.)
+Ask: "What's the context; why was this decision needed? What was decided? What alternatives were considered? Which layer does this belong to; engineering, design, or product?" (`architecture_decision`, `design_decision`, and `product_decision` were consolidated into the single `decision` type with a `layer` property in v0.2.0.)
 
 ### growth_loop
 ```json
@@ -259,7 +259,7 @@ Ask: "What's the context — why was this decision needed? What was decided? Wha
   "status": "theoretical | testing | proven | scaling"
 }
 ```
-Ask: "What type of loop — viral, content, paid, or product? What triggers it? What action does the user take? How does the output feed back into the trigger?"
+Ask: "What type of loop; viral, content, paid, or product? What triggers it? What action does the user take? How does the output feed back into the trigger?"
 
 ### pricing_strategy
 ```json
@@ -272,7 +272,7 @@ Ask: "What type of loop — viral, content, paid, or product? What triggers it? 
   "status": "research | testing | launched | iterating"
 }
 ```
-Ask: "What pricing model — freemium, usage-based, per-seat, etc.? What's the anchor price? How does this compare to competitors — cheaper, parity, or premium?"
+Ask: "What pricing model; freemium, usage-based, per-seat, etc.? What's the anchor price? How does this compare to competitors; cheaper, parity, or premium?"
 
 ### ai_model
 ```json
@@ -287,9 +287,9 @@ Ask: "What pricing model — freemium, usage-based, per-seat, etc.? What's the a
   "status": "prototyping | evaluating | staging | production | deprecated"
 }
 ```
-Ask: "What type of model — LLM, classifier, recommender? Which provider? What's its use case in the product?"
+Ask: "What type of model; LLM, classifier, recommender? Which provider? What's its use case in the product?"
 
-## Edge Types — Valid Connections
+## Edge Types: Valid Connections
 
 After creating an entity, search for related entities and suggest connections. Use these valid edge types:
 

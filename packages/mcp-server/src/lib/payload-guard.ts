@@ -27,7 +27,7 @@ const EDGE_BYTES_FULL = 250
 const EDGE_BYTES_COMPACT = 120
 
 /**
- * Soft limit — responses at or above this size get a `_warning` field but
+ * Soft limit; responses at or above this size get a `_warning` field but
  * still ship. Tunable via `UPG_MCP_PAYLOAD_SOFT_LIMIT`. Defaults to 50 KB.
  */
 export function getSoftLimit(): number {
@@ -37,7 +37,7 @@ export function getSoftLimit(): number {
 }
 
 /**
- * Hard limit — responses at or above this size are refused outright with a
+ * Hard limit; responses at or above this size are refused outright with a
  * structured steering hint. Tunable via `UPG_MCP_PAYLOAD_HARD_LIMIT`.
  * Defaults to 150 KB.
  */
@@ -57,7 +57,7 @@ export interface EstimateInput {
 /**
  * Rough byte estimate for a JSON-stringified `{ nodes, edges, ... }` response.
  *
- * Pure function — safe to call from anywhere. Returns 0 for empty payloads.
+ * Pure function; safe to call from anywhere. Returns 0 for empty payloads.
  */
 export function estimatePayloadBytes(input: EstimateInput): number {
   const edgeUnit = input.compactEdges ? EDGE_BYTES_COMPACT : EDGE_BYTES_FULL
@@ -79,9 +79,9 @@ export interface PreflightInput extends EstimateInput {
  * Decide what to do with a read-tool response based on its estimated size.
  *
  * - bytes < soft → `{ kind: 'ok' }`
- * - soft ≤ bytes < hard → `{ kind: 'warn', fields }` — caller merges `fields`
+ * - soft ≤ bytes < hard → `{ kind: 'warn', fields }`; caller merges `fields`
  *   into the response object before stringifying
- * - bytes ≥ hard → `{ kind: 'refuse', result }` — caller returns `result` directly
+ * - bytes ≥ hard → `{ kind: 'refuse', result }`; caller returns `result` directly
  */
 export function preflightPayload(input: PreflightInput): PreflightOutcome {
   const bytes = estimatePayloadBytes(input)
@@ -123,7 +123,7 @@ function buildRefusalMessage(ctx: RefusalContext): string {
     `Estimated ${kb} KB response (~${tokensK}K tokens). ${ctx.toolName} on ${ctx.nodeCount} nodes / ${ctx.edgeCount} edges routinely overflows MCP transport caps.`,
     '',
     'Try one of:',
-    '  - query({ from: "<type>", include: ["title"], edge_include: [] }) — projection-aware traversal, far cheaper',
+    '  - query({ from: "<type>", include: ["title"], edge_include: [] }); projection-aware traversal, far cheaper',
     `  - ${ctx.toolName} with a smaller limit (~50 nodes)`,
     `  - ${ctx.toolName} with include_edges:false`,
     `  - ${ctx.toolName} with compact_edges:true (where supported)`,
@@ -143,5 +143,5 @@ interface SoftContext extends PreflightInput {
 
 function buildSoftWarning(ctx: SoftContext): string {
   const kb = Math.round(ctx.bytes / 1000)
-  return `estimated ${kb} KB response (${ctx.nodeCount} nodes, ${ctx.edgeCount} edges) — approaching transport limits; consider a tighter projection via query() or a smaller limit.`
+  return `estimated ${kb} KB response (${ctx.nodeCount} nodes, ${ctx.edgeCount} edges): approaching transport limits; consider a tighter projection via query() or a smaller limit.`
 }

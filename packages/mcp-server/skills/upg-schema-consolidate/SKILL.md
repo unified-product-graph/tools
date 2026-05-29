@@ -1,17 +1,17 @@
 ---
 name: upg-schema-consolidate
-description: "Evaluate whether entity types should merge — shared properties, structural analysis, migration path"
+description: "Evaluate whether entity types should merge: shared properties, structural analysis, migration path"
 user-invocable: false
 audience: advanced
 argument-hint: "[type_a] [type_b] or [domain]"
 category: schema
 ---
 
-> ⚠️ **Advanced skill** — intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
+> ⚠️ **Advanced skill**: intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
 
-# /upg-schema-consolidate — Entity Type Consolidation
+# /upg-schema-consolidate: Entity Type Consolidation
 
-You are a schema analyst. Your job is to evaluate whether two or more entity types should be consolidated into a single type with a discriminator property, or kept separate. You do this through structured analysis — not gut feeling.
+You are a schema analyst. Your job is to evaluate whether two or more entity types should be consolidated into a single type with a discriminator property, or kept separate. You do this through structured analysis, not gut feeling.
 
 **This is an internal development skill for schema governance.**
 
@@ -60,7 +60,7 @@ Overlap: X/Y properties shared (Z%)
 
 This is the critical test. Check 4 structural dimensions:
 
-**2a. Parent types** — Do they have the same canonical parent?
+**2a. Parent types**: Do they have the same canonical parent?
 ```
 Read UPG_VALID_CHILDREN in grammar/hierarchy.ts
 - type_a parent: bounded_context
@@ -68,7 +68,7 @@ Read UPG_VALID_CHILDREN in grammar/hierarchy.ts
 → DIFFERENT parents = structural divergence
 ```
 
-**2b. Child types** — Do they have the same children?
+**2b. Child types**: Do they have the same children?
 ```
 Search UPG_VALID_CHILDREN for entries where value = type_a or type_b
 - type_a children: technical_debt_item
@@ -76,7 +76,7 @@ Search UPG_VALID_CHILDREN for entries where value = type_a or type_b
 → DIFFERENT children = structural divergence
 ```
 
-**2c. Edge types** — Do they participate in the same relationships?
+**2c. Edge types**: Do they participate in the same relationships?
 ```
 Search UPG_EDGE_CATALOG in catalog/edge-catalog.ts for both types
 - type_a edges: context_has_decision, decision_has_technical_debt_item
@@ -84,7 +84,7 @@ Search UPG_EDGE_CATALOG in catalog/edge-catalog.ts for both types
 → DIFFERENT edges = semantic divergence
 ```
 
-**2d. Domain membership** — Are they in the same domain?
+**2d. Domain membership**: Are they in the same domain?
 ```
 Check registry/domains.ts
 - type_a: engineering
@@ -102,15 +102,15 @@ Check registry/domains.ts
 
 Check how each type is used in practice:
 
-**3a. Skill references** — Which skills create/reference each type?
+**3a. Skill references**: Which skills create/reference each type?
 ```
 grep -r "type_a\|type_b" packages/upg-mcp-server/skills/
 ```
 
-**3b. Lens relevance** — Do they appear in different lenses?
+**3b. Lens relevance**: Do they appear in different lenses?
 If type_a is surfaced in the engineering lens and type_b in the design lens, consolidation would muddy lens clarity.
 
-**3c. Real-world mental models** — Would users think of these as "the same thing with a label" or "fundamentally different activities"?
+**3c. Real-world mental models**: Would users think of these as "the same thing with a label" or "fundamentally different activities"?
 
 This is where you engage the human. Ask:
 
@@ -134,7 +134,7 @@ Usage context: [SAME/DIFFERENT]
 Recommendation: [explanation]
 ```
 
-### Step 5: If Consolidating — Migration Design
+### Step 5: If Consolidating: Migration Design
 
 If the decision is to consolidate:
 
@@ -170,7 +170,7 @@ Parent migration:
 
 **5d. Cascade the change** using `/upg-schema-update`
 
-### Step 5 (Alternative): If Keeping Separate — Document Why
+### Step 5 (Alternative): If Keeping Separate: Document Why
 
 If the decision is to keep separate, create a brief decision record:
 
@@ -222,14 +222,14 @@ These consolidations have already happened in UPG and can be referenced as patte
 | `risk_item` | `risk` | `risk_domain: 'program'` | 0.1.0 |
 | `architecture_decision`, `design_decision`, `product_decision` | `decision` | `layer: 'engineering' \| 'design' \| 'product'` | 0.2.0 |
 | `jtbd` | `job` | (renamed, no discriminator) | 0.2.0 |
-| `how_might_we` | `design_question` | (renamed — framework-neutral) | 0.2.0 |
+| `how_might_we` | `design_question` | (renamed; framework-neutral) | 0.2.0 |
 | `sli`, `slo`, `sla` | `service_level_indicator`, `service_level_objective`, `service_level_agreement` | (acronyms expanded) | 0.2.0 |
-| `customer_segment_bm`, `target_customer_segment` | `market_segment` | — | 0.2.0 |
-| `channel_bm` | `distribution_channel` | — | 0.2.0 |
+| `customer_segment_bm`, `target_customer_segment` | `market_segment` | | 0.2.0 |
+| `channel_bm` | `distribution_channel` | | 0.2.0 |
 | `campaign` | `growth_campaign` | (disambiguated from marketing_campaign_plan) | 0.2.0 |
 | `segment` | `behavioral_segment` | (disambiguated from market_segment) | 0.2.0 |
-| `package` | `pricing_tier` | — | 0.2.0 |
-| `internal_doc` | `document` | `document_type` — audience=internal | 0.2.0 |
+| `package` | `pricing_tier` | | 0.2.0 |
+| `internal_doc` | `document` | `document_type`; audience=internal | 0.2.0 |
 
 ## Key Principles
 

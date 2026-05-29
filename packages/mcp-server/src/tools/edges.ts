@@ -29,7 +29,7 @@ import type {
  * Build an `isError` result whose text body is a JSON envelope carrying both
  * the error message and the + resolver enrichment blocks.
  * Used by `create_edge` and `batch_create_edges` when the failure is a
- * "no canonical edge" miss — the consumer can parse the body for
+ * "no canonical edge" miss; the consumer can parse the body for
  * `anchor_hint` / `alternate_anchors` / `adjacent_edges`.
  *
  * Falls back to plain `textError` when no enrichment applies, keeping the
@@ -227,14 +227,14 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
     // currently self-referential. F2 (2026-05-20).
     if (e.source_id === e.target_id) {
       return textError(
-        `Edge at index ${i}: self-loop refused — source and target resolve to the same node "${e.source_id}". ` +
+        `Edge at index ${i}: self-loop refused; source and target resolve to the same node "${e.source_id}". ` +
         `No canonical UPG edge type is self-referential.`,
       )
     }
 
     if (e.type) {
       // Catalog pair validation when the type is canonical. F1 (2026-05-20).
-      // Non-canonical types fall through — they're still surfaced by
+      // Non-canonical types fall through; they're still surfaced by
       // validate_graph as edge_drift.
       const pairCheck = validateEdgeTypePair(
         e.type as string,

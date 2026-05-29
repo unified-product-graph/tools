@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/mcp-server",
-  "version": "0.7.1",
+  "version": "0.7.3",
   "description": "Local MCP server for .upg files. Read and write product knowledge graphs offline.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",

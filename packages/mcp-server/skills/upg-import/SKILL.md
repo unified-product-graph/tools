@@ -1,12 +1,12 @@
 ---
 name: upg-import
-description: "Import product knowledge from external tools into your .upg graph — Markdown, GitHub, Linear, Jira, Dovetail, Vistaly, Notion, and 30+ more adapters"
+description: "Import product knowledge from external tools into your .upg graph: Markdown, GitHub, Linear, Jira, Dovetail, Vistaly, Notion, and 30+ more adapters"
 user-invocable: true
 argument-hint: "[tool]"
 category: tooling
 ---
 
-# /upg-import — Import Product Knowledge
+# /upg-import: Import Product Knowledge
 
 You are a UPG import engine. Pull structured product knowledge from external tools into the user's .upg graph.
 
@@ -14,7 +14,7 @@ You are a UPG import engine. Pull structured product knowledge from external too
 
 ## Tools
 
-`mcp__unified-product-graph__*` — create_node, create_edge, list_nodes, get_product_context.
+`mcp__unified-product-graph__*`; create_node, create_edge, list_nodes, get_product_context.
 
 ## Time Estimate
 
@@ -40,8 +40,8 @@ Where do you want to import from?
 
 ── MCP-guided (agent-driven, no CLI yet) ───────────────
 
-  7. 📝 Notion         — uses Notion MCP + upg-notion-sync
-  8. 🔀 Other (37 adapters available — see /integrations)
+  7. 📝 Notion: uses Notion MCP + upg-notion-sync
+  8. 🔀 Other (37 adapters available; see /integrations)
 ```
 
 ---
@@ -109,7 +109,7 @@ upg import --from linear --dry-run --yes     # skip confirmation
 
 ## Step 2c: Notion (MCP-guided, bidirectional sync available)
 
-Notion uses a different path — the Notion MCP server + the `upg-notion-sync` package.
+Notion uses a different path; the Notion MCP server + the `upg-notion-sync` package.
 
 **Import (Notion → UPG):**
 ```bash
@@ -122,7 +122,7 @@ Notion uses a different path — the Notion MCP server + the `upg-notion-sync` p
 # 2. upg import --from markdown --file ./notion-export/
 ```
 
-**Bidirectional sync (UPG ↔ Notion — LIVE TODAY):**
+**Bidirectional sync (UPG ↔ Notion; LIVE TODAY):**
 ```bash
 npx @unified-product-graph/notion-sync push    # UPG → Notion
 npx @unified-product-graph/notion-sync pull    # Notion → UPG
@@ -134,7 +134,7 @@ The sync package creates one Notion database per UPG entity type and maps edges 
 
 ## Step 2d: 30+ other adapters (convert() works for pre-fetched data)
 
-The following adapters have a working `convert()` method — you can pass pre-fetched data:
+The following adapters have a working `convert()` method; you can pass pre-fetched data:
 
 **Strategy & Discovery:** Productboard, Aha!, Quantive, Shortcut, Chisel, Craft.io, Airfocus, ProdPad, Coda  
 **Delivery:** GitLab, Jira (via CLI above)  
@@ -165,21 +165,21 @@ After any successful import:
 
 ```
 Your graph just grew! Suggested next steps:
-- /upg-tree       — see the full structure
-- /upg-gaps       — check what's still missing
-- /upg-status     — health dashboard with completeness scores
-- /upg-discover   — AI-powered entity discovery from what you just imported
+- /upg-tree: see the full structure
+- /upg-gaps: check what's still missing
+- /upg-status: health dashboard with completeness scores
+- /upg-discover: AI-powered entity discovery from what you just imported
 ```
 
 ---
 
 ## Key Principles
 
-- **Preview before creating.** Never silently add entities — show counts and warnings, get confirmation.
+- **Preview before creating.** Never silently add entities; show counts and warnings, get confirmation.
 - **Infer conservatively.** Only create when content clearly maps to a UPG type. When uncertain, ask.
 - **Preserve source context.** Store `source_id`, `source_type`, `external_tool` on every imported node.
 - **Deduplicate.** Check existing nodes with `search_nodes` before creating. Flag potential matches.
-- **Respect mapping_confidence.** Adapters set `'high'` / `'medium'` / `'low'` — surface `'low'` items for human review.
+- **Respect mapping_confidence.** Adapters set `'high'` / `'medium'` / `'low'`; surface `'low'` items for human review.
 - **Never auto-emit `insight_informs_opportunity`.** This edge always requires PM judgment. Emit a warning instead.
 
 ---

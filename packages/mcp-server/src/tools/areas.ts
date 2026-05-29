@@ -110,7 +110,7 @@ export const getAreaGraph: ToolHandler = (args, ctx): ToolResult => {
   })
   if (guardOutcome.kind === 'refuse') return guardOutcome.result
 
-  // Working copies for degradation — operate on cloned shapes so the store's
+  // Working copies for degradation; operate on cloned shapes so the store's
   // canonical objects aren't mutated by the compact/drop stages.
   let workingNodes: Array<UPGBaseNode | Record<string, unknown>> = resultNodes
   let workingEdges: Array<UPGEdge | Record<string, unknown>> = uniqueEdges
@@ -245,7 +245,7 @@ export const getAreaContext: ToolHandler = async (_args, _ctx): Promise<ToolResu
  * Create a product area entity in the portfolio document
  * (`.upg/portfolio.upg`). Product areas represent the organisational axis: who
  * owns what. Supports nesting via `parent_area_id` (stored on the typed
- * record itself; no separate edge is created — portfolio entities use
+ * record itself; no separate edge is created. Portfolio entities use
  * intrinsic parent links rather than per-product hierarchy edges).
  *
  * The portfolio document is created on demand if it does not yet exist.
@@ -254,14 +254,14 @@ export const getAreaContext: ToolHandler = async (_args, _ctx): Promise<ToolResu
  *   `UPGProductArea` record persisted to `portfolio_areas[]`.
  * @throws Returns a textError when `title` is missing or the portfolio write
  *   fails.
- * @atomicity atomic per write — the portfolio file is read, mutated, and
+ * @atomicity atomic per write; the portfolio file is read, mutated, and
  *   flushed in one pass.
  * @see list_product_areas
  */
 export const createArea: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
   if (!args.title) return textError('Missing required parameter: title')
 
-  // Mirror the legacy properties bag — strategic_priority + parent_area_id are
+  // Mirror the legacy properties bag; strategic_priority + parent_area_id are
   // hoisted onto the typed UPGProductArea record by writePortfolioScopedNode.
   // `owner` has no slot on UPGProductArea so it is dropped silently (it lived
   // on the deprecated free-form properties bag).

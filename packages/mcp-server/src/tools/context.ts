@@ -286,7 +286,7 @@ export const getGraphDigest: ToolHandler = (args, ctx): ToolResult => {
  * @returns JSON: `{ lens, skills_invoked, recommendations_given,
  *   recommendations_to_avoid, focus_area, custom, skills_count, last_skill,
  *   last_recommendation }`. `recommendations_to_avoid` is the deduped list of
- *   every recommendation given this session — runners should filter their
+ *   every recommendation given this session; runners should filter their
  *   next recommendation against this array rather than re-deriving the
  *   dedup rule from prose.
  * @atomicity atomic (read-only)
@@ -373,6 +373,6 @@ export const updateSessionContext: ToolHandler = (args, ctx): ToolResult => {
   return text(JSON.stringify({ updated: true, session: sessionContext }, null, 2))
 }
 
-// Allow `void` parameters to silence unused-variable lint — re-export type
+// Allow `void` parameters to silence unused-variable lint; re-export type
 // to keep the registry import surface tidy.
 export type { ToolContext }

@@ -1,17 +1,17 @@
 ---
 name: upg-schema-update
-description: "Add or update UPG entity types, edge types, or properties — cascades through the full codebase"
+description: "Add or update UPG entity types, edge types, or properties: cascades through the full codebase"
 user-invocable: false
 audience: advanced
 argument-hint: "[entity type name or description of change]"
 category: schema
 ---
 
-> ⚠️ **Advanced skill** — intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
+> ⚠️ **Advanced skill**: intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
 
-# /upg-schema-update — UPG Schema Update Cascade
+# /upg-schema-update: UPG Schema Update Cascade
 
-You are a schema update operator. When new entity types, edge types, or properties need to be added to the UPG specification, you cascade the change through every registration point in the codebase — from spec to MCP server to Graph UI to cloud server.
+You are a schema update operator. When new entity types, edge types, or properties need to be added to the UPG specification, you cascade the change through every registration point in the codebase; from spec to MCP server to Graph UI to cloud server.
 
 **This is an internal development skill, not a user-facing UPG skill.**
 
@@ -38,9 +38,9 @@ The source of truth. All changes start here.
 | `registry/domains.ts` | Add to domain's `types` array | Find the domain by `id` in `UPG_DOMAINS`, add to its `types` array |
 | `properties/domains/<domain>.ts` | Add property interface | Create `export interface XxxProperties { ... }` with typed fields. Use existing interfaces as templates. |
 | `catalog/edge-catalog.ts` | Add edge types to `UPG_EDGE_CATALOG` | Format: `edge_name: { source_type, target_type, description, cardinality }`. The `UPG_EDGE_PAIR_MAP` is derived automatically. |
-| `shapes/edges.ts` / `shapes/base-node.ts` | If modifying UPGEdge / UPGBaseNode | Rarely needed — most additions go in catalog and property interfaces |
+| `shapes/edges.ts` / `shapes/base-node.ts` | If modifying UPGEdge / UPGBaseNode | Rarely needed; most additions go in catalog and property interfaces |
 
-**Verify:** `cd packages/upg-spec && npm run build` — must compile clean.
+**Verify:** `cd packages/upg-spec && npm run build`; must compile clean.
 
 ### Layer 2: `upg-mcp-server` (packages/upg-mcp-server/)
 
@@ -48,17 +48,17 @@ The MCP server that reads/writes `.upg` files.
 
 | What to check | When it matters |
 |---------------|----------------|
-| `src/server.ts` — tool handlers | If new types need special handling in `get_product_context`, `get_graph_digest`, or lens-aware sections |
-| `src/lib/tools.ts` — digest computation | If new types should appear in health metrics |
-| `skills/` — skill markdown files | If any skill references entity types that changed |
+| `src/server.ts`; tool handlers | If new types need special handling in `get_product_context`, `get_graph_digest`, or lens-aware sections |
+| `src/lib/tools.ts`; digest computation | If new types should appear in health metrics |
+| `skills/`; skill markdown files | If any skill references entity types that changed |
 | `src/lib/edge-inference.ts` | If new edge types need inference rules |
 | `src/classification.ts` | If tier classification changes |
 
-**Verify:** `cd packages/upg-mcp-server && npm run build` — JS must build (DTS error in preflight.ts is pre-existing, ignore it).
+**Verify:** `cd packages/upg-mcp-server && npm run build`; JS must build (DTS error in preflight.ts is pre-existing, ignore it).
 
 ### Layer 3: `apps/graph` (apps/graph/src/)
 
-The Graph UI. This is the most tedious layer — one monolithic file with ~10 registries that ALL need every type.
+The Graph UI. This is the most tedious layer; one monolithic file with ~10 registries that ALL need every type.
 
 **Main file:** `apps/graph/src/lib/entity-metadata.ts` (~6300 lines)
 
@@ -91,7 +91,7 @@ The Graph UI. This is the most tedious layer — one monolithic file with ~10 re
 2. For each registry, search for that template type and add the new type nearby
 3. Follow alphabetical or domain ordering within each registry
 
-**Verify:** `cd apps/graph && npx tsc --noEmit` — the `Record<NodeType, ...>` pattern will catch any missing entries at compile time.
+**Verify:** `cd apps/graph && npx tsc --noEmit`; the `Record<NodeType, ...>` pattern will catch any missing entries at compile time.
 
 ### Layer 4: `upg-cloud-server` (packages/upg-cloud-server/)
 
@@ -99,11 +99,11 @@ The cloud API server with PostgreSQL storage.
 
 | What to check | When it matters |
 |---------------|----------------|
-| `src/store/pg-store.ts` — `rowToEdge()` | If new fields were added to UPGEdge (e.g., `confidence`, `note`) — need column or JSONB field |
-| `src/store/pg-store.ts` — `rowToNode()` | If new fields were added to UPGBaseNode |
+| `src/store/pg-store.ts`; `rowToEdge()` | If new fields were added to UPGEdge (e.g., `confidence`, `note`); need column or JSONB field |
+| `src/store/pg-store.ts`; `rowToNode()` | If new fields were added to UPGBaseNode |
 | Database migrations | If new columns needed for new edge/node properties |
 
-**Usually no changes needed** for additive entity types — the cloud server stores types as strings and properties as JSONB. But check edge/node serialisation if interface shapes changed.
+**Usually no changes needed** for additive entity types; the cloud server stores types as strings and properties as JSONB. But check edge/node serialisation if interface shapes changed.
 
 ### Layer 5: `apps/upg-site` (apps/upg-site/)
 
@@ -115,19 +115,19 @@ The documentation site.
 | Sanity CMS content | If framework docs reference entity types |
 | Domain/layer overview pages | If domain composition changed |
 
-**Usually deferred** — docs update is a separate task.
+**Usually deferred**: docs update is a separate task.
 
 ## Workflow
 
 ### Step 1: Gather Requirements
 
 Ask for or determine:
-- **Entity type name(s)** — snake_case, singular (e.g., `root_cause`)
-- **Domain** — which domain does it belong to? (e.g., `engineering`)
-- **Properties** — what typed fields does it have?
-- **Parent type** — what's its canonical parent in the hierarchy?
-- **Edge types** — what relationships does it have with other types?
-- **Display metadata** — label, plural, icon, description, layer name
+- **Entity type name(s)**: snake_case, singular (e.g., `root_cause`)
+- **Domain**: which domain does it belong to? (e.g., `engineering`)
+- **Properties**: what typed fields does it have?
+- **Parent type**: what's its canonical parent in the hierarchy?
+- **Edge types**: what relationships does it have with other types?
+- **Display metadata**: label, plural, icon, description, layer name
 
 ### Step 2: Execute the Cascade
 
@@ -154,7 +154,7 @@ cd apps/graph && npx tsc --noEmit
 cd packages/upg-cloud-server && npm run build
 ```
 
-**The `Record<NodeType, ...>` pattern in Layer 3 is your best friend** — TypeScript will error on every registry that's missing the new type. Let the compiler find what you missed.
+**The `Record<NodeType, ...>` pattern in Layer 3 is your best friend**: TypeScript will error on every registry that's missing the new type. Let the compiler find what you missed.
 
 ### Step 4: Commit
 
@@ -176,7 +176,7 @@ Cascade: spec → mcp-server → graph → cloud-server
 
 - Edges live in `UPG_EDGE_CATALOG` in `catalog/edge-catalog.ts`
 - Format: `edge_name: { source_type, target_type, description, cardinality }`
-- `UPG_EDGE_PAIR_MAP` (`source_type:target_type` → edge key) is derived automatically — don't edit it
+- `UPG_EDGE_PAIR_MAP` (`source_type:target_type` → edge key) is derived automatically; don't edit it
 - Check for duplicates before adding: search for the pair in the catalog
 - Edge names should be verb-based: `causes`, `blocks`, `enables`, `implements`, `specifies`
 

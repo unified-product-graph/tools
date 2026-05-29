@@ -157,10 +157,10 @@ describe(' — skill_audit reports source-vs-deployed status', () => {
     expect(s.is_symlink).toBe(false)
     expect(s.in_sync).toBe(false)
     expect(s.issues).toContain(
-      'Deployed entry is a real directory, not a symlink — stale copy will not pick up source updates; run ./scripts/link-skills.sh',
+      'Deployed entry is a real directory, not a symlink; stale copy will not pick up source updates; run ./scripts/link-skills.sh',
     )
     expect(s.issues).toContain(
-      'Deployed SKILL.md differs from canonical source — symlink is stale or broken',
+      'Deployed SKILL.md differs from canonical source; symlink is stale or broken',
     )
     // The deployed frontmatter reflects the STALE file, not the canonical one — that's the whole point
     expect(s.deployed_frontmatter).toMatchObject({ 'user-invocable': true })

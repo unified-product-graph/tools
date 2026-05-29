@@ -1,7 +1,7 @@
 /**
  * Migration tools that live outside the node/edge handler files.
  *
- * Today: `migrate_status` — applies `UPG_STATUS_MIGRATIONS` to rewrite
+ * Today: `migrate_status`; applies `UPG_STATUS_MIGRATIONS` to rewrite
  * legacy status values to canonical lifecycle phases. Mirrors the
  * dry-run / commit envelope used by `migrate_type` and `migrate_properties`.
  *
@@ -30,10 +30,10 @@ import type {
  * lifecycle-phase value drift.
  *
  * **Filters (all optional, all AND-composed):**
- *  - `entity_type` — only consider nodes of this canonical type.
- *  - `from_status` — only consider nodes whose current `status` matches.
- *    (Useful for surgical rewrites — "fix the 173 service:active rows".)
- *  - `to_status` — required when `from_status` is provided; overrides the
+ *  - `entity_type`: only consider nodes of this canonical type.
+ *  - `from_status`: only consider nodes whose current `status` matches.
+ *    (Useful for surgical rewrites; "fix the 173 service:active rows".)
+ *  - `to_status`: required when `from_status` is provided; overrides the
  *    registry lookup with an explicit target.
  *
  * **Selection rule (when `from_status` is NOT provided):**
@@ -54,7 +54,7 @@ import type {
  * @atomicity per-node. Status writes go through `store.updateNode`
  *   one at a time. Dry-run is read-only.
  * @warning Default is `dry_run: true`. Pass `dry_run: false` to commit.
- *   Idempotent on retry — re-running after a successful commit reports
+ *   Idempotent on retry; re-running after a successful commit reports
  *   zero changes (canonical statuses pass the validity check).
  * @see migrate_type
  * @see migrate_properties
@@ -67,7 +67,7 @@ export const migrateStatus: ToolHandler = (args, ctx): ToolResult => {
   const entityTypeFilter = args.entity_type as string | undefined
   const fromStatusFilter = args.from_status as string | undefined
   const toStatusOverride = args.to_status as string | undefined
-  // Default `dry_run` to true — mirror `migrate_properties`. Safer than
+  // Default `dry_run` to true; mirror `migrate_properties`. Safer than
   // `migrate_type`'s default (false) because status writes are more
   // ambiguous; callers should preview before committing.
   const dryRun = (args.dry_run as boolean) ?? true
@@ -81,7 +81,7 @@ export const migrateStatus: ToolHandler = (args, ctx): ToolResult => {
   if (toStatusOverride !== undefined && typeof toStatusOverride !== 'string') {
     return textError('to_status must be a string when provided')
   }
-  // `to_status` only has meaning paired with `from_status` — without
+  // `to_status` only has meaning paired with `from_status`; without
   // a `from`, there's nothing to scope the override to.
   if (fromStatusFilter !== undefined && toStatusOverride === undefined) {
     return textError(
@@ -96,10 +96,10 @@ export const migrateStatus: ToolHandler = (args, ctx): ToolResult => {
     const nodeType = node.type as string
     const nodeStatus = node.status as string | undefined
 
-    // Entity-type filter — narrows the scope when set.
+    // Entity-type filter; narrows the scope when set.
     if (entityTypeFilter && nodeType !== entityTypeFilter) continue
 
-    // Empty / missing status is not drift — nothing to migrate.
+    // Empty / missing status is not drift; nothing to migrate.
     if (typeof nodeStatus !== 'string' || nodeStatus.length === 0) continue
 
     // ── Resolve the target replacement ─────────────────────────────────
@@ -125,7 +125,7 @@ export const migrateStatus: ToolHandler = (args, ctx): ToolResult => {
       }
     }
 
-    // Identity mapping — registered but no-op, don't count it as work.
+    // Identity mapping; registered but no-op, don't count it as work.
     if (target === null || target === nodeStatus) continue
 
     changes.push({ id: node.id, type: nodeType, from: nodeStatus, to: target })

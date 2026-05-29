@@ -6,7 +6,7 @@ argument-hint: "[description]"
 category: tooling
 ---
 
-# /upg-export — Export Graph as Shareable Artifact
+# /upg-export: Export Graph as Shareable Artifact
 
 You are a Unified Product Graph export engine. Your job is to produce a well-formatted export of the entire product graph that can be shared with stakeholders, pasted into documents, or used as a snapshot for review.
 
@@ -25,10 +25,10 @@ If the user specified a format as an argument (e.g., `/upg-export mermaid`), ski
 ```
 Which export format?
 
-1. 📋 **Full Markdown** — full product graph document (default)
-2. 🔀 **Mermaid** — visual graph diagram you can paste anywhere
-3. 📊 **CSV** — flat table of all entities for spreadsheets
-4. 📝 **Markdown Report** — concise business report grouped by area
+1. 📋 **Full Markdown**: full product graph document (default)
+2. 🔀 **Mermaid**: visual graph diagram you can paste anywhere
+3. 📊 **CSV**: flat table of all entities for spreadsheets
+4. 📝 **Markdown Report**: concise business report grouped by area
 ```
 
 ### Step 2: Fetch Everything
@@ -48,7 +48,7 @@ Build a complete picture of the graph. For entities with important properties, u
 Produce a markdown document with these sections:
 
 ```markdown
-# <Product Name> — Product Graph Export
+# <Product Name>: Product Graph Export
 
 > Exported from the Unified Product Graph (UPG)
 > Date: <current date>
@@ -64,7 +64,7 @@ Produce a markdown document with these sections:
 
 ## Personas
 
-### 👤 <Persona Name> — <Role>
+### 👤 <Persona Name>: <Role>
 
 **Context:** <context>
 
@@ -99,8 +99,8 @@ Produce a markdown document with these sections:
 ## Objectives & Key Results
 
 ### <Objective 1> (<timeframe>)
-- KR: <key result 1> — <current> / <target> <unit> (<status>)
-- KR: <key result 2> — <current> / <target> <unit> (<status>)
+- KR: <key result 1>; <current> / <target> <unit> (<status>)
+- KR: <key result 2>; <current> / <target> <unit> (<status>)
 
 (Repeat for each objective, if any exist)
 
@@ -163,7 +163,7 @@ Produce a markdown document with these sections:
 
 ## Graph Health
 
-- **Maturity:** X/5 — <level name>
+- **Maturity:** X/5: <level name>
 - **Connectivity:** X% (Y/Z entities connected)
 - **Domains covered:** X of 32
 - **Lifecycle balance:**
@@ -182,10 +182,10 @@ Produce a markdown document with these sections:
 ---
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 
-*Structured using the Unified Product Graph — an open standard for product knowledge.*
+*Structured using the Unified Product Graph; an open standard for product knowledge.*
 ```
 
 ---
@@ -197,8 +197,8 @@ Generate a Mermaid flowchart that visualises the graph structure. Use entity emo
 ```mermaid
 graph TD
   subgraph Users
-    persona1["👤 Kai — Indie Dev"]
-    persona2["👤 Maria — PM"]
+    persona1["👤 Kai; Indie Dev"]
+    persona2["👤 Maria; PM"]
     job1["💼 Ship fast without losing context"]
     job2["💼 Align team on product direction"]
     need1["🔥 Too many tools"]
@@ -240,7 +240,7 @@ graph TD
 - Use `subgraph` blocks to group by domain: Users, Strategy, Discovery, Validation, Execution
 - Only include subgraphs that have entities
 - Edges follow the actual relationships from the .upg file
-- Keep it readable — if there are more than 30 nodes, suggest splitting into domain-specific diagrams
+- Keep it readable: if there are more than 30 nodes, suggest splitting into domain-specific diagrams
 
 After generating, tell the user:
 
@@ -267,12 +267,12 @@ id,type,title,description,status,tags,parent_id,created_at
 - Escape commas and quotes properly
 - Use empty string for missing fields (not "null" or "undefined")
 - Sort by type, then by title alphabetically
-- Include ALL entities — no filtering
+- Include ALL entities: no filtering
 
 Output the CSV in a code block. Then tell the user:
 
 ```
-CSV exported — X entities total.
+CSV exported; X entities total.
 
 Paste into Google Sheets, Excel, or any spreadsheet tool.
 Column order: id, type, title, description, status, tags, parent_id, created_at
@@ -282,10 +282,10 @@ Column order: id, type, title, description, status, tags, parent_id, created_at
 
 ### Format 4: Markdown Report
 
-Generate a concise business report — less detailed than the full export, focused on readability for stakeholders who don't need every property.
+Generate a concise business report; less detailed than the full export, focused on readability for stakeholders who don't need every property.
 
 ```markdown
-# <Product Name> — Product Report
+# <Product Name>: Product Report
 
 > <one-line product description>
 > Date: <current date> | Stage: <stage> | Entities: X
@@ -294,7 +294,7 @@ Generate a concise business report — less detailed than the full export, focus
 
 ## Who We're Building For
 
-<For each persona, 2-3 sentences summarising who they are, what they need, and their key pain points. No tables — narrative style.>
+<For each persona, 2-3 sentences summarising who they are, what they need, and their key pain points. No tables; narrative style.>
 
 ---
 
@@ -318,7 +318,7 @@ Generate a concise business report — less detailed than the full export, focus
 
 ## What We're Building
 
-<Features and epics grouped logically. Status overview — what's shipped, what's in progress, what's planned.>
+<Features and epics grouped logically. Status overview; what's shipped, what's in progress, what's planned.>
 
 ---
 
@@ -329,14 +329,14 @@ Generate a concise business report — less detailed than the full export, focus
 ---
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-*Structured using the Unified Product Graph — an open standard for product knowledge.*
+*Structured using the Unified Product Graph; an open standard for product knowledge.*
 ```
 
 **Rules for Markdown Report:**
-- Narrative style, not tables — this is for humans reading, not data processing
+- Narrative style, not tables; this is for humans reading, not data processing
 - Skip empty sections entirely
 - Keep each section to 3-5 sentences max
-- Focus on "so what" — not just what exists, but why it matters
+- Focus on "so what", not just what exists, but why it matters
 
 ---
 
@@ -344,14 +344,14 @@ Generate a concise business report — less detailed than the full export, focus
 
 Before rendering the export, check the entity count. If the graph has **100+ entities**, offer to write to a file instead of printing to the conversation:
 
-> Your graph has **X entities** — that's a large export. Want me to:
+> Your graph has **X entities**: that's a large export. Want me to:
 >
-> 1. **Write to file** — save as `<product-name>-export.<ext>` (recommended — saves context)
-> 2. **Print here** — output directly in the conversation
+> 1. **Write to file**: save as `<product-name>-export.<ext>` (recommended; saves context)
+> 2. **Print here**: output directly in the conversation
 
 If the user picks file output, write the export to disk using the Write tool and confirm:
 
-> Saved to `<filename>` — X entities exported.
+> Saved to `<filename>`; X entities exported.
 
 ### Step 3: Present the Export
 
@@ -364,11 +364,11 @@ Stats: X entities, Y edges, Z domains
 Format: <Full Markdown | Mermaid | CSV | Markdown Report>
 
 Next steps:
-- /upg-export <other format> — try a different format
-- /upg-discover — run another discovery session
-- /upg-gaps — check for gaps
-- /upg-status — live dashboard view
-- /upg-diff — see what changed since your last commit
+- /upg-export <other format>: try a different format
+- /upg-discover: run another discovery session
+- /upg-gaps: check for gaps
+- /upg-status: live dashboard view
+- /upg-diff: see what changed since your last commit
 ```
 
 ## Conditional Sections
@@ -378,7 +378,7 @@ Only include sections that have entities. If there are no competitors, skip "Com
 ## Key Principles
 
 - **Complete but not redundant.** Include all entities, but don't repeat the same data in multiple sections.
-- **Properties matter.** Show the full property data — this is what makes the export useful, not just entity titles.
+- **Properties matter.** Show the full property data; this is what makes the export useful, not just entity titles.
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
 - **Tables for comparison.** Use tables for hypotheses, competitors, and features where side-by-side comparison helps.
 - **Trees for hierarchy.** Use the indented tree format for parent-child relationships.

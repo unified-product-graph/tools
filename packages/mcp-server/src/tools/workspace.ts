@@ -64,7 +64,7 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
           }
         }
       } catch {
-        // permission error or similar — skip
+        // permission error or similar; skip
       }
     }
   }
@@ -81,7 +81,7 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
         edges: Array.isArray(doc.edges) ? doc.edges.length : 0,
       })
     } catch {
-      // malformed JSON — skip
+      // malformed JSON; skip
     }
   }
 
@@ -410,7 +410,7 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     )
   }
 
-  // Qualify IDs — accept both bare IDs (with product context) and
+  // Qualify IDs; accept both bare IDs (with product context) and
   // pre-qualified `{product_id}/{node_id}` strings.
   let qualifiedSource: string
   if (sourceIdArg.includes('/')) {
@@ -436,7 +436,7 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     )
   }
 
-  // Resolve portfolio path — requires a workspace
+  // Resolve portfolio path; requires a workspace
   const cwd = process.cwd()
   const portfolioPath = resolvePortfolioPath(cwd)
   if (!portfolioPath) {
@@ -481,7 +481,7 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
 
   // Auto-register both products on portfolio.upg.products[]. Cross-
   // edges referring to products that aren't listed are still valid but harder
-  // to follow — the registry gives a stable lookup table for tooling.
+  // to follow; the registry gives a stable lookup table for tooling.
   const registeredProducts: Array<{ id: string; file_path?: string; title?: string }> = []
   const portfolioDoc = portfolioStore.getDocument()
   if (portfolioDoc) {

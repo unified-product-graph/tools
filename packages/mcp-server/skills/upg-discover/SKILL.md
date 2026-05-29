@@ -8,9 +8,9 @@ approaches: [plan]
 playbooks: [discovery-research-validation, users-needs]
 ---
 
-# /upg-discover — OST-Guided Discovery Session
+# /upg-discover: OST-Guided Discovery Session
 
-> **This skill runs a structured Opportunity Solution Tree (OST) session** — it creates new Outcome → Opportunity → Solution → Hypothesis → Experiment chains from scratch.
+> **This skill runs a structured Opportunity Solution Tree (OST) session**: it creates new Outcome → Opportunity → Solution → Hypothesis → Experiment chains from scratch.
 > 
 > Looking to explore what's already in your graph? Use `/upg-explore` (add entities) or `/upg-inspect` (audit an entity).
 
@@ -53,7 +53,7 @@ Every level must be grounded in evidence, not opinion. Outcomes come from busine
 ## Discovery Flow
 
 ### Step 1: Check Existing State
-**Phase 1 of 5 — Setting the frame** (~10 minutes total)
+**Phase 1 of 5: Setting the frame** (~10 minutes total)
 
 First, check what already exists:
 
@@ -79,7 +79,7 @@ Good outcomes are:
 Bad outcomes:
 - "Make the product better" (not measurable)
 - "Ship feature X" (that's a solution, not an outcome)
-- "Increase revenue" (too broad — which lever?)
+- "Increase revenue" (too broad, which lever?)
 
 If they give a solution disguised as an outcome, coach them: **"That sounds more like a solution. What outcome would that solution drive? What changes for the user or the business?"**
 
@@ -97,12 +97,12 @@ create_node({
 Show the tree so far:
 ```
 🎯 <title>
-  (no opportunities yet — let's discover some)
+  (no opportunities yet; let's discover some)
 ```
 
 ### Step 3: Discover Opportunities
 
-Ask: **"What opportunities have you discovered through research? These should be user needs, pain points, or unmet desires — things you've observed, not things you've assumed."**
+Ask: **"What opportunities have you discovered through research? These should be user needs, pain points, or unmet desires; things you've observed, not things you've assumed."**
 
 Coach them on the difference:
 - **Opportunity (good):** "Users spend 15 minutes manually copying data between tools" (observed friction)
@@ -114,7 +114,7 @@ Help them generate 2-3 opportunities. For each:
 create_node({
   type: "opportunity",
   title: "<user need or problem observed>",
-  description: "<evidence — where did you observe this?>",
+  description: "<evidence; where did you observe this?>",
   properties: {
     status: "identified",
     reach: <1-5>,
@@ -140,7 +140,7 @@ Show the growing tree with score dots:
 
 ### Step 4: Generate Solutions
 
-For the highest-pain opportunity, ask: **"For this opportunity — '<opportunity title>' — what solutions could address it? Think broadly: what are 2-3 different approaches?"**
+For the highest-pain opportunity, ask: **"For this opportunity, '<opportunity title>', what solutions could address it? Think broadly: what are 2-3 different approaches?"**
 
 Coach divergent thinking:
 - "What's the simplest version?"
@@ -195,7 +195,7 @@ Create the experiment chain:
 //
 // Hypothesis MUST attach to a solution (`solution_proposes_hypothesis`),
 // never directly to an opportunity. The OST chain is opportunity → solution
-// → hypothesis — short-circuiting through opportunity produces an
+// → hypothesis; short-circuiting through opportunity produces an
 // orphan hypothesis because there is no canonical
 // `opportunity → hypothesis` edge by design. If you find yourself
 // wanting to skip the solution layer, that is a signal you have not
@@ -286,5 +286,5 @@ After rendering your recommendation, call:
 - **Credit the framework.** Teresa Torres created OST. Always attribute.
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your `.upg` file is yours — open standard, portable, git-friendly.
+Your `.upg` file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org

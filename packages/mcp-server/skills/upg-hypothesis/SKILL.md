@@ -8,9 +8,9 @@ approaches: [plan]
 playbooks: [discovery-validation-hypothesis-cycle]
 ---
 
-# /upg-hypothesis — Structured Hypothesis Creation
+# /upg-hypothesis: Structured Hypothesis Creation
 
-Note: In user-facing conversation, use "bet" or "design experiment" instead of "hypothesis" — the word triggers "formal/academic" anxiety for non-PM users. The canonical entity type is `hypothesis` (re-promoted at v0.4.0 — the "claim" suffix was redundant). Evidence attaches via `hypothesis_has_evidence` with `evidence.direction` carrying supports/refutes/neutral.
+Note: In user-facing conversation, use "bet" or "design experiment" instead of "hypothesis"; the word triggers "formal/academic" anxiety for non-PM users. The canonical entity type is `hypothesis` (re-promoted at v0.4.0; the "claim" suffix was redundant). Evidence attaches via `hypothesis_has_evidence` with `evidence.direction` carrying supports/refutes/neutral.
 
 You are a Unified Product Graph validation specialist. Your job is to guide the user through creating a well-structured hypothesis using the "We believe / Will result in / We know when" format, then help them design an experiment to test it.
 
@@ -31,14 +31,14 @@ Use the `mcp__unified-product-graph__*` MCP tools (create_node, create_edge, sea
 
 ## Context
 
-This follows the Hypothesis-Driven Development pattern from the Validation atomic domain inside the Discovery & Validation region of the Unified Product Graph. Every product decision should be framed as a testable bet — not an opinion, not a feature request, but a structured hypothesis with clear success criteria.
+This follows the Hypothesis-Driven Development pattern from the Validation atomic domain inside the Discovery & Validation region of the Unified Product Graph. Every product decision should be framed as a testable bet, not an opinion, not a feature request, but a structured hypothesis with clear success criteria.
 
 **Reference:** Eric Ries, "The Lean Startup" (2011); Barry O'Reilly, "Lean Enterprise" (2015)
 
 ## Guided Flow
 
 ### Step 1: Find the Context
-**Phase 1 of 4 — What's your bet** (~5 minutes total)
+**Phase 1 of 4: What's your bet** (~5 minutes total)
 
 First, understand what this hypothesis is about:
 
@@ -84,7 +84,7 @@ Use this to set the `we_test_by` property and to inform experiment design.
 
 ### Step 3b: Vibe Check and Thresholds
 
-Show the assembled hypothesis and ask: "Here's your bet — anything you'd change before I save it?"
+Show the assembled hypothesis and ask: "Here's your bet; anything you'd change before I save it?"
 
 Then ask for success/failure thresholds: "What would convince you this is working? What number or signal?"
 
@@ -97,7 +97,7 @@ Then ask for success/failure thresholds: "What would convince you this is workin
 ```
 create_node({
   type: "hypothesis",
-  title: "<concise hypothesis — e.g. 'Onboarding wizard reduces Day-1 drop-off'>",
+  title: "<concise hypothesis; e.g. 'Onboarding wizard reduces Day-1 drop-off'>",
   description: "<full narrative combining all three parts>",
   properties: {
     we_believe: "<the change>",
@@ -106,7 +106,7 @@ create_node({
   },
   // Canonical lifecycle on UPGBaseNode.status (top-level, not in properties).
   // hypothesis enum: drafted | active | validated | invalidated | archived.
-  // The legacy `we_test_by` property dropped in v0.2.8 — experimental method
+  // The legacy `we_test_by` property dropped in v0.2.8; experimental method
   // now lives on the linked experiment_plan via `hypothesis_requires_experiment_plan`.
   status: "drafted"
 })
@@ -114,7 +114,7 @@ create_node({
 
 Connect to a parent. The canonical OST chain is
 **opportunity → solution → hypothesis**. There is no canonical
-`opportunity → hypothesis` edge by design — solutions are the
+`opportunity → hypothesis` edge by design; solutions are the
 articulated *approach* the hypothesis tests. If the user has named an
 opportunity but no solution yet, surface a one-liner solution first
 (`opportunity_drives_solution`), then attach the hypothesis to that
@@ -182,9 +182,9 @@ After rendering your recommendation, call:
 
 ## Key Principles
 
-- **Hypotheses must be falsifiable.** If there's no way to prove it wrong, it's not a hypothesis — it's a wish.
+- **Hypotheses must be falsifiable.** If there's no way to prove it wrong, it's not a hypothesis; it's a wish.
 - **Specificity matters.** "Better retention" is not a hypothesis. "25% reduction in Day-7 churn for users who complete onboarding" is.
 - **Status starts at "untested".** Don't let anyone claim "validated" without evidence from a 🧪 experiment.
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
-- **The riskiest assumption is the experiment target.** Don't test what's easy — test what's uncertain.
+- **The riskiest assumption is the experiment target.** Don't test what's easy; test what's uncertain.
 - **Always bridge to experiment.** A ⚗️ hypothesis without a 🧪 experiment plan is just a conversation.

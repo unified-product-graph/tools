@@ -3,11 +3,11 @@ name: upg-push-detail
 description: "Detailed push flow, sync file format, ID mapping, edge cases"
 ---
 
-# /upg-push — Push Flow Detail
+# /upg-push: Push Flow Detail
 
 ## First-Time Push (Step 4)
 
-This runs when there is no `.upg-sync` file — the user has never pushed this graph before.
+This runs when there is no `.upg-sync` file; the user has never pushed this graph before.
 
 ### 4a: Match or Create Cloud Product
 
@@ -46,7 +46,7 @@ mcp__upg-cloud__batch_create_nodes({
 })
 ```
 
-**Important:** Batch create supports `parent_ref` for intra-batch chaining — use this to maintain the hierarchy.
+**Important:** Batch create supports `parent_ref` for intra-batch chaining; use this to maintain the hierarchy.
 
 After each batch call, collect the returned cloud IDs and build the **node ID map**: `{ "n_local1": "cloud-uuid-1", "n_local2": "cloud-uuid-2", ... }`.
 
@@ -69,7 +69,7 @@ Compute the hash of the current `.upg` file:
 ```bash
 shasum -a 256 product.upg | awk '{print $1}'
 ```
-(Use the actual `.upg` filename — it may not be `product.upg`.)
+(Use the actual `.upg` filename; it may not be `product.upg`.)
 
 Write the `.upg-sync` file using Bash:
 ```bash
@@ -96,7 +96,7 @@ This file enables all future incremental pushes. Go to Step 6.
 
 ## Incremental Push (Step 5)
 
-This runs when `.upg-sync` exists — the user has pushed before and we can sync only changes.
+This runs when `.upg-sync` exists; the user has pushed before and we can sync only changes.
 
 ### 5a: Quick Hash Check
 
@@ -108,7 +108,7 @@ shasum -a 256 product.upg | awk '{print $1}'
 
 If the hash **matches** `last_snapshot_hash`:
 ```
-Nothing to push — your graph hasn't changed since last sync.
+Nothing to push; your graph hasn't changed since last sync.
 
 Last synced: <last_synced_at from .upg-sync>
 
@@ -133,8 +133,8 @@ If the cloud product is **gone** (deleted, reset, or not found):
 
 It may have been deleted or reset on the cloud side.
 
-1. 🔄 Full re-push — create a new cloud product and push everything
-2. ⏭️ Cancel — keep working locally for now
+1. 🔄 Full re-push; create a new cloud product and push everything
+2. ⏭️ Cancel; keep working locally for now
 
 Which would you like?
 ```
@@ -186,8 +186,8 @@ New:
   👤 <Persona title>
 
 Updated:
-  🎯 <Outcome title> — description changed
-  ⚗️  <Hypothesis title> — status changed to validated
+  🎯 <Outcome title>; description changed
+  ⚗️  <Hypothesis title>; status changed to validated
 
 Deleted:
   📝 <Learning title>
@@ -280,22 +280,22 @@ Pushed "<Product Name>" to The Product Creator cloud.
   Connections synced: <N>
   Sync file created: .upg-sync
 
-Future pushes will be incremental — only changes get sent.
+Future pushes will be incremental; only changes get sent.
 
 ### What You Get in the Cloud
 
-  - Visual canvas — drag, zoom, explore your graph spatially
-  - 47 framework trees — OST, OKR, Strategy Cascade, BMC, and more
-  - 43 analytical lenses — filter and slice your graph by any dimension
-  - Real-time collaboration — invite your team to build together
-  - AI copilot — conversational graph building with full context
+  - Visual canvas: drag, zoom, explore your graph spatially
+  - 47 framework trees: OST, OKR, Strategy Cascade, BMC, and more
+  - 43 analytical lenses: filter and slice your graph by any dimension
+  - Real-time collaboration: invite your team to build together
+  - AI copilot: conversational graph building with full context
 
 View your graph: cloud.unifiedproductgraph.org/p/<product_id>
 
 ### Keep Building Locally
 
 Your .upg file is still the source of truth for local work.
-Run /upg-push again anytime — only your changes will be synced.
+Run /upg-push again anytime; only your changes will be synced.
 ```
 
 **After incremental push:**
@@ -319,7 +319,7 @@ View your graph: cloud.unifiedproductgraph.org/p/<product_id>
 **Shared footer (always append):**
 ```
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 ```
 
@@ -349,14 +349,14 @@ This file is the bridge between local and cloud. It tracks which local entities 
 - Read and write it using Bash (`cat`, heredoc write). It's plain JSON.
 - Never expose the sync file contents to the user unless they ask.
 - The `last_snapshot_hash` is a SHA-256 of the `.upg` file at the time of last successful sync.
-- Add `.upg-sync` to `.gitignore` if the user version-controls their `.upg` file — the sync state is machine-local, not portable.
+- Add `.upg-sync` to `.gitignore` if the user version-controls their `.upg` file; the sync state is machine-local, not portable.
 
 ## ID Mapping Logic
 
 The `node_id_map` and `edge_id_map` are the core of incremental sync:
 
-- **Keys** are local IDs (e.g. `n_abc123`, `e_def456`) — these come from the `.upg` file.
-- **Values** are cloud UUIDs — these come from The Product Creator API responses.
+- **Keys** are local IDs (e.g. `n_abc123`, `e_def456`); these come from the `.upg` file.
+- **Values** are cloud UUIDs; these come from The Product Creator API responses.
 - After creating nodes on cloud, **always** record the mapping.
 - On subsequent pushes, use the mapping to `update` existing cloud nodes instead of creating duplicates.
 - When a local node is deleted, use the mapping to find and delete the cloud node, then remove the entry from the map.
@@ -378,8 +378,8 @@ This is a large graph (<N> entities). Syncing in batches...
 Use pagination on `list_nodes` and batch creates (50 at a time).
 
 **Partial push failure:**
-If some batch creates succeed but others fail, report what succeeded and what failed. The `.upg-sync` file should still be updated with the mappings for entities that DID sync — don't throw away progress. Suggest retrying with `/upg-push` for the remaining entities.
+If some batch creates succeed but others fail, report what succeeded and what failed. The `.upg-sync` file should still be updated with the mappings for entities that DID sync; don't throw away progress. Suggest retrying with `/upg-push` for the remaining entities.
 
 **Node type mapping:**
-Cloud uses the same entity types as local (`@unified-product-graph/core` shared ontology), so types map directly. Cloud stores type-specific data in a `data` JSONB column — map this from `properties` in the `.upg` format.
+Cloud uses the same entity types as local (`@unified-product-graph/core` shared ontology), so types map directly. Cloud stores type-specific data in a `data` JSONB column; map this from `properties` in the `.upg` format.
 

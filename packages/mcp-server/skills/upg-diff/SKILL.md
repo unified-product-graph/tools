@@ -7,9 +7,9 @@ category: cognitive
 approaches: [inspect]
 ---
 
-# /upg-diff — Semantic Graph Diff
+# /upg-diff: Semantic Graph Diff
 
-You are a Unified Product Graph diff engine. Your job is to show meaningful, human-readable changes to the product graph since the last git commit (or a specified ref) — not raw JSON, but semantic product changes.
+You are a Unified Product Graph diff engine. Your job is to show meaningful, human-readable changes to the product graph since the last git commit (or a specified ref), not raw JSON, but semantic product changes.
 
 **Before producing any output, read the design system:** /upg-context for emoji mappings, score dots, bar styles, and formatting rules.
 
@@ -31,7 +31,7 @@ git diff HEAD -- "*.upg"
 
 If the `.upg` file isn't tracked by git yet:
 ```
-This .upg file isn't tracked by git yet — there's nothing to diff against.
+This .upg file isn't tracked by git yet; there's nothing to diff against.
 
 Run: git add product.upg && git commit -m "Initial product graph"
 
@@ -76,13 +76,13 @@ Format as a clear, scannable summary:
   + 4 connections added
 
 ### Added
-  + 👤 Sarah Chen — Senior PM at Series B startup
+  + 👤 Sarah Chen: Senior PM at Series B startup
   + 💼 Track decisions on mobile (functional, importance ● ● ● ● ●)
   + 🎯 Reduce time-to-value by 40%
 
 ### Modified
-  ~ ⚗️ "Wizard reduces drop-off" — status: ⚪ untested → 🟡 in_progress
-  ~ 📊 Day-7 retention — target_value: 55% → 65%
+  ~ ⚗️ "Wizard reduces drop-off": status: ⚪ untested → 🟡 in_progress
+  ~ 📊 Day-7 retention: target_value: 55% → 65%
 
 ### Removed
   - ⚔️ OldRival (removed from graph)
@@ -106,9 +106,9 @@ This is a good checkpoint. Consider:
   git add product.upg && git commit -m "Add Sarah persona + retention outcome"
 
 Or keep going:
-  /upg-gaps   — Check if these changes closed any gaps
-  /upg-tree   — See the updated graph structure
-  /upg-status — Full health dashboard
+  /upg-gaps: Check if these changes closed any gaps
+  /upg-tree: See the updated graph structure
+  /upg-status: Full health dashboard
 ```
 
 ## Handling Edge Cases
@@ -127,7 +127,7 @@ Group by entity type and show counts, then offer to expand:
   + 12 connections added
   ~ 3 entities modified
 
-Want me to show the full details? That's a lot of changes — might be worth
+Want me to show the full details? That's a lot of changes; might be worth
 committing as a checkpoint first.
 ```
 
@@ -137,7 +137,7 @@ If the repo has multiple `.upg` files, list them and ask which one to diff.
 ## Key Principles
 
 - **Semantic, not syntactic.** "Added 👤 Sarah Chen" is useful. A JSON diff line is not.
-- **Group by action.** Added, modified, removed — in that order. Additions are the most interesting.
+- **Group by action.** Added, modified, removed, in that order. Additions are the most interesting.
 - **Show the important properties.** For modified entities, show what changed (old → new).
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
 - **Suggest git hygiene.** Encourage committing at natural checkpoints.
@@ -145,6 +145,6 @@ If the repo has multiple `.upg` files, list them and ask which one to diff.
 
 ```
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 ```

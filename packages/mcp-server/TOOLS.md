@@ -98,7 +98,7 @@ diffing.
 
 ### `get_session_context`
 
-Read session context: which skills ran, what was recommended, current focus area. Returns `recommendations_to_avoid` — the deduped list of recommendations already given this session. Pick your next recommendation NOT in that array (data-layer dedup, not prose).
+Read session context: which skills ran, what was recommended, current focus area. Returns `recommendations_to_avoid`; the deduped list of recommendations already given this session. Pick your next recommendation NOT in that array (data-layer dedup, not prose).
 
 **Atomicity:** `atomic (read-only)`
 
@@ -109,7 +109,7 @@ _No arguments._
 JSON: `{ lens, skills_invoked, recommendations_given,
 recommendations_to_avoid, focus_area, custom, skills_count, last_skill,
 last_recommendation }`. `recommendations_to_avoid` is the deduped list of
-every recommendation given this session — runners should filter their
+every recommendation given this session; runners should filter their
 next recommendation against this array rather than re-deriving the
 dedup rule from prose.
 
@@ -887,7 +887,7 @@ _Product areas, the `.upg-area.json` cwd scoper, and the session change log._
 
 Create a product area entity in the portfolio document (`.upg/portfolio.upg`). Product areas represent the organisational axis (who owns what). Supports nesting via `parent_area_id`. The portfolio document is created on demand.
 
-**Atomicity:** `atomic per write — the portfolio file is read, mutated, and
+**Atomicity:** `atomic per write; the portfolio file is read, mutated, and
 flushed in one pass.`
 
 **Arguments:**
@@ -1694,7 +1694,7 @@ JSON: `{ parent_type, valid_children: string[] }`
 
 ### `inspect`
 
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-inspect skill instead of calling this tool directly. — Inspect approach: path of arrival to "what's broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.
+[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-inspect skill instead of calling this tool directly. Inspect approach: path of arrival to "what's broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -1922,7 +1922,7 @@ JSON: `{ patterns: string[], total: number }`
 
 ### `list_frameworks`
 
-List the canonical `UPGFramework` definitions — the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.
+List the canonical `UPGFramework` definitions; the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2156,7 +2156,7 @@ execution_mode: "execution_v0_4_0" }`.
 
 ### `prioritise`
 
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing prioritisation, invoke the /upg-prioritise skill instead of calling this tool directly. — Prioritise approach: path of arrival to "what's most important?". Returns the Prioritise record + invocation params + framework metadata in the family-resemblance envelope. Both `candidates` and `framework_id` are required. The LLM looks up the framework via `get_framework`, reads its scoring spec, and emits `{ ranked: [{ entity_id, score, rationale }], framework_used }`.
+[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing prioritisation, invoke the /upg-prioritise skill instead of calling this tool directly. Prioritise approach: path of arrival to "what's most important?". Returns the Prioritise record + invocation params + framework metadata in the family-resemblance envelope. Both `candidates` and `framework_id` are required. The LLM looks up the framework via `get_framework`, reads its scoring spec, and emits `{ ranked: [{ entity_id, score, rationale }], framework_used }`.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2184,7 +2184,7 @@ or when `framework_id` is not in `UPG_FRAMEWORKS`.
 
 ### `reflect`
 
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing reflection, invoke the /upg-reflect skill instead of calling this tool directly. — Reflect approach: path of arrival to "what should I be questioning?". Returns the Reflect record + invocation params in the family-resemblance envelope. The LLM consumes `mode` + `scope` + `signature_hint` and emits `{ prompts: [{ kind, question, target_entities? }] }`. `mode` is one of: `assumptions`, `alternatives`, `blind-spots`, `load-bearing`; omit for open reflection. `scope` accepts a region id, entity id, or `null` for whole-graph.
+[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing reflection, invoke the /upg-reflect skill instead of calling this tool directly. Reflect approach: path of arrival to "what should I be questioning?". Returns the Reflect record + invocation params in the family-resemblance envelope. The LLM consumes `mode` + `scope` + `signature_hint` and emits `{ prompts: [{ kind, question, target_entities? }] }`. `mode` is one of: `assumptions`, `alternatives`, `blind-spots`, `load-bearing`; omit for open reflection. `scope` accepts a region id, entity id, or `null` for whole-graph.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2241,7 +2241,7 @@ not synthesise a non-canonical key.
 
 ### `trace`
 
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing tracing, invoke the /upg-trace skill instead of calling this tool directly. — Trace approach: path of arrival to "walk a meaningful path through existing graph". Returns the Trace record + invocation params in the family-resemblance envelope. The LLM uses `anchor` + `path` to compose `query()` calls and emits `{ trail: [{ depth, entity_id, edge_type_in }], reached: entity_id[] }`. `path` is type-shorthand: `["persona","job","feature"]` walks persona→job→feature using the canonical edge per pair (via `resolve_edge_for_pair`). Optional `edges_override` selects non-canonical edges per hop; `null` per element means "use canonical".
+[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing tracing, invoke the /upg-trace skill instead of calling this tool directly. Trace approach: path of arrival to "walk a meaningful path through existing graph". Returns the Trace record + invocation params in the family-resemblance envelope. The LLM uses `anchor` + `path` to compose `query()` calls and emits `{ trail: [{ depth, entity_id, edge_type_in }], reached: entity_id[] }`. `path` is type-shorthand: `["persona","job","feature"]` walks persona→job→feature using the canonical edge per pair (via `resolve_edge_for_pair`). Optional `edges_override` selects non-canonical edges per hop; `null` per element means "use canonical".
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2454,7 +2454,7 @@ Walk the loaded graph and return a per-class, per-node report of schema drift pl
 | ---- | ---- | -------- | ----------- |
 | `anti_pattern_ids` | array |  | Restrict anti-pattern evaluation to a subset of catalog ids (e.g. ["features-without-hypotheses"]). |
 | `if_changed_since` | string |  | Hash from a previous response. Returns { changed: false } if graph unchanged. |
-| `include_polymorphic_upgrades` | boolean |  | When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only — omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions. |
+| `include_polymorphic_upgrades` | boolean |  | When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only; omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions. |
 | `limit` | number |  | Max entries per class (default 100, max 1000) |
 | `scope` | `all` \| `entity_drift` \| `edge_drift` \| `property_drift` \| `top_level_drift` \| `lifecycle_drift` \| `self_referential` |  | Which drift class(es) to include in the response (default "all"). Counts in `summary` are always returned for every class. |
 | `severity` | `high` \| `medium` \| `low` |  | Filter anti-pattern violations to one severity tier. |
@@ -2507,7 +2507,7 @@ pure spec-shape check; `skip_drift: true` for catalog-only.
   "_hash": "sha256-abc123"
 }
 
-// Run a full graph health check — schema drift + anti-pattern violations
+// Run a full graph health check; schema drift + anti-pattern violations
 // Input:
 {}
 // Output (truncated):
@@ -2569,7 +2569,7 @@ JSON: `MigrateStatusResult`.
 **Warnings (non-error surfaces):**
 
 - Default is `dry_run: true`. Pass `dry_run: false` to commit.
-Idempotent on retry — re-running after a successful commit reports
+Idempotent on retry; re-running after a successful commit reports
 zero changes (canonical statuses pass the validity check).
 
 **See also:** `migrate_type`, `migrate_properties`, `validate_graph`, `list_lifecycles`

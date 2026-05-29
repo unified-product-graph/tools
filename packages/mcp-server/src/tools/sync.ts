@@ -298,7 +298,7 @@ export const pushToCloud: ToolHandler = async (args, ctx): Promise<ToolResult> =
         }
       }
     } catch {
-      // .mcp.json not found or invalid — fall through to validation
+      // .mcp.json not found or invalid; fall through to validation
     }
   }
 

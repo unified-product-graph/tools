@@ -1,17 +1,17 @@
 ---
 name: upg-schema-edges
-description: "Edge design advisor — when to add an edge, naming, direction, edge vs hierarchy vs entity"
+description: "Edge design advisor: when to add an edge, naming, direction, edge vs hierarchy vs entity"
 user-invocable: false
 audience: advanced
 argument-hint: "[source_type] [target_type] or [relationship description]"
 category: schema
 ---
 
-> ⚠️ **Advanced skill** — intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
+> ⚠️ **Advanced skill**: intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
 
-# /upg-schema-edges — Edge Design Advisor
+# /upg-schema-edges: Edge Design Advisor
 
-You are an edge design advisor. Your job is to help decide whether a relationship between entities should be an edge, a parent-child hierarchy link, or a relationship entity — and if it's an edge, how to name and direct it.
+You are an edge design advisor. Your job is to help decide whether a relationship between entities should be an edge, a parent-child hierarchy link, or a relationship entity, and if it's an edge, how to name and direct it.
 
 **This is an internal development skill for schema governance.**
 
@@ -34,7 +34,7 @@ Every relationship between entities in UPG can be expressed as one of three thin
 **When to use:**
 - The child is a **component** of the parent (journey_step inside user_journey)
 - The child is a **decomposition** of the parent (epic inside feature)
-- The child's **lifecycle** is bound to the parent — delete the parent, delete the children
+- The child's **lifecycle** is bound to the parent; delete the parent, delete the children
 - There's a clear **containment** relationship (acceptance_criterion inside user_story)
 
 **Test:** "Would you delete all [children] if you deleted the [parent]?"
@@ -53,10 +53,10 @@ Every relationship between entities in UPG can be expressed as one of three thin
 **What it is:** A semantic relationship between two independent entities. Defined in `UPG_EDGE_CATALOG` (in `catalog/edge-catalog.ts`). Both entities can exist without the other.
 
 **When to use:**
-- The entities are **independent** — either can exist alone
+- The entities are **independent**: either can exist alone
 - The relationship is **cross-domain** (design → engineering)
 - There are **multiple valid** relationships between the same pair (a service can both `powers` and `has_technical_debt`)
-- The relationship is **discovery-dependent** — you might not know it exists when entities are first created
+- The relationship is **discovery-dependent**: you might not know it exists when entities are first created
 
 **Test:** "Can [source] and [target] each exist meaningfully on their own?"
 - Yes → edge
@@ -129,7 +129,7 @@ The source entity is the actor, the target is the receiver:
 ```
 ✅ debt_blocks_feature  (debt is blocking the feature)
 ✅ fix_resolved_bug     (fix resolved the bug)
-❌ feature_blocked_by_debt  (inverted — make debt the source)
+❌ feature_blocked_by_debt  (inverted; make debt the source)
 ```
 
 **Rule 3: Specific over generic**
@@ -203,8 +203,8 @@ grep "SOURCE_.*_TARGET" packages/upg-spec/src/catalog/edge-catalog.ts
 
 **If a pair already has an edge**, consider whether you need a second edge or if the existing one covers your semantics. Two edges between the same pair should represent genuinely different relationships:
 ```
-✅ service:feature has both 'service_powers_feature' AND 'service_has_feature' — different semantics
-❌ service:feature having 'service_connects_to_feature' AND 'service_links_to_feature' — same thing
+✅ service:feature has both 'service_powers_feature' AND 'service_has_feature'; different semantics
+❌ service:feature having 'service_connects_to_feature' AND 'service_links_to_feature'; same thing
 ```
 
 ## Edge Map Hygiene Audit
@@ -234,7 +234,7 @@ DUPLICATE SEMANTICS
 ```
 
 ### Check 3: Missing Reverse Lookups
-Important edges that only go one direction but should be queryable both ways. Not proposing reverse edges — just flagging that queries might need to follow edges backwards:
+Important edges that only go one direction but should be queryable both ways. Not proposing reverse edges; just flagging that queries might need to follow edges backwards:
 ```
 ONE-WAY EDGES (consider if reverse queries are needed)
 | Edge | Direction | Reverse query use case |
@@ -279,7 +279,7 @@ Value: { source_type: '[source_type]', target_type: '[target_type]', description
 
 - **Hierarchy is structural, edges are semantic.** Parent-child says "X contains Y." Edges say "X relates to Y in this specific way."
 - **When in doubt, prefer an edge.** Hierarchy is harder to change later. Edges can be added and removed without restructuring the graph.
-- **800+ edges is fine if each is distinct.** The problem isn't quantity — it's duplicates, orphans, and vague naming.
+- **800+ edges is fine if each is distinct.** The problem isn't quantity; it's duplicates, orphans, and vague naming.
 - **Direction matters for queries.** Think about how users will traverse: "show me what blocks this feature" requires debt → feature, not feature → debt.
 - **Edges are cheap, relationship entities are expensive.** Only create a relationship entity when the relationship itself has a lifecycle and multiple properties.
 

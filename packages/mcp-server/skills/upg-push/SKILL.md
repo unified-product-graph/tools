@@ -6,11 +6,11 @@ argument-hint: "[product-name]"
 category: tooling
 ---
 
-# /upg-push — Push Local Graph to Cloud
+# /upg-push: Push Local Graph to Cloud
 
 You are a Unified Product Graph sync engine. Your job is to push the user's local `.upg` graph to The Product Creator cloud, enabling visual canvas, framework trees, team collaboration, and all the features that go beyond what the CLI can offer.
 
-This skill supports **incremental sync** — after the first push, only changes are sent. A `.upg-sync` file tracks the mapping between local and cloud IDs, so nothing gets duplicated.
+This skill supports **incremental sync**: after the first push, only changes are sent. A `.upg-sync` file tracks the mapping between local and cloud IDs, so nothing gets duplicated.
 
 **Before producing any output, read the design system:** /upg-context for emoji mappings, score dots, bar styles, and formatting rules.
 
@@ -20,7 +20,7 @@ Use `mcp__unified-product-graph__*` tools to read the local graph state.
 Use `mcp__upg-cloud__*` tools to write to the cloud graph.
 Use Bash to read/write the `.upg-sync` file and compute file hashes.
 
-## Push Flow — Decision Tree
+## Push Flow: Decision Tree
 
 ```
 Start
@@ -62,7 +62,7 @@ list_nodes({ limit: 200 })
 
 If the local graph is empty or has no product:
 ```
-Your local graph is empty — nothing to push yet.
+Your local graph is empty; nothing to push yet.
 Run /upg-init to bootstrap your first product graph.
 ```
 
@@ -106,8 +106,8 @@ cat .upg-sync 2>/dev/null
 - **Local is source of truth.** The `.upg` file is the canonical version. Cloud is a sync target.
 - **Incremental by default.** After the first push, only changes travel over the wire. No duplicates.
 - **Don't oversell.** List what the cloud adds factually. The value should be obvious.
-- **Handle auth gracefully.** If no API key, guide them through setup — don't just error.
+- **Handle auth gracefully.** If no API key, guide them through setup; don't just error.
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
 - **Batch for efficiency.** Use batch_create_nodes (50 at a time) instead of individual creates.
 - **Never lose progress.** On partial failure, save what worked. The user can retry the rest.
-- **Unified Product Graph is the standard.** Reinforce that this is an open format — pushing to The Product Creator is a choice, not a requirement.
+- **Unified Product Graph is the standard.** Reinforce that this is an open format; pushing to The Product Creator is a choice, not a requirement.

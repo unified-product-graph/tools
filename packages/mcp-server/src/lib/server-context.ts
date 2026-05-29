@@ -114,7 +114,7 @@ export async function hashFile(filePath: string): Promise<string> {
 
 /**
  * Runtime context every tool handler receives. `createServer` builds this once
- * and passes it through every dispatch — handlers never see the SDK's `Server`
+ * and passes it through every dispatch; handlers never see the SDK's `Server`
  * directly.
  */
 export interface ToolContext {

@@ -835,7 +835,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'inspect',
     description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-inspect skill instead of calling this tool directly. — Inspect approach: path of arrival to "what\'s broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.',
+      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-inspect skill instead of calling this tool directly. Inspect approach: path of arrival to "what\'s broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -847,7 +847,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'prioritise',
     description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing prioritisation, invoke the /upg-prioritise skill instead of calling this tool directly. — Prioritise approach: path of arrival to "what\'s most important?". Returns the Prioritise record + invocation params + framework metadata in the family-resemblance envelope. Both `candidates` and `framework_id` are required. The LLM looks up the framework via `get_framework`, reads its scoring spec, and emits `{ ranked: [{ entity_id, score, rationale }], framework_used }`.',
+      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing prioritisation, invoke the /upg-prioritise skill instead of calling this tool directly. Prioritise approach: path of arrival to "what\'s most important?". Returns the Prioritise record + invocation params + framework metadata in the family-resemblance envelope. Both `candidates` and `framework_id` are required. The LLM looks up the framework via `get_framework`, reads its scoring spec, and emits `{ ranked: [{ entity_id, score, rationale }], framework_used }`.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -860,7 +860,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'trace',
     description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing tracing, invoke the /upg-trace skill instead of calling this tool directly. — Trace approach: path of arrival to "walk a meaningful path through existing graph". Returns the Trace record + invocation params in the family-resemblance envelope. The LLM uses `anchor` + `path` to compose `query()` calls and emits `{ trail: [{ depth, entity_id, edge_type_in }], reached: entity_id[] }`. `path` is type-shorthand: `["persona","job","feature"]` walks persona→job→feature using the canonical edge per pair (via `resolve_edge_for_pair`). Optional `edges_override` selects non-canonical edges per hop; `null` per element means "use canonical".',
+      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing tracing, invoke the /upg-trace skill instead of calling this tool directly. Trace approach: path of arrival to "walk a meaningful path through existing graph". Returns the Trace record + invocation params in the family-resemblance envelope. The LLM uses `anchor` + `path` to compose `query()` calls and emits `{ trail: [{ depth, entity_id, edge_type_in }], reached: entity_id[] }`. `path` is type-shorthand: `["persona","job","feature"]` walks persona→job→feature using the canonical edge per pair (via `resolve_edge_for_pair`). Optional `edges_override` selects non-canonical edges per hop; `null` per element means "use canonical".',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -874,7 +874,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'reflect',
     description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing reflection, invoke the /upg-reflect skill instead of calling this tool directly. — Reflect approach: path of arrival to "what should I be questioning?". Returns the Reflect record + invocation params in the family-resemblance envelope. The LLM consumes `mode` + `scope` + `signature_hint` and emits `{ prompts: [{ kind, question, target_entities? }] }`. `mode` is one of: `assumptions`, `alternatives`, `blind-spots`, `load-bearing`; omit for open reflection. `scope` accepts a region id, entity id, or `null` for whole-graph.',
+      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing reflection, invoke the /upg-reflect skill instead of calling this tool directly. Reflect approach: path of arrival to "what should I be questioning?". Returns the Reflect record + invocation params in the family-resemblance envelope. The LLM consumes `mode` + `scope` + `signature_hint` and emits `{ prompts: [{ kind, question, target_entities? }] }`. `mode` is one of: `assumptions`, `alternatives`, `blind-spots`, `load-bearing`; omit for open reflection. `scope` accepts a region id, entity id, or `null` for whole-graph.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -913,7 +913,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_frameworks',
     description:
-      'List the canonical `UPGFramework` definitions — the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.',
+      'List the canonical `UPGFramework` definitions; the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -1326,7 +1326,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         skip_drift: { type: 'boolean', description: 'Skip the schema-drift block. Only returns anti-pattern violations.' },
         skip_anti_patterns: { type: 'boolean', description: 'Skip anti-pattern evaluation. Only returns schema drift.' },
         if_changed_since: { type: 'string', description: 'Hash from a previous response. Returns { changed: false } if graph unchanged.' },
-        include_polymorphic_upgrades: { type: 'boolean', description: 'When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only — omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions.' },
+        include_polymorphic_upgrades: { type: 'boolean', description: 'When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only; omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions.' },
       },
     },
   },
@@ -1345,7 +1345,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_session_context',
     description:
-      'Read session context: which skills ran, what was recommended, current focus area. Returns `recommendations_to_avoid` — the deduped list of recommendations already given this session. Pick your next recommendation NOT in that array (data-layer dedup, not prose).',
+      'Read session context: which skills ran, what was recommended, current focus area. Returns `recommendations_to_avoid`; the deduped list of recommendations already given this session. Pick your next recommendation NOT in that array (data-layer dedup, not prose).',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {

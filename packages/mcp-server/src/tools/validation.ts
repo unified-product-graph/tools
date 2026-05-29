@@ -93,7 +93,7 @@ const SCOPES: readonly LocalScope[] = [
 ] as const
 type Scope = LocalScope
 
-// Local aliases — the canonical types live in `@unified-product-graph/mcp-tooling`
+// Local aliases; the canonical types live in `@unified-product-graph/mcp-tooling`
 //. Re-aliased here so the rest of the file
 // reads naturally without sprinkling fully-qualified names everywhere.
 type EntityDriftEntry = ValidateGraphEntityDrift
@@ -103,7 +103,7 @@ type LifecycleDriftEntry = ValidateGraphLifecycleDrift
 type SelfReferentialEntry = ValidateGraphSelfReferential
 type PropertyDriftEntry = ValidateGraphPropertyDrift
 
-// New drift entry types — hardening (2026-05-20).
+// New drift entry types; hardening (2026-05-20).
 interface EdgeTypePairDriftEntry {
   id: string
   type: string
@@ -131,7 +131,7 @@ interface PropertyTypeDriftEntry {
 
 //: polymorphic upgrade hints (opt-in via include_polymorphic_upgrades).
 // One entry per polymorphic edge that has a typed alternative for its
-// actual source/target pair. Severity is "info" — the polymorphic edge
+// actual source/target pair. Severity is "info"; the polymorphic edge
 // remains valid; this is a suggestion, not an error.
 interface PolymorphicUpgradeHintEntry {
   id: string
@@ -176,7 +176,7 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  *     `polymorphic_with_typed_alternative` array. Each entry identifies a
  *     polymorphic edge (e.g. `node_owned_by_person`, `node_constrains_node`)
  *     that has a more-specific typed alternative for its actual source/target
- *     pair. Advisory only — does not affect `valid`. Omitted by default.
+ *     pair. Advisory only; does not affect `valid`. Omitted by default.
  *
  * Top-level `valid` is true iff schema drift is empty AND no violations
  * fired. Polymorphic upgrade hints do NOT affect `valid`. Stricter health
@@ -209,7 +209,7 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  * }
  *
  * @example
- * // Run a full graph health check — schema drift + anti-pattern violations
+ * // Run a full graph health check; schema drift + anti-pattern violations
  * // Input:
  * {}
  * // Output (truncated):
@@ -284,7 +284,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     ? (args.anti_pattern_ids as unknown[]).filter((v): v is string => typeof v === 'string')
     : undefined
 
-  // The drift walker only touches doc.nodes / doc.edges — pass a minimal
+  // The drift walker only touches doc.nodes / doc.edges; pass a minimal
   // synthetic document. Cast through unknown to satisfy UPGDocument's full
   // interface without copying every metadata field.
   const docLike = { nodes: store.getAllNodes(), edges: store.getAllEdges() } as unknown as Parameters<typeof computeSchemaDriftSummary>[0]
@@ -316,7 +316,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // across the version range. We mirror migrateEdge's iteration order so the
   // "via" reference points at the right rule.
   const edgeRules = getUPGEdgeMigrations('0.0.0', UPG_VERSION)
-  // Property migration keys per type — discriminated-union case analysis on
+  // Property migration keys per type; discriminated-union case analysis on
   // UPGPropertyMigration. Only `lift_property_to_top_level` and `drop_props`
   // touch values nested under `properties`; `rename_top_level` and
   // `drop_when_self_referential` operate on top-level fields and are surfaced
@@ -369,7 +369,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       // A type listed in UPG_TYPES is canonical and must never
       // surface as drift, even if a stale rename/split rule still references
       // it. `experiment` was reinstated as canonical alongside its
-      // (former) split children — leaving the v0.2.6 split rule in place
+      // (former) split children; leaving the v0.2.6 split rule in place
       // for legacy data, but the type itself is no longer deprecated.
       // Treat canonicality as the authoritative signal; only suggest a
       // migration when the type isn't in UPG_TYPES.
@@ -482,7 +482,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       }
     }
 
-    // New drift class — property_type_drift. F4 (2026-05-20).
+    // New drift class; property_type_drift. F4 (2026-05-20).
     // Reports declared properties on the node whose value type doesn't match
     // the schema's declared type. Undeclared properties remain
     // out of scope (covered by the read-time unknown-properties warning).
@@ -512,14 +512,14 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     // Fix B (canonical suppression): an edge type listed in UPG_EDGE_CATALOG
     // is canonical and must NEVER surface as edge_drift, even if a historical
     // UPG_EDGE_MIGRATIONS rule still references it as `from`. The hypothesis
-    // family is the canonical example — v0.2.8 renamed
+    // family is the canonical example; v0.2.8 renamed
     // `solution_proposes_hypothesis → solution_proposes_hypothesis_claim`,
     // v0.4.0 renamed it back. Both rules are historically correct; both
     // appear as `from` in the registry. The previous logic
     // (`isCanonical && !matchingRule continue`) leaked here: when the edge
     // was canonical AND a stale older rule still matched, the validator
     // suggested migrating canonical → deprecated. Canonicality is the
-    // authoritative signal — drop the rule check entirely.
+    // authoritative signal; drop the rule check entirely.
     //
     // Fix A (chain walk): for non-canonical edges,
     // walkMigrationChainToCanonical follows the latest-version rule from
@@ -537,7 +537,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       // swapping. Chains longer than one hop don't currently exist in
       // UPG_EDGE_MIGRATIONS; if/when they do, flip semantics across the
       // walk would need separate accumulation. For now, only the first hop
-      // can flip — multi-hop chains are pure renames.
+      // can flip; multi-hop chains are pure renames.
       const firstHop = edgeRules.find((r) => r.from === edge.type)
       if (walk.kind === 'canonical') {
         edgeDrift.push({
@@ -561,7 +561,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
           suggested_migration: { kind: 'drop', via: 'UPG_EDGE_MIGRATIONS' },
         })
       } else {
-        // dead_end or cycle — no canonical target known.
+        // dead_end or cycle; no canonical target known.
         edgeDrift.push({
           id: edge.id,
           type: edge.type as string,
@@ -573,7 +573,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     }
   }
 
-  // New drift classes — F1 + F2 (2026-05-20).
+  // New drift classes; F1 + F2 (2026-05-20).
   //
   // edge_type_pair_drift: edges whose source/target node types don't match
   // what the catalog says their edge type connects. Distinct from edge_drift,
@@ -584,7 +584,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // graph_topology_self_loops: edges where source_id === target_id.
   // Distinct from the existing `self_referential` class, which fires on
   // source_id / source_type properties on a node (external-import
-  // provenance) — those are properties on a node, not loops in the graph
+  // provenance); those are properties on a node, not loops in the graph
   // topology.
   if (includes('edge_type_pair_drift') || includes('graph_topology_self_loops')) {
     for (const edge of doc.edges) {
@@ -600,7 +600,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       if (includes('edge_type_pair_drift')) {
         const sourceNode = nodeById.get(edge.source)
         const targetNode = nodeById.get(edge.target)
-        if (!sourceNode || !targetNode) continue // dangling — separate concern
+        if (!sourceNode || !targetNode) continue // dangling; separate concern
         const pairCheck = validateEdgeTypePair(
           edge.type as string,
           sourceNode.type as string,
@@ -625,7 +625,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // Opt-in (include_polymorphic_upgrades: true). For each edge whose type is
   // in the registered polymorphic allow-list, look up whether a typed
   // alternative exists for the actual source/target node-type pair. If one
-  // does, emit a suggestion. Severity is always "info" — the polymorphic
+  // does, emit a suggestion. Severity is always "info"; the polymorphic
   // edge remains valid; this is advisory only.
   //
   // The wildcard endpoint in the catalog is the literal string 'node'.
@@ -649,7 +649,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
 
       const sourceNode = nodeById.get(edge.source)
       const targetNode = nodeById.get(edge.target)
-      if (!sourceNode || !targetNode) continue // dangling edge — skip
+      if (!sourceNode || !targetNode) continue // dangling edge; skip
 
       const actualSource = sourceNode.type as string
       const actualTarget = targetNode.type as string
@@ -805,7 +805,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   //
   // The new drift classes (edge_type_pair_drift, graph_topology_self_loops,
   // property_type_drift) extend the canonical ValidateGraphResult contract
-  // additively — see hardening (2026-05-20). The local server emits
+  // additively; see hardening (2026-05-20). The local server emits
   // them as extra top-level fields plus matching summary counts. Consumers
   // can read them via `response.edge_type_pair_drift` etc.
   const response = {
@@ -841,7 +841,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     if (includes('graph_topology_self_loops')) response.graph_topology_self_loops = graphTopologySelfLoops
     if (includes('property_type_drift')) response.property_type_drift = propertyTypeDrift
   }
-  // Polymorphic upgrade hints are independent of skip_drift — they are advisory
+  // Polymorphic upgrade hints are independent of skip_drift; they are advisory
   // suggestions, not schema-drift errors, and are controlled solely by
   // include_polymorphic_upgrades. When skip_drift is true they still appear.
   if (includePolymorphicUpgrades) response.polymorphic_with_typed_alternative = polymorphicUpgradeHints
@@ -851,7 +851,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
 
   // Payload-guard `_warning` / `_payload_bytes` are part of the canonical
   // `ValidateGraphResult` contract, so we attach them with the
-  // typed shape — no unknown-cast.
+  // typed shape; no unknown-cast.
   if (guardOutcome.kind === 'warn') {
     response._warning = guardOutcome.fields._warning
     response._payload_bytes = guardOutcome.fields._payload_bytes

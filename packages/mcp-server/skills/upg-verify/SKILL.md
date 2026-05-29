@@ -1,13 +1,13 @@
 ---
 name: upg-verify
-description: "Code-to-graph sync audit — find product knowledge in your codebase that isn't in the graph yet"
+description: "Code-to-graph sync audit: find product knowledge in your codebase that isn't in the graph yet"
 user-invocable: true
 argument-hint: "[scope]"
 category: cognitive
 approaches: [inspect]
 ---
 
-# /upg-verify — Code-to-Graph Sync Audit
+# /upg-verify: Code-to-Graph Sync Audit
 
 You are a Unified Product Graph consistency auditor. Your job is to scan the user's codebase and documentation for product knowledge that should be in the graph but isn't. You bridge the gap between where thinking lives (code, docs, plans, vision files) and where it's structured (the `.upg` graph).
 
@@ -38,24 +38,24 @@ If the user provided a scope argument, use that. Otherwise, ask:
 ```
 What should I audit? Pick one (or say "full"):
 
-1. **Features** — capabilities in your code not modeled in the graph
-2. **Personas** — user types referenced in docs but missing from the graph
-3. **Decisions** — strategic decisions documented but not captured
-4. **Research** — user evidence and insights scattered across docs
-5. **Architecture** — system structure that maps to product entities
-6. **Full audit** — all of the above
+1. **Features**: capabilities in your code not modeled in the graph
+2. **Personas**: user types referenced in docs but missing from the graph
+3. **Decisions**: strategic decisions documented but not captured
+4. **Research**: user evidence and insights scattered across docs
+5. **Architecture**: system structure that maps to product entities
+6. **Full audit**: all of the above
 ```
 
 ### Step 3: Scan the Codebase
 
-Based on the chosen scope, scan relevant files. Be targeted — don't read the entire codebase.
+Based on the chosen scope, scan relevant files. Be targeted; don't read the entire codebase.
 
 #### Features scope
 Scan for product capabilities not in the graph:
-- **App route definitions** — `app/**/page.tsx`, route groups, API routes → feature-worthy surfaces
-- **Feature flags or config** — search for `feature_flag`, `FEATURES`, `enabled` in config files
-- **README files** — feature lists in project READMEs
-- **CHANGELOG or release notes** — shipped features
+- **App route definitions**: `app/**/page.tsx`, route groups, API routes → feature-worthy surfaces
+- **Feature flags or config**: search for `feature_flag`, `FEATURES`, `enabled` in config files
+- **README files**: feature lists in project READMEs
+- **CHANGELOG or release notes**: shipped features
 
 ```bash
 # Example scans
@@ -65,32 +65,32 @@ find apps/ -name "page.tsx" -path "*/app/*"
 
 #### Personas scope
 Scan for user types referenced but not in graph:
-- **AGENTS.md / CLAUDE.md files** — persona names, user descriptions
-- **Vision documents** — wherever your team keeps vision / strategy docs
-- **Skill / prompt files** — persona references in agent prompts
-- **Comments and docs** — "users", "customers", named user types
+- **AGENTS.md / CLAUDE.md files**: persona names, user descriptions
+- **Vision documents**: wherever your team keeps vision / strategy docs
+- **Skill / prompt files**: persona references in agent prompts
+- **Comments and docs**: "users", "customers", named user types
 
 Search terms: persona names, "user", "customer", "builder", "creator", named roles.
 
 #### Decisions scope
 Scan for strategic decisions not captured as graph entities:
-- **Decision docs / ADRs** — wherever your team records architecture decisions
-- **Plan files** — completed plans = decisions
-- **AGENTS.md / CLAUDE.md** — documented decisions and conventions
+- **Decision docs / ADRs**: wherever your team records architecture decisions
+- **Plan files**: completed plans = decisions
+- **AGENTS.md / CLAUDE.md**: documented decisions and conventions
 
 #### Research scope
 Scan for user evidence and insights:
-- **Session logs** — dated session / standup notes
-- **Progress logs** — release notes, weekly digests
-- **Vision docs** — user research references, quotes, findings
-- **Plan files** — research findings that motivated the plan
+- **Session logs**: dated session / standup notes
+- **Progress logs**: release notes, weekly digests
+- **Vision docs**: user research references, quotes, findings
+- **Plan files**: research findings that motivated the plan
 
 #### Architecture scope
 Scan for system structure that maps to product entities:
-- **App directories** — each app could be a `product_area` or `bounded_context`
-- **Package structure** — shared packages as `capability` or `service` entities
-- **Database schemas** — Supabase schemas, migrations
-- **API surface** — API routes, MCP tools, external integrations
+- **App directories**: each app could be a `product_area` or `bounded_context`
+- **Package structure**: shared packages as `capability` or `service` entities
+- **Database schemas**: Supabase schemas, migrations
+- **API surface**: API routes, MCP tools, external integrations
 
 #### Full audit
 Run all five scopes sequentially. Present each scope's findings, then a combined summary.
@@ -101,9 +101,9 @@ For each discovered item:
 1. Search the graph: `search_nodes(title_or_keyword)`
 2. Also check by type: `list_nodes({ type: 'likely_type' })`
 3. Classify:
-   - **In graph** — already captured, no action needed
-   - **Partially in graph** — exists but missing detail or connections
-   - **Not in graph** — gap, needs to be added
+   - **In graph**: already captured, no action needed
+   - **Partially in graph**: exists but missing detail or connections
+   - **Not in graph**: gap, needs to be added
 
 ### Step 5: Score Confidence
 
@@ -113,7 +113,7 @@ Each discovered item gets a confidence score:
 |-------|---------|--------|
 | ⚪ Low (1-2) | Mentioned once, might be exploratory | Ask: "Is this real or just brainstorming?" |
 | 🟡 Medium (3) | Referenced in multiple places or formally documented | Suggest adding with `/upg-explore` |
-| 🟢 High (4-5) | Clearly intentional — appears in code, docs, AND discussions | Strongly recommend adding |
+| 🟢 High (4-5) | Clearly intentional; appears in code, docs, AND discussions | Strongly recommend adding |
 
 **Confidence factors:**
 - Mentioned in multiple files → +1
@@ -130,18 +130,18 @@ Format as a clear, scannable report:
 ## Verify Report: [Scope]
 
 ### Graph Inventory
-  📊 **[Product Name]** — [N] entities, [M] edges
+  📊 **[Product Name]**: [N] entities, [M] edges
   Stage: [stage]
 
 ### Findings
 
 #### 🟢 High Confidence (should be in graph)
 
-  1. 👤 **Kai — Technical Solo Founder**
+  1. 👤 **Kai: Technical Solo Founder**
      Found in: CLAUDE.md, skills/upg-context/SKILL.md, docs/vision.md
      Graph status: ❌ Not found
      Suggested type: persona
-     → `/upg-explore persona "Kai — Technical Solo Founder"`
+     → `/upg-explore persona "Kai; Technical Solo Founder"`
 
   2. 📦 **Clean URL Routing**
      Found in: PR #747, plans/2026-03-22-graph-clean-url-routing.md
@@ -164,10 +164,10 @@ Format as a clear, scannable report:
      → Probably an internal process, not a product entity. Skip?
 
 ### Summary
-  🟢 High: [X] items — strongly recommend adding
-  🟡 Medium: [Y] items — worth considering
-  ⚪ Low: [Z] items — probably not graph-worthy
-  ✅ Already in graph: [W] items — no action needed
+  🟢 High: [X] items; strongly recommend adding
+  🟡 Medium: [Y] items; worth considering
+  ⚪ Low: [Z] items; probably not graph-worthy
+  ✅ Already in graph: [W] items; no action needed
 
   Coverage: [%] of discovered items are in the graph
 ```
@@ -180,9 +180,9 @@ For high-confidence items, offer batch creation:
 Want me to add the [X] high-confidence items to your graph?
 I'll create them as individual entities with the suggested types.
 
-1. Yes — add all [X] items
+1. Yes; add all [X] items
 2. Let me pick which ones
-3. Not now — I'll do it manually later
+3. Not now; I'll do it manually later
 ```
 
 If the user picks option 1 or 2, use `mcp__unified-product-graph__create_node` for each, following the entity confirmation pattern from `/upg-context`.
@@ -196,7 +196,7 @@ Follow the smart ending pattern from `/upg-context`:
 
 ```
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours — open standard, portable, git-friendly.
+Your .upg file is yours: open standard, portable, git-friendly.
 unifiedproductgraph.org
 ```
 

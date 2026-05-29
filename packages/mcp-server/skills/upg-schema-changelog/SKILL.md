@@ -1,15 +1,15 @@
 ---
 name: upg-schema-changelog
-description: "Generate a schema changelog — what changed between versions, migration notes, breaking changes"
+description: "Generate a schema changelog: what changed between versions, migration notes, breaking changes"
 user-invocable: false
 audience: advanced
 argument-hint: "[from_version] [to_version] or 'latest'"
 category: schema
 ---
 
-> ⚠️ **Advanced skill** — intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
+> ⚠️ **Advanced skill**: intended for UPG contributors and power users who understand the spec internals. Not for general use. Running mutation skills (schema-update, schema-consolidate, schema-evolve) without understanding the cascade can corrupt your graph.
 
-# /upg-schema-changelog — Schema Changelog Generator
+# /upg-schema-changelog: Schema Changelog Generator
 
 You are a schema changelog generator. Your job is to diff the UPG schema between versions and produce a human-readable changelog that tells adopters what changed, why, and how to migrate.
 
@@ -17,7 +17,7 @@ You are a schema changelog generator. Your job is to diff the UPG schema between
 
 ## When to Use
 
-- After a batch of schema changes — before cutting a release
+- After a batch of schema changes; before cutting a release
 - When preparing documentation for external adopters
 - When someone asks "what changed in v0.2.0?"
 - Before merging a PR that touches `packages/upg-spec/src/`
@@ -112,10 +112,10 @@ For each change, classify as:
 
 | Classification | Meaning | Migration impact |
 |----------------|---------|-----------------|
-| **Additive** | New types, edges, properties, or domains | None — old files still valid |
+| **Additive** | New types, edges, properties, or domains | None; old files still valid |
 | **Deprecation** | Type marked deprecated with replacement | Warn on load, auto-migrate if possible |
 | **Breaking** | Type removed, property renamed, edge direction changed | Old files need migration |
-| **Enhancement** | New optional fields on existing interfaces | None — backwards compatible |
+| **Enhancement** | New optional fields on existing interfaces | None; backwards compatible |
 
 ## Output Format
 
@@ -124,40 +124,40 @@ Generate a markdown changelog:
 ```markdown
 # UPG Schema Changelog
 
-## [0.2.0] — YYYY-MM-DD
+## [0.2.0]: YYYY-MM-DD
 
 ### Summary
-One paragraph describing the theme of this release (e.g., "Engineering lens support —
+One paragraph describing the theme of this release (e.g., "Engineering lens support;
 four new entity types for debugging workflows, causal edge vocabulary, and edge confidence.")
 
 ### Added
 
 #### Entity Types
-- `investigation` (Engineering) — Active thread of inquiry for debugging and architecture exploration
-- `root_cause` (Engineering) — Underlying architectural or systemic issue
-- `symptom` (Engineering) — Observable behavior produced by a root cause
-- `fix` (Engineering) — Specific change that resolved an issue
-- (Note: v0.2.0 consolidated `design_decision`, `architecture_decision`, and `product_decision` into the single `decision` type with a `layer` property — see 0.2.0 migration entry.)
+- `investigation` (Engineering): Active thread of inquiry for debugging and architecture exploration
+- `root_cause` (Engineering): Underlying architectural or systemic issue
+- `symptom` (Engineering): Observable behavior produced by a root cause
+- `fix` (Engineering): Specific change that resolved an issue
+- (Note: v0.2.0 consolidated `design_decision`, `architecture_decision`, and `product_decision` into the single `decision` type with a `layer` property; see 0.2.0 migration entry.)
 
 #### Edge Types
-- `causes` — root_cause → symptom/bug (causal production)
-- `revealed_by` — investigation/fix → bug/root_cause (discovery)
-- `same_root_cause` — symptom ↔ symptom (shared cause)
-- `subsumes` — root_cause → bug (architectural fix eliminates quick-fix)
-- `affects` — bug/root_cause → service/feature (impact)
-- `screen_implements_feature` — screen → feature (design-to-spec bridge)
+- `causes`: root_cause → symptom/bug (causal production)
+- `revealed_by`: investigation/fix → bug/root_cause (discovery)
+- `same_root_cause`: symptom ↔ symptom (shared cause)
+- `subsumes`: root_cause → bug (architectural fix eliminates quick-fix)
+- `affects`: bug/root_cause → service/feature (impact)
+- `screen_implements_feature`: screen → feature (design-to-spec bridge)
   [... and others]
 
 #### Properties
-- `InvestigationProperties` — investigation_status, hypothesis, findings, session_id, category
-- `RootCauseProperties` — severity, category, affected_area, verified
-- `SymptomProperties` — reproducibility, frequency, steps_to_reproduce
-- `FixProperties` — commit, files_changed, verified, fixed_date
-- `DecisionProperties` — layer ('engineering' | 'design' | 'product'), status, context, decision, consequences
+- `InvestigationProperties`: investigation_status, hypothesis, findings, session_id, category
+- `RootCauseProperties`: severity, category, affected_area, verified
+- `SymptomProperties`: reproducibility, frequency, steps_to_reproduce
+- `FixProperties`: commit, files_changed, verified, fixed_date
+- `DecisionProperties`: layer ('engineering' | 'design' | 'product'), status, context, decision, consequences
 
 #### Edge Interface
-- `UPGEdge.confidence` — Optional causal confidence: `'verified' | 'likely' | 'speculative'`
-- `UPGEdge.note` — Optional note explaining why this relationship exists
+- `UPGEdge.confidence`: Optional causal confidence: `'verified' | 'likely' | 'speculative'`
+- `UPGEdge.note`: Optional note explaining why this relationship exists
 
 ### Changed
 - Engineering domain expanded from 22 to 26 entity types
@@ -170,7 +170,7 @@ four new entity types for debugging workflows, causal edge vocabulary, and edge 
 (none in this release)
 
 ### Migration Guide
-No migration needed — all changes are additive. Existing .upg files are fully compatible.
+No migration needed; all changes are additive. Existing .upg files are fully compatible.
 Old tools that don't recognise new types will preserve them as opaque nodes (type stored as string).
 
 ### Cascade Status
@@ -187,8 +187,8 @@ Old tools that don't recognise new types will preserve them as opaque nodes (typ
 
 Save the changelog in two places:
 
-1. **`packages/upg-spec/CHANGELOG.md`** — Cumulative, all versions. Append new version at the top.
-2. **PR description** — Include the summary section in the PR body for review.
+1. **`packages/upg-spec/CHANGELOG.md`**: Cumulative, all versions. Append new version at the top.
+2. **PR description**: Include the summary section in the PR body for review.
 
 If the file doesn't exist yet, create it with a header:
 
