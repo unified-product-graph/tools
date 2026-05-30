@@ -91,10 +91,10 @@ describe('list_playbooks / get_playbook', () => {
     expect(b.playbooks).toHaveLength(UPG_PLAYBOOKS.length)
   })
 
-  it('list_playbooks ships 23 playbooks at v0.3.0', () => {
+  it('list_playbooks ships 12 playbooks at v0.3.0', () => {
     const { body } = call(listPlaybooks, {})
     const b = body as { count: number }
-    expect(b.count).toBe(23)
+    expect(b.count).toBe(12)
   })
 
   it('list_playbooks filters by canonical_only (W1 invariant: exactly 10)', () => {
@@ -113,11 +113,10 @@ describe('list_playbooks / get_playbook', () => {
   })
 
   it('list_playbooks filters by framework_id', () => {
+    //: no playbook is framework-anchored anymore; anchors live on related_framework_ids.
     const { body } = call(listPlaybooks, { framework_id: 'business-model-canvas' })
     const b = body as { playbooks: Array<{ id: string; framework_id?: string }> }
-    expect(b.playbooks).toHaveLength(1)
-    expect(b.playbooks[0].id).toBe('playbook:business-model-bmc')
-    expect(b.playbooks[0].framework_id).toBe('business-model-canvas')
+    expect(b.playbooks).toHaveLength(0)
   })
 
   it('get_playbook returns the canonical record by id', () => {

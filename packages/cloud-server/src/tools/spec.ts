@@ -152,7 +152,7 @@ export const listPlaybooks: ToolHandler = (args): ToolResult => {
 
 /**
  * Return one canonical UPGPlaybook by id (e.g. "playbook:strategy-outcomes",
- * "playbook:business-model-bmc"). Includes the ordered creation_sequence with
+ * "playbook:business-gtm-growth"). Includes the ordered creation_sequence with
  * full step kinds and prompts.
  *
  * IDs are namespace-prefixed (`playbook:*`). Calling with an `approach:*` id

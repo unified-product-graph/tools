@@ -799,7 +799,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_playbook',
     description:
-      'Return one `UPGPlaybook` by id (e.g. "playbook:strategy-outcomes", "playbook:business-model-bmc"). Includes the ordered `creation_sequence` with step kinds and prompts. IDs are namespace-prefixed `playbook:*`. For approaches, use `get_approach`.',
+      'Return one `UPGPlaybook` by id (e.g. "playbook:strategy-outcomes", "playbook:business-gtm-growth"). Includes the ordered `creation_sequence` with step kinds and prompts. IDs are namespace-prefixed `playbook:*`. For approaches, use `get_approach`.',
     inputSchema: {
       type: 'object' as const,
       properties: {

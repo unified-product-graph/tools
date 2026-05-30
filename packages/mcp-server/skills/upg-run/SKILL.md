@@ -2,7 +2,7 @@
 name: upg-run
 description: "Run any UPG playbook: generic driver for canonical playbooks"
 user-invocable: true
-argument-hint: "[playbook-id] (e.g. playbook:strategy-outcomes, playbook:business-model-bmc, playbook:experience-design-brand)"
+argument-hint: "[playbook-id] (e.g. playbook:strategy-outcomes, playbook:business-gtm-growth, playbook:experience-design-brand)"
 category: cognitive
 approaches: [plan]
 ---
@@ -23,12 +23,12 @@ For `kind: 'domain_guide'` steps, the runtime expands them via `DomainUsageGuide
 
 ## Argument parsing
 
-The user invokes this skill with a playbook id, e.g. `/upg-run playbook:business-model-bmc`.
+The user invokes this skill with a playbook id, e.g. `/upg-run playbook:business-gtm-growth`.
 
-If no argument is given, list the canonical ids and ask the user to pick one. Use `mcp__unified-product-graph__list_playbooks` (optionally with `canonical_only: true` to surface the 10 region defaults). v0.3.0 ships 23 playbooks across 10 regions:
+If no argument is given, list the canonical ids and ask the user to pick one. Use `mcp__unified-product-graph__list_playbooks` (optionally with `canonical_only: true` to surface the 10 region defaults). v0.3.0 ships 12 playbooks across 10 regions:
 
 - **Canonical** (one per region): `playbook:strategy-outcomes`, `playbook:users-needs`, `playbook:discovery-research-validation`, `playbook:market-competitive`, `playbook:experience-design-brand`, `playbook:product-delivery`, `playbook:engineering-platform`, `playbook:business-gtm-growth`, `playbook:analytics-data`, `playbook:operations-quality`.
-- **Specialised** (alternative entry paths, often framework-anchored): `playbook:discovery-validation-hypothesis-cycle` (hypothesis-experiment-evidence loop), `playbook:experience-ux-domain-only`, `playbook:experience-design-system`, `playbook:experience-content`, `playbook:product-feedback-synthesis`, `playbook:engineering-architecture-only`, `playbook:business-model-bmc` (BMC), `playbook:business-pricing`, `playbook:business-growth-funnel` (AARRR), `playbook:business-marketing`, `playbook:business-growth-metric-driven`, `playbook:business-marketing-audience-first`, `playbook:operations-team-rituals`.
+- **Specialised** (alternative entry paths): `playbook:business-growth-metric-driven`, `playbook:business-marketing-audience-first`.
 
 ## Session flow
 
@@ -117,7 +117,7 @@ Summarize:
 
 If the final step (or any completed step) declared `next_sequence_on_gap` **and** the named gap is present in the graph, offer to run it:
 
-> "Done with `playbook:business-model-bmc`. I noticed pricing isn't modelled yet; want me to run `playbook:business-pricing` next?"
+> "Done with `playbook:strategy-outcomes`. I noticed discovery research isn't modelled yet; want me to run `playbook:discovery-research-validation` next?"
 
 The user picks yes/no/different playbook. On yes, invoke `/upg-run <chained-id>` directly.
 
