@@ -74,7 +74,7 @@ describe('UPGPortfolioStore.loadOrInit', () => {
  expect(existsSync(portfolioPath)).toBe(true)
 
  const raw = JSON.parse(readFileSync(portfolioPath, 'utf-8'))
- expect(raw.type).toBe('portfolio')
+ expect(raw.$upg.kind).toBe('portfolio')
  expect(raw.organization.title).toBe('Acme Corp')
  expect(raw.cross_edges).toEqual([])
  })
@@ -505,7 +505,7 @@ describe('migration: UPGFileStore + UPGPortfolioStore round-trip', () => {
 
  // Verify portfolio file
  const savedPortfolio = JSON.parse(readFileSync(portfolioPath, 'utf-8'))
- expect(savedPortfolio.type).toBe('portfolio')
+ expect(savedPortfolio.$upg.kind).toBe('portfolio')
  expect(savedPortfolio.cross_edges).toHaveLength(1)
  expect(savedPortfolio.cross_edges[0].source).toBe('prod_main/n_aaa')
  expect(savedPortfolio.cross_edges[0].target).toBe('prod_sibling/n_ext')

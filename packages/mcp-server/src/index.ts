@@ -18,7 +18,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createServer, SERVER_VERSION } from './server.js'
-import { UPG_VERSION, getDeprecatedTypes, UPG_MIGRATIONS } from '@unified-product-graph/core'
+import { UPG_VERSION, getDeprecatedTypes, UPG_MIGRATIONS, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
 import { nanoid } from 'nanoid'
 
 /**
@@ -135,11 +135,7 @@ export async function runMcpServer() {
       edges: [],
     }
     await fs.mkdir(path.dirname(defaultFile), { recursive: true })
-    await fs.writeFile(
-      defaultFile,
-      JSON.stringify(blank, null, 2) + '\n',
-      'utf-8',
-    )
+    await fs.writeFile(defaultFile, serializeCanonical(blank as UPGDocument), 'utf-8')
     process.stderr.write(`Created new UPG file: ${defaultFile}\n`)
     resolvedPath = defaultFile
   } else {
@@ -164,11 +160,7 @@ export async function runMcpServer() {
         edges: [],
       }
       await fs.mkdir(path.dirname(resolvedPath), { recursive: true })
-      await fs.writeFile(
-        resolvedPath,
-        JSON.stringify(blank, null, 2) + '\n',
-        'utf-8',
-      )
+      await fs.writeFile(resolvedPath, serializeCanonical(blank as UPGDocument), 'utf-8')
       process.stderr.write(`Created new UPG file: ${resolvedPath}\n`)
     }
   }

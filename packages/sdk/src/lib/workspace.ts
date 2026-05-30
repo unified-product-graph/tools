@@ -24,6 +24,7 @@ import {
   resolveSlugCollision,
   UPG_VERSION,
   validateProductStageStrict,
+  serializeCanonical,
 } from '@unified-product-graph/core'
 import { edgeId, productId } from './id.js'
 
@@ -332,7 +333,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }
 
-  await fsp.writeFile(destPath, JSON.stringify(newDoc, null, 2) + '\n', 'utf-8')
+  await fsp.writeFile(destPath, serializeCanonical(newDoc), 'utf-8')
 
   // Append to workspace.json's products list
   const workspacePath = path.join(upgDir, 'workspace.json')

@@ -201,11 +201,14 @@ describe('createProduct', () => {
     const store = await bootstrapWorkspace()
     const result = await createProduct({ cwd, store, name: 'Stamped Product' })
 
+    // Canonical form: integrity lives in the `$upg` header as a
+    // checksum of the canonical body, and provenance carries the writer tool.
     const raw = readFileSync(join(cwd, '.upg', result.file), 'utf-8')
-    const doc = JSON.parse(raw) as UPGDocument
-    expect(doc._integrity).toBeDefined()
-    expect(doc._integrity?.checksum).toMatch(/^[a-f0-9]{32}$/)
-    expect(doc._integrity?.verified_by).toBe('upg-mcp-local')
+    const doc = JSON.parse(raw) as { $upg?: { integrity?: { algorithm?: string; body?: string }; provenance?: { tool?: string }; format_version?: string } }
+    expect(doc.$upg?.format_version).toBeDefined()
+    expect(doc.$upg?.integrity?.algorithm).toBe('sha256-128')
+    expect(doc.$upg?.integrity?.body).toMatch(/^[a-f0-9]{32}$/)
+    expect(doc.$upg?.provenance?.tool).toBe('upg-mcp-local')
   })
 
   it('appends to workspace.json so the new product is immediately listable', async () => {

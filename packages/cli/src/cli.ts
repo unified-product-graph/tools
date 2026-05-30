@@ -22,6 +22,7 @@ import { gapsCommand } from './commands/gaps.js'
 import { initCommand } from './commands/init.js'
 import { workspaceCommand } from './commands/workspace.js'
 import { exportCommand } from './commands/export.js'
+import { fmtCommand } from './commands/fmt.js'
 import { loginCommand, logoutCommand } from './commands/login.js'
 import { pushCommand } from './commands/push.js'
 import { pullCommand } from './commands/pull.js'
@@ -60,6 +61,7 @@ function printHelp() {
   console.log(cmd('workspace', '[action]', 'List, switch, or add products'))
   console.log(cmd('import', '--from <tool>', 'Import from Markdown, Notion, Linear, Vistaly, Dovetail, GitHub'))
   console.log(cmd('export', '[options]', 'Export as JSON, Markdown, or CSV'))
+  console.log(cmd('fmt', '[files...]', 'Rewrite .upg to canonical form. --check for CI'))
   console.log()
 
   console.log(chalk.bold('  Governance'))
@@ -138,6 +140,7 @@ program.addCommand(initCommand)
 program.addCommand(workspaceCommand)
 program.addCommand(importCommand)
 program.addCommand(exportCommand)
+program.addCommand(fmtCommand)
 
 // Phase 3: Cloud bridge
 program.addCommand(loginCommand)

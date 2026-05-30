@@ -13,6 +13,7 @@ import {
   UPG_CROSS_EDGE_TYPES,
 } from '@unified-product-graph/core'
 import { UPG_TYPES, rotateSlug, migrateEdge, migrateNodeProperties, UPG_VERSION, type UPGPropertyMigrationChange } from '@unified-product-graph/core'
+import { serializeCanonical, normalizeDocument } from '@unified-product-graph/core'
 import { coerceProductStage } from '@unified-product-graph/core'
 import type { UPGEdgeType, UPGEntityType, UPGCrossEdgeType } from '@unified-product-graph/core'
 import {
@@ -216,7 +217,10 @@ export class UPGFileStore {
   async load(filePath: string): Promise<void> {
     this.filePath = path.resolve(filePath)
     const raw = await fs.readFile(this.filePath, 'utf-8')
-    const parsed = JSON.parse(raw)
+    // normalizeDocument accepts BOTH the canonical `$upg` envelope and the
+    // legacy flat envelope, returning the flat in-memory shape (and repairing
+    // double-encoded properties/tags drift). This is the one read path.
+    const parsed = normalizeDocument(JSON.parse(raw))
 
     const result = validateUPGDocument(parsed)
     if (!result.valid) {
@@ -386,10 +390,13 @@ export class UPGFileStore {
       this.doc.source.tool = 'upg-mcp-local'
     }
 
-    // Stamp integrity checksum before serializing
+    // Stamp integrity checksum before serializing (in-memory tamper baseline).
     this.stampIntegrity()
 
-    const output = JSON.stringify(this.doc, null, 2) + '\n'
+    // Canonical serialisation: one shared serialiser, so the file is
+    // byte-identical regardless of which tool wrote it. Uses the doc's
+    // exported_at + source set just above. Always ends with a trailing newline.
+    const output = serializeCanonical(this.doc)
     const tmpPath = this.filePath + '.tmp'
 
     this.selfWriteInProgress = true
@@ -424,7 +431,7 @@ export class UPGFileStore {
   private async mergeWithDisk(diskRaw: string): Promise<MergeResult> {
     let diskDoc: UPGDocument
     try {
-      const parsed = JSON.parse(diskRaw)
+      const parsed = normalizeDocument(JSON.parse(diskRaw))
       if (!validateUPGDocument(parsed).valid) {
         // Disk has invalid JSON; can't merge, our version wins
         return { merged: true, nodesAdded: 0, edgesAdded: 0, nodesFromDisk: 0, edgesFromDisk: 0, conflicts: [] }
@@ -535,7 +542,11 @@ export class UPGFileStore {
   private scheduleSave(): void {
     this.dirty = true
     if (this.saveTimer) clearTimeout(this.saveTimer)
-    this.saveTimer = setTimeout(() => this.save(), 300)
+    // Fire-and-forget debounced save: own its errors. On failure the store
+    // stays dirty (save() only clears dirty after a successful write), so the
+    // next mutation/flush retries; swallowing here keeps a transient FS error
+    // (e.g. the dir was removed under us) from becoming an unhandled rejection.
+    this.saveTimer = setTimeout(() => void this.save().catch(() => {}), 300)
   }
 
   // ── File Watching ────────────────────────────────────────────────────────
@@ -1034,7 +1045,10 @@ export class UPGPortfolioStore {
       }
     }
 
-    const parsed = JSON.parse(raw) as UPGPortfolioDocument
+    // normalizeDocument accepts both the canonical `$upg` envelope (kind:
+    // "portfolio") and the legacy flat envelope, returning the flat in-memory
+    // portfolio shape (with `type: "portfolio"` restored).
+    const parsed = normalizeDocument(JSON.parse(raw)) as UPGPortfolioDocument
     if (parsed.type !== 'portfolio') {
       throw new Error(
         `Expected a portfolio document (type: "portfolio") at ${this.filePath}, ` +
@@ -1104,13 +1118,17 @@ export class UPGPortfolioStore {
   private scheduleSave(): void {
     this.dirty = true
     if (this.saveTimer) clearTimeout(this.saveTimer)
-    this.saveTimer = setTimeout(() => void this.writeToDisk(), 300)
+    // Fire-and-forget debounced save: own its errors so a transient FS failure
+    // never becomes an unhandled rejection. Stays dirty on failure → next flush retries.
+    this.saveTimer = setTimeout(() => void this.writeToDisk().catch(() => {}), 300)
   }
 
   private async writeToDisk(): Promise<void> {
     if (!this.dirty || !this.doc || !this.filePath) return
     this.doc.exported_at = new Date().toISOString()
-    const output = JSON.stringify(this.doc, null, 2) + '\n'
+    // Canonical serialisation — handles both single-product and
+    // portfolio documents via the shared core serialiser.
+    const output = serializeCanonical(this.doc)
     const tmpPath = this.filePath + '.tmp'
     await fs.writeFile(tmpPath, output, 'utf-8')
     await fs.rename(tmpPath, this.filePath)

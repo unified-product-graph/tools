@@ -7,7 +7,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import chalk from 'chalk'
 import { input, select } from '@inquirer/prompts'
-import { UPG_VERSION } from '@unified-product-graph/core'
+import { UPG_VERSION, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
 import { nodeId } from '../lib/graph.js'
 import { upgLogo } from '../lib/formatter.js'
 
@@ -178,7 +178,7 @@ export const initCommand = new Command('init')
         edges: [],
       }
 
-      await fs.writeFile(filePath, JSON.stringify(doc, null, 2) + '\n', 'utf-8')
+      await fs.writeFile(filePath, serializeCanonical(doc as UPGDocument), 'utf-8')
 
       // ── Success output ────────────────────────────────────────────────────
       const relPath = path.relative(cwd, filePath)

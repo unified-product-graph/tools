@@ -1,6 +1,6 @@
 # @unified-product-graph/mcp
 
-The `upg` CLI. 22 commands across 6 groups: setup, workspace, governance, explore, create/edit, cloud.
+The `upg` CLI. 23 commands across 6 groups: setup, workspace, governance, explore, create/edit, cloud.
 
 ```
    •  ·  •
@@ -86,6 +86,7 @@ Open Claude Code. The MCP status indicator shows `unified-product-graph` connect
 | `upg init` | Create a `.upg` file. `--title`, `--workspace` |
 | `upg workspace` | List products. `workspace switch <name>` to change active |
 | `upg export` | Export as JSON, Markdown, or CSV. `--format=md --type=persona` |
+| `upg fmt` | Rewrite `.upg` files to canonical form (byte-stable, diff-friendly). `fmt [files...]`, `--check` for CI |
 
 ### Governance
 

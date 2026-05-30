@@ -15,6 +15,7 @@ import { confirm } from '@inquirer/prompts'
 import { input, password } from '@inquirer/prompts'
 import ora from 'ora'
 import { MarkdownAdapter } from '@unified-product-graph/adapters'
+import { serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
 import { discoverUPGFile, loadStore, nodeId as genNodeId, edgeId as genEdgeId } from '../lib/graph.js'
 
 // Version constant: keep in sync with packages/upg-spec/src/index.ts
@@ -222,7 +223,7 @@ async function writeToUPGFile(
     }
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true })
-    await fs.writeFile(outputPath, JSON.stringify(doc, null, 2) + '\n', 'utf-8')
+    await fs.writeFile(outputPath, serializeCanonical(doc as UPGDocument), 'utf-8')
     return { created: true }
   }
 }
