@@ -8,6 +8,7 @@ import type { ToolHandler } from './server-context.js'
 import {
   getProductContext,
   getGraphDigest,
+  start,
   getSessionContext,
   updateSessionContext,
 } from '../tools/context.js'
@@ -146,6 +147,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         if_changed_since: { type: 'string', description: 'Hash from a previous response. Returns { changed: false } if graph unchanged (saves ~470 tokens).' },
       },
+    },
+  },
+  {
+    name: 'start',
+    description:
+      'Zero-state on-ramp: "there is nothing here yet, where do I begin?". Reads the live graph and, for an empty or barely-started graph, recommends the first canonical playbook (from UPG_PLAYBOOKS) plus the exact create_node call for its anchor entity. Established graphs are routed to plan / inspect / get_graph_digest instead. Takes no arguments.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
     },
   },
   {
@@ -1541,6 +1551,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 const HANDLERS: Record<string, ToolHandler> = {
   get_product_context: getProductContext,
   get_graph_digest: getGraphDigest,
+  start,
   list_nodes: listNodes,
   get_node: getNode,
   get_nodes: getNodes,

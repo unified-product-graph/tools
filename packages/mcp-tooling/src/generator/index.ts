@@ -39,6 +39,15 @@ export interface GeneratorConfig {
   toolsDir: string
   /** Domain order. Controls section ordering and TOC. */
   domains: readonly string[]
+  /**
+   * Optional override of which source files feed each domain. Defaults to
+   * `['<domain>.ts']`. Use this to fold a handler that lives in its own file
+   * into another domain's section without moving the code: e.g.
+   * `{ validation: ['validation.ts', 'skills.ts'] }` groups `skill_audit`
+   * under Validation while keeping it in `skills.ts`. Every listed file is
+   * walked under the owning domain; a file may appear under only one domain.
+   */
+  domainSourceFiles?: Record<string, readonly string[]>
   /** Human-readable section header per domain. */
   domainLabels: Record<string, string>
   /** Optional one-line blurb under each section header. */
@@ -91,22 +100,27 @@ export async function runGenerator(config: GeneratorConfig): Promise<GeneratorRe
     written: [],
   }
 
-  // 1. Walk every handler file.
+  // 1. Walk every handler file. A domain reads `<domain>.ts` by default, or
+  //    the explicit file list in `domainSourceFiles` (lets a handler
+  //    in its own file group under another domain's section without moving it).
   const blocksByName = new Map<string, { block: JSDocBlock; domain: string }>()
   for (const domain of config.domains) {
-    const file = join(config.toolsDir, `${domain}.ts`)
-    if (!existsSync(file)) {
-      result.errors.push(`Missing handler file: ${file}`)
-      continue
-    }
-    const walked = walkHandlerFile(file, config.packageRoot)
-    for (const e of walked.errors) {
-      result.errors.push(`${e.source} ${e.symbol ?? ''}: ${e.message}`)
-    }
-    for (const block of walked.blocks) {
-      const toolName = config.symbolToToolName[block.symbol]
-      if (!toolName) continue // helper export, not a tool. Skip silently.
-      blocksByName.set(toolName, { block, domain })
+    const sources = config.domainSourceFiles?.[domain] ?? [`${domain}.ts`]
+    for (const source of sources) {
+      const file = join(config.toolsDir, source)
+      if (!existsSync(file)) {
+        result.errors.push(`Missing handler file: ${file}`)
+        continue
+      }
+      const walked = walkHandlerFile(file, config.packageRoot)
+      for (const e of walked.errors) {
+        result.errors.push(`${e.source} ${e.symbol ?? ''}: ${e.message}`)
+      }
+      for (const block of walked.blocks) {
+        const toolName = config.symbolToToolName[block.symbol]
+        if (!toolName) continue // helper export, not a tool. Skip silently.
+        blocksByName.set(toolName, { block, domain })
+      }
     }
   }
 
@@ -230,3 +244,4 @@ export {
   type ToolManifest,
   type ToolManifestEntry,
 } from './emit.js'
+export { parseReturnShape, type ReturnShape } from './return-shape.js'

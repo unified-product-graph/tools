@@ -10,6 +10,7 @@ import {
   UPG_DOMAINS,
   UPG_DOMAIN_GUIDES,
   UPG_LENSES,
+  UPG_PLAYBOOKS,
   getDomainForType,
   resolveLabel,
 } from '@unified-product-graph/core'
@@ -276,6 +277,127 @@ export const getGraphDigest: ToolHandler = (args, ctx): ToolResult => {
   }
 
   return text(JSON.stringify({ ...digest, lens: sessionContext.lens, lens_digest: lensDigest, _hash: currentHash }, null, 2))
+}
+
+/** Below this many non-product nodes a graph is still "young" and benefits
+ *  from the playbook on-ramp rather than gap analysis. */
+const YOUNG_GRAPH_THRESHOLD = 8
+
+/**
+ * `start`: the zero-state on-ramp. An empty or barely-started graph gives an
+ * agent nothing to plan against — `plan` returns the whole backlog, `inspect`
+ * finds nothing, `get_graph_digest` reports zeros. `start` answers the one
+ * question those can't: "there's nothing here yet, where do I begin?"
+ *
+ * Reads the live graph and routes by maturity:
+ *  - **empty** (0 non-product nodes): recommends the first canonical playbook
+ *    and the exact `create_node` call for its anchor entity.
+ *  - **young** (< 8 non-product nodes): recommends the first canonical playbook
+ *    whose anchor entity isn't in the graph yet, and points at `plan` for the
+ *    full backlog.
+ *  - **established** (>= 8): skips the beginner ramp and points at
+ *    `plan` / `inspect` / `get_graph_digest`.
+ *
+ * Canonical playbooks come from `UPG_PLAYBOOKS` (one per region, in canonical
+ * region order), so the recommendation tracks the spec, not a hard-coded path.
+ *
+ * @example
+ * // Input (empty graph):
+ * {}
+ * // Output (truncated):
+ * {
+ *   "graph_state": "empty",
+ *   "node_count": 0,
+ *   "recommended_playbook": { "id": "playbook:users-needs", "name": "Users & Needs", "target_anchor_entity": "persona" },
+ *   "first_action": { "tool": "create_node", "args": { "type": "persona", "title": "<your first persona>" } },
+ *   "recommendation": "Your graph is empty. Begin with the \"Users & Needs\" playbook: create your first persona."
+ * }
+ *
+ * @returns JSON: `{ graph_state: "empty" | "young" | "established", product,
+ *   node_count, recommended_playbook?, first_action?, recommendation,
+ *   next_tools }`. `recommended_playbook` and `first_action` are present only
+ *   for empty/young graphs.
+ * @atomicity atomic (read-only)
+ * @see plan
+ * @see get_playbook
+ * @see list_playbooks
+ * @see get_graph_digest
+ */
+export const start: ToolHandler = (_args, ctx): ToolResult => {
+  const { store } = ctx
+  const allNodes = store.getAllNodes()
+  const realNodes = allNodes.filter((n) => n.type !== 'product')
+  const nodeCount = realNodes.length
+  const product = store.getProduct()
+  const presentTypes = new Set<string>(allNodes.map((n) => n.type))
+  const productInfo = product
+    ? { title: product.title, stage: (product as { stage?: string }).stage ?? null }
+    : null
+
+  const state =
+    nodeCount === 0 ? 'empty' : nodeCount < YOUNG_GRAPH_THRESHOLD ? 'young' : 'established'
+
+  // Established graphs have enough structure to plan against directly.
+  if (state === 'established') {
+    return text(
+      JSON.stringify(
+        {
+          graph_state: state,
+          product: productInfo,
+          node_count: nodeCount,
+          recommendation: `Graph is established (${nodeCount} entities). Use plan for the missing-entities backlog, inspect for issues, and get_graph_digest for health.`,
+          next_tools: ['plan', 'inspect', 'get_graph_digest'],
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  // empty / young: the first canonical playbook whose anchor entity is not yet
+  // present (for an empty graph, that is simply the first canonical playbook).
+  const canonicalPlaybooks = UPG_PLAYBOOKS.filter((p) => p.is_canonical === true)
+  const recommend =
+    canonicalPlaybooks.find((p) =>
+      p.target_anchor_entity ? !presentTypes.has(p.target_anchor_entity) : true,
+    ) ?? canonicalPlaybooks[0]
+
+  const response: Record<string, unknown> = {
+    graph_state: state,
+    product: productInfo,
+    node_count: nodeCount,
+  }
+
+  if (recommend) {
+    const anchor = recommend.target_anchor_entity
+    response.recommended_playbook = {
+      id: recommend.id,
+      name: recommend.name,
+      region: recommend.region,
+      target_anchor_entity: anchor ?? null,
+      description: recommend.description,
+    }
+    if (anchor) {
+      response.first_action = {
+        tool: 'create_node',
+        args: { type: anchor, title: `<your first ${anchor}>` },
+      }
+    }
+    response.recommendation =
+      state === 'empty'
+        ? `Your graph is empty. Begin with the "${recommend.name}" playbook${anchor ? `: create your first ${anchor}` : ''}. Open the full sequence with get_playbook("${recommend.id}").`
+        : `You have ${nodeCount} ${nodeCount === 1 ? 'entity' : 'entities'}. Continue with the "${recommend.name}" playbook${anchor ? `: add a ${anchor}` : ''}. Use plan for the full missing-entities backlog.`
+  } else {
+    response.recommendation =
+      'No canonical playbooks available. Use plan to see the missing-entities backlog.'
+  }
+
+  response.next_tools =
+    state === 'empty'
+      ? ['get_playbook', 'create_node', 'list_playbooks']
+      : ['plan', 'get_playbook', 'get_graph_digest']
+
+  return text(JSON.stringify(response, null, 2))
 }
 
 /**

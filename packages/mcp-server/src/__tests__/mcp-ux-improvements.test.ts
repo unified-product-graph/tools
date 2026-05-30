@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createNode } from '../tools/nodes.js'
+import { start } from '../tools/context.js'
 import { batchCreateNodes as batchCreateNodesLib } from '@unified-product-graph/sdk'
 import { createEdge, batchCreateEdges } from '../tools/edges.js'
 import { resolveEdgeForPair } from '../tools/spec.js'
@@ -362,5 +363,85 @@ describe(': create_node first-use hints', () => {
       createNode({ type: 'job', title: 'Save time' }, ctx),
     ) as Record<string, unknown>
     expect(second.hints).toBeUndefined()
+  })
+})
+
+// ──: start tool + create_node orphan warning ────────────────────────
+
+describe(': create_node orphan warning', () => {
+  it('warns when a child-type node lands with no parent', async () => {
+    const store = await makeStore()
+    const ctx = makeCtx(store)
+    // `job` sits at position > 0 in the user domain (anchor: persona).
+    const result = (await parseBody(
+      createNode({ type: 'job', title: 'Ship faster' }, ctx),
+    )) as Record<string, unknown>
+    expect(result.warning).toBeDefined()
+    expect(/orphan/i.test(result.warning as string)).toBe(true)
+    expect((result.warning as string).includes('persona')).toBe(true)
+  })
+
+  it('omits the orphan warning when a parent_id wires the node', async () => {
+    const store = await makeStore()
+    const ctx = makeCtx(store)
+    const persona = (await parseBody(
+      createNode({ type: 'persona', title: 'Busy PM' }, ctx),
+    )) as { node: { id: string } }
+    const result = (await parseBody(
+      createNode({ type: 'job', title: 'Ship faster', parent_id: persona.node.id }, ctx),
+    )) as Record<string, unknown>
+    const warning = (result.warning as string | undefined) ?? ''
+    expect(/orphan/i.test(warning)).toBe(false)
+  })
+
+  it('omits the orphan warning for an anchor/root type', async () => {
+    const store = await makeStore()
+    const ctx = makeCtx(store)
+    // `persona` is the user-domain anchor (position 0): standing alone is fine.
+    const result = (await parseBody(
+      createNode({ type: 'persona', title: 'Busy PM' }, ctx),
+    )) as Record<string, unknown>
+    const warning = (result.warning as string | undefined) ?? ''
+    expect(/orphan/i.test(warning)).toBe(false)
+  })
+})
+
+describe(': start tool', () => {
+  it('recommends the first canonical playbook + first action on an empty graph', async () => {
+    const store = await makeStore()
+    const ctx = makeCtx(store)
+    const result = (await parseBody(start({}, ctx))) as Record<string, unknown>
+    expect(result.graph_state).toBe('empty')
+    expect(result.node_count).toBe(0)
+    const playbook = result.recommended_playbook as Record<string, unknown> | undefined
+    expect(playbook).toBeDefined()
+    expect(typeof playbook!.id).toBe('string')
+    const firstAction = result.first_action as Record<string, unknown> | undefined
+    expect(firstAction?.tool).toBe('create_node')
+  })
+
+  it('reports young state with a recommendation below the threshold', async () => {
+    const store = await makeStore([
+      { id: 'persona_1', type: 'persona', title: 'P1' },
+    ] as UPGDocument['nodes'])
+    const ctx = makeCtx(store)
+    const result = (await parseBody(start({}, ctx))) as Record<string, unknown>
+    expect(result.graph_state).toBe('young')
+    expect(result.node_count).toBe(1)
+    expect(typeof result.recommendation).toBe('string')
+  })
+
+  it('routes established graphs to plan/inspect instead of the beginner ramp', async () => {
+    const nodes = Array.from({ length: 9 }, (_, i) => ({
+      id: `persona_${i}`,
+      type: 'persona',
+      title: `P${i}`,
+    })) as UPGDocument['nodes']
+    const store = await makeStore(nodes)
+    const ctx = makeCtx(store)
+    const result = (await parseBody(start({}, ctx))) as Record<string, unknown>
+    expect(result.graph_state).toBe('established')
+    expect(result.recommended_playbook).toBeUndefined()
+    expect(result.next_tools).toContain('plan')
   })
 })

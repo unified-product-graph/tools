@@ -23,6 +23,7 @@ import {
   migrateEdge,
   migrateNodeProperties,
   getPropertySchema,
+  resolveContainmentEdge,
   type UPGPropertyMigrationChange,
 } from '@unified-product-graph/core'
 import {
@@ -671,6 +672,30 @@ function buildFirstUseHints(canonicalType: string): Record<string, unknown> | un
 }
 
 /**
+ * (orphan warning). When a node is created with no parent, warn if its
+ * type is one the spec expects to hang off a parent. The signal is the domain
+ * guide's creation sequence: a type at `position_in_sequence > 0` is a child of
+ * its domain anchor (anchors / roots sit at position 0 and legitimately stand
+ * alone). Returns `undefined` for anchors, roots, and types with no guide, so
+ * standalone entities never get a spurious warning.
+ */
+function buildOrphanWarning(canonicalType: string): string | undefined {
+  let schema: ReturnType<typeof buildEntitySchema>
+  try {
+    schema = buildEntitySchema(canonicalType)
+  } catch {
+    return undefined
+  }
+  const guide = schema.domain_guide
+  if (!guide || guide.position_in_sequence <= 0) return undefined
+  const anchor = guide.anchor_entity
+  if (!anchor || anchor === canonicalType) return undefined
+  const edge = resolveContainmentEdge(anchor, canonicalType)
+  const via = edge ? ` (canonical edge: ${edge})` : ''
+  return `Orphan: created ${canonicalType} with no parent. ${canonicalType} typically attaches under ${anchor}${via}. Pass parent_id on create, or wire it later with create_edge.`
+}
+
+/**
  * Create a new entity in the graph. Optionally connect it to a parent node via
  * `parent_id` (the edge type is inferred from the parent→child types). For 3+
  * entities, ALWAYS use `batch_create_nodes` instead.
@@ -687,8 +712,8 @@ function buildFirstUseHints(canonicalType: string): Record<string, unknown> | un
  * @returns JSON: `{ node, edge?, unknown_properties?, warning? }`. The `edge`
  *   field is present only when `parent_id` was supplied and a canonical
  *   hierarchy edge could be inferred. `unknown_properties` and `warning` are
- *   present when the caller passed properties not in the entity's schema
- *  . Pass `strict: true` to reject unknown properties instead of
+ *   present when the caller passed properties not in the entity's schema.
+ *   Pass `strict: true` to reject unknown properties instead of
  *   warning. For portfolio-scoped types the response shape is
  *   `{ node, portfolio_file, written_to, warning? }` where `node` is the
  *   persisted typed record.
@@ -794,6 +819,14 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
     const aggregatedWarnings: string[] = []
     if (warning) aggregatedWarnings.push(warning)
     if (lengthWarnings.length > 0) aggregatedWarnings.push(...lengthWarnings)
+    //: orphan warning. Only when no parent was supplied AND a canonical
+    // parent edge was not inferred by the lib (a parent_id that resolved to an
+    // edge means the node is wired). Resolve against the created node's
+    // canonical type so aliases warn correctly.
+    if (!args.parent_id && !(result as { edge?: unknown }).edge) {
+      const orphanWarning = buildOrphanWarning((result.node as { type: string }).type)
+      if (orphanWarning) aggregatedWarnings.push(orphanWarning)
+    }
     const libWarning = (result as { warning?: string }).warning
     const combinedWarning = libWarning
       ? aggregatedWarnings.length > 0

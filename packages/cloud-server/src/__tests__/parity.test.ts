@@ -26,6 +26,14 @@ const LOCAL_MANIFEST = resolve(REPO_ROOT, 'packages/upg-mcp-server/dist/tools-ma
 interface Manifest { tools: Array<{ name: string }> }
 
 function readNames(path: string): string[] {
+  if (!existsSync(path)) {
+    const which = path === LOCAL_MANIFEST ? '@unified-product-graph/mcp-server' : '@unified-product-graph/cloud-server'
+    throw new Error(
+      `Tool manifest not found at ${path}. The parity audit reads built manifests; ` +
+        `build ${which} first (\`npm run build --workspace=${which}\`). ` +
+        `Both manifests must exist on disk before this suite runs.`,
+    )
+  }
   const m = JSON.parse(readFileSync(path, 'utf-8')) as Manifest
   return m.tools.map((t) => t.name).sort()
 }
@@ -83,6 +91,7 @@ const CLOUD_NA = new Set([
   'get_organization',                // org / portfolio read
   'migrate_properties',              // cloud has migrate_type but not these two
   'migrate_status',
+  'start',                           // cold-start on-ramp; store-coupled, reads the local graph to recommend the first playbook. Cloud graphs could get the same on-ramp later (follow-up); local-only for 0.7.6.
 ])
 
 describe('MCP parity audit: @unified-product-graph/cloud-server vs @unified-product-graph/mcp-server', () => {

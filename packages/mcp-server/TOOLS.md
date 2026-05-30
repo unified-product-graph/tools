@@ -1,20 +1,18 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 93 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 94 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
-- [Context & Session](#context-session): 4 tools
-- [Nodes](#nodes): 14 tools
+- [Context & Session](#context-session): 5 tools
+- [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 5 tools
 - [Workspace & Portfolios](#workspace-portfolios): 10 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 43 tools
 - [Cloud Sync](#cloud-sync): 3 tools
-- [Validation](#validation): 2 tools
-- [Migrations](#migrations): 1 tool
-- [Skills Introspection](#skills-introspection): 1 tool
+- [Validation](#validation): 3 tools
 
 ## Context & Session
 
@@ -23,6 +21,7 @@ _Product overview, graph digest, lens-aware session state._
 - [`get_graph_digest`](#get-graph-digest)
 - [`get_product_context`](#get-product-context)
 - [`get_session_context`](#get-session-context)
+- [`start`](#start)
 - [`update_session_context`](#update-session-context)
 
 ### `get_graph_digest`
@@ -116,6 +115,37 @@ dedup rule from prose.
 **See also:** `update_session_context`
 
 
+### `start`
+
+Zero-state on-ramp: "there is nothing here yet, where do I begin?". Reads the live graph and, for an empty or barely-started graph, recommends the first canonical playbook (from UPG_PLAYBOOKS) plus the exact create_node call for its anchor entity. Established graphs are routed to plan / inspect / get_graph_digest instead. Takes no arguments.
+
+**Atomicity:** `atomic (read-only)`
+
+_No arguments._
+
+**Returns:**
+
+JSON: `{ graph_state: "empty" | "young" | "established", product,
+node_count, recommended_playbook?, first_action?, recommendation,
+next_tools }`. `recommended_playbook` and `first_action` are present only
+for empty/young graphs.
+
+**Examples:**
+
+// Input (empty graph):
+{}
+// Output (truncated):
+{
+  "graph_state": "empty",
+  "node_count": 0,
+  "recommended_playbook": { "id": "playbook:users-needs", "name": "Users & Needs", "target_anchor_entity": "persona" },
+  "first_action": { "tool": "create_node", "args": { "type": "persona", "title": "<your first persona>" } },
+  "recommendation": "Your graph is empty. Begin with the \"Users & Needs\" playbook: create your first persona."
+}
+
+**See also:** `plan`, `get_playbook`, `list_playbooks`, `get_graph_digest`
+
+
 ### `update_session_context`
 
 Update session context: register a skill invocation, record a recommendation, set focus area, switch lens, or store custom state for cross-skill coordination.
@@ -145,7 +175,7 @@ new state.
 
 ## Nodes
 
-_Read, search, traverse, mutate, batch, migrate, dedupe._
+_Read, search, traverse, mutate, batch, migrate type/properties/status, dedupe._
 
 - [`batch_create_nodes`](#batch-create-nodes)
 - [`batch_delete_nodes`](#batch-delete-nodes)
@@ -157,6 +187,7 @@ _Read, search, traverse, mutate, batch, migrate, dedupe._
 - [`get_nodes`](#get-nodes)
 - [`list_nodes`](#list-nodes)
 - [`migrate_properties`](#migrate-properties)
+- [`migrate_status`](#migrate-status)
 - [`migrate_type`](#migrate-type)
 - [`query`](#query)
 - [`search_nodes`](#search-nodes)
@@ -262,8 +293,8 @@ Create one entity, optionally with a parent edge. For 3+ entities, use `batch_cr
 JSON: `{ node, edge?, unknown_properties?, warning? }`. The `edge`
 field is present only when `parent_id` was supplied and a canonical
 hierarchy edge could be inferred. `unknown_properties` and `warning` are
-present when the caller passed properties not in the entity's schema
-. Pass `strict: true` to reject unknown properties instead of
+present when the caller passed properties not in the entity's schema.
+Pass `strict: true` to reject unknown properties instead of
 warning. For portfolio-scoped types the response shape is
 `{ node, portfolio_file, written_to, warning? }` where `node` is the
 persisted typed record.
@@ -464,6 +495,40 @@ Re-running with `dry_run: true` after a successful commit reports zero
 changes (idempotent on the canonical-properties shape).
 
 **See also:** `migrate_type`, `validate_graph`, `list_type_migrations`
+
+
+### `migrate_status`
+
+Apply `UPG_STATUS_MIGRATIONS` graph-wide: rewrite legacy lifecycle status values to canonical phase ids. Auto-mode (no filters) selects nodes whose current status is invalid against the entity type's lifecycle and has a registered replacement (the same invariant that drives `validate_graph` lifecycle_drift). Surgical mode (`from_status` + `to_status`) overrides the registry and rewrites every (entity_type?, from_status) match. Nodes with invalid statuses but no registered replacement surface under `skipped_no_migration`. Default `dry_run=true`; pass `dry_run=false` to commit.
+
+**Atomicity:** `per-node. Status writes go through `store.updateNode`
+one at a time. Dry-run is read-only.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `dry_run` | boolean |  | Preview changes without applying (default true). Pass false to commit. |
+| `entity_type` | string |  | Optional. Restrict the rewrite to nodes of this canonical entity type (e.g. "service", "feature"). |
+| `from_status` | string |  | Optional. Restrict the rewrite to nodes whose current status equals this exact value. When provided, `to_status` is required and the registry is bypassed. |
+| `to_status` | string |  | Required when `from_status` is provided. The canonical phase id to write. |
+
+**Returns:**
+
+JSON: `MigrateStatusResult`.
+
+**Throws:**
+
+- Returns a textError when `from_status` is provided without
+`to_status`, or when `entity_type` is provided but isn't a string.
+
+**Warnings (non-error surfaces):**
+
+- Default is `dry_run: true`. Pass `dry_run: false` to commit.
+Idempotent on retry; re-running after a successful commit reports
+zero changes (canonical statuses pass the validity check).
+
+**See also:** `migrate_type`, `migrate_properties`, `validate_graph`, `list_lifecycles`
 
 
 ### `migrate_type`
@@ -2388,9 +2453,10 @@ target an existing one.
 
 ## Validation
 
-_Schema-drift detection and full per-node drift reports._
+_Schema-drift detection, full per-node drift reports, and source-vs-deployed integrity audits of UPG `/upg-*` skills._
 
 - [`get_anti_pattern_violations_for`](#get-anti-pattern-violations-for)
+- [`skill_audit`](#skill-audit)
 - [`validate_graph`](#validate-graph)
 
 ### `get_anti_pattern_violations_for`
@@ -2440,6 +2506,23 @@ per-id matching once `target_entities` carries ids.
 }
 
 **See also:** `validate_graph`, `list_anti_patterns`, `get_anti_pattern`, `inspect`
+
+
+### `skill_audit`
+
+Audit one or every UPG skill for source-vs-deployed integrity. Use before recommending a skill to confirm `.claude/skills/<name>/SKILL.md` is a symlink to canonical source and the bodies match. When `in_sync: false`, what you read from `packages/upg-mcp-server/skills/` is NOT what the user will experience.
+
+**Atomicity:** `atomic (read-only filesystem stat + read)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `name` | string |  | Optional skill name (e.g. "upg-trace"). If omitted, audits every canonical skill. |
+
+**Returns:**
+
+`{ skills: SkillAuditRecord[] }`
 
 
 ### `validate_graph`
@@ -2533,67 +2616,4 @@ pure spec-shape check; `skip_drift: true` for catalog-only.
 }
 
 **See also:** `migrate_type`, `migrate_properties`, `rename_edge_type`, `get_anti_pattern_violations_for`, `list_anti_patterns`, `list_type_migrations`, `list_edge_migrations`, `inspect`
-
-
-## Migrations
-
-_Status value migration across the graph._
-
-- [`migrate_status`](#migrate-status)
-
-### `migrate_status`
-
-Apply `UPG_STATUS_MIGRATIONS` graph-wide: rewrite legacy lifecycle status values to canonical phase ids. Auto-mode (no filters) selects nodes whose current status is invalid against the entity type's lifecycle and has a registered replacement (the same invariant that drives `validate_graph` lifecycle_drift). Surgical mode (`from_status` + `to_status`) overrides the registry and rewrites every (entity_type?, from_status) match. Nodes with invalid statuses but no registered replacement surface under `skipped_no_migration`. Default `dry_run=true`; pass `dry_run=false` to commit.
-
-**Atomicity:** `per-node. Status writes go through `store.updateNode`
-one at a time. Dry-run is read-only.`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `dry_run` | boolean |  | Preview changes without applying (default true). Pass false to commit. |
-| `entity_type` | string |  | Optional. Restrict the rewrite to nodes of this canonical entity type (e.g. "service", "feature"). |
-| `from_status` | string |  | Optional. Restrict the rewrite to nodes whose current status equals this exact value. When provided, `to_status` is required and the registry is bypassed. |
-| `to_status` | string |  | Required when `from_status` is provided. The canonical phase id to write. |
-
-**Returns:**
-
-JSON: `MigrateStatusResult`.
-
-**Throws:**
-
-- Returns a textError when `from_status` is provided without
-`to_status`, or when `entity_type` is provided but isn't a string.
-
-**Warnings (non-error surfaces):**
-
-- Default is `dry_run: true`. Pass `dry_run: false` to commit.
-Idempotent on retry; re-running after a successful commit reports
-zero changes (canonical statuses pass the validity check).
-
-**See also:** `migrate_type`, `migrate_properties`, `validate_graph`, `list_lifecycles`
-
-
-## Skills Introspection
-
-_Verify source-vs-deployed integrity of UPG `/upg-*` skills before recommending them._
-
-- [`skill_audit`](#skill-audit)
-
-### `skill_audit`
-
-Audit one or every UPG skill for source-vs-deployed integrity. Use before recommending a skill to confirm `.claude/skills/<name>/SKILL.md` is a symlink to canonical source and the bodies match. When `in_sync: false`, what you read from `packages/upg-mcp-server/skills/` is NOT what the user will experience.
-
-**Atomicity:** `atomic (read-only filesystem stat + read)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `name` | string |  | Optional skill name (e.g. "upg-trace"). If omitted, audits every canonical skill. |
-
-**Returns:**
-
-`{ skills: SkillAuditRecord[] }`
 

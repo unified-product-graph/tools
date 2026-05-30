@@ -2,6 +2,18 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.6] - 2026-05-30
+
+### Added
+
+- **`start` tool:** a zero-state on-ramp. An empty or barely-started graph gives an agent nothing to plan against; `start` reads the live graph and recommends the first canonical playbook (from `UPG_PLAYBOOKS`) plus the exact `create_node` call for its anchor entity. Young graphs (< 8 non-product nodes) get the first canonical playbook whose anchor isn't present yet; established graphs are routed to `plan` / `inspect` / `get_graph_digest`. 94 tools total.
+
+### Changed
+
+- **`create_node` orphan warning:** when a node lands with no parent and its type sits at position > 0 in its domain's creation sequence (the spec expects it under the domain anchor), the response carries a warning naming the typical parent and the canonical edge. Anchors, roots, and guide-less types never warn.
+- **Tool reference return shapes are now authored-source-derived:** the generator parses each tool's `@returns` prose into a structured `return_shape` / `return_notes` at build time, shipped on the manifest. Fixed a `create_node` `@returns` wrap artifact at source.
+- **Dissolved the singleton `Migrations` and `Skills Introspection` tool-reference sections:** `migrate_status` now groups under Nodes and `skill_audit` under Validation, without moving the source. Reference drops from 11 to 9 domains.
+
 ## [0.6.3] - 2026-05-27
 
 ### Changed

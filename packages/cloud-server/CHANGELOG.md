@@ -4,6 +4,13 @@ All notable changes to `@unified-product-graph/cloud-server` are documented in t
 
 This package co-versions with `@unified-product-graph/core` and `@unified-product-graph/mcp-server`. One version line covers the spec and both reference implementations.
 
+## 0.7.6 · 2026-05-30 · Tool UX train (mcp-server lead)
+
+This line is led by `@unified-product-graph/mcp-server` (the `start` tool, `create_node` orphan warning, authored return shapes, and the dissolved singleton tool groups). The cloud server itself is unchanged at runtime; it co-versions and picks up the shared `mcp-tooling` generator changes:
+
+- **Authored return shapes:** the generated tool reference now ships build-time `return_shape` / `return_notes` derived from each handler's authored `@returns`.
+- **Parity audit hardening ( /):** the cloud ↔ local parity audit now fails with an actionable "build the manifest first" message instead of a raw `ENOENT` when run without a prior build.
+
 ## 0.6.0 · 2026-05-22 · Launch train alignment
 
 Aligned with `@unified-product-graph/core@0.6.0`. Bumped `@unified-product-graph/core` dep to `^0.6.0`. No cloud-server surface changes; co-versioned for the launch train.

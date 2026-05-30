@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/cloud-server",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "Postgres-backed MCP server for the Unified Product Graph, self-hostable, open source",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",

@@ -38,9 +38,19 @@ const DOMAINS = [
   'spec',
   'sync',
   'validation',
-  'migrations',
-  'skills',
 ] as const
+
+//: `migrate_status` and `skill_audit` were each the sole member of
+// their own section (Migrations, Skills Introspection). Singleton groups add
+// navigational noise without adding meaning, so fold them into the nearest
+// substantive domain WITHOUT moving the source: `migrate_status` reads under
+// Nodes (it is a node-status rewrite, sibling to `migrate_type` /
+// `migrate_properties`), `skill_audit` under Validation (it is an integrity
+// check). The handlers stay in `migrations.ts` / `skills.ts`.
+const DOMAIN_SOURCE_FILES: Record<string, readonly string[]> = {
+  nodes: ['nodes.ts', 'migrations.ts'],
+  validation: ['validation.ts', 'skills.ts'],
+}
 
 const DOMAIN_LABELS: Record<string, string> = {
   context: 'Context & Session',
@@ -52,22 +62,18 @@ const DOMAIN_LABELS: Record<string, string> = {
   spec: 'Spec Introspection',
   sync: 'Cloud Sync',
   validation: 'Validation',
-  migrations: 'Migrations',
-  skills: 'Skills Introspection',
 }
 
 const DOMAIN_BLURBS: Record<string, string> = {
   context: 'Product overview, graph digest, lens-aware session state.',
-  nodes: 'Read, search, traverse, mutate, batch, migrate, dedupe.',
+  nodes: 'Read, search, traverse, mutate, batch, migrate type/properties/status, dedupe.',
   edges: 'Single create/delete/move plus matching atomic batches.',
   areas: 'Product areas, the `.upg-area.json` cwd scoper, and the session change log.',
   workspace: 'Multi-product discovery, switching, init, cross-product edges.',
   schema: 'Entity schema introspection. Same constraints the LSP enforces.',
   spec: 'Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings. All from `@unified-product-graph/core`.',
   sync: 'Read sync state, pull cloud changes, push local graph.',
-  validation: 'Schema-drift detection and full per-node drift reports.',
-  migrations: 'Status value migration across the graph.',
-  skills: 'Verify source-vs-deployed integrity of UPG `/upg-*` skills before recommending them.',
+  validation: 'Schema-drift detection, full per-node drift reports, and source-vs-deployed integrity audits of UPG `/upg-*` skills.',
 }
 
 // ─── Symbol → tool-name map (mirrors HANDLERS in tool-registry.ts) ─────────
@@ -80,6 +86,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   // context
   getProductContext: 'get_product_context',
   getGraphDigest: 'get_graph_digest',
+  start: 'start',
   getSessionContext: 'get_session_context',
   updateSessionContext: 'update_session_context',
   // skills
@@ -209,6 +216,7 @@ async function main(): Promise<void> {
     packageVersion: pkgJson.version,
     toolsDir: TOOLS_DIR,
     domains: DOMAINS,
+    domainSourceFiles: DOMAIN_SOURCE_FILES,
     domainLabels: DOMAIN_LABELS,
     domainBlurbs: DOMAIN_BLURBS,
     symbolToToolName: SYMBOL_TO_TOOL_NAME,

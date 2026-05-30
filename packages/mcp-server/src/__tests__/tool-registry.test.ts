@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 91 tools', () => {
+  it('exposes the expected 94 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -101,7 +101,8 @@ describe('Tool registry: completeness', () => {
     // + 1 portfolio organisation read: get_organization. → 91.
     // + migrate_status ( status migration). → 92.
     // + skill_audit ( source-vs-deployed integrity for skills). → 93.
-    expect(TOOL_DEFINITIONS).toHaveLength(93)
+    // + start ( zero-state on-ramp). → 94.
+    expect(TOOL_DEFINITIONS).toHaveLength(94)
   })
 })
 

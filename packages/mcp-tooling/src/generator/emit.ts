@@ -17,6 +17,7 @@
 import type { JSDocBlock } from './jsdoc-walker.js'
 import type { ToolDefinition } from '../tool-definition.js'
 import type { AuditedTool } from './audit.js'
+import { parseReturnShape } from './return-shape.js'
 
 // ─── Markdown emitter ──────────────────────────────────────────────────────
 
@@ -196,7 +197,20 @@ export interface ToolManifestEntry {
   description: string
   domain: string
   inputSchema: ToolDefinition['inputSchema']
+  /** Raw authored `@returns` prose (the source of truth). */
   returns?: string
+  /**
+   * Build-time structured derivation of `returns`: the leading
+   * object/array shape, if the prose led with one. Consumers render this
+   * directly instead of re-parsing in the browser.
+   */
+  return_shape?: string
+  /**
+   * Build-time structured derivation of `returns`: the explanatory
+   * sentences after the shape, each renderable as its own bullet. Present
+   * whenever `returns` is, even when `return_shape` is absent.
+   */
+  return_notes?: string[]
   throws: string[]
   examples: string[]
   warnings: string[]
@@ -258,7 +272,15 @@ function toManifestEntry(t: AuditedTool): ToolManifestEntry {
     source: b.source,
     symbol: b.symbol,
   }
-  if (b.returns) out.returns = b.returns
+  if (b.returns) {
+    out.returns = b.returns
+    //: derive the structured shape at build time from the authored
+    // prose so the site renders the authored shape directly (its client-side
+    // parser stays as a fallback for any tool lacking these fields).
+    const parsed = parseReturnShape(b.returns)
+    if (parsed.shape) out.return_shape = parsed.shape
+    if (parsed.notes.length > 0) out.return_notes = parsed.notes
+  }
   if (b.atomicity) out.atomicity = b.atomicity
   if (b.since) out.since = b.since
   if (b.deprecated) out.deprecated = b.deprecated
