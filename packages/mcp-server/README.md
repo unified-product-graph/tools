@@ -134,7 +134,7 @@ All spec-introspection handlers are read-only and snapshot from the spec package
 
 ## Installing Skills (Claude Code)
 
-The server provides the raw MCP tools. For a guided experience with slash commands (`/upg`, `/upg-init`, `/upg-journey`), install the skill files:
+The server provides the raw MCP tools. For a guided experience with slash commands (`/upg`, `/upg-new-graph`, `/upg-show-journey`), install the skill files:
 
 ```bash
 bash scripts/install-skills.sh

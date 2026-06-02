@@ -12,6 +12,7 @@ import * as fsp from 'node:fs/promises'
 import * as path from 'node:path'
 import { createHash } from 'node:crypto'
 import type { UPGFileStore } from '@unified-product-graph/sdk'
+import { getLensIds } from '@unified-product-graph/core'
 
 // ── Result helpers ─────────────────────────────────────────────────────────
 
@@ -35,7 +36,34 @@ export function textError(s: string): ToolResult {
 
 // ── Session context (cross-skill awareness) ────────────────────────────────
 
-export type UPGLens = 'product' | 'engineering' | 'design' | 'growth'
+/**
+ * Canonical lens ids, DERIVED from core's lens registry at module load
+ * (`getLensIds()` → the 8 lenses in `@unified-product-graph/core`). Single
+ * source of truth so the session-context setter's accepted lenses can never
+ * drift from what `get_lens` / `list_lenses` resolve (Seam 4 / DT-LENS-5).
+ */
+export const CANONICAL_LENS_IDS: readonly string[] = getLensIds()
+
+/** Runtime membership check for the lens enum, against the canonical set. */
+export function isCanonicalLens(id: unknown): id is UPGLens {
+  return typeof id === 'string' && CANONICAL_LENS_IDS.includes(id)
+}
+
+/**
+ * A lens id accepted by the session context. Kept as the canonical id-string
+ * union so it tracks core: product, ux_design, engineering, growth, business,
+ * research, marketing, full. (Was a 4-value hardcode that omitted 4 real
+ * lenses and used the non-existent id "design".)
+ */
+export type UPGLens =
+  | 'product'
+  | 'ux_design'
+  | 'engineering'
+  | 'growth'
+  | 'business'
+  | 'research'
+  | 'marketing'
+  | 'full'
 
 export interface SessionContext {
   lens: UPGLens

@@ -586,7 +586,7 @@ describe('GitLabAdapter: exported constants', () => {
 // ─── list() throws ────────────────────────────────────────────────────────────
 
 describe('GitLabAdapter: list()', () => {
-  it('throws an error directing user to /upg-import', async () => {
+  it('throws an error directing user to /upg-sync-import', async () => {
     await expect(adapter.list({})).rejects.toThrow('GitLab adapter requires GitLab API access')
   })
 })

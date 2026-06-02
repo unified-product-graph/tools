@@ -4,6 +4,10 @@ All notable changes to `@unified-product-graph/cloud-server` are documented in t
 
 This package co-versions with `@unified-product-graph/core` and `@unified-product-graph/mcp-server`. One version line covers the spec and both reference implementations.
 
+## 0.8.2 · 2026-06-02 · E2E remediation train
+
+Co-version with the `@unified-product-graph/*` 0.8.2 release train. No cloud-server surface changes; co-versioned for a clean install matrix alongside the shared write-validation and skills work led by `core`, `sdk`, and `mcp-server`.
+
 ## 0.7.6 · 2026-05-30 · Tool UX train (mcp-server lead)
 
 This line is led by `@unified-product-graph/mcp-server` (the `start` tool, `create_node` orphan warning, authored return shapes, and the dissolved singleton tool groups). The cloud server itself is unchanged at runtime; it co-versions and picks up the shared `mcp-tooling` generator changes:

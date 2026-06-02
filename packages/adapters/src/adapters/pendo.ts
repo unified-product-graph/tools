@@ -111,7 +111,7 @@ export class PendoAdapter implements UPGAdapter {
   async list(_config: AdapterConfig): Promise<SourceItem[]> {
     throw new Error(
       'Pendo adapter requires Pendo API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.items.',
     )
   }
 

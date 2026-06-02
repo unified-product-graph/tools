@@ -10,6 +10,7 @@ import { input, select } from '@inquirer/prompts'
 import { UPG_VERSION, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
 import { nodeId } from '../lib/graph.js'
 import { upgLogo } from '../lib/formatter.js'
+import { CLI_VERSION } from '../lib/version.js'
 
 // ── Template definitions ───────────────────────────────────────────────────
 
@@ -73,7 +74,9 @@ export const initCommand = new Command('init')
 
       // ── Banner ────────────────────────────────────────────────────────────
       if (isInteractive) {
-        console.log(upgLogo(UPG_VERSION))
+        // Banner uses the CLI package version, not the spec's UPG_VERSION,
+        // so it matches `upg --version` (CLI-FEEDBACK #5).
+        console.log(upgLogo(CLI_VERSION))
       }
 
       // ── Prompt: product title ─────────────────────────────────────────────

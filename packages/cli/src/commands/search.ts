@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { discoverUPGFile, loadStore, searchNodes } from '../lib/graph.js'
 import { formatNode, upgHeader } from '../lib/formatter.js'
+import { die } from '../lib/errors.js'
 
 export const searchCommand = new Command('search')
   .arguments('<query>')
@@ -28,16 +29,14 @@ export const searchCommand = new Command('search')
       }
 
       if (results.length === 0) {
-        console.log(`No results for "${query}".`)
+        process.stderr.write(`No results for "${query}".\n`)
         return
       }
 
-      console.log(upgHeader('Search'))
-      console.log(`  ${results.length} result(s) for "${query}":\n`)
+      process.stderr.write(upgHeader('Search') + '\n')
+      process.stderr.write(`  ${results.length} result(s) for "${query}":\n\n`)
       for (const { node } of results) console.log(formatNode(node, '  '))
-      console.log()
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

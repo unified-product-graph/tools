@@ -89,7 +89,7 @@ export class LaunchDarklyAdapter implements UPGAdapter {
   async list(_config: AdapterConfig): Promise<SourceItem[]> {
     throw new Error(
       'LaunchDarkly adapter requires LaunchDarkly API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.',
     )
   }
 

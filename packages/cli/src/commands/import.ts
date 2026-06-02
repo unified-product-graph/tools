@@ -487,7 +487,7 @@ function printComingSoon(tool: 'notion'): void {
       console.log()
       console.log(`  ${chalk.bold('To import from Notion via Claude Code (recommended):')}`)
       console.log()
-      console.log(`    Open Claude Code and run: ${chalk.blueBright('/upg-import')}`)
+      console.log(`    Open Claude Code and run: ${chalk.blueBright('/upg-sync-import')}`)
       console.log(`    The skill guides you through Notion MCP setup, database`)
       console.log(`    classification, and controlled import with review.`)
       console.log()

@@ -110,7 +110,7 @@ export class StorybookAdapter implements UPGAdapter {
     // Storybook dev server is not directly accessible.
     throw new Error(
       'Storybook adapter requires access to a running Storybook instance or a pre-exported stories.json. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.items.',
     )
   }
 

@@ -166,14 +166,30 @@ function auditOne(name: string): SkillAuditRecord {
   }
 }
 
-/** All canonical skill names (every directory under `packages/upg-mcp-server/skills`). */
+/**
+ * All skill names to audit: the UNION of every directory under the canonical
+ * source (`packages/upg-mcp-server/skills`) and the deployed dir
+ * (`.claude/skills`).
+ *
+ * The union matters because the no-args sweep used to read only the source
+ * dir, which is absent whenever the server is invoked from a location whose
+ * `process.cwd()` is not the monorepo root (e.g. the published/npx/homebrew
+ * package) — yielding `{ skills: [] }` (DT-MACH-1). Auditing the union means
+ * the sweep still surfaces every deployed skill (and its symlink/in_sync
+ * issues) even when the source tree isn't reachable from cwd, and still
+ * surfaces source-only skills that haven't been deployed.
+ */
 function allSkillNames(): string[] {
-  const dir = sourceSkillsDir()
-  if (!existsSync(dir)) return []
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .sort()
+  const names = new Set<string>()
+  for (const dir of [sourceSkillsDir(), deployedSkillsDir()]) {
+    if (!existsSync(dir)) continue
+    for (const d of readdirSync(dir, { withFileTypes: true })) {
+      // Follow symlinked dirs: `.claude/skills/<name>` is typically a symlink
+      // to the source skill directory, so `isDirectory()` is false on it.
+      if (d.isDirectory() || d.isSymbolicLink()) names.add(d.name)
+    }
+  }
+  return [...names].sort()
 }
 
 /**

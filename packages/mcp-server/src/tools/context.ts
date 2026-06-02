@@ -5,7 +5,7 @@
  */
 
 import type { ToolContext, ToolHandler, ToolResult, UPGLens } from '../lib/server-context.js'
-import { text } from '../lib/server-context.js'
+import { text, textError, isCanonicalLens, CANONICAL_LENS_IDS } from '../lib/server-context.js'
 import {
   UPG_DOMAINS,
   UPG_DOMAIN_GUIDES,
@@ -100,7 +100,7 @@ export const getProductContext: ToolHandler = (args, ctx): ToolResult => {
         lines.push(`  - [${sev}] ${b.title}`)
       }
     }
-  } else if (sessionContext.lens === 'design') {
+  } else if (sessionContext.lens === 'ux_design') {
     const screens = nodes.filter((n) => n.type === 'screen')
     const components = nodes.filter((n) => n.type === 'design_component')
     const flows = nodes.filter((n) => n.type === 'user_flow')
@@ -260,7 +260,7 @@ export const getGraphDigest: ToolHandler = (args, ctx): ToolResult => {
     const blockedFeatures = allNodes.filter((n) => blockedFeatureIds.has(n.id)).map((n) => n.title)
     const openInvestigations = allNodes.filter((n) => n.type === 'investigation' && n.status !== 'resolved').length
     lensDigest = { open_bugs: openBugs, blockers: blockerEdges.length, in_flight_features: inFlightFeatures, active_debt: activeDebt, blocked_features: blockedFeatures, open_investigations: openInvestigations }
-  } else if (sessionContext.lens === 'design') {
+  } else if (sessionContext.lens === 'ux_design') {
     const screens = allNodes.filter((n) => n.type === 'screen').length
     const components = allNodes.filter((n) => n.type === 'design_component').length
     const flows = allNodes.filter((n) => n.type === 'user_flow').length
@@ -478,7 +478,17 @@ export const updateSessionContext: ToolHandler = (args, ctx): ToolResult => {
   if (focusArea !== undefined) {
     sessionContext.focus_area = focusArea
   }
-  if (lensArg && ['product', 'engineering', 'design', 'growth'].includes(lensArg)) {
+  if (lensArg !== undefined) {
+    // Seam 4 (DT-LENS-5): REJECT a non-canonical / legacy lens instead of
+    // silently skipping it while still returning `updated:true`. Previously a
+    // bad lens like "design" (a legacy id that no longer exists) passed
+    // through unset, so callers believed the lens switched when it hadn't.
+    // Canonical set is derived from core, so this message never drifts.
+    if (!isCanonicalLens(lensArg)) {
+      return textError(
+        `Invalid lens "${lensArg}". Canonical lenses: ${CANONICAL_LENS_IDS.join(', ')}`,
+      )
+    }
     sessionContext.lens = lensArg
     if (persistLens && store) {
       const doc = store.getDocument()

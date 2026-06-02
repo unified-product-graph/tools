@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import * as fs from 'node:fs'
 import { discoverUPGFile, loadStore, computeGraphDigest, computeHealthScore, BUSINESS_AREAS } from '../lib/graph.js'
 import { scoreBar, scoreColor, success, fail, label, upgHeader } from '../lib/formatter.js'
+import { EXIT, die } from '../lib/errors.js'
 import type { UPGFileStore } from '../lib/graph.js'
 import type { GraphDigest } from '../lib/graph.js'
 
@@ -106,10 +107,11 @@ export const healthCommand = new Command('health')
         if (!opts.json) {
           console.error(chalk.red(`  Health score ${score} is below minimum ${opts.minScore}\n`))
         }
-        process.exit(1)
+        // Below the policy threshold = validation/policy violation → exit 2
+        // (CLI-FEEDBACK #6, design-spec S4). Previously exited 1.
+        process.exit(EXIT.VIOLATION)
       }
     } catch (err) {
-      console.error(chalk.red((err as Error).message))
-      process.exit(2)
+      die(err)
     }
   })

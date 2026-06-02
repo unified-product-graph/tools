@@ -125,7 +125,7 @@ export class PostHogAdapter implements UPGAdapter {
   async list(_config: AdapterConfig): Promise<SourceItem[]> {
     throw new Error(
       'PostHog adapter requires PostHog API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.items.',
     )
   }
 

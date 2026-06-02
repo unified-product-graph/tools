@@ -1,7 +1,16 @@
 import { Command } from 'commander'
 import { discoverUPGFile, loadStore, sortByType } from '../lib/graph.js'
 import { renderTree, upgHeader } from '../lib/formatter.js'
+import { die, runtimeError } from '../lib/errors.js'
 import type { UPGBaseNode } from '@unified-product-graph/core'
+
+interface TreeJsonNode {
+  id: string
+  type: string
+  title: string
+  status?: string
+  children: TreeJsonNode[]
+}
 
 export const treeCommand = new Command('tree')
   .arguments('[filter]')
@@ -9,6 +18,7 @@ export const treeCommand = new Command('tree')
   .option('--file <path>', 'Path to .upg file')
   .option('--id <id>', 'Subtree rooted at a specific node')
   .option('--depth <n>', 'Maximum depth. Defaults to 10', parseInt, 10)
+  .option('--json', 'Machine-readable nested JSON output')
   .action(async (filter, opts) => {
     try {
       const filePath = await discoverUPGFile(opts.file)
@@ -39,7 +49,7 @@ export const treeCommand = new Command('tree')
 
       if (opts.id) {
         const node = nodeMap.get(opts.id)
-        if (!node) { console.error(`Node not found: ${opts.id}`); process.exit(1) }
+        if (!node) { store.stopWatching(); die(runtimeError(`Node not found: ${opts.id}`)) }
         roots = [node]
       } else if (filter) {
         const typeMatch = allNodes.filter((n) => n.type === filter)
@@ -51,13 +61,27 @@ export const treeCommand = new Command('tree')
       store.stopWatching()
 
       roots = sortByType(roots)
-      if (roots.length === 0) { console.log('No matching entities.'); return }
 
-      console.log(upgHeader(filter ? `Tree · ${filter}` : 'Tree'))
-      console.log(renderTree(roots, childrenOf, opts.depth))
-      console.log()
+      if (opts.json) {
+        // Emit the nested structure (CLI-FEEDBACK #7). Guard against cycles so
+        // a self/back edge can't recurse forever.
+        const build = (node: UPGBaseNode, depth: number, seen: Set<string>): TreeJsonNode => {
+          const entry: TreeJsonNode = { id: node.id, type: node.type, title: node.title, status: node.status, children: [] }
+          if (depth >= opts.depth || seen.has(node.id)) return entry
+          const next = new Set(seen).add(node.id)
+          entry.children = childrenOf(node.id).map((c) => build(c, depth + 1, next))
+          return entry
+        }
+        const tree = roots.map((r) => build(r, 0, new Set()))
+        process.stdout.write(JSON.stringify(tree, null, 2) + '\n')
+        return
+      }
+
+      if (roots.length === 0) { process.stderr.write('No matching entities.\n'); return }
+
+      process.stderr.write(upgHeader(filter ? `Tree - ${filter}` : 'Tree') + '\n')
+      process.stdout.write(renderTree(roots, childrenOf, opts.depth) + '\n')
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

@@ -115,7 +115,7 @@ export class ProdpadAdapter implements UPGAdapter {
   async list(_config: AdapterConfig): Promise<SourceItem[]> {
     throw new Error(
       'ProdPad adapter requires ProdPad API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.items.',
     )
   }
 

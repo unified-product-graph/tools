@@ -188,7 +188,7 @@ export async function runMcpServer() {
       return `  \u26A0\uFE0F  ${count} "${type}" entities (deprecated)`
     })
     process.stderr.write(`\nDeprecated types found in your graph:\n${lines.join('\n')}\n`)
-    process.stderr.write(`Run /upg-migrate to update them.\n\n`)
+    process.stderr.write(`Run /upg-fix-types to update them.\n\n`)
   }
 
   // Start MCP server over stdio

@@ -27,12 +27,16 @@ import {
   WorkspaceAlreadyExistsError,
   WorkspaceNotInitialisedError,
 } from '@unified-product-graph/sdk'
+import { coerceProductStage } from '@unified-product-graph/core'
 
 /**
  * Find all `.upg` files in the current directory and its immediate
  * subdirectories. Skips dotfiles other than `.upg/`.
  *
  * @returns JSON: `{ products: Array<{ file, title, stage, nodes, edges }> }`.
+ *   `stage` is the CANONICAL UPGProductStage (legacy values like `idea` are
+ *   coerced to `concept`), or `null` when unset — matching what
+ *   `get_product_context` reports for the same product ( / DT-MCP-3).
  * @atomicity atomic (read-only)
  * @see switch_product
  * @see get_workspace_info
@@ -42,7 +46,7 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
   const products: {
     file: string
     title: string
-    stage: string
+    stage: string | null
     nodes: number
     edges: number
   }[] = []
@@ -73,10 +77,14 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
     try {
       const raw = fs.readFileSync(filePath, 'utf-8')
       const doc = JSON.parse(raw)
+      // Coerce the raw on-disk stage to canonical (same rule the store applies
+      // at load) so this read agrees with get_product_context. Unknown / unset
+      // → null (not the old "unknown" sentinel) to match the context tool.
+      const coerced = coerceProductStage(doc.product?.stage)
       products.push({
         file: path.relative(cwd, filePath),
         title: doc.product?.title ?? '(untitled)',
-        stage: doc.product?.stage ?? 'unknown',
+        stage: coerced.canonical ?? null,
         nodes: Array.isArray(doc.nodes) ? doc.nodes.length : 0,
         edges: Array.isArray(doc.edges) ? doc.edges.length : 0,
       })

@@ -93,14 +93,23 @@ export function classifyDanglingEdges(
 }
 
 /**
- * Render the integrity report as the multi-line stderr message described
- * in the acceptance criteria. Returns null when there are no dangling edges.
+ * Render the integrity report as a multi-line string.
+ *
+ * (S-03): by default this ALWAYS returns a string — a "no issues" line
+ * on the clean case — so `renderDanglingReport(r, f).split('\n')` is safe on a
+ * healthy graph (it previously returned `null`, throwing on `.split`). Pass
+ * `{ quietWhenClean: true }` to get `null` on the clean case (used by the
+ * loader to stay silent on stderr).
  */
 export function renderDanglingReport(
   report: DanglingEdgeReport,
   filePath: string,
+  options?: { quietWhenClean?: boolean },
 ): string | null {
-  if (report.total === 0) return null
+  if (report.total === 0) {
+    if (options?.quietWhenClean) return null
+    return `.upg integrity report (${filePath}): no dangling edges.`
+  }
   const lines: string[] = []
   lines.push(`.upg integrity report (${filePath}):`)
   if (report.by_class.expected > 0) {

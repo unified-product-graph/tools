@@ -76,10 +76,10 @@ Maturity ● ● ● ○ ○ **3/5** *<stage label>*
 
 | | Approach | Question | Common entry |
 |---|---|---|---|
-| 🧠 | **Plan** | What should I build next? | `/upg-explore <region>` · `/upg-strategy` · `/upg-journey` |
-| 🔍 | **Inspect** | What's broken? | `/upg-status` · `/upg-tree` · `/upg-inspect <entity>` |
-| 📊 | **Prioritise** | What's most important? | `/upg-prioritise` · `/upg-gaps` · `/upg-impact` |
-| 🧵 | **Trace** | Walk a path through what exists | `/upg-trace <anchor> → <destination>` · `/upg-impact <entity>` · `/upg-connect` |
+| 🧠 | **Plan** | What should I build next? | `/upg-walk-region <region>` · `/upg-new-strategy` · `/upg-show-journey` |
+| 🔍 | **Inspect** | What's broken? | `/upg-show-status` · `/upg-show-tree` · `/upg-show-entity <entity>` |
+| 📊 | **Prioritise** | What's most important? | `/upg-prioritise` · `/upg-check-gaps` · `/upg-show-impact` |
+| 🧵 | **Trace** | Walk a path through what exists | `/upg-trace <anchor> → <destination>` · `/upg-show-impact <entity>` · `/upg-link` |
 | 🪞 | **Reflect** | What should I be questioning? | `/upg-reflect` · *Five Whys · Pre-mortem · Red Team · Devil's Advocate · Second-order* |
 
 **Tell me which approach, or just describe what's on your mind.**
@@ -92,22 +92,22 @@ When the user selects an approach (or you infer one from their description), pre
 
 | Approach | Pre-call | Entry skill |
 |---|---|---|
-| 🧠 Plan | `mcp__unified-product-graph__list_playbooks()`; see region options | `/upg-explore <region>` |
-| 🔍 Inspect | `mcp__unified-product-graph__get_graph_digest()`; health metrics | `/upg-status` |
-| 📊 Prioritise | `mcp__unified-product-graph__get_graph_digest()`; gap + coverage data | `/upg-gaps` |
-| 🧵 Trace | `mcp__unified-product-graph__get_product_context()`; find anchor entities | `/upg-impact <entity>` |
+| 🧠 Plan | `mcp__unified-product-graph__list_playbooks()`; see region options | `/upg-walk-region <region>` |
+| 🔍 Inspect | `mcp__unified-product-graph__get_graph_digest()`; health metrics | `/upg-show-status` |
+| 📊 Prioritise | `mcp__unified-product-graph__get_graph_digest()`; gap + coverage data | `/upg-check-gaps` |
+| 🧵 Trace | `mcp__unified-product-graph__get_product_context()`; find anchor entities | `/upg-show-impact <entity>` |
 | 🪞 Reflect | `mcp__unified-product-graph__get_session_context()`; recent decisions | `/upg-reflect` |
 
 ---
 
 After the card, **make ONE concrete suggestion** based on the graph state. Pick the highest-value next move from this priority order:
 
-1. **No anchor entity for an active region** → suggest `/upg-explore <region>` to fill the missing scaffolding (Plan)
-2. **Anti-pattern violations present** → suggest `/upg-status` then `/upg-gaps` (Inspect)
+1. **No anchor entity for an active region** → suggest `/upg-walk-region <region>` to fill the missing scaffolding (Plan)
+2. **Anti-pattern violations present** → suggest `/upg-show-status` then `/upg-check-gaps` (Inspect)
 3. **A `decision` entity has no rationale or has gone stale** → suggest `/upg-reflect <decision>` (Reflect)
-4. **A `hypothesis` has no `evidence`** → suggest `/upg-hypothesis` to design the experiment (Plan)
-5. **A `feature` is `in_progress` with no linked outcome** → suggest `/upg-impact <feature>` (Trace)
-6. **Otherwise** → suggest `/upg-status` for a 30-second pulse
+4. **A `hypothesis` has no `evidence`** → suggest `/upg-new-hypothesis` to design the experiment (Plan)
+5. **A `feature` is `in_progress` with no linked outcome** → suggest `/upg-show-impact <feature>` (Trace)
+6. **Otherwise** → suggest `/upg-show-status` for a 30-second pulse
 
 Surface that one suggestion as: *"Looking at your graph, the highest-value next move is **X**. Want to start there?"*
 
@@ -129,7 +129,7 @@ Render (real markdown, NOT a code block):
 
 **Structure your product thinking as a connected graph, right here in the terminal.**
 
-Your graph lives in a `.upg` file; a portable JSON format you own and track with git. No cloud required, no lock-in.
+Your graph lives in a `.upg` file: a JSON format you own and track with git, with no cloud required.
 
 UPG is a chart of your product knowledge across **10 regions**: Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations.
 
@@ -141,8 +141,8 @@ You read the chart through **5 approaches**: Plan, Inspect, Prioritise, Trace, R
 
 | | Command | What it does |
 |---|---|---|
-| 🌱 | `/upg-init` | Bootstrap your first product graph (guided, ~5 minutes) |
-| 📋 | `/upg-template` | Start from a proven pattern (SaaS, marketplace, mobile, OSS, agency) |
+| 🌱 | `/upg-new-graph` | Bootstrap your first product graph (guided, ~5 minutes) |
+| 📋 | `/upg-new-from-template` | Start from a proven pattern (SaaS, marketplace, mobile, OSS, agency) |
 
 > Learn more: **unifiedproductgraph.org**
 
@@ -154,7 +154,7 @@ If `/upg <something>` is given:
 
 1. **Match a subcommand:** `init`, `status`, `tree`, `gaps`, `inspect`, `reflect`, `explore`, `journey`, etc. → run the corresponding `/upg-<x>` skill.
 2. **Match an approach name:** `plan`, `inspect`, `prioritise`, `trace`, `reflect` → call `get_approach({ approach_id })` and route the user to the most-fitting skill for their graph state.
-3. **Match a region name:** `strategy`, `users_needs`, `experience_design_brand`, etc. → suggest `/upg-explore <region>`.
+3. **Match a region name:** `strategy`, `users_needs`, `experience_design_brand`, etc. → suggest `/upg-walk-region <region>`.
 4. **Free-text question:** parse intent into one of the 5 approaches, then suggest a skill.
 
 If unmatched, show the orientation card and ask: *"Did you mean one of these? Or tell me in your own words."*
@@ -172,49 +172,49 @@ When asked, show this expanded view:
 🧠 **Plan**
 | Skill | What |
 |---|---|
-| `/upg-explore <region>` | Walk a region's canonical playbook |
-| `/upg-run <playbook-id>` | Run any canonical playbook directly |
-| `/upg-journey` | 7-phase product journey |
-| `/upg-strategy` | Vision → mission → themes → outcomes |
-| `/upg-okr` | Objectives & key results |
-| `/upg-launch` | Go-to-market planning |
-| `/upg-research` | User research session |
-| `/upg-discover` | OST-guided discovery |
-| `/upg-hypothesis` | Structured hypothesis creation |
-| `/upg-persona` | Guided persona building |
+| `/upg-walk-region <region>` | Walk a region's canonical playbook |
+| `/upg-walk-playbook <playbook-id>` | Run any canonical playbook directly |
+| `/upg-show-journey` | 7-phase product journey |
+| `/upg-new-strategy` | Vision → mission → themes → outcomes |
+| `/upg-new-okr` | Objectives & key results |
+| `/upg-new-launch` | Go-to-market planning |
+| `/upg-new-research` | User research session |
+| `/upg-new-discovery` | OST-guided discovery |
+| `/upg-new-hypothesis` | Structured hypothesis creation |
+| `/upg-new-persona` | Guided persona building |
 
 🔍 **Inspect**
 | Skill | What |
 |---|---|
-| `/upg-status` | Health dashboard |
-| `/upg-tree` | Framework-aware tree view |
-| `/upg-inspect <entity>` | Deep-dive on one entity |
-| `/upg-analytics` | Product thinking metrics |
-| `/upg-verify` | Code-to-graph sync audit |
-| `/upg-diff` | What changed since last commit |
+| `/upg-show-status` | Health dashboard |
+| `/upg-show-tree` | Framework-aware tree view |
+| `/upg-show-entity <entity>` | Deep-dive on one entity |
+| `/upg-show-metrics` | Product thinking metrics |
+| `/upg-find-untracked` | Code-to-graph sync audit |
+| `/upg-show-diff` | What changed since last commit |
 
 📊 **Prioritise**
 | Skill | What |
 |---|---|
 | `/upg-prioritise` | RICE / WSJF / Eisenhower / ICE scoring across candidate items |
-| `/upg-gaps` | Strategic gap analysis + maturity scoring |
-| `/upg-impact` | Forward blast radius (Trace + Prioritise) |
+| `/upg-check-gaps` | Strategic gap analysis + maturity scoring |
+| `/upg-show-impact` | Forward blast radius (Trace + Prioritise) |
 
 🧵 **Trace**
 | Skill | What |
 |---|---|
 | `/upg-trace <anchor> → <destination>` | Walk a directed path through the graph (canonical Trace entry) |
-| `/upg-impact <entity>` | Forward / `--upstream` causal chain |
-| `/upg-connect` | Wire relationships between entities |
+| `/upg-show-impact <entity>` | Forward / `--upstream` causal chain |
+| `/upg-link` | Wire relationships between entities |
 
 🪞 **Reflect**
 | Skill | What |
 |---|---|
 | `/upg-reflect [scope]` | Five Whys / Pre-mortem / Red Team / Devil's Advocate / Second-order |
 
-**Tooling** (graph state operations; `/upg-init`, `/upg-capture`, `/upg-push`, `/upg-pull`, `/upg-snapshot`, `/upg-rollback`, `/upg-migrate`, `/upg-import`, `/upg-export`, `/upg-feedback`, `/upg-template`, `/upg-workspace`)
+**Tooling** (graph state operations; `/upg-new-graph`, `/upg-new-from-session`, `/upg-sync-push`, `/upg-sync-pull`, `/upg-sync-snapshot`, `/upg-fix-rollback`, `/upg-fix-types`, `/upg-sync-import`, `/upg-sync-export`, `/upg-send-feedback`, `/upg-new-from-template`, `/upg-use-workspace`)
 
-**Schema** (spec evolution; `/upg-schema-update`, `/upg-schema-consolidate`, `/upg-schema-evolve`, `/upg-schema-health`, `/upg-schema-changelog`, `/upg-schema-edges`)
+**Schema** (spec evolution; `/upg-new-schema-type`, `/upg-check-schema-merge`, `/upg-check-schema-coverage`, `/upg-check-schema`, `/upg-show-schema-changelog`, `/upg-check-schema-edges`)
 
 **Meta** (system reference; `/upg-context`, `/upg-design-system`)
 
@@ -224,11 +224,11 @@ When asked, show this expanded view:
 
 - **Orient, don't overwhelm.** Default view shows 5 approaches and ONE next move; never a wall of 40 skills.
 - **Approaches are the spine.** Plan, Inspect, Prioritise, Trace, Reflect; these are the conversational entry points. Skills implement them.
-- **Tooling is plumbing.** `/upg-init`, `/upg-push`, `/upg-snapshot` etc. are real and important, but they don't belong in the main view. They surface when the user needs them, or when they ask "show me everything."
+- **Tooling is plumbing.** `/upg-new-graph`, `/upg-sync-push`, `/upg-sync-snapshot` etc. are real and important, but they don't belong in the main view. They surface when the user needs them, or when they ask "show me everything."
 - **State-aware.** If a graph exists, show its state and one concrete suggestion. If not, show the get-started path.
 - **Listen before you list.** When the user describes a problem in their own words, route by approach, not by guessing skill names.
 - **Always write "Unified Product Graph" in full** when introducing it. Never abbreviate to "UPG" in user-facing text.
-- **The `.upg` file is the hero.** Open standard, portable, git-friendly. Reinforce ownership.
+- **The `.upg` file is the hero.** The graph lives in a file the user owns and tracks with git. Reinforce ownership.
 - **Follow the design system.** Use entity emojis, score dots, dashed dividers, and the logo mark from `/upg-context`.
 
 After routing the user to the next skill, call:

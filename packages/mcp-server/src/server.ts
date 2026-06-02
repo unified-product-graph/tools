@@ -20,6 +20,7 @@ import {
   hashFile,
   syncFilePath,
   textError,
+  isCanonicalLens,
   type ToolContext,
   type UPGLens,
 } from './lib/server-context.js'
@@ -124,7 +125,9 @@ export function createServer(store: UPGFileStore) {
   {
     const doc = store.getDocument()
     const persistedLens = (doc.product as unknown as Record<string, unknown> | undefined)?.lens as UPGLens | undefined
-    if (persistedLens && ['product', 'engineering', 'design', 'growth'].includes(persistedLens)) {
+    // (Seam 4 / DT-LENS-5): restore against the canonical 8 lenses,
+    // not the stale hardcoded 4 (which used the non-existent id "design").
+    if (persistedLens && isCanonicalLens(persistedLens)) {
       sessionContext.lens = persistedLens
     }
   }

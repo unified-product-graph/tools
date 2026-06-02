@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { execSync } from 'node:child_process'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
+import { die } from '../lib/errors.js'
 import type { UPGBaseNode } from '@unified-product-graph/core'
 
 export const diffCommand = new Command('diff')
@@ -100,7 +101,6 @@ export const diffCommand = new Command('diff')
       }
       console.log()
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

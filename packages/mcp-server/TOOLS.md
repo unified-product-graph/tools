@@ -160,10 +160,10 @@ succeed or fail independently of the session update.`
 | ---- | ---- | -------- | ----------- |
 | `custom` | object |  | Arbitrary key-value pairs for cross-skill state |
 | `focus_area` | string |  | Set the current focus area (e.g. "strategy", "validation", "user_research") |
-| `lens` | `product` \| `engineering` \| `design` \| `growth` |  | Switch the active lens. Changes what context, skills, and gaps are surfaced first. |
+| `lens` | `product` \| `ux_design` \| `engineering` \| `growth` \| `business` \| `research` \| `marketing` \| `full` |  | Switch the active lens. Changes what context, skills, and gaps are surfaced first. Canonical lens ids (derived from core): product, ux_design, engineering, growth, business, research, marketing, full. |
 | `persist_lens` | boolean |  | If true, also save the lens to the .upg file so it persists across sessions |
-| `recommendation` | string |  | Record a recommendation given to the user (e.g. "Run /upg-strategy to fill strategy gap") |
-| `skill_invoked` | string |  | Register that this skill was just invoked (e.g. "upg-status") |
+| `recommendation` | string |  | Record a recommendation given to the user (e.g. "Run /upg-new-strategy to fill strategy gap") |
+| `skill_invoked` | string |  | Register that this skill was just invoked (e.g. "upg-show-status") |
 
 **Returns:**
 
@@ -648,20 +648,22 @@ shallow-merge patches.`
 | `tags` | array |  |  |
 | `title` | string |  |  |
 | `type` | string |  | Change the entity type. Atomic single-node migration: validates against UPG_TYPES, rewrites incident edges to canonical types. |
+| `unset_properties` | array |  | Property keys to DELETE. Applied after the `properties` merge, so one call can set some keys and drop others. Writing `{ key: null }` only stores a literal null; use this to actually remove a key. Unknown keys are ignored. |
 
 **Returns:**
 
-JSON: `{ node, warning?, unknown_properties? }`. `warning`
-aggregates lifecycle-status hints, migration warnings, and any
-unknown-property notice. `unknown_properties` lists property
-keys not in the entity's schema. Pass `strict: true` to reject unknown
-properties instead of warning.
+JSON: `{ node, warning?, unknown_properties?, unset? }`. `warning`
+aggregates migration warnings and any unknown-property notice.
+`unknown_properties` lists property keys not in the entity's schema.
+`unset` lists the keys actually removed. Pass `strict: true` to reject
+unknown properties instead of warning.
 
 **Throws:**
 
 - Returns a textError when `node_id` is missing, the type migration
-fails, when `strict: true` and unknown properties are present, or when
-the underlying store rejects the patch.
+fails, the `status` is not a valid lifecycle phase for the type, when
+`strict: true` and unknown properties are present, or when the underlying
+store rejects the patch.
 
 **See also:** `migrate_type`, `batch_update_nodes`
 
@@ -1212,6 +1214,9 @@ _No arguments._
 **Returns:**
 
 JSON: `{ products: Array<{ file, title, stage, nodes, edges }> }`.
+`stage` is the CANONICAL UPGProductStage (legacy values like `idea` are
+coerced to `concept`), or `null` when unset — matching what
+`get_product_context` reports for the same product ( / DT-MCP-3).
 
 **See also:** `switch_product`, `get_workspace_info`
 
@@ -1759,7 +1764,7 @@ JSON: `{ parent_type, valid_children: string[] }`
 
 ### `inspect`
 
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-inspect skill instead of calling this tool directly. Inspect approach: path of arrival to "what's broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.
+[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-show-entity skill instead of calling this tool directly. Inspect approach: path of arrival to "what's broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2184,7 +2189,7 @@ JSON: `{ migrations: [{ from, to, since }], total: number }`
 
 ### `plan`
 
-Plan approach: path of arrival to "what should I build next?". Returns the Plan record + invocation params wrapped in `{ approach_id, scope, generated_at, approach, params }`. The LLM consumes `signature_hint` and synthesises `{ missing_entities, coverage_score }` against the live graph. Optional `region` narrows scope.
+Plan approach: path of arrival to "what should I build next?". Returns the Plan record + invocation params wrapped in `{ approach_id, scope, generated_at, approach, params }`. The LLM consumes `signature_hint` and synthesises `{ missing_entities, coverage_score }` against the live graph. Optional `region` narrows scope; omit `region` to scope to the product's ACTIVE regions; pass `exhaustive:true` to score the full type universe.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2192,7 +2197,8 @@ Plan approach: path of arrival to "what should I build next?". Returns the Plan 
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `region` | string |  | Optional UPGRegionId. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit for whole-graph planning. |
+| `exhaustive` | boolean |  | If true, score against the entire 312-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted. |
+| `region` | string |  | Optional UPGRegionId or atomic-domain id. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit to scope to the product's active regions. |
 
 **Returns:**
 

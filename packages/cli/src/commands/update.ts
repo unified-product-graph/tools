@@ -1,5 +1,6 @@
 import { Command } from 'commander'
-import { discoverUPGFile, loadStore } from '../lib/graph.js'
+import { discoverUPGFile, loadStore, validateStatusAgainstLifecycle } from '../lib/graph.js'
+import { EXIT, die, violation, runtimeError } from '../lib/errors.js'
 
 export const updateCommand = new Command('update')
   .arguments('<id>')
@@ -10,6 +11,7 @@ export const updateCommand = new Command('update')
   .option('--status <status>', 'New status')
   .option('--tags <list>', 'Comma-separated tags. Replaces existing', (v) => v.split(','))
   .option('--data <json>', 'Type-specific fields as JSON. Merged into existing')
+  .option('--json', 'Machine-readable JSON output')
   .action(async (id, opts) => {
     try {
       const filePath = await discoverUPGFile(opts.file)
@@ -17,8 +19,16 @@ export const updateCommand = new Command('update')
 
       const node = store.getNode(id)
       if (!node) {
-        console.error(`Node not found: ${id}`)
-        process.exit(1)
+        store.stopWatching()
+        die(runtimeError(`Node not found: ${id}`))
+      }
+
+      // Validate --status against the lifecycle for THIS node's type before
+      // writing — the writer must not be more permissive than the reader
+      // (CLI-FEEDBACK #4).
+      if (opts.status) {
+        const warning = validateStatusAgainstLifecycle(node.type, opts.status)
+        if (warning) { store.stopWatching(); die(violation(warning)) }
       }
 
       const patch: Record<string, unknown> = {}
@@ -28,7 +38,8 @@ export const updateCommand = new Command('update')
       if (opts.tags) patch.tags = opts.tags
       if (opts.data) {
         try { patch.properties = JSON.parse(opts.data) } catch {
-          console.error('Invalid --data JSON'); process.exit(1)
+          store.stopWatching()
+          die(runtimeError('Invalid --data JSON'))
         }
       }
 
@@ -36,9 +47,15 @@ export const updateCommand = new Command('update')
       await store.flush()
       store.stopWatching()
 
-      console.log(`Updated: ${updated.type} "${updated.title}"`)
+      if (opts.json) {
+        process.stdout.write(JSON.stringify({ node: updated }, null, 2) + '\n')
+      } else {
+        // Human line to stderr (chrome); the id stays on stdout for scripts.
+        process.stderr.write(`Updated: ${updated.type} "${updated.title}"\n`)
+        process.stdout.write(updated.id + '\n')
+      }
+      process.exit(EXIT.OK)
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

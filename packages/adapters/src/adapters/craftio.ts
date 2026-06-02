@@ -120,7 +120,7 @@ export class CraftioAdapter implements UPGAdapter {
   async list(_config: AdapterConfig): Promise<SourceItem[]> {
     throw new Error(
       'Craft.io adapter requires Craft.io API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.items.',
     )
   }
 

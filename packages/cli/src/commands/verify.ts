@@ -1,8 +1,9 @@
 import { Command } from 'commander'
 import { discoverUPGFile, loadStore, computeGraphDigest, getOrphans, BUSINESS_AREAS } from '../lib/graph.js'
+import { EXIT, die, violation } from '../lib/errors.js'
 
 export const verifyCommand = new Command('verify')
-  .description('Structural validation. Exits 1 on violations for CI gates.')
+  .description('Structural validation. Exits 2 on violations for CI gates.')
   .option('--file <path>', 'Path to .upg file')
   .option('--no-orphans', 'Fail when orphan entities exist')
   .option('--no-broken-chains', 'Fail when any chain is incomplete')
@@ -73,9 +74,16 @@ export const verifyCommand = new Command('verify')
         console.log()
       }
 
-      process.exit(passed ? 0 : 1)
+      // Violation = exit 2 (policy), matching the published exit-code table
+      // and the help text. Previously this exited 1, contradicting the docs
+      // (CLI-FEEDBACK #2).
+      process.exit(passed ? EXIT.OK : EXIT.VIOLATION)
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      // A structurally invalid document (dangling edge, bad type) is itself a
+      // validation violation → exit 2. Any other load failure (missing file,
+      // unreadable path) is a runtime error → exit 1 (CLI-FEEDBACK #2/#6).
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.startsWith('Invalid UPG document')) die(violation(msg))
+      die(err)
     }
   })

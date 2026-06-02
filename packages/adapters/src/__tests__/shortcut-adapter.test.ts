@@ -500,7 +500,7 @@ describe('ShortcutAdapter: labels as tags', () => {
 // ─── list() throws ────────────────────────────────────────────────────────────
 
 describe('ShortcutAdapter: list()', () => {
-  it('throws an error directing user to /upg-import', async () => {
+  it('throws an error directing user to /upg-sync-import', async () => {
     await expect(adapter.list({})).rejects.toThrow('Shortcut adapter requires Shortcut API connection')
   })
 })

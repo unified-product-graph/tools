@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/mcp-tooling",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Shared tool-registry, transport contract, and JSDoc-driven reference generator for UPG MCP servers (local, cloud, and embedded)",
   "license": "MIT",

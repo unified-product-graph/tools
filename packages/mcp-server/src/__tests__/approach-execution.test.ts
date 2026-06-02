@@ -361,13 +361,17 @@ describe('plan: gap analysis vs canonical creation sequences', () => {
     expect(body.covered_count).toBe(0)
   })
 
-  it('handles whole-graph plan (no region): surfaces missing types across domains', async () => {
+  it('handles whole-universe plan (exhaustive): surfaces missing types across domains', async () => {
+    // (Seam 5): whole-universe gap scoring is now opt-in via
+    // `exhaustive:true`. A no-region plan defaults to the product's ACTIVE
+    // regions, so on an empty graph the universe scan must be requested.
     const store = await loadStore(makeDoc([], []))
     const ctx = makeCtx(store)
-    const { body } = await callAsync(plan, {}, ctx)
+    const { body } = await callAsync(plan, { exhaustive: true }, ctx)
     expect(body.region).toBeNull()
+    expect(body.plan_scope).toBe('exhaustive')
     const missing = body.missing_entities as unknown[]
-    // Whole-graph expected set should be larger than any one region.
+    // Whole-universe expected set should be larger than any one region.
     expect(missing.length).toBeGreaterThan(20)
   })
 })

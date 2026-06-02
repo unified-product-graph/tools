@@ -5,6 +5,7 @@
 
 import type { ToolDefinition } from '@unified-product-graph/mcp-tooling'
 import type { ToolHandler } from './server-context.js'
+import { CANONICAL_LENS_IDS } from './server-context.js'
 import {
   getProductContext,
   getGraphDigest,
@@ -311,6 +312,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         properties: {
           type: 'object',
           description: 'Merged with existing properties',
+        },
+        unset_properties: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Property keys to DELETE. Applied after the `properties` merge, so one call can set some keys and drop others. Writing `{ key: null }` only stores a literal null; use this to actually remove a key. Unknown keys are ignored.',
         },
       },
       required: ['node_id'],
@@ -834,18 +840,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'plan',
     description:
-      'Plan approach: path of arrival to "what should I build next?". Returns the Plan record + invocation params wrapped in `{ approach_id, scope, generated_at, approach, params }`. The LLM consumes `signature_hint` and synthesises `{ missing_entities, coverage_score }` against the live graph. Optional `region` narrows scope.',
+      'Plan approach: path of arrival to "what should I build next?". Returns the Plan record + invocation params wrapped in `{ approach_id, scope, generated_at, approach, params }`. The LLM consumes `signature_hint` and synthesises `{ missing_entities, coverage_score }` against the live graph. Optional `region` narrows scope; omit `region` to scope to the product\'s ACTIVE regions; pass `exhaustive:true` to score the full type universe.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        region: { type: 'string', description: 'Optional UPGRegionId. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit for whole-graph planning.' },
+        region: { type: 'string', description: 'Optional UPGRegionId or atomic-domain id. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit to scope to the product\'s active regions.' },
+        exhaustive: { type: 'boolean', description: 'If true, score against the entire 312-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted.' },
       },
     },
   },
   {
     name: 'inspect',
     description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-inspect skill instead of calling this tool directly. Inspect approach: path of arrival to "what\'s broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.',
+      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-show-entity skill instead of calling this tool directly. Inspect approach: path of arrival to "what\'s broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -1379,10 +1386,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {
-        skill_invoked: { type: 'string', description: 'Register that this skill was just invoked (e.g. "upg-status")' },
-        recommendation: { type: 'string', description: 'Record a recommendation given to the user (e.g. "Run /upg-strategy to fill strategy gap")' },
+        skill_invoked: { type: 'string', description: 'Register that this skill was just invoked (e.g. "upg-show-status")' },
+        recommendation: { type: 'string', description: 'Record a recommendation given to the user (e.g. "Run /upg-new-strategy to fill strategy gap")' },
         focus_area: { type: 'string', description: 'Set the current focus area (e.g. "strategy", "validation", "user_research")' },
-        lens: { type: 'string', enum: ['product', 'engineering', 'design', 'growth'], description: 'Switch the active lens. Changes what context, skills, and gaps are surfaced first.' },
+        lens: { type: 'string', enum: [...CANONICAL_LENS_IDS], description: 'Switch the active lens. Changes what context, skills, and gaps are surfaced first. Canonical lens ids (derived from core): product, ux_design, engineering, growth, business, research, marketing, full.' },
         persist_lens: { type: 'boolean', description: 'If true, also save the lens to the .upg file so it persists across sessions' },
         custom: { type: 'object', description: 'Arbitrary key-value pairs for cross-skill state' },
       },

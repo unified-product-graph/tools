@@ -20,8 +20,8 @@ import {
   UPG_REGIONS,
   UPG_ENTITY_TO_DOMAIN,
   UPG_ANTI_PATTERNS,
+  getRegionForEntityType,
   resolveContainmentEdge,
-  type UPGRegion,
   type UPGEdgeType,
   type UPGEntityType,
 } from '@unified-product-graph/core'
@@ -56,6 +56,53 @@ export interface PrioritiseFallbackResult {
   hint: string
 }
 
+export interface PrioritiseTypeMismatchResult {
+  kind: 'type_mismatch'
+  framework_used: { id: string; name: string; category: string }
+  /** The entity type(s) the framework scores. */
+  target_entity_types: string[]
+  /** Per-candidate type breakdown for the mismatching candidates. */
+  mismatched: Array<{ entity_id: string; entity_type: string }>
+  /** Clear, actionable explanation. */
+  hint: string
+}
+
+/**
+ * Resolve the entity type(s) a framework's scoring is defined over.:
+ * a framework's computed expression is written against ONE entity type's
+ * properties (RICE → feature.reach/impact/confidence/effort). Running it on a
+ * candidate of a different type produced a confusing "Division by zero" when a
+ * property happened to be missing/zero. We read the target type from the most
+ * precise source first:
+ *   1. `data.computed_properties[].entity_type` (the type the formula scores)
+ *   2. `data.required_properties` keys
+ *   3. `data.entity_types[].type`
+ * Returns the de-duplicated set, or `[]` when the framework declares none
+ * (then we skip the guard and compute permissively).
+ */
+export function frameworkTargetTypes(framework: UPGFramework): string[] {
+  const out = new Set<string>()
+  const data = framework.data as
+    | {
+        computed_properties?: Array<{ entity_type?: string }>
+        required_properties?: Record<string, unknown>
+        entity_types?: Array<{ type?: string }>
+      }
+    | undefined
+  for (const c of data?.computed_properties ?? []) {
+    if (typeof c.entity_type === 'string' && c.entity_type) out.add(c.entity_type)
+  }
+  if (out.size === 0 && data?.required_properties) {
+    for (const k of Object.keys(data.required_properties)) out.add(k)
+  }
+  if (out.size === 0) {
+    for (const e of data?.entity_types ?? []) {
+      if (typeof e.type === 'string' && e.type) out.add(e.type)
+    }
+  }
+  return [...out]
+}
+
 /**
  * Execute a framework's first numeric `computed_properties` expression over a
  * candidate set. Returns either ranked rows (when the framework defines an
@@ -77,7 +124,50 @@ export function executePrioritise(
   framework: UPGFramework,
   candidateIds: string[],
   store: UPGFileStore,
-): PrioritiseExecutionResult | PrioritiseFallbackResult {
+): PrioritiseExecutionResult | PrioritiseFallbackResult | PrioritiseTypeMismatchResult {
+  // (Seam 5): validate candidate types against the framework's target
+  // BEFORE computing. RICE scores `feature`; given `opportunity` candidates the
+  // formula either silently scores the wrong type or — when a divisor property
+  // is missing — emits a baffling "Division by zero". Reject loud with a clear
+  // message instead. (The schema/entity decision of WHICH properties belong on
+  // WHICH type is, Captain's call; this guard is correct regardless.)
+  const targetTypes = frameworkTargetTypes(framework)
+  if (targetTypes.length > 0 && candidateIds.length > 0) {
+    const mismatched: Array<{ entity_id: string; entity_type: string }> = []
+    for (const id of candidateIds) {
+      const node = store.getNode(id)
+      if (!node) continue // missing nodes handled in the compute loop below
+      if (!targetTypes.includes(node.type as string)) {
+        mismatched.push({ entity_id: id, entity_type: node.type as string })
+      }
+    }
+    // Reject only when EVERY resolvable candidate is the wrong type; a mixed
+    // set still computes the matching ones and reports the rest as missing
+    // properties (existing behaviour) rather than failing the whole call.
+    const resolvable = candidateIds.map((id) => store.getNode(id)).filter(Boolean).length
+    if (resolvable > 0 && mismatched.length === resolvable) {
+      const byType = new Map<string, number>()
+      for (const m of mismatched) byType.set(m.entity_type, (byType.get(m.entity_type) ?? 0) + 1)
+      const breakdown = [...byType.entries()]
+        .map(([t, n]) => `${n} ${t}`)
+        .join(', ')
+      return {
+        kind: 'type_mismatch',
+        framework_used: {
+          id: framework.id,
+          name: framework.name,
+          category: framework.category,
+        },
+        target_entity_types: targetTypes,
+        mismatched,
+        hint:
+          `${framework.id} scores ${targetTypes.join(' / ')}; ` +
+          `${breakdown} candidate(s) are a different type. ` +
+          `Pass ${targetTypes.join('/')} candidates, or use a framework that targets ${[...byType.keys()].join('/')}.`,
+      }
+    }
+  }
+
   const computed = framework.data?.computed_properties?.[0]
   if (!computed || typeof computed.expression !== 'string' || computed.expression.length === 0) {
     return {
@@ -211,29 +301,115 @@ export interface PlanResult {
   covered_count: number
   /** Region narrowed to, if any. */
   region: string | null
+  /** How the expected set was scoped: which regions were counted. */
+  scope: 'active_regions' | 'region' | 'exhaustive'
+  /** The canonical region ids the expected set was drawn from. */
+  scoped_regions: string[]
+  /** Set when an explicit region/domain arg did not resolve. */
+  error?: string
+}
+
+export interface PlanOptions {
+  /**
+   * Narrow to a single region OR atomic-domain id. Accepts canonical region
+   * ids (e.g. `discovery_research_validation`) AND atomic-domain ids (e.g.
+   * `discovery`); an unknown id returns a clear `error` rather than a silent
+   * empty result.
+   */
+  region?: string
+  /**
+   * Score against the ENTIRE 312-type universe (every domain guide's creation
+   * sequence). Off by default: whole-universe gap scoring is a token-bomb and
+   * noise for a focused product. Without this, scope defaults to the product's
+   * ACTIVE regions (every region that already has ≥1 entity).
+   */
+  exhaustive?: boolean
 }
 
 /**
  * Compute a missing-entity backlog from the graph's current coverage against
- * the canonical creation sequences.
+ * the canonical creation sequences (Seam 5).
  *
- * When `region` is provided, the expected set is that region's entity
- * memberships. When omitted, the expected set is every type listed across all
- * domain guides' creation sequences (the union, that's the "whole-graph"
- * planning surface).
+ * Scope (in precedence order):
+ *   1. `region` set → just that region/domain (clear error if it doesn't resolve).
+ *   2. `exhaustive: true` → every type across all domain guides (the full
+ *      ~312-type universe; opt-in only).
+ *   3. Default → the product's ACTIVE regions: every canonical region that
+ *      already has at least one entity in the graph. This keeps `plan` aligned
+ *      with `get_graph_digest`'s focused coverage instead of grading an
+ *      idea-stage product against 292 missing types.
+ *
+ * Back-compat: the legacy `executePlan(store, regionId)` positional call still
+ * works (the second arg is treated as `{ region }`).
  *
  * Ordering: missing entities are sorted by position in their domain's
- * `creation_sequence` (earlier types surface first) so the agent always sees
- * the foundational gaps before the late-stage ones.
+ * `creation_sequence` (earlier types surface first).
  */
-export function executePlan(store: UPGFileStore, regionId?: string): PlanResult {
+export function executePlan(
+  store: UPGFileStore,
+  options?: PlanOptions | string,
+): PlanResult {
+  const opts: PlanOptions =
+    typeof options === 'string' ? { region: options } : (options ?? {})
+
   const typesPresent = new Set<string>()
   for (const node of store.getAllNodes()) {
     typesPresent.add(node.type as string)
   }
 
-  // Build the expected set + per-type metadata.
-  const expected = collectExpectedTypes(regionId)
+  // ── Resolve the scope into a set of atomic domains + a label ──────────────
+  let scope: PlanResult['scope']
+  let scopedRegions: string[]
+  let domainsInScope: Set<string> | null // null = all domains (exhaustive)
+
+  if (opts.region) {
+    const resolved = resolveRegionOrDomain(opts.region)
+    if (!resolved) {
+      const regionIds = UPG_REGIONS.map((r) => r.id).join(', ')
+      return {
+        missing_entities: [],
+        coverage_score: 0,
+        expected_count: 0,
+        covered_count: 0,
+        region: opts.region,
+        scope: 'region',
+        scoped_regions: [],
+        error:
+          `Unknown region/domain "${opts.region}". ` +
+          `Pass a canonical region id (one of: ${regionIds}) or an atomic-domain id.`,
+      }
+    }
+    scope = 'region'
+    scopedRegions = resolved.regionId ? [resolved.regionId] : []
+    domainsInScope = new Set(resolved.domains)
+  } else if (opts.exhaustive) {
+    scope = 'exhaustive'
+    scopedRegions = UPG_REGIONS.map((r) => r.id)
+    domainsInScope = null
+  } else {
+    // Default: the product's ACTIVE regions (regions with ≥1 present type).
+    const activeRegionIds = new Set<string>()
+    for (const t of typesPresent) {
+      let region
+      try {
+        region = getRegionForEntityType(t as UPGEntityType)
+      } catch {
+        region = undefined
+      }
+      if (region?.id) activeRegionIds.add(region.id as string)
+    }
+    scope = 'active_regions'
+    scopedRegions = [...activeRegionIds]
+    const domains = new Set<string>()
+    for (const rid of activeRegionIds) {
+      const region = UPG_REGION_MAP[rid]
+      for (const d of region?.composes_atomic_domains ?? []) domains.add(d as string)
+    }
+    domainsInScope = domains
+  }
+
+  // Build the expected set + per-type metadata for the resolved domains.
+  const expected = collectExpectedTypes(domainsInScope)
 
   const missing: MissingEntityRow[] = []
   let coveredCount = 0
@@ -261,8 +437,29 @@ export function executePlan(store: UPGFileStore, regionId?: string): PlanResult 
     coverage_score: expected.length === 0 ? 0 : coveredCount / expected.length,
     expected_count: expected.length,
     covered_count: coveredCount,
-    region: regionId ?? null,
+    region: opts.region ?? null,
+    scope,
+    scoped_regions: scopedRegions,
   }
+}
+
+/**
+ * Resolve a user-supplied id to a set of atomic domains. Accepts either a
+ * canonical region id (→ its `composes_atomic_domains`) or an atomic-domain id
+ * (→ itself). Returns null when neither matches (clear error, not
+ * silent empty).
+ */
+function resolveRegionOrDomain(
+  id: string,
+): { regionId?: string; domains: string[] } | null {
+  const region = UPG_REGION_MAP[id]
+  if (region) {
+    return { regionId: id, domains: [...region.composes_atomic_domains] as string[] }
+  }
+  // Atomic-domain id? Accept it if any domain guide declares it.
+  const isDomain = UPG_DOMAIN_GUIDES.some((g) => (g.domain_id as string) === id)
+  if (isDomain) return { domains: [id] }
+  return null
 }
 
 interface ExpectedTypeRow {
@@ -273,24 +470,17 @@ interface ExpectedTypeRow {
   hint: string
 }
 
-function collectExpectedTypes(regionId?: string): ExpectedTypeRow[] {
+/**
+ * Build the expected-type rows for a set of atomic domains. `null` means "all
+ * domains" (the exhaustive universe). Scope resolution (region/domain id →
+ * domain set, active-region defaulting) is the caller's job (`executePlan`).
+ */
+function collectExpectedTypes(domainsInScope: Set<string> | null): ExpectedTypeRow[] {
   const rows: ExpectedTypeRow[] = []
   const seen = new Set<string>()
 
-  // If region specified, restrict to that region's atomic-domain composition.
-  let domainsInScope: string[] | null = null
-  if (regionId) {
-    const region: UPGRegion | undefined = UPG_REGION_MAP[regionId]
-    if (region) {
-      domainsInScope = [...region.composes_atomic_domains]
-    } else {
-      // Unknown region; return empty expected set so caller surfaces 0 coverage.
-      return rows
-    }
-  }
-
   for (const guide of UPG_DOMAIN_GUIDES) {
-    if (domainsInScope && !domainsInScope.includes(guide.domain_id as string)) {
+    if (domainsInScope && !domainsInScope.has(guide.domain_id as string)) {
       continue
     }
     const anchorType = guide.anchor_entity as string
@@ -568,13 +758,27 @@ export interface TraceResult {
 }
 
 /**
- * Walk a typed path starting from `anchor`. Each step in `path` is an entity
- * type; the walker chooses the canonical edge for the previous-type →
- * current-type pair (via `resolveContainmentEdge`) unless `edgesOverride[i]`
- * is set to a non-null string.
+ * Walk a typed path starting from `anchor`.
+ *
+ * **`path` is the list of entity types to visit AFTER the anchor — NOT
+ * including the anchor's own type** (Seam 5). Each element is one hop.
+ * The walker resolves the canonical edge for `previousType → path[i]` (via
+ * `resolveContainmentEdge`) unless `edgesOverride[i]` supplies an explicit edge
+ * type. The anchor itself is depth 0 in the returned `trail`; `path[0]` is the
+ * first hop (depth 1), `path[1]` the second (depth 2), and so on.
+ *
+ * @example
+ * // From a persona anchor, walk persona → job → need:
+ * executeTrace(store, personaId, ['job', 'need'])
+ * // → trail: [persona(d0), job(d1), need(d2)]
+ *
+ * Do NOT include the anchor's own type as `path[0]` (e.g. `['persona', 'job',
+ * 'need']` from a persona): that asks for a persona → persona self-hop, which
+ * has no canonical edge, and the trace halts at depth 1. The documented form
+ * is hops-after-anchor.
  *
  * Strategy is breadth-first per depth: at depth N+1 we walk every outgoing
- * edge of the resolved type whose target node matches `path[N+1]`. The trail
+ * edge of the resolved type whose target node matches `path[N]`. The trail
  * carries every reached node at every depth.
  *
  * Halts when no canonical edge can be resolved for a hop AND no override is
@@ -714,12 +918,37 @@ export interface ReflectResult {
  *
  * Prompts are capped at a sensible per-mode limit so the response stays
  * digestible; the agent calls again with a tighter mode if it wants more.
+ *
+ * Valid modes: `assumptions`, `alternatives`, `blind-spots`, `load-bearing`
+ * (or `null`/omitted to run all four and return the top 3). (S-06): an
+ * unrecognised mode now THROWS `ReflectModeError` listing the valid set, rather
+ * than silently returning `prompts: []` (which read as a no-op feature).
  */
+export const REFLECT_MODES = ['assumptions', 'alternatives', 'blind-spots', 'load-bearing'] as const
+export type ReflectMode = (typeof REFLECT_MODES)[number]
+
+export class ReflectModeError extends Error {
+  readonly validModes: readonly string[]
+  constructor(mode: string) {
+    super(
+      `Unknown reflect mode "${mode}". Valid modes: ${REFLECT_MODES.join(', ')} ` +
+        `(or omit the mode to run all four and return the top 3).`,
+    )
+    this.name = 'ReflectModeError'
+    this.validModes = REFLECT_MODES
+  }
+}
+
 export function executeReflect(
   store: UPGFileStore,
   mode?: string,
   scope?: string | null,
 ): ReflectResult {
+  // (S-06): reject unknown modes loud. `null`/undefined runs all four.
+  if (mode !== undefined && mode !== null && !(REFLECT_MODES as readonly string[]).includes(mode)) {
+    throw new ReflectModeError(mode)
+  }
+
   const allNodes = store.getAllNodes()
   const allEdges = store.getAllEdges()
 

@@ -44,6 +44,25 @@ export { resolveEntityType, UnknownEntityTypeError, type EntityTypeResolution }
 import { nodeId, edgeId } from './id.js'
 import { inferEdgeType, inferEdgeTypeWithTier } from './edge-inference.js'
 import { validateEdgeTypePair } from './edge-pair-validator.js'
+import { validateNodeWrite, validateExplicitEdgeType } from './write-validation.js'
+
+/**
+ * Thrown by single-node write tools (createNode / updateNode) when the unified
+ * validation pass rejects an input on a STRICT dimension (unknown
+ * status, or — in `strict` mode — an unknown property). Unknown entity TYPES
+ * still throw `UnknownEntityTypeError` (a subclass-free sibling) so existing
+ * `instanceof UnknownEntityTypeError` handlers keep working. Batch tools return
+ * the same messages in their structured `{ ok: false, error }` envelope, so
+ * single and batch agree for the same input.
+ */
+export class WriteValidationError extends Error {
+  readonly issues: string[]
+  constructor(issues: string[]) {
+    super(issues.join(' | '))
+    this.name = 'WriteValidationError'
+    this.issues = issues
+  }
+}
 
 // ── Lifecycle helpers ─────────────────────────────────────────────────────────
 
@@ -211,6 +230,35 @@ export const CHAINS = [
   // user_story via story_task_implements_user_story.
   { name: 'feature → user_story', from: 'feature', to: 'user_story', edgePattern: 'user_story' },
 ] as const
+
+/**
+ * (S-07): map a `CHAINS` entry to the keys it occupies in
+ * `computeGraphDigest(...).chains`. The two public vocabularies disagree —
+ * `CHAINS[i].name` is `'persona → job'` while `digest.chains` is keyed
+ * `persona_with_job` / `persona_total` — so `digest.chains[chain.name]` was
+ * always `undefined`. Use this helper to bridge them:
+ *
+ * ```ts
+ * const { with_child, total } = chainDigestKeys(CHAINS[0])
+ * const connected = digest.chains[with_child]   // persona_with_job
+ * const totalN    = digest.chains[total]        // persona_total
+ * ```
+ *
+ * Returns `null` for chains not surfaced in the digest (only the five
+ * persona/job/opportunity/hypothesis/experiment chains are computed).
+ */
+export function chainDigestKeys(
+  chain: { from: string; to: string },
+): { with_child: string; total: string } | null {
+  const map: Record<string, { with_child: string; total: string }> = {
+    'persona→job': { with_child: 'persona_with_job', total: 'persona_total' },
+    'job→need': { with_child: 'job_with_need', total: 'job_total' },
+    'opportunity→solution': { with_child: 'opportunity_with_solution', total: 'opportunity_total' },
+    'hypothesis→experiment_plan': { with_child: 'hypothesis_untested', total: 'hypothesis_total' },
+    'experiment_run→learning': { with_child: 'experiment_with_learning', total: 'experiment_total' },
+  }
+  return map[`${chain.from}→${chain.to}`] ?? null
+}
 
 // ── Type sort order (for tree rendering: group children by type) ─────────────
 // Follows the natural product thinking hierarchy: who → why → what → how → measure
@@ -771,6 +819,18 @@ export function getNodes(
 
 // ── Create node ──────────────────────────────────────────────────────────────
 
+/**
+ * Count `product`-typed nodes already in the graph ( / DT-SIM-2).
+ * Used to warn when a write would create a SECOND product node in one .upg.
+ */
+function countProductNodes(store: UPGFileStore): number {
+  let n = 0
+  for (const node of store.getAllNodes()) {
+    if (node.type === 'product') n++
+  }
+  return n
+}
+
 export interface CreateNodeArgs {
   type: string
   title: string
@@ -779,6 +839,12 @@ export interface CreateNodeArgs {
   status?: string
   properties?: Record<string, unknown>
   parent_id?: string
+  /**
+   * (Seam 1): authoring-time strictness. When true, unknown-property
+   * WARNINGS are promoted to rejections (throws). Strict dimensions (type,
+   * status) reject regardless. Same flag, same effect, on every write tool.
+   */
+  strict?: boolean
 }
 
 export interface CreateNodeResult {
@@ -791,15 +857,44 @@ export function createNode(
   store: UPGFileStore,
   args: CreateNodeArgs
 ): CreateNodeResult {
-  // Validate the entity type up front. Aliases (deprecated → canonical)
-  // are accepted with a warning; genuinely unknown types throw
-  // `UnknownEntityTypeError` (with near-miss suggestions) so the caller cannot
-  // accidentally write an orphan node that no edge constraint will accept.
-  const resolved = resolveEntityType(args.type)
-  const canonicalNodeType = resolved.canonical
-  const aliasWarning = resolved.alias
-    ? `Type '${resolved.alias.from}' aliased to canonical '${resolved.alias.to}'. Update your caller to use '${resolved.alias.to}' directly.`
-    : undefined
+  // (Seam 1): ONE shared validation pass, identical for single + batch.
+  // Posture: STRICT on type (unknown → throw UnknownEntityTypeError; alias →
+  // warn) and status (must ∈ lifecycle phases → reject); PERMISSIVE on
+  // properties (unknown keys → warn, store) unless `strict: true` promotes
+  // them to rejections. Unknown types still throw `UnknownEntityTypeError` so
+  // existing `instanceof` handlers keep working.
+  if (args.type !== undefined) {
+    try {
+      resolveEntityType(args.type)
+    } catch (err) {
+      if (err instanceof UnknownEntityTypeError) throw err
+      throw err
+    }
+  }
+  const validation = validateNodeWrite(
+    { type: args.type, status: args.status, properties: args.properties },
+    { strict: args.strict },
+  )
+  if (validation.errors.length > 0) {
+    throw new WriteValidationError(validation.errors)
+  }
+  const canonicalNodeType = validation.canonicalType
+  const warnings = [...validation.warnings]
+
+  // ── two-product guard ( / DT-SIM-2) ────────────────────────────────
+  // A single .upg holds ONE product. Creating a second `product` node silently
+  // pollutes the active graph (the user usually wanted product ISOLATION via
+  // init_workspace + a separate file). We do not hard-reject (a multi-product
+  // workspace legitimately creates products via createProduct, and we should
+  // not break recovery paths), but we warn loudly so an unaware caller does not
+  // orphan nodes into the wrong graph.
+  if (canonicalNodeType === 'product' && countProductNodes(store) >= 1) {
+    warnings.push(
+      'A `product` node already exists in this .upg. A single graph models ONE product; ' +
+        'this creates a SECOND product node in the active graph rather than an isolated product. ' +
+        'For a separate product, run `init_workspace` then `create_product` (each product lives in its own .upg file).',
+    )
+  }
 
   const newNode: UPGBaseNode = {
     id: nodeId(),
@@ -811,17 +906,15 @@ export function createNode(
   if (args.properties) newNode.properties = args.properties
   autoFillSlug(newNode, store)
 
-  // Lifecycle-aware status handling
-  let warning: string | undefined = aliasWarning
+  // Status: validated above (reject on invalid). Apply or default.
   if (args.status) {
     newNode.status = args.status
-    const statusWarning = validateStatusAgainstLifecycle(canonicalNodeType, args.status)
-    if (statusWarning) warning = warning ? `${warning} | ${statusWarning}` : statusWarning
   } else {
-    // Auto-default to initial_phase if the type has a lifecycle
     const defaultStatus = getDefaultStatus(canonicalNodeType)
     if (defaultStatus) newNode.status = defaultStatus
   }
+
+  let warning: string | undefined = warnings.length > 0 ? warnings.join(' | ') : undefined
 
   store.addNode(newNode)
 
@@ -867,9 +960,20 @@ export function createNode(
 
 export interface CreateEdgeArgs {
   source_id: string
+  /** Target node id. Prefer this; the title/type pair is a convenience lookup. */
   target_id?: string
+  /**
+   * (S-11): LOOK UP an EXISTING node by title (does NOT create one).
+   * Combined with `target_type`, resolves to a single existing node of that
+   * type whose title matches (case-insensitive). Errors `No <type> found with
+   * title "<x>"` when absent, or an ambiguity error when > 1 match — pass
+   * `target_id` to disambiguate. This is resolve-on-connect, not
+   * create-on-connect.
+   */
   target_title?: string
+  /** Required with `target_title`: the entity type to look the title up within. */
   target_type?: string
+  /** Explicit canonical edge type. Omit to infer from (source.type → target.type). */
   type?: string
 }
 
@@ -940,13 +1044,14 @@ export function createEdge(
   let edgeWarning: string | undefined
 
   if (args.type) {
-    // User-supplied edge type; verify against the catalog's source/target
-    // pair when the type is canonical. Non-canonical types fall through
-    // (they're still surfaced by validate_graph as edge_drift). Tracked as
-    // audit finding F1 (2026-05-20).
-    const pairCheck = validateEdgeTypePair(args.type, source.type as string, target.type as string)
-    if (!pairCheck.valid) {
-      return { error: pairCheck.reason }
+    // User-supplied edge type. (Seam 1): STRICT — the type must be in
+    // UPG_EDGE_CATALOG *and* match the catalog's declared source/target pair.
+    // This matches what batch `edges[]` already enforced; single create_edge
+    // previously skipped catalog-membership and silently accepted any string
+    // (the master single↔batch inconsistency). One shared validator now.
+    const typeCheck = validateExplicitEdgeType(args.type, source.type as string, target.type as string)
+    if (typeCheck.errors.length > 0) {
+      return { error: typeCheck.errors.join(' ') }
     }
     edgeType = args.type as UPGEdgeType
   } else {
@@ -1288,6 +1393,8 @@ export interface BatchNodeInput {
   properties?: Record<string, unknown>
   parent_id?: string
   parent_ref?: string
+  /**: per-node strictness — promote unknown-property warnings to a batch rejection. */
+  strict?: boolean
 }
 
 export interface BatchEdgeInput {
@@ -1343,25 +1450,27 @@ export function batchCreateNodes(
   }
 
   // ── Validation pass ─────────────────────────────────────────────────────
+  // (Seam 1): identical posture to single createNode. STRICT on type
+  // (unknown → reject) and status (invalid → reject; previously this batch path
+  // only WARNED); PERMISSIVE on properties (unknown keys → warning; previously
+  // SILENT here). `strict: true` on a node promotes its property warnings to a
+  // rejection. Single and batch now agree for the same input.
   const resolvedTypes: string[] = []
   const aliasWarnings: string[] = []
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i]
     if (!n.type) return { ok: false, error: `Node at index ${i}: missing required field "type"` }
     if (!n.title) return { ok: false, error: `Node at index ${i}: missing required field "title"` }
-    try {
-      const resolved = resolveEntityType(n.type)
-      resolvedTypes.push(resolved.canonical)
-      if (resolved.alias) {
-        aliasWarnings.push(
-          `Node at index ${i}: type '${resolved.alias.from}' aliased to canonical '${resolved.alias.to}'.`,
-        )
-      }
-    } catch (err) {
-      if (err instanceof UnknownEntityTypeError) {
-        return { ok: false, error: `Node at index ${i}: ${err.message}` }
-      }
-      throw err
+    const validation = validateNodeWrite(
+      { type: n.type, status: n.status, properties: n.properties },
+      { strict: n.strict },
+    )
+    if (validation.errors.length > 0) {
+      return { ok: false, error: `Node at index ${i}: ${validation.errors.join(' ')}` }
+    }
+    resolvedTypes.push(validation.canonicalType)
+    for (const w of validation.warnings) {
+      aliasWarnings.push(`Node at index ${i}: ${w}`)
     }
     if (n.parent_ref !== undefined) {
       const match = n.parent_ref.match(/^\$(\d+)$/)
@@ -1486,10 +1595,10 @@ export function batchCreateNodes(
       if (n.tags) newNode.tags = normalizeTags(n.tags) ?? []
       if (n.properties) newNode.properties = n.properties
 
+      // Status validated in the validation pass above (invalid → batch
+      // rejected). Apply the caller's status or default to initial_phase.
       if (n.status) {
         newNode.status = n.status
-        const sw = validateStatusAgainstLifecycle(newNode.type, n.status)
-        if (sw) warnings.push(`Node "${n.title}": ${sw}`)
       } else {
         const ds = getDefaultStatus(newNode.type)
         if (ds) newNode.status = ds
@@ -1730,4 +1839,178 @@ export function migrateNodeType(
     edges_rewritten: edgesRewritten,
     ...(aliasWarning ? { warning: aliasWarning } : {}),
   }
+}
+
+// ── update_node ( unified validation + property unset) ─────────
+
+export interface UpdateNodeArgs {
+  node_id: string
+  title?: string
+  description?: string
+  tags?: unknown
+  status?: string
+  /** Properties to set/merge (deep-merge over existing). */
+  properties?: Record<string, unknown>
+  /**
+   *: property keys to DELETE. Permissive writes (store unknown keys)
+   * require a permissive unset; writing `{ key: null }` only stores a literal
+   * null, it can't remove the key. Applied AFTER `properties` merge, so you can
+   * set some keys and drop others in one call. Unknown keys are ignored.
+   */
+  unset_properties?: string[]
+  /**: promote unknown-property warnings to a rejection. */
+  strict?: boolean
+}
+
+export interface UpdateNodeResult {
+  node: UPGBaseNode
+  /** Property keys removed by `unset_properties`. */
+  unset?: string[]
+  warning?: string
+}
+
+/**
+ * Update a node with the SAME validation posture as createNode and
+ * permissive property unset.
+ *
+ * - `status` (when provided): must ∈ the node type's lifecycle phases → throws
+ *   `WriteValidationError` (single↔batch identical; batch returns the message).
+ * - `properties`: deep-merged; unknown keys → warning (or rejection in strict).
+ * - `unset_properties`: deletes keys after the merge.
+ *
+ * Throws `Error` if the node does not exist.
+ */
+export function updateNode(
+  store: UPGFileStore,
+  args: UpdateNodeArgs,
+): UpdateNodeResult {
+  const existing = store.getNode(args.node_id)
+  if (!existing) throw new Error(`Node not found: ${args.node_id}`)
+
+  // Validate against the node's FIXED type (update doesn't change type here;
+  // migrateNodeType owns retyping). Status + properties get the same posture
+  // as createNode.
+  const validation = validateNodeWrite(
+    { knownType: existing.type as string, status: args.status, properties: args.properties },
+    { strict: args.strict },
+  )
+  if (validation.errors.length > 0) {
+    throw new WriteValidationError(validation.errors)
+  }
+
+  const patch: Partial<UPGBaseNode> = {}
+  if (args.title !== undefined) patch.title = args.title
+  if (args.description !== undefined) patch.description = args.description
+  if (args.tags !== undefined) patch.tags = normalizeTags(args.tags) ?? []
+  if (args.status !== undefined) patch.status = args.status
+  if (args.properties !== undefined) patch.properties = args.properties
+
+  let node = store.updateNode(args.node_id, patch)
+
+  let removed: string[] | undefined
+  if (args.unset_properties && args.unset_properties.length > 0) {
+    const r = store.unsetNodeProperties(args.node_id, args.unset_properties)
+    node = r.node
+    if (r.removed.length > 0) removed = r.removed
+  }
+
+  const warning = validation.warnings.length > 0 ? validation.warnings.join(' | ') : undefined
+  return {
+    node,
+    ...(removed ? { unset: removed } : {}),
+    ...(warning ? { warning } : {}),
+  }
+}
+
+// ── batch_update_nodes ( unified validation + unset) ───────────
+
+export interface BatchUpdateInput {
+  node_id: string
+  title?: string
+  description?: string
+  tags?: unknown
+  status?: string
+  properties?: Record<string, unknown>
+  unset_properties?: string[]
+  strict?: boolean
+}
+
+export interface BatchUpdateOk {
+  ok: true
+  updated: Array<{ id: string; unset?: string[] }>
+  count: number
+  warnings?: string[]
+}
+
+export interface BatchUpdateFail {
+  ok: false
+  error: string
+}
+
+export type BatchUpdateResult = BatchUpdateOk | BatchUpdateFail
+
+/**
+ * Atomic batch update with the SAME validation posture as updateNode /
+ * createNode. Validates EVERY update against the canonical schema
+ * BEFORE any mutation; on the first rejection nothing is applied. If a mutation
+ * fails mid-apply (should not happen post-validation) the already-applied
+ * updates are NOT auto-rolled-back (property merges are not losslessly
+ * reversible) — instead the call fails loud with the failing index so the
+ * caller can re-read and reconcile. Validation is the real guard; the apply
+ * pass should never throw.
+ */
+export function batchUpdateNodes(
+  store: UPGFileStore,
+  updates: BatchUpdateInput[],
+): BatchUpdateResult {
+  if (!Array.isArray(updates)) return { ok: false, error: 'Missing required parameter: updates (array)' }
+  if (updates.length === 0) return { ok: false, error: 'updates array is empty' }
+  if (updates.length > 50) return { ok: false, error: 'Maximum 50 updates per batch' }
+
+  // ── Validation pass ─────────────────────────────────────────────────────
+  const warnings: string[] = []
+  for (let i = 0; i < updates.length; i++) {
+    const u = updates[i]
+    if (!u.node_id) return { ok: false, error: `Update at index ${i}: missing required field "node_id"` }
+    const node = store.getNode(u.node_id)
+    if (!node) return { ok: false, error: `Update at index ${i}: node not found: ${u.node_id}` }
+    const validation = validateNodeWrite(
+      { knownType: node.type as string, status: u.status, properties: u.properties },
+      { strict: u.strict },
+    )
+    if (validation.errors.length > 0) {
+      return { ok: false, error: `Update at index ${i}: ${validation.errors.join(' ')}` }
+    }
+    for (const w of validation.warnings) warnings.push(`Update at index ${i}: ${w}`)
+  }
+
+  // ── Apply pass ────────────────────────────────────────────────────────────
+  const updated: Array<{ id: string; unset?: string[] }> = []
+  for (let i = 0; i < updates.length; i++) {
+    const u = updates[i]
+    const patch: Partial<UPGBaseNode> = {}
+    if (u.title !== undefined) patch.title = u.title
+    if (u.description !== undefined) patch.description = u.description
+    if (u.tags !== undefined) patch.tags = normalizeTags(u.tags) ?? []
+    if (u.status !== undefined) patch.status = u.status
+    if (u.properties !== undefined) patch.properties = u.properties
+    try {
+      store.updateNode(u.node_id, patch)
+      let removed: string[] | undefined
+      if (u.unset_properties && u.unset_properties.length > 0) {
+        const r = store.unsetNodeProperties(u.node_id, u.unset_properties)
+        if (r.removed.length > 0) removed = r.removed
+      }
+      updated.push({ id: u.node_id, ...(removed ? { unset: removed } : {}) })
+    } catch (err) {
+      return {
+        ok: false,
+        error: `Update at index ${i} failed during apply: ${(err as Error).message}. ${updated.length} update(s) already applied; re-read to reconcile.`,
+      }
+    }
+  }
+
+  const result: BatchUpdateOk = { ok: true, updated, count: updated.length }
+  if (warnings.length > 0) result.warnings = warnings
+  return result
 }

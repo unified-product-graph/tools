@@ -107,12 +107,12 @@ describe('createNode', () => {
  title: 'Dark Mode',
  description: 'Support dark colour scheme',
  tags: ['ux', 'accessibility'],
- status: 'planned',
+ status: 'proposed',
  properties: { priority: 'high' },
  })
  expect(result.node.description).toBe('Support dark colour scheme')
  expect(result.node.tags).toEqual(['ux', 'accessibility'])
- expect(result.node.status).toBe('planned')
+ expect(result.node.status).toBe('proposed')
  expect(result.node.properties).toEqual({ priority: 'high' })
  })
 
@@ -181,15 +181,28 @@ describe('createEdge', () => {
  })
 
  it('uses explicit edge type when provided', () => {
+ // (Seam 1): explicit edge types must resolve against UPG_EDGE_CATALOG
+ // and match the source/target pair. persona → job is canonically
+ // persona_pursues_job; passing it explicitly must be accepted.
+ const result = createEdge(store, {
+ source_id: nodeA.id,
+ target_id: nodeB.id,
+ type: 'persona_pursues_job',
+ })
+ expect('edge' in result).toBe(true)
+ if ('edge' in result) {
+ expect(result.edge.type).toBe('persona_pursues_job')
+ }
+ })
+
+ it('rejects a non-catalog explicit edge type ( strict)', () => {
  const result = createEdge(store, {
  source_id: nodeA.id,
  target_id: nodeB.id,
  type: 'custom_edge_type',
  })
- expect('edge' in result).toBe(true)
- if ('edge' in result) {
- expect(result.edge.type).toBe('custom_edge_type')
- }
+ expect('edge' in result).toBe(false)
+ expect('error' in result).toBe(true)
  })
 
  it('returns error when source does not exist', () => {
@@ -329,10 +342,12 @@ describe('listNodes', () => {
 
  beforeEach(async () => {
  store = await makeStore()
- createNode(store, { type: 'persona', title: 'Alice', status: 'active' })
- createNode(store, { type: 'persona', title: 'Bob', status: 'draft' })
- createNode(store, { type: 'feature', title: 'Search', status: 'active' })
- createNode(store, { type: 'feature', title: 'Filter', status: 'active' })
+ // persona and metric are lifecycle-free (no status); feature phases are
+ // proposed | in_progress | shipped | archived ( strict).
+ createNode(store, { type: 'persona', title: 'Alice' })
+ createNode(store, { type: 'persona', title: 'Bob' })
+ createNode(store, { type: 'feature', title: 'Search', status: 'proposed' })
+ createNode(store, { type: 'feature', title: 'Filter', status: 'proposed' })
  createNode(store, { type: 'metric', title: 'NPS' })
  })
 
@@ -349,8 +364,8 @@ describe('listNodes', () => {
  })
 
  it('filters by status', () => {
- const result = listNodes(store, { status: 'active' })
- expect(result.total).toBe(3)
+ const result = listNodes(store, { status: 'proposed' })
+ expect(result.total).toBe(2)
  })
 
  it('filters by parent_id', () => {

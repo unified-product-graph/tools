@@ -2,13 +2,13 @@
  *: Every `chains.X` / `health.X` / `lens_digest.X` reference in a
  * canonical SKILL.md must resolve against the real `get_graph_digest` output.
  *
- * Why this exists: PR #1679's `/upg-impact` density gate referenced
+ * Why this exists: PR #1679's `/upg-show-impact` density gate referenced
  * `chains.feature_with_no_blockers`, a field that doesn't exist. The gate
  * compiled in markdown but never fired at runtime; caught only by Ro
  * Laren grepping the codebase mid-audit. This test pins the contract so
  * any future drift fails CI.
  *
- * Baseline before this test: N/A (new contract). `/upg-impact`'s fictional
+ * Baseline before this test: N/A (new contract). `/upg-show-impact`'s fictional
  * field was patched by PR #1681 before this test landed, so the
  * suite passes against the current source.
  */

@@ -44,7 +44,7 @@ These people are already in the terminal. They don't need another app; they need
 - Building a first real product; background in engineering, new to product thinking
 - Needs: a structured way to think about users before jumping to code; validation before build
 - Fears: building the wrong thing, shipping features nobody asked for
-- UPG entry point: `/upg-init` → `/upg-research` → `/upg-hypothesis`
+- UPG entry point: `/upg-new-graph` → `/upg-new-research` → `/upg-new-hypothesis`
 - Language: responds to frameworks and structure; likes "the canonical way to do X"
 
 These users often discover UPG through visual tools rather than the CLI.
@@ -77,21 +77,17 @@ If any of these are empty, there's a blind spot. The graph makes blind spots vis
 
 Every assumption is a hypothesis. Every hypothesis needs an experiment. Every experiment produces a learning. This isn't academic; it's the difference between building something people want and building something you think they want.
 
-### 4. Open beats locked
-
-The `.upg` file is yours. MIT licensed. Portable. Git-friendly. Your thinking is your data.
-
-### 5. The graph compounds over time.
+### 4. The graph compounds over time.
 
 Every entity you add makes the next decision easier. A persona without connections is a note. A persona connected to jobs, needs, and outcomes is a lens. The graph gets more valuable the more it reflects how your product actually thinks.
 
-### 6. Collaborate, don't interrogate
+### 5. Collaborate, don't interrogate
 
 Every question should feel like brainstorming with a partner, not filling out a form. Offer options. Suggest. React. Build on what the user says. One question at a time; never dump a wall of prompts.
 
-### 7. Start simple, scale when ready
+### 6. Start simple, scale when ready
 
-The graph grows with the product. A solo builder at the `idea` stage uses a small fraction of the 310 entity types; most surface only when the product is mature enough to need them. Don't overwhelm an early-stage builder with concepts that belong at scale.
+The graph grows with the product. A solo builder at the `concept` stage uses a small fraction of the entity catalogue; most types surface only when the product is mature enough to need them. Don't overwhelm an early-stage builder with concepts that belong at scale.
 
 ---
 
@@ -101,31 +97,31 @@ Every UPG skill follows one of three patterns:
 
 ### Pattern 1: Discovery (guided conversation)
 Ask → discuss → create entities → connect. The user provides the thinking, you structure it. One question at a time, numbered options, vibe check before creating.
-Skills: `/upg-persona`, `/upg-discover`, `/upg-strategy`, `/upg-explore engineering`, `/upg-explore growth`, `/upg-explore ux_design`
+Skills: `/upg-new-persona`, `/upg-new-discovery`, `/upg-new-strategy`, `/upg-walk-region engineering`, `/upg-walk-region growth`, `/upg-walk-region ux_design`
 
 ### Pattern 2: Analysis (read and map)
 Scan external sources (codebase, docs, tools) → infer entities → present for confirmation → create. The skill does the reading, the user validates. Fast, automated, high-leverage.
-Skills: `/upg-explore engineering` (codebase / api / debt / deps), `/upg-explore ux_design` (screens / design-audit), `/upg-verify`, `/upg-explore marketing` (SEO).
+Skills: `/upg-walk-region engineering` (codebase / api / debt / deps), `/upg-walk-region ux_design` (screens / design-audit), `/upg-find-untracked`, `/upg-walk-region marketing` (SEO).
 
 ### Pattern 3: Workshop (think together)
 Interactive decision-making with frameworks, scoring, and trade-offs. Not just Q&A; actual collaborative problem-solving with comparison tables, ranking, and "why this matters" coaching.
-Skills: `/upg-explore pricing`, `/upg-explore content`, `/upg-explore ux_design` (flows / wireframes), `/upg-explore growth`.
+Skills: `/upg-walk-region pricing`, `/upg-walk-region content`, `/upg-walk-region ux_design` (flows / wireframes), `/upg-walk-region growth`.
 
 ---
 
 ## The Journey: 7 Phases
 
 ```
-Phase 1: Identity        /upg-init, /upg-strategy
-Phase 2: Understanding   /upg-persona, /upg-research, /upg-explore ux_design
-Phase 3: Discovery       /upg-discover, /upg-hypothesis
-Phase 4: Business        /upg-explore business_model, /upg-explore market_intelligence, /upg-okr, /upg-explore pricing
-Phase 5: Reaching        /upg-launch, /upg-explore market_intelligence, /upg-explore content, /upg-explore marketing, /upg-explore growth
-Phase 6: Building        /upg-explore product_spec, /upg-explore engineering, /upg-explore ux_design
-Phase 7: Learning        /upg-explore team_org, /upg-gaps, /upg-explore engineering (debt + deps)
+Phase 1: Identity        /upg-new-graph, /upg-new-strategy
+Phase 2: Understanding   /upg-new-persona, /upg-new-research, /upg-walk-region ux_design
+Phase 3: Discovery       /upg-new-discovery, /upg-new-hypothesis
+Phase 4: Business        /upg-walk-region business_model, /upg-walk-region market_intelligence, /upg-new-okr, /upg-walk-region pricing
+Phase 5: Reaching        /upg-new-launch, /upg-walk-region market_intelligence, /upg-walk-region content, /upg-walk-region marketing, /upg-walk-region growth
+Phase 6: Building        /upg-walk-region product_spec, /upg-walk-region engineering, /upg-walk-region ux_design
+Phase 7: Learning        /upg-walk-region team_org, /upg-check-gaps, /upg-walk-region engineering (debt + deps)
 ```
 
-`/upg-journey` tracks progress across all phases. Every skill points back to it.
+`/upg-show-journey` tracks progress across all phases. Every skill points back to it.
 
 ---
 
@@ -190,13 +186,13 @@ A benchmark is not "you have 1 persona, expected 2-4." A benchmark is a conversa
 > "You mapped a user journey for Kai but didn't mark any friction points. The whole reason to map a journey is to find where things break down; the moments of confusion, frustration, or abandonment. Go back and score each step: where does Kai struggle?"
 
 **Cross-domain (code exists but graph doesn't reflect it):**
-> "Your codebase has routes, components, and API endpoints, but your graph only has personas and features. The graph is meant to hold your whole product, not just the strategy side. Running `/upg-explore engineering` would bring your technical reality into the same picture as your product thinking."
+> "Your codebase has routes, components, and API endpoints, but your graph only has personas and features. The graph is meant to hold your whole product, not just the strategy side. Running `/upg-walk-region engineering` would bring your technical reality into the same picture as your product thinking."
 
 **The voice:** A coach who's been through this before. Not a linter flagging errors. Not a dashboard showing red/green. A thinking partner who says "here's what I've seen work" and lets you decide.
 
 **How to use the full benchmark set:**
 - The full benchmark data lives in `@unified-product-graph/core` (`benchmarks.ts`) with `getBenchmarksForStage()`, `getRelationshipBenchmarksForStage()`, `getRatioBenchmarksForStage()`, and `getExpectedDomainsForStage()`.
-- `/upg-gaps` runs ALL benchmarks (in its forward-looking signals section) and synthesises them into a narrative.
+- `/upg-check-gaps` runs ALL benchmarks (in its forward-looking signals section) and synthesises them into a narrative.
 - Individual skills surface the 1-2 benchmarks most relevant to what the user is doing.
 - Never show the raw benchmark table. Always narrate.
 
@@ -213,15 +209,15 @@ At the start of any graph-modifying skill session, detect the user's graph state
 
 | Local | Cloud | Action |
 |-------|-------|--------|
-| Exists | Available, same product | Note both are connected. Compare entity counts; if they differ by >20%, mention: "Local graph has {N} entities. Cloud has {M}. They may be out of sync; consider `/upg-push` or `/upg-pull`." |
+| Exists | Available, same product | Note both are connected. Compare entity counts; if they differ by >20%, mention: "Local graph has {N} entities. Cloud has {M}. They may be out of sync; consider `/upg-sync-push` or `/upg-sync-pull`." |
 | Exists | Available, different product | Ask: "Your local graph is **{local product}** but your cloud has **{cloud product}**. Which one are we working on?" |
 | Exists | Not available (tool doesn't exist or errors) | Proceed normally with local only. No sync suggestions at end. |
-| Doesn't exist | Available | Suggest: "You have a cloud graph but no local `.upg` file. Run `/upg-pull` to bring it down, or `/upg-init` to start fresh." |
-| Doesn't exist | Not available | Suggest `/upg-init` to get started. |
+| Doesn't exist | Available | Suggest: "You have a cloud graph but no local `.upg` file. Run `/upg-sync-pull` to bring it down, or `/upg-new-graph` to start fresh." |
+| Doesn't exist | Not available | Suggest `/upg-new-graph` to get started. |
 
 ### Rules
 
 - This check must be **QUICK**: just 2 tool calls. Do not block the user or force them to sync before working.
 - Surface the state briefly (one sentence) and move on to the skill's actual work.
-- Do NOT run this check for read-only skills (`/upg-status`, `/upg-gaps`, `/upg-tree`, `/upg-diff`, `/upg-export`).
-- Do NOT run this check for `/upg-push` or `/upg-pull` themselves; they already handle sync.
+- Do NOT run this check for read-only skills (`/upg-show-status`, `/upg-check-gaps`, `/upg-show-tree`, `/upg-show-diff`, `/upg-sync-export`).
+- Do NOT run this check for `/upg-sync-push` or `/upg-sync-pull` themselves; they already handle sync.

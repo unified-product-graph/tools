@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { die, runtimeError, usageError } from '../lib/errors.js'
 
 export const workspaceCommand = new Command('workspace')
   .arguments('[action]')
@@ -38,7 +39,7 @@ export const workspaceCommand = new Command('workspace')
       }
 
       if (action === 'switch') {
-        if (!arg) { console.error('Usage: upg workspace switch <name>'); process.exit(1) }
+        if (!arg) die(usageError('Usage: upg workspace switch <name>'))
         const raw = await fs.readFile(workspacePath, 'utf-8')
         const workspace = JSON.parse(raw)
         const match = workspace.products?.find(
@@ -46,8 +47,7 @@ export const workspaceCommand = new Command('workspace')
             p.file === arg || p.file === `${arg}.upg` || p.title.toLowerCase() === arg.toLowerCase()
         )
         if (!match) {
-          console.error(`Product not found: "${arg}". Available: ${workspace.products?.map((p: { title: string }) => p.title).join(', ')}`)
-          process.exit(1)
+          die(runtimeError(`Product not found: "${arg}". Available: ${workspace.products?.map((p: { title: string }) => p.title).join(', ')}`))
         }
         workspace.default_product = match.file
         await fs.writeFile(workspacePath, JSON.stringify(workspace, null, 2) + '\n', 'utf-8')
@@ -55,10 +55,8 @@ export const workspaceCommand = new Command('workspace')
         return
       }
 
-      console.error(`Unknown action: "${action}". Use: list, switch`)
-      process.exit(1)
+      die(usageError(`Unknown action: "${action}". Use: list, switch`))
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

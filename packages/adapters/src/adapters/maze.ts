@@ -94,7 +94,7 @@ export class MazeAdapter implements UPGAdapter {
   async list(_config: AdapterConfig): Promise<SourceItem[]> {
     throw new Error(
       'Maze adapter requires Maze API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.',
     )
   }
 

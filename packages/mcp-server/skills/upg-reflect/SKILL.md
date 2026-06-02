@@ -165,8 +165,8 @@ Common patterns and where they go:
 | A load-bearing belief that hasn't been tested | `assumption` entity, link to the anchor |
 | A risk to mitigate | `risk` entity, link to the target it threatens |
 | A decision that needs revisiting | `decision` entity with rationale field, link to original decision |
-| A new hypothesis to test | Suggest `/upg-hypothesis` |
-| A path through the graph the user wants to walk | Suggest `/upg-impact` or `/upg-connect` |
+| A new hypothesis to test | Suggest `/upg-new-hypothesis` |
+| A path through the graph the user wants to walk | Suggest `/upg-show-impact` or `/upg-link` |
 | Just notes; nothing structural | Skip capture; suggest user re-run `/upg-reflect` after they sit with it |
 
 Use `create_node` + `create_edge` to capture. Always confirm before writing.
@@ -175,10 +175,10 @@ Use `create_node` + `create_edge` to capture. Always confirm before writing.
 
 Don't dump a menu. Pick ONE next move based on what surfaced:
 
-- **If a hypothesis emerged:** "The biggest assumption you surfaced sounds testable. Want me to run `/upg-hypothesis` to design that experiment?"
-- **If a risk landed:** "That risk is concrete. Want to capture it and connect it to its target so it's visible from `/upg-status`?"
-- **If a decision is now uncertain:** "Sounds like the decision needs a revisit. Want to `/upg-inspect` it to see what depends on it?"
-- **If reflection produced clarity, not action:** "That was the work. Want me to `/upg-snapshot` so the graph remembers this state?"
+- **If a hypothesis emerged:** "The biggest assumption you surfaced sounds testable. Want me to run `/upg-new-hypothesis` to design that experiment?"
+- **If a risk landed:** "That risk is concrete. Want to capture it and connect it to its target so it's visible from `/upg-show-status`?"
+- **If a decision is now uncertain:** "Sounds like the decision needs a revisit. Want to `/upg-show-entity` it to see what depends on it?"
+- **If reflection produced clarity, not action:** "That was the work. Want me to `/upg-sync-snapshot` so the graph remembers this state?"
 - **If the framework felt wrong for the scope:** "We can switch frameworks. Want me to walk this through Pre-mortem instead?"
 
 After rendering your recommendation, call:
@@ -198,4 +198,4 @@ A few rules that make this work:
 
 Reflect is one of the 5 canonical UPG approaches (`get_approach({ approach_id: "reflect" })`). Until v0.3.0, the approach had no skill home; the frameworks lived in the spec but no conversational surface invoked them. This skill closes that gap.
 
-It's the only canonical entry point for the Reflect approach in the user-invocable surface. Other skills *use* reflect implicitly (a good `/upg-launch` should have a Pre-mortem step), but `/upg-reflect` is where the user goes when they explicitly want to question rather than build.
+It's the only canonical entry point for the Reflect approach in the user-invocable surface. Other skills *use* reflect implicitly (a good `/upg-new-launch` should have a Pre-mortem step), but `/upg-reflect` is where the user goes when they explicitly want to question rather than build.

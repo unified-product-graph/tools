@@ -1,9 +1,15 @@
 /**
- * UPG CLI entry point. 22 commands across 6 groups.
+ * UPG CLI entry point. Local-first: nodes, edges, graph analysis, MCP wiring,
+ * skills. (The former Cloud command group was removed — there is no cloud
+ * backend; see CLI-FEEDBACK #10.)
  *
  * Usage: upg <command> [options]
  *
- * Groups: setup, workspace, governance, explore, create/edit, cloud.
+ * Groups: setup, workspace, governance, explore, create/edit.
+ *
+ * Help safety (CLI-FEEDBACK #1): `--help`/`-h` and `upg help <cmd>` are
+ * intercepted in `interceptHelp()` BEFORE Commander dispatches any action, so
+ * asking for help can never trigger a command's side effects.
  */
 
 import { Command } from 'commander'
@@ -23,32 +29,68 @@ import { initCommand } from './commands/init.js'
 import { workspaceCommand } from './commands/workspace.js'
 import { exportCommand } from './commands/export.js'
 import { fmtCommand } from './commands/fmt.js'
-import { loginCommand, logoutCommand } from './commands/login.js'
-import { pushCommand } from './commands/push.js'
-import { pullCommand } from './commands/pull.js'
-import { productsCommand } from './commands/products.js'
-import { logCommand } from './commands/log.js'
 import { installSkillsCommand } from './commands/install-skills.js'
 import { mcpCommand } from './commands/mcp.js'
 import { importCommand } from './commands/import.js'
+// Tier-1 "ceiling" verbs: stand-inside-the-graph UX, additive sugar
+// over the Tier-3 flat substrate above. They share session-local cursor + lens
+// state (lib/session.ts); the Tier-3 commands never read it.
+import { useCommand } from './commands/use.js'
+import { hereCommand, atCommand } from './commands/here.js'
+import { lsCommand } from './commands/ls.js'
+import { newCommand } from './commands/new.js'
+import { linkCommand } from './commands/link.js'
+import { findCommand } from './commands/find.js'
+import { checkCommand } from './commands/check.js'
+import { fixCommand } from './commands/fix.js'
 import chalk from 'chalk'
 import { upgLogo } from './lib/formatter.js'
+import { applyColorPreference } from './lib/output.js'
+import { commandHelp, helpTopics, type HelpEntry } from './lib/help.js'
+import { CLI_VERSION } from './lib/version.js'
 
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+// Single source of truth for the version — read from package.json at runtime so
+// `upg --version`, the logo, and the `init` banner never drift (CLI-FEEDBACK #5).
+export const VERSION = CLI_VERSION
 
-// Read the version from package.json at runtime so `upg --version` always
-// reflects the actually-installed package, not a hardcoded literal.
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const pkgPath = resolve(__dirname, '..', 'package.json')
-const VERSION = (JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }).version
+// Every command registered on the program. The order is the display order in
+// `printHelp`. Kept as a single array so the help interceptor and the
+// regression test can both iterate the full registry.
+const ALL_COMMANDS: Command[] = [
+  // Tier-1 "ceiling" verbs — the stand-inside-the-graph surface.
+  useCommand, hereCommand, atCommand, lsCommand, findCommand,
+  newCommand, linkCommand, checkCommand, fixCommand,
+  // Governance
+  healthCommand, verifyCommand, diffCommand, listCommand, treeCommand, searchCommand,
+  // CRUD & manipulation
+  createCommand, updateCommand, deleteCommand, connectCommand, gapsCommand,
+  initCommand, workspaceCommand, importCommand, exportCommand, fmtCommand,
+  // Setup
+  installSkillsCommand, mcpCommand,
+]
+
+/** Command names the user can pass to `upg help <name>` / probe with --help. */
+export function commandNames(): string[] {
+  return ALL_COMMANDS.map((c) => c.name())
+}
 
 function printHelp() {
   console.log(upgLogo(VERSION))
 
   const cmd = (name: string, args: string, desc: string) =>
     `  ${chalk.blueBright(name.padEnd(12))} ${chalk.dim(args.padEnd(24))} ${desc}`
+
+  console.log(chalk.bold('  Stand in the graph'))
+  console.log(cmd('use', '<lens>', 'Set the operating lens (scopes vocabulary)'))
+  console.log(cmd('here', '', 'Show where the cursor stands'))
+  console.log(cmd('at', '<node>', 'Move the cursor (by id or title)'))
+  console.log(cmd('ls', '', "The cursor's neighbours, grouped by relationship"))
+  console.log(cmd('find', '<query>', 'Search; pick a result to move the cursor (TTY)'))
+  console.log(cmd('new', '<type> <title>', 'Create + auto-link to the cursor (edge inferred)'))
+  console.log(cmd('link', '<a> <b>', 'Connect two nodes (edge + direction inferred)'))
+  console.log(cmd('check', '', 'One verdict: structure + health + gaps + lint'))
+  console.log(cmd('fix', '', 'Execute the top auto-remediable fix from check'))
+  console.log()
 
   console.log(chalk.bold('  Setup'))
   console.log(cmd('mcp setup', '[options]', 'Write MCP server entry into .claude/settings.json'))
@@ -65,8 +107,8 @@ function printHelp() {
   console.log()
 
   console.log(chalk.bold('  Governance'))
-  console.log(cmd('health', '[options]', 'Score the graph 0–100. Pair --min-score with CI'))
-  console.log(cmd('verify', '[options]', 'Structural validation. Exits 1 on violations'))
+  console.log(cmd('health', '[options]', 'Score the graph 0-100. Pair --min-score with CI'))
+  console.log(cmd('verify', '[options]', 'Structural validation. Exits 2 on violations'))
   console.log(cmd('diff', '[options]', 'Compare against a git ref. For PR reviews'))
   console.log(cmd('gaps', '[options]', 'Empty domains, broken chains, sparse areas'))
   console.log()
@@ -84,25 +126,104 @@ function printHelp() {
   console.log(cmd('connect', '<src> <tgt>', 'Create an edge. Type auto-inferred'))
   console.log()
 
-
-  console.log(chalk.bold('  Cloud'))
-  console.log(cmd('login', '[options]', 'Authenticate with UPG cloud'))
-  console.log(cmd('logout', '[options]', 'Remove stored credentials'))
-  console.log(cmd('push', '[options]', 'Push local graph to cloud'))
-  console.log(cmd('pull', '[options]', 'Pull cloud changes to local'))
-  console.log(cmd('products', '[options]', 'List your cloud products'))
-  console.log(cmd('log', '[options]', 'Activity log: who changed what, when'))
+  console.log(chalk.bold('  Global flags'))
+  console.log(cmd('--file <path>', '', 'Target a specific .upg file (or set UPG_FILE)'))
+  console.log(cmd('--json', '', 'Machine-readable JSON (reads + mutations)'))
+  console.log(cmd('--no-color', '', 'Disable colour/boxes (also honours NO_COLOR)'))
+  console.log(cmd('--yes, -y', '', 'Skip confirmation on destructive ops'))
   console.log()
+
+  console.log(chalk.bold('  Exit codes'))
+  console.log('  ' + chalk.dim('0 success · 1 runtime error · 2 validation/policy · 3 usage error'))
+  console.log()
+
+  console.log(chalk.dim('  Run `upg <command> --help` for command-specific help and examples.'))
+  console.log()
+}
+
+/** Render one command's structured help block to stdout, then exit 0. */
+function printCommandHelp(entry: HelpEntry): never {
+  const b = chalk.bold
+  console.log()
+  console.log(`  ${b(entry.usage)}`)
+  console.log()
+  console.log(`  ${entry.summary}`)
+  if (entry.options.length > 0) {
+    console.log()
+    console.log(`  ${b('Options')}`)
+    const width = Math.max(...entry.options.map((o) => o.flag.length))
+    for (const o of entry.options) {
+      console.log(`    ${chalk.blueBright(o.flag.padEnd(width))}  ${chalk.dim(o.desc)}`)
+    }
+  }
+  if (entry.examples.length > 0) {
+    console.log()
+    console.log(`  ${b('Examples')}`)
+    for (const ex of entry.examples) {
+      if (ex.comment) console.log(`    ${chalk.dim('# ' + ex.comment)}`)
+      console.log(`    ${chalk.white(ex.cmd)}`)
+    }
+  }
+  if (entry.seeAlso) {
+    console.log()
+    console.log(`  ${chalk.dim('See also: ' + entry.seeAlso)}`)
+  }
+  console.log()
+  process.exit(0)
+}
+
+const HELP_TOKENS = new Set(['--help', '-h'])
+
+/**
+ * CLI-FEEDBACK #1 — help safety.
+ *
+ * Intercept help BEFORE Commander parses or dispatches anything, so `upg <cmd>
+ * --help`, `upg <cmd> -h`, and `upg help <cmd>` can never run a command's
+ * action (no logout, no delete picker, no skill install). Returns true if it
+ * handled and exited; otherwise lets normal parsing proceed.
+ */
+function interceptHelp(argv: string[]): void {
+  // Tokens after `node cli.js`.
+  const args = argv.slice(2)
+  if (args.length === 0) return
+
+  // `upg help [topic]`  → alias of `--help`.
+  if (args[0] === 'help') {
+    const topic = args[1]
+    if (!topic) { printHelp(); process.exit(0) }
+    const entry = commandHelp(topic)
+    if (entry) printCommandHelp(entry)
+    // Unknown help topic: show the top-level help (still safe, exit 0).
+    printHelp()
+    process.exit(0)
+  }
+
+  // Find the first non-flag token — the candidate command name.
+  const cmdName = args.find((a) => !a.startsWith('-'))
+  const hasHelpFlag = args.some((a) => HELP_TOKENS.has(a))
+
+  // Top-level `upg --help` / `upg -h` → full help.
+  if (!cmdName && hasHelpFlag) { printHelp(); process.exit(0) }
+
+  if (cmdName && hasHelpFlag) {
+    // `upg <cmd> ... --help` (in any position) → command help, never the action.
+    const entry = commandHelp(cmdName)
+    if (entry) printCommandHelp(entry)
+    // Help requested for an unknown command: fall back to top-level help.
+    printHelp()
+    process.exit(0)
+  }
 }
 
 const program = new Command()
   .name('upg')
-  .description('Unified Product Graph CLI. Governance, CRUD, cloud sync.')
+  .description('Unified Product Graph CLI. Local-first governance, CRUD, analysis.')
   .version(VERSION, '-V, --version', 'output the version number')
-  .helpOption(false)
-  .option('-h, --help', 'display help')
+  .option('--no-color', 'disable coloured output')
+  // Commander's own help stays enabled as a backstop, but `interceptHelp` runs
+  // first so help is guaranteed side-effect-free even for subcommands.
+  .helpOption('-h, --help', 'display help')
   .action((_opts) => {
-    // Check whether a .upg file (or .upg/ dir) exists in the current directory.
     const cwd = process.cwd()
     let hasDotUpg = false
     try {
@@ -122,36 +243,16 @@ const program = new Command()
     printHelp()
   })
 
-// Phase 1: Governance
-program.addCommand(healthCommand)
-program.addCommand(verifyCommand)
-program.addCommand(diffCommand)
-program.addCommand(listCommand)
-program.addCommand(treeCommand)
-program.addCommand(searchCommand)
+for (const c of ALL_COMMANDS) program.addCommand(c)
 
-// Phase 2: CRUD & manipulation
-program.addCommand(createCommand)
-program.addCommand(updateCommand)
-program.addCommand(deleteCommand)
-program.addCommand(connectCommand)
-program.addCommand(gapsCommand)
-program.addCommand(initCommand)
-program.addCommand(workspaceCommand)
-program.addCommand(importCommand)
-program.addCommand(exportCommand)
-program.addCommand(fmtCommand)
+// Apply --no-color / NO_COLOR before anything renders.
+applyColorPreference(process.argv.includes('--no-color'))
 
-// Phase 3: Cloud bridge
-program.addCommand(loginCommand)
-program.addCommand(logoutCommand)
-program.addCommand(pushCommand)
-program.addCommand(pullCommand)
-program.addCommand(productsCommand)
-program.addCommand(logCommand)
+// Help is intercepted before parse so it can never execute a command.
+interceptHelp(process.argv)
 
-// Skills
-program.addCommand(installSkillsCommand)
-program.addCommand(mcpCommand)
+// Surface the registered topics so `help.ts` and the regression test agree on
+// coverage. (Referenced to keep the import meaningful for tree-shakers.)
+void helpTopics
 
 program.parse()

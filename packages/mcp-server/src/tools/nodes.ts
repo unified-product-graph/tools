@@ -858,14 +858,20 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
  * incident edge is re-inferred against the catalog and the change is atomic
  * with rollback. For 3+ entities, ALWAYS use `batch_update_nodes` instead.
  *
- * @returns JSON: `{ node, warning?, unknown_properties? }`. `warning`
- *   aggregates lifecycle-status hints, migration warnings, and any
- *   unknown-property notice. `unknown_properties` lists property
- *   keys not in the entity's schema. Pass `strict: true` to reject unknown
- *   properties instead of warning.
+ * Pass `unset_properties: ["key", ...]` to DELETE property keys (applied
+ * after the `properties` merge, so one call can set some keys and drop
+ * others). An invalid lifecycle `status` is REJECTED (parity with
+ * `create_node` / `batch_update_nodes`), not warned.
+ *
+ * @returns JSON: `{ node, warning?, unknown_properties?, unset? }`. `warning`
+ *   aggregates migration warnings and any unknown-property notice.
+ *   `unknown_properties` lists property keys not in the entity's schema.
+ *   `unset` lists the keys actually removed. Pass `strict: true` to reject
+ *   unknown properties instead of warning.
  * @throws Returns a textError when `node_id` is missing, the type migration
- *   fails, when `strict: true` and unknown properties are present, or when
- *   the underlying store rejects the patch.
+ *   fails, the `status` is not a valid lifecycle phase for the type, when
+ *   `strict: true` and unknown properties are present, or when the underlying
+ *   store rejects the patch.
  * @atomicity atomic-with-rollback (when `type` is changed); atomic for
  *   shallow-merge patches.
  * @see migrate_type
@@ -899,8 +905,12 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
   if (args.status !== undefined) {
     const existingNode = store.getNode(nid)
     if (existingNode) {
+      // (Seam 1): REJECT an invalid lifecycle status, matching
+      // create_node / batch (createNodeLib → validateNodeWrite throws). Update
+      // previously only warned, so `update_node({status:"bogus"})` landed a
+      // bad value silently. Single + batch + create are now consistent.
       const sw = validateStatusAgainstLifecycle(existingNode.type, args.status as string)
-      if (sw) warnings.push(sw)
+      if (sw) return textError(sw)
     }
   }
 
@@ -942,10 +952,22 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
   if (lengthWarnings.length > 0) warnings.push(...lengthWarnings)
 
   try {
-    const updated = store.updateNode(nid, patch)
+    let updated = store.updateNode(nid, patch)
+    //: wire `unset_properties`. The handler previously ignored this
+    // arg entirely (silent no-op) even though the store + SDK lib support it.
+    // Applied AFTER the property merge so a single call can set some keys and
+    // drop others. Unknown keys are simply not present in `removed`.
+    let removedKeys: string[] | undefined
+    const unsetArg = args.unset_properties
+    if (Array.isArray(unsetArg) && unsetArg.length > 0) {
+      const r = store.unsetNodeProperties(nid, unsetArg as string[])
+      updated = r.node
+      if (r.removed.length > 0) removedKeys = r.removed
+    }
     const result: Record<string, unknown> = { node: updated }
     if (warnings.length > 0) result.warning = warnings.join(' | ')
     if (unknownProperties.length > 0) result.unknown_properties = unknownProperties
+    if (removedKeys && removedKeys.length > 0) result.unset = removedKeys
     return text(JSON.stringify(result, null, 2))
   } catch (err) {
     return textError((err as Error).message)

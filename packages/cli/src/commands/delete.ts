@@ -2,7 +2,9 @@ import { Command } from 'commander'
 import chalk from 'chalk'
 import { input, search } from '@inquirer/prompts'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
-import { formatNode, upgHeader } from '../lib/formatter.js'
+import { formatNode } from '../lib/formatter.js'
+import { EXIT, die, runtimeError, usageError } from '../lib/errors.js'
+import { isTTY } from '../lib/output.js'
 import type { UPGBaseNode } from '@unified-product-graph/core'
 
 export const deleteCommand = new Command('delete')
@@ -10,9 +12,14 @@ export const deleteCommand = new Command('delete')
   .description('Delete an entity and its edges. Omit ID for an interactive picker.')
   .option('--file <path>', 'Path to .upg file')
   .option('--type <type>', 'Filter the picker by entity type')
-  .option('--force', 'Skip confirmation')
+  .option('-y, --yes', 'Skip confirmation (required for non-interactive use)')
+  .option('--force', 'Alias of --yes')
+  .option('--json', 'Machine-readable JSON output')
   .action(async (id, opts) => {
     try {
+      const skipConfirm = Boolean(opts.yes || opts.force)
+      const interactive = isTTY() && Boolean(process.stdin.isTTY)
+
       const filePath = await discoverUPGFile(opts.file)
       const store = await loadStore(filePath)
 
@@ -21,16 +28,22 @@ export const deleteCommand = new Command('delete')
       if (id) {
         node = store.getNode(id)
         if (!node) {
-          console.error(chalk.red(`Node not found: ${id}`))
-          process.exit(1)
+          store.stopWatching()
+          die(runtimeError(`Node not found: ${id}`))
         }
       } else {
-        // Interactive picker
+        // The interactive picker requires a TTY. In a non-TTY (CI/script) with
+        // no id, fail fast with exit 3 rather than hang (CLI-FEEDBACK #3).
+        if (!interactive) {
+          store.stopWatching()
+          die(usageError('No entity id given and no TTY for the picker. Pass an id, e.g. `upg delete <id> --yes`.'))
+        }
+
         let nodes = store.getAllNodes()
         if (opts.type) nodes = nodes.filter((n) => n.type === opts.type)
 
         if (nodes.length === 0) {
-          console.log('No entities to delete.')
+          process.stderr.write('No entities to delete.\n')
           store.stopWatching()
           return
         }
@@ -52,38 +65,55 @@ export const deleteCommand = new Command('delete')
 
         node = store.getNode(picked)
         if (!node) {
-          console.error(chalk.red('Entity not found.'))
           store.stopWatching()
-          process.exit(1)
+          die(runtimeError('Entity not found.'))
         }
       }
 
       const edges = store.getEdgesForNode(node.id)
 
-      if (!opts.force) {
-        console.log()
-        console.log(`  Will delete: ${formatNode(node)}`)
-        console.log(chalk.dim(`  ${edges.length} connected edge(s) will also be removed`))
-        console.log()
+      if (!skipConfirm) {
+        // Non-TTY without --yes must not hang; require explicit consent.
+        if (!interactive) {
+          store.stopWatching()
+          die(usageError(
+            `Refusing to delete ${node.type} "${node.title}" without confirmation in a non-interactive shell. ` +
+            `Re-run with --yes (or -y).`,
+          ))
+        }
+
+        process.stderr.write('\n')
+        process.stderr.write(`  Will delete: ${formatNode(node)}\n`)
+        process.stderr.write(chalk.dim(`  ${edges.length} connected edge(s) will also be removed\n`))
+        process.stderr.write('\n')
 
         const answer = await input({
           message: `Type "${node.title}" to confirm deletion:`,
         })
 
         if (answer !== node.title) {
-          console.log(chalk.dim('  Cancelled.'))
+          process.stderr.write(chalk.dim('  Cancelled.\n'))
           store.stopWatching()
           return
         }
       }
 
+      const deleted = { id: node.id, type: node.type, title: node.title }
+      const cascadedEdges = edges.map((e) => ({ id: e.id, source: e.source, target: e.target, type: e.type }))
+
       const { removedEdgeIds } = store.removeNode(node.id)
       await store.flush()
       store.stopWatching()
 
-      console.log(chalk.green(`\n  ✓ Deleted: ${node.type} "${node.title}" (${removedEdgeIds.length} edges removed)\n`))
+      if (opts.json) {
+        process.stdout.write(JSON.stringify({ deleted, removed_edges: cascadedEdges }, null, 2) + '\n')
+      } else {
+        process.stderr.write(
+          chalk.green(`\n  ✓ Deleted: ${node.type} "${node.title}" (${removedEdgeIds.length} edges removed)\n`),
+        )
+      }
+      process.exit(EXIT.OK)
     } catch (err) {
-      console.error(chalk.red((err as Error).message))
-      process.exit(2)
+      die(err)
     }
   })

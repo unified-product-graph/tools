@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { discoverUPGFile, loadStore, computeGraphDigest, BUSINESS_AREAS } from '../lib/graph.js'
 import { upgHeader } from '../lib/formatter.js'
+import { die } from '../lib/errors.js'
 
 export const gapsCommand = new Command('gaps')
   .description('Report empty domains, broken chains, and sparse areas.')
@@ -73,7 +74,6 @@ export const gapsCommand = new Command('gaps')
 
       console.log()
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

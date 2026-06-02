@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { discoverUPGFile, loadStore, listNodes, getOrphans } from '../lib/graph.js'
 import { formatNode, formatCountTable, upgHeader } from '../lib/formatter.js'
+import { die } from '../lib/errors.js'
 import type { UPGBaseNode } from '@unified-product-graph/core'
 
 export const listCommand = new Command('list')
@@ -52,15 +53,14 @@ export const listCommand = new Command('list')
       }
 
       if (nodes.length === 0) {
-        console.log('No matching entities.')
+        process.stderr.write('No matching entities.\n')
         return
       }
 
-      console.log(upgHeader('List'))
+      process.stderr.write(upgHeader('List') + '\n')
       for (const node of nodes) console.log(formatNode(node, '  '))
-      console.log(`\n  ${nodes.length} entities`)
+      process.stderr.write(`\n  ${nodes.length} entities\n`)
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

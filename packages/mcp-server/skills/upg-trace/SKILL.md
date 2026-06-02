@@ -45,9 +45,9 @@ These are examples. The user may want to trace any path in the graph; canonical 
 
 Before starting the trace, call `get_graph_digest()` and `resolve_edge_for_pair({ source_type, target_type })` for the first hop of the requested path. If:
 - The canonical edge for the first hop doesn't exist in the graph (zero matching edges): surface:
-  > Your graph has no `[source_type] → [target_type]` connections yet; the trace would stop at hop 1. Run `/upg-connect` or `/upg-explore` to add the missing links first.
+  > Your graph has no `[source_type] → [target_type]` connections yet; the trace would stop at hop 1. Run `/upg-link` or `/upg-walk-region` to add the missing links first.
 - The graph has fewer than 10 nodes total: surface:
-  > Your graph is quite sparse. Traces are most useful once you have at least a few connected entities. Run `/upg-init` or `/upg-discover` to build out the foundation.
+  > Your graph is quite sparse. Traces are most useful once you have at least a few connected entities. Run `/upg-new-graph` or `/upg-new-discovery` to build out the foundation.
 
 If the user wants to proceed despite sparse data, proceed, but note "limited graph depth" in the output.
 
@@ -152,7 +152,7 @@ has no documented route to a potential solution.
 
 For each gap, offer:
 - "Want me to create a stub opportunity node here so the chain is complete?"
-- "Want to flag this for `/upg-gaps` to include in a full graph gap analysis?"
+- "Want to flag this for `/upg-check-gaps` to include in a full graph gap analysis?"
 
 ### Step 6: Capture What the Trace Revealed
 
@@ -173,10 +173,10 @@ Always confirm before writing. Never silently create nodes or edges.
 
 Pick ONE next move based on what the trace found:
 
-- **If the path was complete and well-connected:** "Clean chain from [anchor] to [destination]. Want to `/upg-snapshot` to preserve this as a known-good state?"
-- **If one or more gaps were found:** "Found [N] gap(s) in the chain. Want to run `/upg-gaps` for a full structural gap audit across the product?"
+- **If the path was complete and well-connected:** "Clean chain from [anchor] to [destination]. Want to `/upg-sync-snapshot` to preserve this as a known-good state?"
+- **If one or more gaps were found:** "Found [N] gap(s) in the chain. Want to run `/upg-check-gaps` for a full structural gap audit across the product?"
 - **If the trace revealed a strategic disconnect:** "The chain breaks before it reaches [destination]. That might mean the strategy isn't wired to execution yet. Want to run `/upg-reflect` to examine why?"
-- **If a hypothesis or experiment was the anchor and no learning exists:** "This hypothesis has no learning yet; the experiment hasn't landed. Want to run `/upg-hypothesis` to check on its test design?"
+- **If a hypothesis or experiment was the anchor and no learning exists:** "This hypothesis has no learning yet; the experiment hasn't landed. Want to run `/upg-new-hypothesis` to check on its test design?"
 - **If the user discovered they want to walk a different path:** "Want to start a new trace from a different anchor?"
 
 After rendering your recommendation, call:
@@ -194,4 +194,4 @@ After rendering your recommendation, call:
 
 Trace is one of the 5 canonical UPG approaches (`get_approach({ approach_id: "trace" })`). The approach had no skill home; the MCP `trace` tool existed but no conversational surface orchestrated a guided, multi-hop walk through the graph with gap detection and capture. This skill closes that gap.
 
-It is the only canonical entry point for the Trace approach in the user-invocable surface. Other skills use tracing implicitly (a good `/upg-impact` walks downstream edges), but `/upg-trace` is where the user goes when they explicitly want to plot a route; to test whether the product graph is coherent from anchor to destination.
+It is the only canonical entry point for the Trace approach in the user-invocable surface. Other skills use tracing implicitly (a good `/upg-show-impact` walks downstream edges), but `/upg-trace` is where the user goes when they explicitly want to plot a route; to test whether the product graph is coherent from anchor to destination.

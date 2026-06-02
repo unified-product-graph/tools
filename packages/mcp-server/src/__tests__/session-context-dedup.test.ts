@@ -74,35 +74,35 @@ describe(': recommendations_to_avoid on get_session_context', () => {
   it('accumulates each unique recommendation in registration order', async () => {
     const store = await loadStore(makeDoc())
     const ctx = makeCtx(store)
-    updateSessionContext({ skill_invoked: 'upg', recommendation: '/upg-status' }, ctx)
-    updateSessionContext({ skill_invoked: 'upg-analytics', recommendation: '/upg-connect' }, ctx)
-    updateSessionContext({ skill_invoked: 'upg-gaps', recommendation: '/upg-migrate' }, ctx)
+    updateSessionContext({ skill_invoked: 'upg', recommendation: '/upg-show-status' }, ctx)
+    updateSessionContext({ skill_invoked: 'upg-show-metrics', recommendation: '/upg-link' }, ctx)
+    updateSessionContext({ skill_invoked: 'upg-check-gaps', recommendation: '/upg-fix-types' }, ctx)
     const session = readSession(ctx)
     expect(session.recommendations_to_avoid).toEqual([
-      '/upg-status',
-      '/upg-connect',
-      '/upg-migrate',
+      '/upg-show-status',
+      '/upg-link',
+      '/upg-fix-types',
     ])
   })
 
   it('dedupes when two skills recommend the same command', async () => {
     const store = await loadStore(makeDoc())
     const ctx = makeCtx(store)
-    updateSessionContext({ skill_invoked: 'upg', recommendation: '/upg-status' }, ctx)
-    updateSessionContext({ skill_invoked: 'upg-gaps', recommendation: '/upg-status' }, ctx)
-    updateSessionContext({ skill_invoked: 'upg-impact', recommendation: '/upg-connect' }, ctx)
+    updateSessionContext({ skill_invoked: 'upg', recommendation: '/upg-show-status' }, ctx)
+    updateSessionContext({ skill_invoked: 'upg-check-gaps', recommendation: '/upg-show-status' }, ctx)
+    updateSessionContext({ skill_invoked: 'upg-show-impact', recommendation: '/upg-link' }, ctx)
     const session = readSession(ctx)
     // recommendations_given keeps both entries; recommendations_to_avoid dedupes
     expect((session.recommendations_given as unknown[]).length).toBe(3)
-    expect(session.recommendations_to_avoid).toEqual(['/upg-status', '/upg-connect'])
+    expect(session.recommendations_to_avoid).toEqual(['/upg-show-status', '/upg-link'])
   })
 
   it('survives recommendation-less skill invocations', async () => {
     const store = await loadStore(makeDoc())
     const ctx = makeCtx(store)
-    updateSessionContext({ skill_invoked: 'upg-tree' }, ctx) // no recommendation
-    updateSessionContext({ skill_invoked: 'upg', recommendation: '/upg-status' }, ctx)
+    updateSessionContext({ skill_invoked: 'upg-show-tree' }, ctx) // no recommendation
+    updateSessionContext({ skill_invoked: 'upg', recommendation: '/upg-show-status' }, ctx)
     const session = readSession(ctx)
-    expect(session.recommendations_to_avoid).toEqual(['/upg-status'])
+    expect(session.recommendations_to_avoid).toEqual(['/upg-show-status'])
   })
 })

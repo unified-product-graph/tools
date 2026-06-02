@@ -212,7 +212,7 @@ export class ShortcutAdapter implements UPGAdapter {
     // access isn't directly available from this adapter.
     throw new Error(
       'Shortcut adapter requires Shortcut API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.items.',
     )
   }
 

@@ -227,7 +227,18 @@ export class UPGFileStore {
       const msgs = result.errors
         .map((e) => `  ${e.path}: ${e.message}`)
         .join('\n')
-      throw new Error(`Invalid UPG document:\n${msgs}`)
+      // (S-12): the validator reports the envelope-internal path (e.g.
+      // `$.exported_at`), but in the on-disk canonical envelope that field
+      // lives at `$upg.provenance.exported_at`. A hand-authored `{ product,
+      // nodes, edges }` is missing the whole `$upg` block. Point there.
+      const missingEnvelope = result.errors.some((e) => /exported_at|provenance|\$upg|format_version/.test(`${e.path} ${e.message}`))
+      const hint = missingEnvelope
+        ? `\n\nThe \`$upg\` provenance envelope is required (real field path: ` +
+          `\`$upg.provenance.exported_at\`). Don't hand-author a bare ` +
+          `{ product, nodes, edges } file — scaffold via the CLI (\`upg init\`) ` +
+          `or clone an existing \`.upg\` file's \`$upg\` block.`
+        : ''
+      throw new Error(`Invalid UPG document:\n${msgs}${hint}`)
     }
 
     this.doc = parsed as UPGDocument
@@ -282,13 +293,13 @@ export class UPGFileStore {
       this.doc.edges,
       new Set(this.doc.nodes.map((n) => n.id)),
     )
-    const rendered = renderDanglingReport(this.lastDanglingReport, this.filePath)
+    const rendered = renderDanglingReport(this.lastDanglingReport, this.filePath, { quietWhenClean: true })
     if (rendered) process.stderr.write(rendered + '\n')
 
     // Schema-drift summary on load. Counts only; full per-node
     // breakdown lives in `validate_graph`. Silent when zero drift.
     this.lastDriftSummary = computeSchemaDriftSummary(this.doc)
-    const driftRendered = renderDriftSummary(this.lastDriftSummary, this.filePath)
+    const driftRendered = renderDriftSummary(this.lastDriftSummary, this.filePath, { quietWhenClean: true })
     if (driftRendered) process.stderr.write(driftRendered + '\n')
 
     await this.startWatching()
@@ -747,6 +758,34 @@ export class UPGFileStore {
     this.logChange('update', 'node', node.id, node.type, node.title)
     this.scheduleSave()
     return node
+  }
+
+  /**
+   * Remove one or more property keys from a node.
+   *
+   * `update_node` deep-MERGES `properties`, so writing `{ key: null }` stores a
+   * literal `null` rather than removing the key — a trap, given writes are
+   * permissive about unknown keys. This is the matching permissive-UNSET: it
+   * deletes the named keys outright. Unknown keys are ignored (idempotent).
+   * Returns the keys that were actually deleted.
+   */
+  unsetNodeProperties(id: string, keys: string[]): { node: UPGBaseNode; removed: string[] } {
+    const node = this.nodeMap.get(id)
+    if (!node) throw new Error(`Node not found: ${id}`)
+    const removed: string[] = []
+    if (node.properties) {
+      for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(node.properties, key)) {
+          delete node.properties[key]
+          removed.push(key)
+        }
+      }
+    }
+    if (removed.length > 0) {
+      this.logChange('update', 'node', node.id, node.type, node.title)
+      this.scheduleSave()
+    }
+    return { node, removed }
   }
 
   removeNode(id: string): { node: UPGBaseNode; removedEdgeIds: string[] } {

@@ -12,7 +12,7 @@ This is the shared design reference for all `/upg-*` skills. Every skill that pr
 ## Brand
 
 - **Name:** Always write "Unified Product Graph" in full; never just "UPG" in user-facing text
-- **Logo mark:** Use on key screens (`/upg`, `/upg-status`, `/upg-export`)
+- **Logo mark:** Use on key screens (`/upg`, `/upg-show-status`, `/upg-sync-export`)
 - **Standard URL:** unifiedproductgraph.org
 
 ### Logo Mark
@@ -26,7 +26,7 @@ The dot cluster logo in a code block, followed by a bold H1 for the name:
 ```
 # Unified Product Graph
 
-The logo is the dot cluster (renders in monospace). The name is a markdown H1 (renders large and bold). Use at the top of `/upg`, `/upg-status`, and `/upg-export`. Other skills don't need the logo; keep it special.
+The logo is the dot cluster (renders in monospace). The name is a markdown H1 (renders large and bold). Use at the top of `/upg`, `/upg-show-status`, and `/upg-sync-export`. Other skills don't need the logo; keep it special.
 
 ## Section Dividers
 
@@ -194,7 +194,7 @@ After creating entities, the skill should:
 1. Call `get_graph_digest()` to check the current state
 2. Determine which of the 8 business areas has the biggest gap
 3. Recommend ONE specific next skill based on that gap
-4. Always offer `/upg-journey` as the "see full picture" fallback
+4. Always offer `/upg-show-journey` as the "see full picture" fallback
 
 **Good ending (smart, contextual):**
 ```
@@ -203,19 +203,19 @@ After creating entities, the skill should:
 Your graph now covers 6 of 8 business areas.
 The biggest gap: 📣 Reaching; you haven't thought about how people find your product.
 
-→ Run /upg-launch to define your positioning and channels.
+→ Run /upg-new-launch to define your positioning and channels.
 
-Or /upg-journey to see your full progress across all 7 phases.
+Or /upg-show-journey to see your full progress across all 7 phases.
 ```
 
 **Bad ending (menu dump; DON'T DO THIS):**
 ```
 Next steps:
-- /upg-persona: Add more personas
-- /upg-discover: Run a discovery session
-- /upg-hypothesis: Structure a bet
-- /upg-gaps: Check for gaps
-- /upg-status: Health dashboard
+- /upg-new-persona: Add more personas
+- /upg-new-discovery: Run a discovery session
+- /upg-new-hypothesis: Structure a bet
+- /upg-check-gaps: Check for gaps
+- /upg-show-status: Health dashboard
 ```
 
 The business areas to check (in priority order):
@@ -229,31 +229,26 @@ The business areas to check (in priority order):
 8. 📊 **Learning**: outcome, metric, objective, key_result, retrospective
 
 Map each empty/thin area to a skill:
-- Identity → `/upg-strategy`
-- Understanding → `/upg-persona`
-- Discovery → `/upg-discover`
-- Reaching → `/upg-launch` or `/upg-explore marketing`
-- Converting → `/upg-explore business_model`
-- Building → `/upg-explore product_spec`
-- Sustaining → `/upg-explore business_model`
-- Learning → `/upg-okr` or `/upg-explore team_org`
+- Identity → `/upg-new-strategy`
+- Understanding → `/upg-new-persona`
+- Discovery → `/upg-new-discovery`
+- Reaching → `/upg-new-launch` or `/upg-walk-region marketing`
+- Converting → `/upg-walk-region business_model`
+- Building → `/upg-walk-region product_spec`
+- Sustaining → `/upg-walk-region business_model`
+- Learning → `/upg-new-okr` or `/upg-walk-region team_org`
 
-If ALL areas are covered, celebrate and point to `/upg-journey`.
+If ALL areas are covered, celebrate and point to `/upg-show-journey`.
 
 ## Footer Pattern
 
 After the smart ending, add the standard footer with a dashed divider:
 
-```
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Your .upg file is yours: open standard, portable, git-friendly.
-unifiedproductgraph.org
-```
 
-On `/upg-status` and `/upg-gaps` (where maturity is 3+), the footer can be slightly more direct:
+On `/upg-show-status` and `/upg-check-gaps` (where maturity is 3+), the footer can be slightly more direct:
 
 ```
-can show patterns the CLI can't. → /upg-push to sync
+can show patterns the CLI can't. → /upg-sync-push to sync
 ```
 
 ## Tone

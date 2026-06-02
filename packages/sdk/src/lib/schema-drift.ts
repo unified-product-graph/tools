@@ -232,7 +232,20 @@ export function computeSchemaDriftSummary(doc: UPGDocument): SchemaDriftSummary 
   }
 }
 
-export function renderDriftSummary(summary: SchemaDriftSummary, filePath?: string): string | null {
+/**
+ * Render the schema-drift summary as a multi-line string.
+ *
+ * (S-03): by default this ALWAYS returns a string — a "no issues" line
+ * on the clean case — so `renderDriftSummary(d).split('\n')` is safe on a
+ * healthy graph (it previously returned `null`, throwing on `.split`). Pass
+ * `{ quietWhenClean: true }` to get `null` on the clean case (used by the
+ * loader to stay silent on stderr).
+ */
+export function renderDriftSummary(
+  summary: SchemaDriftSummary,
+  filePath?: string,
+  options?: { quietWhenClean?: boolean },
+): string | null {
   const total =
     summary.entity_drift +
     summary.edge_drift +
@@ -240,7 +253,10 @@ export function renderDriftSummary(summary: SchemaDriftSummary, filePath?: strin
     summary.lifecycle_drift +
     summary.self_referential +
     summary.property_drift
-  if (total === 0) return null
+  if (total === 0) {
+    if (options?.quietWhenClean) return null
+    return `No schema drift detected${filePath ? ` (${filePath})` : ''}.`
+  }
 
   const lines: string[] = []
   lines.push(`.upg schema drift summary${filePath ? ` (${filePath})` : ''}:`)

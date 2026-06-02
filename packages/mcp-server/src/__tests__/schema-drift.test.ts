@@ -219,9 +219,11 @@ describe('self_referential: source_id/source_type mirror id/type', () => {
 })
 
 describe('renderDriftSummary: output shape', () => {
-  it('returns null for an all-zeros summary', () => {
+  it('returns the clean-case string for an all-zeros summary', () => {
+    //-drift: renderDriftSummary no longer returns null on a clean
+    // graph; it returns an explicit "no drift" string (filePath omitted here).
     const summary = computeSchemaDriftSummary(makeDoc([], []))
-    expect(renderDriftSummary(summary)).toBeNull()
+    expect(renderDriftSummary(summary)).toBe('No schema drift detected.')
   })
 
   it('renders a multi-line summary with class counts and a pointer to validate_graph', () => {

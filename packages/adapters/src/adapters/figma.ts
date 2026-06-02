@@ -96,7 +96,7 @@ export class FigmaAdapter implements UPGAdapter {
   async list(_config: AdapterConfig): Promise<SourceItem[]> {
     throw new Error(
       'Figma adapter requires Figma API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.',
     )
   }
 

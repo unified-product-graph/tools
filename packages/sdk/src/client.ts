@@ -34,7 +34,13 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
-import { UPGFileStore } from './store.js'
+import {
+  UPG_EDGE_CATALOG,
+  resolveAllEdges,
+  pickCanonicalEdge,
+  getValidChildren,
+} from '@unified-product-graph/core'
+import { UPGFileStore, type IntegrityReport } from './store.js'
 import {
   createNode as createNodeOp,
   createEdge as createEdgeOp,
@@ -42,6 +48,8 @@ import {
   deleteEdge as deleteEdgeOp,
   listNodes as listNodesOp,
   getNode as getNodeOp,
+  updateNode as updateNodeOp,
+  batchCreateNodes as batchCreateNodesOp,
   computeGraphDigest,
   computeHealthScore,
   searchNodes,
@@ -50,6 +58,10 @@ import {
   type ListNodesOptions,
   type GraphDigest,
   type SearchResult,
+  type GetNodeResult,
+  type UpdateNodeArgs,
+  type BatchCreateArgs,
+  type BatchCreateResult,
 } from './lib/tools.js'
 
 export interface UPGClientOptions {
@@ -82,20 +94,80 @@ export interface SearchOptions {
   type?: string
 }
 
+/** (S-02): integrity report + a top-level `ok` clean-check. */
+export interface VerifyResult extends IntegrityReport {
+  /** True when no integrity issues were detected. The clean-check. */
+  ok: boolean
+}
+
+/** (S-04): a canonical edge resolution for a (source, target) pair. */
+export interface EdgeResolution {
+  /** The canonical edge type for the pair, in this direction. */
+  type: UPGEdgeType
+}
+
 export class UPGClient {
   private readonly options: UPGClientOptions
   private store: UPGFileStore | null = null
   private loadPromise: Promise<void> | null = null
+  /**
+   *: when > 0, mutations DEFER their per-call auto-flush (one disk
+   * write per `transaction()` block instead of per mutation). Nested
+   * transactions are reference-counted; the outermost flushes once at the end.
+   */
+  private deferDepth = 0
 
   /** Node operations namespace. */
   readonly nodes: NodesAPI
   /** Edge operations namespace. */
   readonly edges: EdgesAPI
+  /** Schema introspection facade: valid children + canonical edges. */
+  readonly schema: SchemaAPI
+  /** Product-metadata operations: update stage / title. */
+  readonly product: ProductAPI
 
   constructor(options: UPGClientOptions) {
     this.options = options
     this.nodes = new NodesAPI(this)
     this.edges = new EdgesAPI(this)
+    this.schema = new SchemaAPI()
+    this.product = new ProductAPI(this)
+  }
+
+  /** @internal True while inside a `transaction()` block (defer flushes). */
+  get deferringFlush(): boolean {
+    return this.deferDepth > 0
+  }
+
+  /** @internal Flush unless we're inside a transaction. */
+  async maybeFlush(): Promise<void> {
+    if (this.deferDepth > 0) return
+    await this.flush()
+  }
+
+  /**
+   *: run a batch of mutations with a SINGLE disk write at the end.
+   * Inside the callback, every `nodes.create` / `edges.connect` / etc. defers
+   * its auto-flush; the block flushes once on success. On throw the partial
+   * in-memory changes are still flushed (the `.upg` is the source of truth and
+   * mutations are already applied to the store) and the error re-thrown.
+   *
+   * ```ts
+   * await upg.transaction(async () => {
+   *   const a = await upg.nodes.create({ type: 'persona', title: 'A' })
+   *   await upg.nodes.create({ type: 'job', title: 'J', parent_id: a.node.id })
+   * }) // one flush here
+   * ```
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    this.deferDepth++
+    try {
+      const result = await fn()
+      return result
+    } finally {
+      this.deferDepth--
+      if (this.deferDepth === 0) await this.flush()
+    }
   }
 
   /**
@@ -154,13 +226,29 @@ export class UPGClient {
   }
 
   /**
-   * Verify integrity of the loaded graph. Returns the integrity report from
-   * the last load + any in-memory mutation checks. `null` indicates no
-   * integrity issues were detected.
+   * Verify integrity of the loaded graph.
+   *
+   * (S-02): returns a report object with a top-level `ok: boolean` —
+   * `ok: true` means no integrity issues. The clean-check is `(await
+   * upg.verify()).ok`, NOT `if (await upg.verify())` (the report object is
+   * always truthy; the old JSDoc wrongly claimed it returned `null` when
+   * clean, so a naive truthiness check reported false problems).
+   *
+   * @returns `{ ok, tampered, quarantined, orphanedEdges }`. `ok` is the
+   * single clean-check; the other fields explain WHY when `ok` is false.
    */
-  async verify() {
+  async verify(): Promise<VerifyResult> {
     const store = await this.getStore()
-    return store.getIntegrityReport()
+    const report = store.getIntegrityReport()
+    if (!report) {
+      // No report computed yet (should not happen post-load) → treat as clean.
+      return { ok: true, tampered: false, quarantined: [], orphanedEdges: 0 }
+    }
+    const ok =
+      !report.tampered &&
+      report.orphanedEdges === 0 &&
+      report.quarantined.length === 0
+    return { ok, ...report }
   }
 
   /**
@@ -189,12 +277,28 @@ class NodesAPI {
   /**
    * Create a node. The `type` is validated against the UPG entity catalog:
    * deprecated aliases are accepted with a warning, genuinely unknown types
-   * throw `UnknownEntityTypeError`.
+   * throw `UnknownEntityTypeError`. An invalid `status` (not in the type's
+   * lifecycle phases) throws `WriteValidationError`. Unknown properties are
+   * stored with a warning unless `{ strict: true }`.
    */
   async create(args: CreateNodeArgs) {
     const store = await this.client.getStore()
     const result = createNodeOp(store, args)
-    await store.flush()
+    await this.client.maybeFlush()
+    return result
+  }
+
+  /**
+   *: create many nodes atomically in one call. Wraps the
+   * `batchCreateNodes` free function, so it supports `parent_ref` chaining
+   * (`"$0"`, `"$1"`) and an optional explicit `edges[]` array — all-or-nothing,
+   * one disk write. Returns `{ ok: false, error }` on validation failure
+   * (NOTHING is written) instead of throwing.
+   */
+  async createMany(args: BatchCreateArgs): Promise<BatchCreateResult> {
+    const store = await this.client.getStore()
+    const result = batchCreateNodesOp(store, args)
+    if (result.ok) await this.client.maybeFlush()
     return result
   }
 
@@ -204,26 +308,72 @@ class NodesAPI {
     return listNodesOp(store, options)
   }
 
-  /** Get a single node by id. Returns `undefined` if not found. */
-  async get(id: string): Promise<UPGBaseNode | undefined> {
+  /**
+   * Get a single node by id.
+   *
+   * (S-08): pass `{ withEdges: true }` to get the full
+   * `{ node, edges_out, edges_in }` shape the underlying `getNode` already
+   * computes (default `get(id)` returns just the node, as before, for
+   * back-compat). See also `inspect(id)`.
+   */
+  async get(id: string): Promise<UPGBaseNode | undefined>
+  async get(id: string, opts: { withEdges: true }): Promise<GetNodeResult | undefined>
+  async get(
+    id: string,
+    opts?: { withEdges?: boolean },
+  ): Promise<UPGBaseNode | GetNodeResult | undefined> {
     const store = await this.client.getStore()
     const result = getNodeOp(store, { node_id: id })
-    return result?.node
+    if (!result) return undefined
+    return opts?.withEdges ? result : result.node
   }
 
-  /** Update a node by id. Returns the updated node. */
-  async update(id: string, patch: Partial<UPGBaseNode>): Promise<UPGBaseNode> {
+  /**
+   * (S-08): deep-dive a node with its connections —
+   * `{ node, edges_out, edges_in }`. Returns `undefined` if not found.
+   */
+  async inspect(id: string): Promise<GetNodeResult | undefined> {
     const store = await this.client.getStore()
-    const updated = store.updateNode(id, patch)
-    await store.flush()
-    return updated
+    return getNodeOp(store, { node_id: id }) ?? undefined
+  }
+
+  /**
+   * Update a node by id. Validated with the same posture as `create`
+   *: invalid `status` throws `WriteValidationError`; unknown
+   * properties warn (or throw in `strict`).
+   *
+   *: pass `unset_properties: [...]` to DELETE property keys — writing
+   * `{ properties: { key: null } }` only stores a literal null, it can't remove
+   * the key. `unset_properties` runs after the `properties` merge.
+   *
+   * The legacy `update(id, { status, properties, ... })` form still works (the
+   * second arg is treated as the patch).
+   */
+  async update(
+    id: string,
+    patch: Partial<UPGBaseNode> & { unset_properties?: string[]; strict?: boolean },
+  ): Promise<UPGBaseNode> {
+    const store = await this.client.getStore()
+    const args: UpdateNodeArgs = {
+      node_id: id,
+      ...(patch.title !== undefined ? { title: patch.title } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.properties !== undefined ? { properties: patch.properties } : {}),
+      ...(patch.unset_properties !== undefined ? { unset_properties: patch.unset_properties } : {}),
+      ...(patch.strict !== undefined ? { strict: patch.strict } : {}),
+    }
+    const result = updateNodeOp(store, args)
+    await this.client.maybeFlush()
+    return result.node
   }
 
   /** Delete a node and all incident edges. */
   async delete(id: string) {
     const store = await this.client.getStore()
     const result = deleteNodeOp(store, { node_id: id })
-    await store.flush()
+    await this.client.maybeFlush()
     return result
   }
 }
@@ -232,8 +382,23 @@ class EdgesAPI {
   constructor(private readonly client: UPGClient) {}
 
   /**
-   * Connect two nodes with an edge. Edge type is inferred from source +
-   * target entity types if not provided.
+   * Connect two nodes with a directed edge `source → target`.
+   *
+   * **Edge type is INFERRED from `(source.type, target.type)` when `type` is
+   * omitted — and DIRECTION MATTERS.** `solution → feature` resolves to
+   * `solution_becomes_feature`; the reverse has no canonical edge. **Most type
+   * pairs have NO canonical edge** — for those `connect` returns an ERROR
+   * OBJECT, it does NOT throw:
+   *
+   *   - success → `{ edge, warning? }`
+   *   - failure → `{ error, no_canonical_edge_for? }`
+   *
+   * So handle the result as a union (inspect `.error`), not with try/catch.
+   * Passing an explicit `type` does NOT override direction: the type's declared
+   * source/target must still match the nodes (a "wrong-way" link is
+   * inexpressible — reorient the call). Use `upg.edges.resolve(srcType,
+   * tgtType)` or `upg.schema.edgeFor(a, b)` to discover the right edge/direction
+   * up front.
    */
   async connect(sourceId: string, targetId: string, opts: Partial<CreateEdgeArgs> = {}) {
     const store = await this.client.getStore()
@@ -243,8 +408,21 @@ class EdgesAPI {
       ...opts,
     }
     const result = createEdgeOp(store, args)
-    await store.flush()
+    // Only flush when an edge was actually created (success branch).
+    if ('edge' in result) await this.client.maybeFlush()
     return result
+  }
+
+  /**
+   * (S-04): resolve the canonical edge type for a directed
+   * `(sourceType → targetType)` pair, WITHOUT touching the graph. Returns
+   * `{ type }` or `null` when the pair has no canonical edge. Direction
+   * matters — `resolve('feature','solution')` and `resolve('solution',
+   * 'feature')` differ.
+   */
+  resolve(sourceType: string, targetType: string): EdgeResolution | null {
+    const type = pickCanonicalEdge(sourceType, targetType)
+    return type ? { type } : null
   }
 
   /** List edges, optionally filtered by source / target / type. */
@@ -261,7 +439,78 @@ class EdgesAPI {
   async delete(id: string) {
     const store = await this.client.getStore()
     const result = deleteEdgeOp(store, { edge_id: id })
-    await store.flush()
+    await this.client.maybeFlush()
     return result
+  }
+}
+
+/**
+ * (S-04): schema introspection facade. Answers the questions an author
+ * has to answer to build a VALID graph — "what can attach to a feature?",
+ * "which edge connects A→B?" — from the object you're already holding, instead
+ * of separately importing `@unified-product-graph/core`. All methods are pure
+ * (catalog reads); no graph state.
+ */
+class SchemaAPI {
+  /** Canonical edge types LEAVING `sourceType` (every `source → *` edge). */
+  edgesFrom(sourceType: string): Array<{ type: UPGEdgeType; target_type: string }> {
+    const out: Array<{ type: UPGEdgeType; target_type: string }> = []
+    for (const [key, def] of Object.entries(UPG_EDGE_CATALOG)) {
+      if (def.source_type !== sourceType) continue
+      if (def.source_type === '*' || def.target_type === '*') continue
+      out.push({ type: key as UPGEdgeType, target_type: def.target_type as string })
+    }
+    return out
+  }
+
+  /** Entity types that may be hierarchy children of `type`. */
+  validChildren(type: string): readonly string[] {
+    return getValidChildren(type)
+  }
+
+  /**
+   * Canonical edge for a directed `(a → b)` pair, or `null`. Alias of
+   * `upg.edges.resolve(...).type`, surfaced on `schema` for discoverability.
+   * Direction matters.
+   */
+  edgeFor(a: string, b: string): UPGEdgeType | null {
+    return pickCanonicalEdge(a, b)
+  }
+
+  /** Every catalogued edge for a directed `(a → b)` pair (may be > 1). */
+  allEdgesFor(a: string, b: string): UPGEdgeType[] {
+    return resolveAllEdges(a, b)
+  }
+}
+
+/**
+ *: product-metadata operations. The graph viewer showed `stage:
+ * unknown` because there was no way to set the product's stage through the
+ * client (only by editing the `.upg` JSON or the workspace-bootstrap
+ * `createProduct` free function). `product.update({ stage, title })` fixes that.
+ */
+class ProductAPI {
+  constructor(private readonly client: UPGClient) {}
+
+  /** Read the current product metadata. */
+  async get(): Promise<{ id?: string; title?: string; stage?: string } & Record<string, unknown>> {
+    const store = await this.client.getStore()
+    return store.getProduct() as { id?: string; title?: string; stage?: string } & Record<string, unknown>
+  }
+
+  /**
+   * Update product metadata (`stage`, `title`, and any additional fields).
+   * Merges over the existing product object and persists. Returns the updated
+   * product.
+   */
+  async update(
+    patch: { stage?: string; title?: string } & Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const store = await this.client.getStore()
+    const doc = store.getDocument()
+    doc.product = { ...doc.product, ...patch } as typeof doc.product
+    store.markDirty()
+    await this.client.maybeFlush()
+    return doc.product as unknown as Record<string, unknown>
   }
 }

@@ -418,10 +418,19 @@ function approachEnvelope(
  */
 export const plan: ToolHandler = (args, ctx): ToolResult => {
   const region = args.region as string | undefined
-  const result = executePlan(ctx.store, region)
+  const exhaustive = args.exhaustive as boolean | undefined
+  // (Seam 5): no-region plan scopes to the product's ACTIVE regions by
+  // default; whole-universe (312-type) scoring is opt-in via `exhaustive:true`.
+  const result = executePlan(ctx.store, { region, exhaustive })
+  // NOTE: the envelope's top-level `scope` is the region arg (its established
+  // meaning across all approach tools). The plan's scope-KIND (active_regions
+  // | region | exhaustive) is exposed separately as `plan_scope` to avoid
+  // colliding with that field.
   return approachEnvelope('plan', region ?? null, {
-    params: { region: region ?? null },
+    params: { region: region ?? null, exhaustive: exhaustive ?? false },
     region: result.region,
+    plan_scope: result.scope,
+    scoped_regions: result.scoped_regions,
     missing_entities: result.missing_entities,
     coverage_score: result.coverage_score,
     expected_count: result.expected_count,

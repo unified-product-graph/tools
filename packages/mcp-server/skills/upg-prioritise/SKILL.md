@@ -171,11 +171,11 @@ Always confirm before writing. Never silently mutate graph nodes.
 
 Pick ONE next move based on what the ranking revealed:
 
-- **If a clear winner emerged with an unclear implementation path:** "The top-ranked item has a clear priority but no epic yet. Want me to run `/upg-inspect` on it to see what's missing?"
-- **If a high-value item scored low on confidence:** "Low confidence on that one might mean the hypothesis hasn't been tested. Want to run `/upg-hypothesis` to design an experiment?"
+- **If a clear winner emerged with an unclear implementation path:** "The top-ranked item has a clear priority but no epic yet. Want me to run `/upg-show-entity` on it to see what's missing?"
+- **If a high-value item scored low on confidence:** "Low confidence on that one might mean the hypothesis hasn't been tested. Want to run `/upg-new-hypothesis` to design an experiment?"
 - **If items scored similarly and the user is unsure which to commit to:** "Close scores like these suggest a risk/opportunity lens might help. Want to try `/upg-reflect` with a Value vs Effort pre-mortem?"
 - **If the Won't list was surprising:** "Three items ended up in the Won't bucket; that's a useful decision record. Want me to capture them as explicit deferrals in the graph?"
-- **If the ranking feels complete and actionable:** "Prioritisation done. Want to `/upg-snapshot` so this ranking is preserved?"
+- **If the ranking feels complete and actionable:** "Prioritisation done. Want to `/upg-sync-snapshot` so this ranking is preserved?"
 
 After rendering your recommendation, call:
 `update_session_context({ skill_invoked: "upg-prioritise", recommendation: "<the next skill you recommended>" })`
@@ -192,4 +192,4 @@ After rendering your recommendation, call:
 
 Prioritise is one of the 5 canonical UPG approaches (`get_approach({ approach_id: "prioritise" })`). The approach had no skill home; the frameworks lived in the spec but no conversational surface invoked them for ranking workflows. This skill closes that gap.
 
-It is the only canonical entry point for the Prioritise approach in the user-invocable surface. Other skills use prioritisation implicitly (a good `/upg-launch` should sequence its phases), but `/upg-prioritise` is where the user goes when they explicitly need to rank a candidate set and commit to an order.
+It is the only canonical entry point for the Prioritise approach in the user-invocable surface. Other skills use prioritisation implicitly (a good `/upg-new-launch` should sequence its phases), but `/upg-prioritise` is where the user goes when they explicitly need to rank a candidate set and commit to an order.

@@ -5,7 +5,7 @@
  * and exposes the shared `PlaybookRuntime` contract, with a step resolver
  * that expands `domain_guide` steps via `DomainUsageGuide` at execution time.
  *
- * `/upg-explore` is the user-facing skill that drives this runtime.
+ * `/upg-walk-region` is the user-facing skill that drives this runtime.
  */
 
 import type {
@@ -123,7 +123,7 @@ export function createInMemoryCliRuntime(
 
 /**
  * The CLI runtime backed by the canonical playbook registry shipped in
- * `@unified-product-graph/core`. This is what `/upg-explore` reaches for;
+ * `@unified-product-graph/core`. This is what `/upg-walk-region` reaches for;
  * any playbook in the registry becomes instantly runnable on the CLI surface
  * with no extra code.
  */

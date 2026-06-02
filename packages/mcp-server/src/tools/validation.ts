@@ -870,7 +870,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
  * the lookup matches by type. Phase 1.x will promote to specific ids and the
  * matcher will tighten accordingly.
  *
- * Use case: `/upg-inspect <entity>` displays "this entity is implicated in
+ * Use case: `/upg-show-entity <entity>` displays "this entity is implicated in
  * N violations." Tightens the Inspect approach.
  *
  * @example

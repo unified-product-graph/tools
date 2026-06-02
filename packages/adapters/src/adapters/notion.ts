@@ -566,7 +566,7 @@ export class NotionAdapter implements UPGAdapter {
     // tools aren't directly callable from this adapter.
     throw new Error(
       'Notion adapter requires Notion MCP connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched pages via config.pages.',
+        'Use /upg-sync-import to connect, or pass pre-fetched pages via config.pages.',
     )
   }
 

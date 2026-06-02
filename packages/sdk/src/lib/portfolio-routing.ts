@@ -328,14 +328,24 @@ export interface PortfolioProductReference {
 
 /**
  * Ensure that a product is registered on `portfolio.upg.products[]`. No-op when
- * an entry with the same `id` already exists. Does NOT flush; caller flushes
- * once after registering both source and target products in a single pass.
+ * an entry with the same `id` already exists.
+ *
+ * (S-01): this MUTATES `doc.products` in place. Because `store.flush()`
+ * is a no-op unless the store is dirty, the documented "register then flush
+ * once" pattern previously DROPPED the append silently (the in-memory mutation
+ * was never flagged dirty). Pass the owning `store` and this flags it dirty for
+ * you — mirroring `writePortfolioScopedNode`, which flags dirty internally.
+ *
+ * If you can't pass the store, call `store.markDirty()` yourself BEFORE
+ * `flush()`. The 2-arg form is retained for back-compat but is the footgun;
+ * prefer the 3-arg form.
  *
  * @returns true when a new entry was appended, false when already present.
  */
 export function registerProductOnPortfolio(
   doc: UPGPortfolioDocument,
   ref: PortfolioProductReference,
+  store?: { markDirty: () => void },
 ): boolean {
   if (!ref.id) return false
   // The spec types `products` as `Array<UPGProduct & { nodes; edges }>` but at
@@ -348,6 +358,8 @@ export function registerProductOnPortfolio(
   if (ref.file_path) entry.file_path = ref.file_path
   if (ref.title) entry.title = ref.title
   products.push(entry)
+  //: flag the store dirty so the in-memory append survives flush().
+  store?.markDirty()
   return true
 }
 

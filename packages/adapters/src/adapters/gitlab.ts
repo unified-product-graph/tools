@@ -168,7 +168,7 @@ export class GitLabAdapter implements UPGAdapter {
     // tools aren't directly callable from this adapter.
     throw new Error(
       'GitLab adapter requires GitLab API access or MCP connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched items via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched items via config.items.',
     )
   }
 

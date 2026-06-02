@@ -10,7 +10,7 @@ import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
 import { UPG_EDGE_CATALOG } from '@unified-product-graph/core'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
-import { validateEdgeTypePair } from '@unified-product-graph/sdk'
+import { validateExplicitEdgeType } from '@unified-product-graph/sdk'
 import { preflightPayload } from '../lib/payload-guard.js'
 import { buildResolverHints } from '@unified-product-graph/sdk'
 import {
@@ -233,16 +233,20 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
     }
 
     if (e.type) {
-      // Catalog pair validation when the type is canonical. F1 (2026-05-20).
-      // Non-canonical types fall through; they're still surfaced by
-      // validate_graph as edge_drift.
-      const pairCheck = validateEdgeTypePair(
+      // (Seam 1): STRICT explicit-type validation via the SAME SDK
+      // validator single `create_edge` uses — catalog membership AND pair
+      // check. Previously this only called `validateEdgeTypePair`, which
+      // returns valid:true for unknown types, so a made-up `type:"banana"`
+      // slipped through batch while single create_edge rejected it. One pass,
+      // every caller. Non-catalog types are now rejected here, not silently
+      // accepted and deferred to validate_graph edge_drift.
+      const typeCheck = validateExplicitEdgeType(
         e.type as string,
         sourceNode.type as string,
         targetNode.type as string,
       )
-      if (!pairCheck.valid) {
-        return textError(`Edge at index ${i}: ${pairCheck.reason}`)
+      if (typeCheck.errors.length > 0) {
+        return textError(`Edge at index ${i}: ${typeCheck.errors.join(' ')}`)
       }
       resolvedEdgeTypes.push(e.type as UPGEdgeType)
     } else {

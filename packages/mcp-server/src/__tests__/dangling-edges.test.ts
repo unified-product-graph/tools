@@ -157,13 +157,15 @@ describe('classifyDanglingEdges', () => {
 })
 
 describe('renderDanglingReport', () => {
- it('returns null when there are no dangling edges', () => {
+ it('returns the clean-case integrity report when there are no dangling edges', () => {
+ // (S-02): renderDanglingReport no longer returns null on a clean
+ // graph; it returns an explicit integrity-report string.
  expect(
  renderDanglingReport(
  { total: 0, by_class: { expected: 0, suspect: 0, corrupt: 0 }, edges: [] },
  '/tmp/x.upg',
  ),
- ).toBeNull()
+ ).toBe('.upg integrity report (/tmp/x.upg): no dangling edges.')
  })
 
  it('renders a multi-line report classifying each class', () => {

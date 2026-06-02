@@ -160,7 +160,7 @@ export class QuantiveAdapter implements UPGAdapter {
     // access isn't directly available from this adapter.
     throw new Error(
       'Quantive adapter requires Quantive API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched entities via config.items.',
+        'Use /upg-sync-import to connect, or pass pre-fetched entities via config.items.',
     )
   }
 

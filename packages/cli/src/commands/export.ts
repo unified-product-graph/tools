@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
+import { die, violation } from '../lib/errors.js'
 
 export const exportCommand = new Command('export')
   .description('Export entities as JSON, Markdown, or CSV.')
@@ -43,7 +44,10 @@ export const exportCommand = new Command('export')
         }
       }
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      // Invalid document = validation violation (exit 2); other load failures
+      // = runtime error (exit 1). Matches verify (CLI-FEEDBACK #6).
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.startsWith('Invalid UPG document')) die(violation(msg))
+      die(err)
     }
   })

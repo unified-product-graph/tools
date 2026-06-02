@@ -2,6 +2,17 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.2] - 2026-06-02
+
+Co-version with the @unified-product-graph/* 0.8.2 release train.
+
+### Changed
+- Tool handlers now enforce the shared write-validation policy directly: `batch_create_edges` rejects invalid edge types, `update_node` honours property unset and rejects invalid status, and session-context updates reject invalid lenses.
+- Bundled skills renamed to a consistent verb-based grammar and reworked to be MCP-first: schemas, lifecycles, and edges are fetched from the server before writes rather than hard-coded.
+
+### Added
+- `skill_audit` all-mode for full-surface review.
+
 ## [0.7.6] - 2026-05-30
 
 ### Added

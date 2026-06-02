@@ -15,8 +15,9 @@
 import { Command } from 'commander'
 import * as fs from 'node:fs/promises'
 import chalk from 'chalk'
-import { formatUpgText, isCanonical } from '@unified-product-graph/core'
+import { formatUpgText } from '@unified-product-graph/core'
 import { discoverUPGFile } from '../lib/graph.js'
+import { EXIT, die } from '../lib/errors.js'
 
 export const fmtCommand = new Command('fmt')
   .description('Rewrite .upg files to canonical form (byte-stable, diff-friendly).')
@@ -64,21 +65,22 @@ export const fmtCommand = new Command('fmt')
       }
 
       if (opts.check) {
+        // A read/parse error is a runtime failure (exit 1) and takes priority.
+        if (errored > 0) process.exit(EXIT.RUNTIME)
         if (nonCanonical.length > 0) {
           console.error(chalk.red(`\n${nonCanonical.length} file(s) not in canonical form:`))
           for (const f of nonCanonical) console.error(`  ${f}`)
           console.error(chalk.dim('\nRun `upg fmt` to fix.'))
-          process.exit(1)
+          // Non-canonical = policy violation → exit 2 (CLI-FEEDBACK #6, S4).
+          process.exit(EXIT.VIOLATION)
         }
-        if (errored > 0) process.exit(2)
         console.log(chalk.green(`${targets.length} file(s) already canonical.`))
         return
       }
 
-      if (errored > 0) process.exit(2)
+      if (errored > 0) process.exit(EXIT.RUNTIME)
       console.log(chalk.dim(changed === 0 ? 'Nothing to format; already canonical.' : `Formatted ${changed} file(s).`))
     } catch (err) {
-      console.error((err as Error).message)
-      process.exit(2)
+      die(err)
     }
   })

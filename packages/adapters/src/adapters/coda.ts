@@ -378,7 +378,7 @@ export class CodaAdapter implements UPGAdapter {
     // access isn't directly available from this adapter.
     throw new Error(
       'Coda adapter requires Coda API connection. ' +
-        'Use /upg-import to connect, or pass pre-fetched rows via config.rows.',
+        'Use /upg-sync-import to connect, or pass pre-fetched rows via config.rows.',
     )
   }
 
