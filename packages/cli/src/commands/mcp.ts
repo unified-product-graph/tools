@@ -74,8 +74,11 @@ export function detectMcpCommand(commandOverride?: string): McpServerEntry {
     return { command: 'node', args: ['./packages/upg-mcp-server/dist/index.js'] }
   }
 
-  // 3. Default: npx the published server package directly.
-  return { command: 'npx', args: ['-y', '@unified-product-graph/mcp-server'] }
+  // 3. Default: npx the published server package directly. Pin @latest so npx
+  // resolves the newest release on launch instead of serving a stale cached
+  // version after a publish (the npx-cache skew gotcha field-reported on 0.8.4).
+  // Editing the entry to pin a specific version is supported for reproducibility.
+  return { command: 'npx', args: ['-y', '@unified-product-graph/mcp-server@latest'] }
 }
 
 // ── Settings file helpers ─────────────────────────────────────────────────────

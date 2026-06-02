@@ -1,6 +1,23 @@
 # Changelog
 
-Changes to `@unified-product-graph/mcp` follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Changes to `@unified-product-graph/cli` follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.8.5] - 2026-06-02
+
+Field-report fast-follow (tester report on 0.8.4).
+
+### Fixed
+- `upg install-skills` recorded the manifest version as `0.0.0` (it checked the pre-split package name `@unified-product-graph/mcp`); it now reads `@unified-product-graph/cli`. The stale "reinstall @unified-product-graph/mcp" error message is corrected too.
+- README: removed dead `@unified-product-graph/mcp` package references from the get-started, npx, and CI/CD examples (that package does not exist; the `upg` bin ships in `@unified-product-graph/cli`), and a stray "cloud sync" phrase left over from the removed Cloud group. A drift test now guards against the dead name.
+
+### Added
+- Per-command help for `upg apply` / `upg score`: `--help` now shows usage, options, and examples instead of falling back to the top-level help.
+
+### Changed
+- `upg mcp setup` writes `npx -y @unified-product-graph/mcp-server@latest`, so npx resolves the newest server on launch instead of serving a stale cached build after a publish (the npx-cache skew gotcha). Pin a version by hand for reproducible team setups.
+
+### Note
+- Bundled skills use a verb-first grammar (renamed in 0.8.x). After upgrading, run `upg install-skills --force` to refresh your local skill set.
 
 ## [0.8.4] - 2026-06-02
 

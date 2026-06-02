@@ -7,7 +7,8 @@
  */
 
 import { existsSync, lstatSync, readlinkSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { text, type ToolHandler, type ToolResult } from '../lib/server-context.js'
 
 /** Per-skill audit record returned by `skill_audit`. */
@@ -50,8 +51,55 @@ function canonicalisePath(p: string): string {
   }
 }
 
+/** Does `candidate` look like a skills bundle (>=1 subdir with a SKILL.md)? */
+function isSkillsDir(candidate: string): boolean {
+  try {
+    if (!existsSync(candidate)) return false
+    return readdirSync(candidate, { withFileTypes: true }).some(
+      (e) => (e.isDirectory() || e.isSymbolicLink()) && existsSync(join(candidate, e.name, 'SKILL.md')),
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Resolve the bundled skills dir relative to THIS module (not cwd). Mirrors the
+ * CLI's `resolveSkillsSource`: when the server runs from an npm/npx install, its
+ * skills ship inside the package (`<pkg-root>/skills`), reachable from the
+ * compiled module location even though `process.cwd()` is the user's project.
+ */
+function resolveBundledSkillsDir(): string | null {
+  let md: string
+  try {
+    md = dirname(fileURLToPath(import.meta.url))
+  } catch {
+    md = process.cwd()
+  }
+  for (const c of [resolve(md, '..', 'skills'), resolve(md, '..', '..', 'skills'), resolve(md, 'skills')]) {
+    if (isSkillsDir(c)) return c
+  }
+  let dir = md
+  for (let i = 0; i < 12; i++) {
+    const mono = join(dir, 'packages', 'upg-mcp-server', 'skills')
+    if (isSkillsDir(mono)) return mono
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return null
+}
+
 function sourceSkillsDir(): string {
-  return resolve(repoRoot(), 'packages/upg-mcp-server/skills')
+  // Dev + tests run from the monorepo root (or a fixture cwd) where this exists.
+  const cwdPath = resolve(repoRoot(), 'packages/upg-mcp-server/skills')
+  if (existsSync(cwdPath)) return cwdPath
+  // Published / npx: the server runs from the user's project, so cwd has no
+  // monorepo source. The canonical source is the skills bundled in the installed
+  // package, resolved relative to this module. Without this, skill_audit diffs
+  // every deployed skill against a monorepo path that does not exist in a user's
+  // project and false-reports them all as out of sync.
+  return resolveBundledSkillsDir() ?? cwdPath
 }
 
 function deployedSkillsDir(): string {
@@ -114,6 +162,27 @@ function auditOne(name: string): SkillAuditRecord {
   if (!sourceExists) issues.push('Canonical source SKILL.md is missing')
   if (!deployedExists) issues.push('Deployed SKILL.md is missing; run ./scripts/link-skills.sh')
 
+  // Content match is the real signal: does the file the user runs equal the
+  // canonical source? Compute it first so the deployment-method warnings below
+  // fire only on real drift. A symlink to a different but byte-identical bundle
+  // (the CLI's skills vs the mcp-server's), or a matching copy, is how a healthy
+  // npm/npx install looks and must not be flagged.
+  let inSync = false
+  let deployedFrontmatter: Record<string, unknown> | null = null
+  let deployedFirstHeading: string | null = null
+  if (deployedExists) {
+    const deployedBody = readFileSync(deployedPath, 'utf8')
+    deployedFrontmatter = parseFrontmatter(deployedBody)
+    deployedFirstHeading = firstHeading(deployedBody)
+    if (sourceExists) {
+      const sourceBody = readFileSync(sourcePath, 'utf8')
+      inSync = deployedBody === sourceBody
+      if (!inSync) {
+        issues.push('Deployed SKILL.md differs from canonical source; symlink is stale or broken')
+      }
+    }
+  }
+
   let isSymlink = false
   let symlinkTarget: string | null = null
   if (existsSync(deployedDir)) {
@@ -121,34 +190,19 @@ function auditOne(name: string): SkillAuditRecord {
     isSymlink = stat.isSymbolicLink()
     if (isSymlink) {
       symlinkTarget = readlinkSync(deployedDir)
-      // Canonicalise both sides before comparing; on macOS, /tmp ↔ /private/tmp
-      // and other symlink-in-path situations make a string compare unreliable.
-      const targetReal = canonicalisePath(symlinkTarget)
-      const expectedReal = canonicalisePath(sourceDir)
-      if (targetReal !== expectedReal) {
-        issues.push(`Symlink points to ${symlinkTarget}, expected ${sourceDir}`)
+      // Only flag a target mismatch when the bytes ALSO differ. Canonicalise
+      // both sides first; on macOS /tmp vs /private/tmp and other
+      // symlink-in-path situations make a string compare unreliable.
+      if (!inSync && sourceExists) {
+        const targetReal = canonicalisePath(symlinkTarget)
+        const expectedReal = canonicalisePath(sourceDir)
+        if (targetReal !== expectedReal) {
+          issues.push(`Symlink points to ${symlinkTarget}, expected ${sourceDir}`)
+        }
       }
-    } else if (deployedExists) {
+    } else if (deployedExists && !inSync) {
       issues.push('Deployed entry is a real directory, not a symlink; stale copy will not pick up source updates; run ./scripts/link-skills.sh')
     }
-  }
-
-  let inSync = false
-  let deployedFrontmatter: Record<string, unknown> | null = null
-  let deployedFirstHeading: string | null = null
-  if (deployedExists && sourceExists) {
-    const deployedBody = readFileSync(deployedPath, 'utf8')
-    const sourceBody = readFileSync(sourcePath, 'utf8')
-    inSync = deployedBody === sourceBody
-    deployedFrontmatter = parseFrontmatter(deployedBody)
-    deployedFirstHeading = firstHeading(deployedBody)
-    if (!inSync) {
-      issues.push('Deployed SKILL.md differs from canonical source; symlink is stale or broken')
-    }
-  } else if (deployedExists) {
-    const deployedBody = readFileSync(deployedPath, 'utf8')
-    deployedFrontmatter = parseFrontmatter(deployedBody)
-    deployedFirstHeading = firstHeading(deployedBody)
   }
 
   return {

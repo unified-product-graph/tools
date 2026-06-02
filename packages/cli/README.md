@@ -13,7 +13,7 @@ The `upg` CLI — local-first governance, CRUD, and analysis for `.upg` files, p
 ## Get started in 60 seconds
 
 ```bash
-npm install -g @unified-product-graph/mcp
+npm install -g @unified-product-graph/cli
 upg init --title "My Product"    # create a .upg file in the current directory
 upg install-skills               # install UPG skills into Claude Code
 # wire the MCP server (see "MCP server setup" below)
@@ -23,14 +23,14 @@ upg install-skills               # install UPG skills into Claude Code
 Or run without installing:
 
 ```bash
-npx @unified-product-graph/mcp health
+npx @unified-product-graph/cli health
 ```
 
 ## Two surfaces
 
 The package ships two surfaces against the same `.upg` file.
 
-**CLI (`upg <command>`)** governs the file: CI gates, CRUD, cloud sync, scripts, pre-commit hooks.
+**CLI (`upg <command>`)** governs the file: CI gates, CRUD, governance, scripts, pre-commit hooks.
 
 **MCP server** surfaces the file to Claude Code as AI-native tools: exploration, entity creation, strategic analysis, playbooks.
 
@@ -45,7 +45,7 @@ Wire the MCP server once per project. 1 file, 1 entry.
   "mcpServers": {
     "unified-product-graph": {
       "command": "npx",
-      "args": ["-y", "@unified-product-graph/mcp-server"],
+      "args": ["-y", "@unified-product-graph/mcp-server@latest"],
       "env": {
         "UPG_FILE": ".upg/product.upg"
       }
@@ -55,6 +55,8 @@ Wire the MCP server once per project. 1 file, 1 entry.
 ```
 
 `.mcp.json` at the project root is the file Claude Code reads for project-scoped MCP servers — commit it so the team shares the config. Point `UPG_FILE` at your `.upg` file (optional; the server auto-discovers).
+
+The `@latest` tag matters: `npx` caches by package name, so without it a machine that ran an earlier version keeps launching that cached build after you publish a new one. `@latest` makes npx resolve the newest release each launch. Pin a specific version instead (e.g. `@unified-product-graph/mcp-server@0.8.5`) if you want reproducible, locked behaviour across a team.
 
 Or let the CLI write it:
 
@@ -177,9 +179,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npx @unified-product-graph/mcp health --min-score=50
-      - run: npx @unified-product-graph/mcp verify --no-orphans --max-orphan-rate=0.15
-      - run: npx @unified-product-graph/mcp diff --since=origin/main --summary
+      - run: npx @unified-product-graph/cli@latest health --min-score=50
+      - run: npx @unified-product-graph/cli@latest verify --no-orphans --max-orphan-rate=0.15
+      - run: npx @unified-product-graph/cli@latest diff --since=origin/main --summary
 ```
 
 Governance commands read the `.upg` file directly. CI runs skip MCP setup.
@@ -189,7 +191,7 @@ Governance commands read the `.upg` file directly. CI runs skip MCP setup.
 ```bash
 #!/bin/sh
 if git diff --cached --name-only | grep -q '\.upg$'; then
-  npx @unified-product-graph/mcp verify --no-orphans || exit 1
+  npx @unified-product-graph/cli@latest verify --no-orphans || exit 1
 fi
 ```
 

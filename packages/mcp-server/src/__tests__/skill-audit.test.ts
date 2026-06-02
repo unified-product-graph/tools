@@ -173,3 +173,38 @@ describe(': skill_audit reports source-vs-deployed status', () => {
     expect(skills.map((s) => s.name).sort()).toEqual(['ro-healthy', 'ro-mutation'])
   })
 })
+
+describe('0.8.5: skill_audit tolerates published-install symlinks (no false alarm)', () => {
+  let fixtureRoot: string
+  let originalCwd: string
+
+  beforeEach(() => {
+    originalCwd = process.cwd()
+    fixtureRoot = mkdtempSync(join(tmpdir(), 'upg-skill-audit-pub-'))
+    // Canonical monorepo source (what skill_audit diffs against in-repo)
+    mkdirSync(join(fixtureRoot, 'packages/upg-mcp-server/skills/ro-healthy'), { recursive: true })
+    writeFileSync(join(fixtureRoot, 'packages/upg-mcp-server/skills/ro-healthy/SKILL.md'), HEALTHY_SKILL_BODY)
+    // A separate, byte-identical "bundle" standing in for the CLI's bundled skills
+    mkdirSync(join(fixtureRoot, 'bundle/ro-healthy'), { recursive: true })
+    writeFileSync(join(fixtureRoot, 'bundle/ro-healthy/SKILL.md'), HEALTHY_SKILL_BODY)
+    // Deployed symlink points at the BUNDLE, not the monorepo source path — the
+    // shape of a real npm/npx install (install-skills links to the package bundle).
+    mkdirSync(join(fixtureRoot, '.claude/skills'), { recursive: true })
+    symlinkSync(join(fixtureRoot, 'bundle/ro-healthy'), join(fixtureRoot, '.claude/skills/ro-healthy'))
+    process.chdir(fixtureRoot)
+  })
+
+  afterEach(() => {
+    process.chdir(originalCwd)
+    rmSync(fixtureRoot, { recursive: true, force: true })
+  })
+
+  it('a symlink to a different but byte-identical bundle is in_sync with no issues', async () => {
+    const ctx = makeCtx(await loadStore())
+    const result = skillAudit({ name: 'ro-healthy' }, ctx)
+    const s = readSkills(result)[0]
+    expect(s.is_symlink).toBe(true)
+    expect(s.in_sync).toBe(true)
+    expect(s.issues).toEqual([])
+  })
+})

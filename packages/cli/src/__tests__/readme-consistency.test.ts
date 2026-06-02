@@ -44,4 +44,10 @@ describe('bundled CLI README stays consistent with the binary', () => {
     expect(readme).toContain('upg apply')
     expect(readme).toContain('upg score')
   })
+
+  it('does not reference the dead @unified-product-graph/mcp package (it is cli + mcp-server now)', () => {
+    // Matches the bare package name but not @unified-product-graph/mcp-server
+    // or .../mcp-tooling. The install -g / npx / CI examples had regressed to it.
+    expect(readme).not.toMatch(/@unified-product-graph\/mcp(?![-\w])/)
+  })
 })

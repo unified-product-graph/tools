@@ -310,6 +310,34 @@ export const helpTopics: Record<string, HelpEntry> = {
     ],
     seeAlso: 'upg create',
   },
+  apply: {
+    usage: 'upg apply <framework> [entity-ids...] [options]',
+    summary: 'Run a framework over entities: creates a framework_exercise and an includes edge to each. The result lives on the edge, so the same entity can be scored in many exercises and any entity type can be scored.',
+    options: [
+      FILE_OPT, JSON_OPT,
+      { flag: '--title <title>', desc: 'Human label for the exercise (default "<Framework> exercise")' },
+      { flag: '--status <status>', desc: 'Lifecycle phase: draft | active | archived (default draft)' },
+    ],
+    examples: [
+      { cmd: 'upg apply moscow feat_sso feat_dark --title "Q3 Release Scope"', comment: 'prints the exercise id' },
+      { cmd: 'upg apply rice-scoring opp_onboarding', comment: 'an exercise can score any entity type' },
+    ],
+    seeAlso: 'upg score, upg list --type framework_exercise',
+  },
+  score: {
+    usage: 'upg score <exercise-id> <entity-id> --data <json> [options]',
+    summary: "Record a framework's result for one entity on the exercise's includes edge (a MoSCoW bucket, a RICE score). Auto-includes the entity if it is not yet in scope.",
+    options: [
+      FILE_OPT, JSON_OPT,
+      { flag: '--data <json>', desc: 'Required. Result as JSON, e.g. \'{"moscow":"must"}\' or \'{"reach":800,"impact":3}\'' },
+      { flag: '--replace', desc: 'Replace the edge properties instead of merging into them' },
+    ],
+    examples: [
+      { cmd: 'upg score n_fx_q3 feat_sso --data \'{"moscow":"must"}\'' },
+      { cmd: 'upg score n_fx_q3 feat_dark --data \'{"moscow":"could"}\'' },
+    ],
+    seeAlso: 'upg apply',
+  },
   gaps: {
     usage: 'upg gaps [options]',
     summary: 'Surface empty domains, broken chains, and sparse areas.',

@@ -46,7 +46,7 @@ describe('detectMcpCommand', () => {
       expect(result.command).toBe('node')
       expect(result.args).toEqual(['./packages/upg-mcp-server/dist/index.js'])
     } else {
-      expect(result).toEqual({ command: 'npx', args: ['-y', '@unified-product-graph/mcp-server'] })
+      expect(result).toEqual({ command: 'npx', args: ['-y', '@unified-product-graph/mcp-server@latest'] })
     }
   })
 })

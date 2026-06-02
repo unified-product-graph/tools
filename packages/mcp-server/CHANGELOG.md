@@ -2,6 +2,16 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.5] - 2026-06-02
+
+Field-report fast-follow (tester report on 0.8.4).
+
+### Fixed
+- `skill_audit` no longer false-reports skills as out of sync on npm/npx installs. It resolved the canonical source from `process.cwd()/packages/upg-mcp-server/skills` — a monorepo-only path absent in a user's project — so every deployed skill came back unverifiable. It now resolves the skills bundled in the installed package (relative to the module), and treats a symlink to a byte-identical bundle, or a matching copy, as healthy: content match, not deployment method, is the signal.
+
+### Changed
+- The `prioritise` `type_mismatch` hint now points to the framework_exercise escape hatch (`apply_framework` / `upg apply`, then prioritise with `exercise_id`), so scoring a non-target entity type is discoverable.
+
 ## [0.8.4] - 2026-06-02
 
 Framework exercises, with the 0.8.3 launch fix folded in.

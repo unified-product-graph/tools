@@ -145,7 +145,10 @@ function readCliVersion(entry: string = getEntryFilename()): string {
   for (const c of candidates) {
     try {
       const pkg = JSON.parse(fs.readFileSync(c, 'utf-8'))
-      if (pkg?.name === '@unified-product-graph/mcp' && typeof pkg.version === 'string') return pkg.version
+      // This command ships in @unified-product-graph/cli; the old check used the
+      // pre-split name @unified-product-graph/mcp, which never matched, so the
+      // manifest recorded version 0.0.0.
+      if (pkg?.name === '@unified-product-graph/cli' && typeof pkg.version === 'string') return pkg.version
     } catch { /* try next */ }
   }
   return '0.0.0'
@@ -305,7 +308,7 @@ export async function runInstallSkills(opts: RunOptions): Promise<RunResult> {
     throw new Error(
       'Could not locate bundled skills. If running from the monorepo, ensure ' +
       '`packages/upg-mcp-server/skills/` exists. If installed from npm, the ' +
-      'package may be missing its `skills/` directory. Try reinstalling @unified-product-graph/mcp.',
+      'package may be missing its `skills/` directory. Try reinstalling @unified-product-graph/cli.',
     )
   }
 

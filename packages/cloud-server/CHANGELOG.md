@@ -4,6 +4,10 @@ All notable changes to `@unified-product-graph/cloud-server` are documented in t
 
 This package co-versions with `@unified-product-graph/core` and `@unified-product-graph/mcp-server`. One version line covers the spec and both reference implementations.
 
+## 0.8.5 · 2026-06-02 · Field-report fast-follow
+
+Co-version with the `@unified-product-graph/*` 0.8.5 fast-follow (skill_audit source resolution + CLI/docs consistency + npx-cache fix, led by `cli`/`mcp-server`). No cloud-server surface change; co-versioned for a clean install matrix.
+
 ## 0.8.4 · 2026-06-02 · Framework exercises train
 
 Co-version with the `@unified-product-graph/*` 0.8.4 release train (framework exercises led by `core`/`sdk`/`mcp-server`, folding the 0.8.3 CLI/MCP wiring fixes). No cloud-server surface change; co-versioned for a clean install matrix.

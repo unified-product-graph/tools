@@ -181,7 +181,9 @@ export function executePrioritise(
         hint:
           `${framework.id} scores ${targetTypes.join(' / ')}; ` +
           `${breakdown} candidate(s) are a different type. ` +
-          `Pass ${targetTypes.join('/')} candidates, or use a framework that targets ${[...byType.keys()].join('/')}.`,
+          `Pass ${targetTypes.join('/')} candidates, use a framework that targets ${[...byType.keys()].join('/')}, ` +
+          `or run a framework_exercise over them (apply_framework / 'upg apply', then prioritise with exercise_id) ` +
+          `to score any entity type from the exercise's edges.`,
       }
     }
   }
