@@ -27,8 +27,11 @@ import {
   renderDanglingReport,
   registerProductOnPortfolio,
 } from '../index.js'
-import { UPG_FRAMEWORKS_BY_ID } from '@unified-product-graph/frameworks'
-import { validateProductStageStrict } from '@unified-product-graph/core'
+// Frameworks are asserted against the CANONICAL public surface (core), the
+// surface the mcp-server/CLI actually serve at runtime — not the raw internal
+// @unified-product-graph/frameworks research catalog. 0.8.6 broadened RICE/ICE/
+// WSJF/cost-of-delay declared targets here; the tests must verify that surface.
+import { UPG_FRAMEWORKS_BY_ID, validateProductStageStrict } from '@unified-product-graph/core'
 
 // A connected, well-formed graph: persona → job → need, solution → feature, etc.
 function fixtureDoc() {
@@ -176,11 +179,13 @@ describe(' prioritise type guard', () => {
   it('returns a clear type_mismatch (not a div-by-zero) for wrong-type candidates', async () => {
     const store = await freshStore()
     const rice = UPG_FRAMEWORKS_BY_ID['rice-scoring']!
-    const r = executePrioritise(rice, ['n_opp'], store) // opportunity, not feature
+    // n_sol is a `solution` — NOT one of RICE's targets (feature/opportunity/need
+    // after the 0.8.6 broadening), so the guard must still fire loud.
+    const r = executePrioritise(rice, ['n_sol'], store)
     expect(r.kind).toBe('type_mismatch')
     if (r.kind === 'type_mismatch') {
       expect(r.target_entity_types).toContain('feature')
-      expect(r.hint).toMatch(/opportunity/)
+      expect(r.hint).toMatch(/solution/)
     }
   })
 
@@ -190,6 +195,16 @@ describe(' prioritise type guard', () => {
     // give the feature rice props so it computes
     updateNode(store, { node_id: 'n_feat', properties: { reach: 100, impact: 2, confidence: 1, effort: 4 } })
     const r = executePrioritise(rice, ['n_feat'], store)
+    expect(r.kind).toBe('execution')
+  })
+
+  it('0.8.6: RICE now scores an opportunity directly (broadened target)', async () => {
+    const store = await freshStore()
+    const rice = UPG_FRAMEWORKS_BY_ID['rice-scoring']!
+    // n_opp is an `opportunity` carrying RICE inputs in the fixture; broadening
+    // makes it a first-class target, so the direct path computes (no exercise).
+    expect(rice.data.computed_properties?.some((c) => c.entity_type === 'opportunity')).toBe(true)
+    const r = executePrioritise(rice, ['n_opp'], store)
     expect(r.kind).toBe('execution')
   })
 })

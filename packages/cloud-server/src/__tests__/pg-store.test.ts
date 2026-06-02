@@ -397,6 +397,78 @@ describe('UPGPgStore', () => {
       const insertedId = findQuery(queries, 'INSERT INTO upg.edges').values[0] as string
       expect(insertedId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
     })
+
+    it('persists gated edge properties as JSONB (0.8.6)', async () => {
+      const { pool, queries } = createMockPool(
+        new Map([['INSERT INTO upg.edges', { rows: [] }]]),
+      )
+      const store = new UPGPgStore(pool)
+
+      await store.addEdge('p1', {
+        id: 'e_1',
+        source: 'n_a',
+        target: 'n_b',
+        type: 'framework_exercise_includes_node' as UPGEdge['type'],
+        properties: { moscow: 'must' },
+      })
+
+      const insert = findQuery(queries, 'INSERT INTO upg.edges')
+      expect(insert.text).toContain('properties')
+      expect(insert.values[5]).toBe(JSON.stringify({ moscow: 'must' })) // payload at $6
+    })
+
+    it('writes a NULL payload when an edge carries no properties', async () => {
+      const { pool, queries } = createMockPool(
+        new Map([['INSERT INTO upg.edges', { rows: [] }]]),
+      )
+      const store = new UPGPgStore(pool)
+      await store.addEdge('p1', {
+        id: 'e_1',
+        source: 'n_a',
+        target: 'n_b',
+        type: 'persona_pursues_job',
+      })
+      expect(findQuery(queries, 'INSERT INTO upg.edges').values[5]).toBeNull()
+    })
+  })
+
+  describe('setEdgeProperties()', () => {
+    it('merges via JSONB || by default and returns the updated edge', async () => {
+      const updated = { id: 'e_1', product_id: 'p1', source: 'n_a', target: 'n_b', type: 'framework_exercise_includes_node', properties: { reach: 800, impact: 3 } }
+      const { pool, queries } = createMockPool(
+        new Map([['UPDATE upg.edges', { rows: [updated] }]]),
+      )
+      const store = new UPGPgStore(pool)
+
+      const edge = await store.setEdgeProperties('e_1', { impact: 3 })
+
+      const update = findQuery(queries, 'UPDATE upg.edges')
+      expect(update.text).toContain("COALESCE(properties, '{}'::jsonb) || $1::jsonb")
+      expect(update.values[0]).toBe(JSON.stringify({ impact: 3 }))
+      expect(update.values[1]).toBe('e_1')
+      expect(edge.properties).toEqual({ reach: 800, impact: 3 })
+      expect(wroteAudit(queries), 'setEdgeProperties must write an audit row').toBe(true)
+    })
+
+    it('replaces the payload wholesale when merge:false', async () => {
+      const updated = { id: 'e_1', product_id: 'p1', source: 'n_a', target: 'n_b', type: 'framework_exercise_includes_node', properties: { moscow: 'could' } }
+      const { pool, queries } = createMockPool(
+        new Map([['UPDATE upg.edges', { rows: [updated] }]]),
+      )
+      const store = new UPGPgStore(pool)
+
+      await store.setEdgeProperties('e_1', { moscow: 'could' }, { merge: false })
+
+      const update = findQuery(queries, 'UPDATE upg.edges')
+      expect(update.text).toContain('SET properties = $1::jsonb')
+      expect(update.text).not.toContain('COALESCE')
+    })
+
+    it('throws when the edge does not exist', async () => {
+      const { pool } = createMockPool(new Map([['UPDATE upg.edges', { rows: [] }]]))
+      const store = new UPGPgStore(pool)
+      await expect(store.setEdgeProperties('missing', { x: 1 })).rejects.toThrow(/Edge not found/)
+    })
   })
 
   describe('removeEdge()', () => {

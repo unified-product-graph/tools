@@ -489,7 +489,7 @@ export class UPGPgStore {
 
   async getAllEdges(productId: string): Promise<UPGEdge[]> {
     const { rows } = await this.pool.query(
-      `SELECT id, source, target, type FROM upg.edges WHERE product_id = $1`,
+      `SELECT id, source, target, type, properties FROM upg.edges WHERE product_id = $1`,
       [productId],
     )
     return rows.map(rowToEdge)
@@ -497,7 +497,7 @@ export class UPGPgStore {
 
   async getEdgesForNode(nodeId: string): Promise<UPGEdge[]> {
     const { rows } = await this.pool.query(
-      `SELECT id, source, target, type FROM upg.edges
+      `SELECT id, source, target, type, properties FROM upg.edges
        WHERE source = $1 OR target = $1`,
       [nodeId],
     )
@@ -510,9 +510,16 @@ export class UPGPgStore {
     try {
       await client.query('BEGIN')
       await client.query(
-        `INSERT INTO upg.edges (id, product_id, source, target, type)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [id, productId, edge.source, edge.target, edge.type],
+        `INSERT INTO upg.edges (id, product_id, source, target, type, properties)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          id,
+          productId,
+          edge.source,
+          edge.target,
+          edge.type,
+          edge.properties ? JSON.stringify(edge.properties) : null,
+        ],
       )
       await appendAudit(client, {
         productId,
@@ -537,7 +544,7 @@ export class UPGPgStore {
       await client.query('BEGIN')
       const { rows } = await client.query(
         `DELETE FROM upg.edges WHERE id = $1
-         RETURNING id, product_id, source, target, type`,
+         RETURNING id, product_id, source, target, type, properties`,
         [id],
       )
       if (rows.length === 0) {
@@ -553,6 +560,53 @@ export class UPGPgStore {
       })
       await client.query('COMMIT')
       this.emit(rows[0].product_id, 'edge.deleted', { id, source: rows[0].source, target: rows[0].target, type: rows[0].type })
+      return rowToEdge(rows[0])
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+  }
+
+  /**
+   * Set (or merge) the gated `properties` payload on a single edge (0.8.6
+   * framework-exercise parity). Merge is the default: the supplied keys are
+   * deep-merged at the top level via JSONB `||`; pass `{ merge: false }` to
+   * replace the payload wholesale. Mirrors the local SDK's `setEdgeProperties`.
+   */
+  async setEdgeProperties(
+    id: string,
+    values: Record<string, unknown>,
+    opts: { merge?: boolean } = {},
+  ): Promise<UPGEdge> {
+    const merge = opts.merge !== false
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const sql = merge
+        ? `UPDATE upg.edges
+             SET properties = COALESCE(properties, '{}'::jsonb) || $1::jsonb
+           WHERE id = $2
+           RETURNING id, product_id, source, target, type, properties`
+        : `UPDATE upg.edges
+             SET properties = $1::jsonb
+           WHERE id = $2
+           RETURNING id, product_id, source, target, type, properties`
+      const { rows } = await client.query(sql, [JSON.stringify(values), id])
+      if (rows.length === 0) {
+        await client.query('ROLLBACK')
+        throw new Error(`Edge not found: ${id}`)
+      }
+      await appendAudit(client, {
+        productId: rows[0].product_id,
+        action: 'update',
+        entityType: 'edge',
+        entityId: id,
+        changes: values,
+      })
+      await client.query('COMMIT')
+      this.emit(rows[0].product_id, 'edge.updated', { id, properties: values })
       return rowToEdge(rows[0])
     } catch (err) {
       await client.query('ROLLBACK')
@@ -1058,5 +1112,8 @@ function rowToNode(row: any): UPGBaseNode & { product_id: string } {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToEdge(row: any): UPGEdge {
-  return { id: row.id, source: row.source, target: row.target, type: row.type }
+  const edge: UPGEdge = { id: row.id, source: row.source, target: row.target, type: row.type }
+  // Gated edge payload (0.8.6). JSONB comes back parsed; null/absent → no key.
+  if (row.properties != null) edge.properties = row.properties
+  return edge
 }

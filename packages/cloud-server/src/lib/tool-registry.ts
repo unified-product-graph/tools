@@ -13,6 +13,7 @@ import {
   deduplicateNodes, exportUpgDocument,
 } from '../tools/nodes.js'
 import { createEdge, deleteEdge, exportEdges, renameEdgeType } from '../tools/edges.js'
+import { applyFramework, scoreEntity } from '../tools/frameworks.js'
 import { listProductAreas, getAreaGraph, createArea, getAreaContext } from '../tools/areas.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { addComment, listComments, grantAccess, listCollaborators } from '../tools/collaboration.js'
@@ -1628,6 +1629,42 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         "product_id"
       ]
     }
+  },
+  {
+    "name": "apply_framework",
+    "description": "Apply a framework (MoSCoW, RICE, Kano, ...) to a set of entities in a product: creates a framework_exercise node and an `includes` edge to each entity. The per-entity result is recorded on the edge via score_entity, never on the entity node, so the same entity can sit in many exercises and any entity type can be scored. Returns { exercise_id, exercise, included, warnings }.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "product_id": { "type": "string", "description": "Required. Product the exercise belongs to." },
+        "framework_id": { "type": "string", "description": "Required. UPGFramework.id (e.g. \"moscow\", \"rice-scoring\")." },
+        "title": { "type": "string", "description": "Human label for the exercise (default \"<Framework> exercise\")." },
+        "entity_ids": { "type": "array", "items": { "type": "string" }, "description": "Entities to pull into the exercise (any type)." },
+        "status": { "type": "string", "description": "Lifecycle phase: draft | active | archived (default draft)." }
+      },
+      "required": [
+        "product_id",
+        "framework_id"
+      ]
+    }
+  },
+  {
+    "name": "score_entity",
+    "description": "Record a framework's result for one entity on the exercise's includes edge (a MoSCoW bucket, a RICE score, a canvas slot). Auto-includes the entity if not already in scope. Merges into existing edge properties unless replace is set. The product is resolved from the exercise node. Returns { edge, warnings }.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "exercise_id": { "type": "string", "description": "Required. The framework_exercise id." },
+        "entity_id": { "type": "string", "description": "Required. The entity being scored." },
+        "values": { "type": "object", "description": "Required. The result as { input: value }, e.g. { \"moscow\": \"must\" } or { \"reach\": 800, \"impact\": 3 }." },
+        "replace": { "type": "boolean", "description": "Replace the edge properties instead of merging (default false)." }
+      },
+      "required": [
+        "exercise_id",
+        "entity_id",
+        "values"
+      ]
+    }
   }
 ]
 
@@ -1652,6 +1689,9 @@ const HANDLERS: Record<string, ToolBinding<CloudContext>['handler']> = {
   delete_edge: deleteEdge,
   export_edges: exportEdges,
   rename_edge_type: renameEdgeType,
+  // ── Framework exercises (0.8.6 cloud parity) ────────────────────
+  apply_framework: applyFramework,
+  score_entity: scoreEntity,
   list_product_areas: listProductAreas,
   get_area_graph: getAreaGraph,
   create_area: createArea,

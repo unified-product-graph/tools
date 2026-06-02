@@ -1,6 +1,6 @@
 # UPG MCP Cloud Server Tool Reference
 
-Reference for the 91 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
+Reference for the 93 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
 
 ## Contents
 
@@ -8,6 +8,7 @@ Reference for the 91 tools exposed by `@unified-product-graph/cloud-server`. Gen
 - [Context & Traversal](#context-traversal): 4 tools
 - [Nodes](#nodes): 11 tools
 - [Edges](#edges): 4 tools
+- [Framework Exercises](#framework-exercises): 2 tools
 - [Areas](#areas): 4 tools
 - [Schema](#schema): 1 tool
 - [Collaboration](#collaboration): 4 tools
@@ -747,6 +748,68 @@ JSON: `{ from, to, affected: number, dry_run: boolean }`.
 - textError when `product_id`, `from`, or `to` is missing.
 
 **See also:** `list_edge_types`, `get_edge_type`, `export_edges`, `migrate_type`
+
+
+## Framework Exercises
+
+_Apply a framework over entities; record per-entity results on the includes edge._
+
+- [`apply_framework`](#apply-framework)
+- [`score_entity`](#score-entity)
+
+### `apply_framework`
+
+Apply a framework (MoSCoW, RICE, Kano, ...) to a set of entities in a product: creates a framework_exercise node and an `includes` edge to each entity. The per-entity result is recorded on the edge via score_entity, never on the entity node, so the same entity can sit in many exercises and any entity type can be scored. Returns { exercise_id, exercise, included, warnings }.
+
+**Atomicity:** `per-write atomic; the exercise node and each includes edge commit
+independently (a target that cannot be included is reported in `warnings`).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `entity_ids` | array |  | Entities to pull into the exercise (any type). |
+| `framework_id` | string | ✓ | Required. UPGFramework.id (e.g. "moscow", "rice-scoring"). |
+| `product_id` | string | ✓ | Required. Product the exercise belongs to. |
+| `status` | string |  | Lifecycle phase: draft \| active \| archived (default draft). |
+| `title` | string |  | Human label for the exercise (default "<Framework> exercise"). |
+
+**Returns:**
+
+JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id }], warnings }`.
+
+**Throws:**
+
+- textError on a missing product_id/framework_id or an unknown framework_id.
+
+**See also:** `score_entity`
+
+
+### `score_entity`
+
+Record a framework's result for one entity on the exercise's includes edge (a MoSCoW bucket, a RICE score, a canvas slot). Auto-includes the entity if not already in scope. Merges into existing edge properties unless replace is set. The product is resolved from the exercise node. Returns { edge, warnings }.
+
+**Atomicity:** `atomic-with-rollback (single edge upsert).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `entity_id` | string | ✓ | Required. The entity being scored. |
+| `exercise_id` | string | ✓ | Required. The framework_exercise id. |
+| `replace` | boolean |  | Replace the edge properties instead of merging (default false). |
+| `values` | object | ✓ | Required. The result as { input: value }, e.g. { "moscow": "must" } or { "reach": 800, "impact": 3 }. |
+
+**Returns:**
+
+JSON: `{ edge, warnings }`.
+
+**Throws:**
+
+- textError when the exercise/entity is missing or the node is not a
+framework_exercise.
+
+**See also:** `apply_framework`
 
 
 ## Areas

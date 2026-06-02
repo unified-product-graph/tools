@@ -31,6 +31,7 @@ const DOMAINS = [
   'context',
   'nodes',
   'edges',
+  'frameworks',
   'areas',
   'schema',
   'collaboration',
@@ -48,6 +49,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   context: 'Context & Traversal',
   nodes: 'Nodes',
   edges: 'Edges',
+  frameworks: 'Framework Exercises',
   areas: 'Areas',
   schema: 'Schema',
   collaboration: 'Collaboration',
@@ -65,6 +67,7 @@ const DOMAIN_BLURBS: Record<string, string> = {
   context: 'Product summary, digest, BFS traversal, change feed.',
   nodes: 'Entity CRUD scoped to a product.',
   edges: 'Edge create and delete.',
+  frameworks: 'Apply a framework over entities; record per-entity results on the includes edge.',
   areas: 'Product-area listing and subgraph BFS.',
   schema: 'Per-type spec contract: properties, edges in and out, lifecycle.',
   collaboration: 'Comments and role-based access. Cloud-only.',
@@ -103,6 +106,9 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   // edges
   createEdge: 'create_edge',
   deleteEdge: 'delete_edge',
+  // framework exercises
+  applyFramework: 'apply_framework',
+  scoreEntity: 'score_entity',
   // nodes (extra)
   moveNode: 'move_node',
   exportEdges: 'export_edges',

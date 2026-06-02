@@ -18,7 +18,9 @@ import {
   applyFramework,
   scoreEntity,
 } from '../index.js'
-import { UPG_FRAMEWORKS_BY_ID } from '@unified-product-graph/frameworks'
+// Canonical public surface (core) — the frameworks the runtime actually serves.
+// 0.8.6 broadened RICE/ICE/WSJF/cost-of-delay declared targets in this surface.
+import { UPG_FRAMEWORKS_BY_ID } from '@unified-product-graph/core'
 
 const INCLUDES = 'framework_exercise_includes_node'
 
@@ -148,17 +150,18 @@ describe('exercise-aware executePrioritise', () => {
     expect(store.getNode('n_sso')!.properties?.reach).toBeUndefined()
   })
 
-  it('an exercise over a non-feature entity bypasses the type-mismatch guard', async () => {
+  it('an exercise over an off-target entity bypasses the type-mismatch guard', async () => {
     const { store } = await freshStore()
     const rice = UPG_FRAMEWORKS_BY_ID['rice-scoring']!
 
-    // Without an exercise: a need is the wrong type → type_mismatch.
-    const direct = executePrioritise(rice, ['n_need'], store)
+    // n_sol is a `solution` — still NOT a RICE target after the 0.8.6 broadening
+    // (which added opportunity/need, not solution). Direct path → type_mismatch.
+    const direct = executePrioritise(rice, ['n_sol'], store)
     expect(direct.kind).toBe('type_mismatch')
 
-    // Via an exercise: deliberately included, so it scores.
-    const ex = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_need'] })
-    scoreEntity(store, { exercise_id: ex.exercise.id, entity_id: 'n_need', values: { reach: 500, impact: 2, confidence: 0.8, effort: 2 } })
+    // Via an exercise: deliberately included, so the guard is bypassed and it scores.
+    const ex = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_sol'] })
+    scoreEntity(store, { exercise_id: ex.exercise.id, entity_id: 'n_sol', values: { reach: 500, impact: 2, confidence: 0.8, effort: 2 } })
     const viaExercise = executePrioritise(rice, [], store, { exerciseId: ex.exercise.id })
     expect(viaExercise.kind).toBe('execution')
   })
