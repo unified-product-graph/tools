@@ -112,6 +112,11 @@ export async function runMcpServer() {
       file: { type: 'string', short: 'f' },
       title: { type: 'string', short: 't' },
     },
+    // Tolerate stray positionals. When launched via `upg mcp run`, argv carries
+    // the `mcp run` subcommand tokens; without this, parseArgs throws
+    // ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL and the server never starts. The
+    // standalone bin (`upg-mcp-server`) passes none, so this is harmless there.
+    allowPositionals: true,
   })
 
   let resolvedPath = await discoverUPGFile(values.file)

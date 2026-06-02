@@ -35,17 +35,18 @@ describe('detectMcpCommand', () => {
     })
   })
 
-  it('returns npx default when no override provided and monorepo dist not present', () => {
-    // In the monorepo the dist file may not exist; this test confirms fallback to npx.
-    // Post-fold: mcp-server lives inside @unified-product-graph/mcp as `upg mcp run`.
-    const monoPath = path.join(process.cwd(), 'packages', 'upg-cli', 'dist', 'cli.cjs')
-    const exists = fs.existsSync(monoPath)
+  it('returns the mcp-server package by default; monorepo runs the server dist directly', () => {
+    // The server is its own package (@unified-product-graph/mcp-server). Default
+    // launch is the package via npx -y; in the monorepo, the server's own built
+    // entry — never `upg mcp run` with `mcp`/`run` positionals (which crashed it).
+    const monoServer = path.join(process.cwd(), 'packages', 'upg-mcp-server', 'dist', 'index.js')
+    const exists = fs.existsSync(monoServer)
     const result = detectMcpCommand()
     if (exists) {
       expect(result.command).toBe('node')
-      expect(result.args).toEqual(['./packages/upg-cli/dist/cli.cjs', 'mcp', 'run'])
+      expect(result.args).toEqual(['./packages/upg-mcp-server/dist/index.js'])
     } else {
-      expect(result).toEqual({ command: 'npx', args: ['@unified-product-graph/mcp', 'mcp', 'run'] })
+      expect(result).toEqual({ command: 'npx', args: ['-y', '@unified-product-graph/mcp-server'] })
     }
   })
 })

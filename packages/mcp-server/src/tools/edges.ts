@@ -92,6 +92,7 @@ export const createEdge: ToolHandler = (args, ctx): ToolResult => {
     target_title: args.target_title as string | undefined,
     target_type: args.target_type as string | undefined,
     type: args.type as string | undefined,
+    properties: args.properties as Record<string, unknown> | undefined,
   })
 
   if ('error' in result) {

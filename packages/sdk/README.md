@@ -99,8 +99,22 @@ Beyond CRUD, the SDK ships the functions that power the `plan` / `trace` / `prio
 - `executeTrace(store, anchorId, path)` — walk a typed path. **`path` lists the entity types AFTER
   the anchor**, e.g. `executeTrace(store, personaId, ['job', 'need'])` walks persona → job → need.
 - `executePrioritise(framework, ids, store)` — framework-driven scoring (pass a framework OBJECT,
-  e.g. `UPG_FRAMEWORKS_BY_ID['rice-scoring']`). Candidates whose type ≠ the framework's target
-  return a clear `type_mismatch` result.
+  e.g. `UPG_FRAMEWORKS_BY_ID['rice-scoring']`). Returns one of three result kinds:
+  `execution` (ranked scores), `fallback` (no numeric formula — e.g. a bucketing framework like
+  MoSCoW), or `type_mismatch` (candidates whose type ≠ the framework's target). The
+  `type_mismatch` result names the target and the offending types so you know exactly why nothing
+  ranked:
+  ```ts
+  import { frameworkTargetTypes, executePrioritise, UPG_FRAMEWORKS_BY_ID } from '@unified-product-graph/sdk'
+
+  const rice = UPG_FRAMEWORKS_BY_ID['rice-scoring']
+  frameworkTargetTypes(rice)            // → ['feature']  — pick candidates of this type up front
+  const res = executePrioritise(rice, featureIds, store)
+  if (res.kind === 'type_mismatch') console.log(res.hint)  // "rice-scoring scores feature; 3 need mismatched"
+  else if (res.kind === 'execution') console.log(res.ranked)
+  ```
+- `frameworkTargetTypes(framework)` → `string[]` — the entity types a framework scores. Use it to
+  select the right candidates before calling `executePrioritise`.
 - `executeReflect(store, mode)` — modes: `assumptions`, `alternatives`, `blind-spots`,
   `load-bearing` (omit to run all four). An unknown mode throws `ReflectModeError`.
 

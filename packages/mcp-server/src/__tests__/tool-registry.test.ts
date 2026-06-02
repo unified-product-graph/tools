@@ -102,7 +102,8 @@ describe('Tool registry: completeness', () => {
     // + migrate_status ( status migration). → 92.
     // + skill_audit ( source-vs-deployed integrity for skills). → 93.
     // + start ( zero-state on-ramp). → 94.
-    expect(TOOL_DEFINITIONS).toHaveLength(94)
+    // + apply_framework + score_entity (0.8.4 framework exercises). → 96.
+    expect(TOOL_DEFINITIONS).toHaveLength(96)
   })
 })
 

@@ -1,6 +1,6 @@
-# @unified-product-graph/mcp
+# @unified-product-graph/cli
 
-The `upg` CLI. 23 commands across 6 groups: setup, workspace, governance, explore, create/edit, cloud.
+The `upg` CLI — local-first governance, CRUD, and analysis for `.upg` files, plus a cursor-based "stand in the graph" command set (`use`/`here`/`at`/`ls`/`find`/`new`/`link`/`check`/`fix`). Command groups: stand-in-the-graph, setup, workspace, governance, explore, create/edit, frameworks.
 
 ```
    •  ·  •
@@ -38,14 +38,14 @@ The package ships two surfaces against the same `.upg` file.
 
 Wire the MCP server once per project. 1 file, 1 entry.
 
-### Add to `.claude/settings.json`
+### Add to `.mcp.json`
 
 ```json
 {
   "mcpServers": {
-    "upg-local": {
+    "unified-product-graph": {
       "command": "npx",
-      "args": ["@unified-product-graph/mcp", "mcp", "run"],
+      "args": ["-y", "@unified-product-graph/mcp-server"],
       "env": {
         "UPG_FILE": ".upg/product.upg"
       }
@@ -54,12 +54,12 @@ Wire the MCP server once per project. 1 file, 1 entry.
 }
 ```
 
-Point `UPG_FILE` at your `.upg` file. Commit `.claude/settings.json` so the team shares the config.
+`.mcp.json` at the project root is the file Claude Code reads for project-scoped MCP servers — commit it so the team shares the config. Point `UPG_FILE` at your `.upg` file (optional; the server auto-discovers).
 
 Or let the CLI write it:
 
 ```bash
-upg mcp setup --scope project   # writes .claude/settings.json
+upg mcp setup --scope project   # writes .mcp.json (user scope writes ~/.claude.json)
 upg mcp status                  # confirm the entry landed
 ```
 
@@ -75,7 +75,7 @@ Open Claude Code. The MCP status indicator shows `unified-product-graph` connect
 
 | Command | Description |
 |---------|-------------|
-| `upg mcp setup` | Write the MCP server entry into `.claude/settings.json`. `--scope user`, `--force` |
+| `upg mcp setup` | Write the MCP server entry into `.mcp.json` (or `~/.claude.json` with `--scope user`). `--force` |
 | `upg mcp status` | Report MCP server config across scopes |
 | `upg install-skills` | Install UPG skills into Claude Code. See [Install skills](#install-skills) |
 
@@ -114,22 +114,33 @@ Open Claude Code. The MCP status indicator shows `unified-product-graph` connect
 | `upg delete <id>` | Delete entity + edges. `--force` skips confirm |
 | `upg connect <src> <tgt>` | Create edge. Type auto-inferred |
 
-### Cloud
+### Frameworks
+
+Run a framework over a set of entities. `apply` creates a `framework_exercise` and an `includes` edge to each entity; `score` records that framework's result for one entity **on the edge** (a MoSCoW bucket, a RICE score, a canvas slot), never on the entity node — so the same entity can sit in many exercises with different results, and any entity type can be scored.
 
 | Command | Description |
 |---------|-------------|
-| `upg login` | Browser OAuth or `--key` |
-| `upg logout` | Remove stored credentials |
-| `upg push` | Push to cloud. `--dry-run`, `--strategy=merge` |
-| `upg pull` | Pull cloud changes. `--force` overwrites local |
-| `upg products` | List your cloud products |
-| `upg log` | Activity log: who changed what, when |
+| `upg apply <framework> [ids...]` | Create an exercise + an `includes` edge per entity. `--title`, `--status` |
+| `upg score <exercise> <entity>` | Record the result on the edge. `--data='{"moscow":"must"}'`, `--replace` |
+
+```bash
+upg apply moscow feat_sso feat_dark --title "Q3 Release Scope"   # → prints the exercise id
+upg score <exercise-id> feat_sso --data '{"moscow":"must"}'
+```
+
+### MCP
+
+| Command | Description |
+|---------|-------------|
+| `upg mcp setup` | Write the server entry into `.mcp.json` (project) or `~/.claude.json` (user) |
+| `upg mcp status` | Report MCP config across project + user scopes |
+| `upg mcp run` | Run the UPG MCP server over stdio (invoked by Claude) |
 
 ## Install skills
 
 The package ships UPG skills as a `skills/` directory. `upg install-skills` links each one into `.claude/skills/`.
 
-Symlinks are the default, so updates to `@unified-product-graph/mcp` propagate automatically. Windows falls back to copy. A `.upg-manifest.json` records UPG-owned skills, so `--remove` only touches them.
+Symlinks are the default, so updates to `@unified-product-graph/cli` propagate automatically. Windows falls back to copy. A `.upg-manifest.json` records UPG-owned skills, so `--remove` only touches them.
 
 ```bash
 # Project scope (default): <cwd>/.claude/skills/, committable with the team
@@ -187,8 +198,9 @@ fi
 | Code | Meaning |
 |------|---------|
 | 0 | Success / pass |
-| 1 | Failure / below threshold / violations found |
-| 2 | Error (file not found, invalid JSON, etc.) |
+| 1 | Runtime error (file not found, invalid JSON, etc.) |
+| 2 | Validation / policy (verify violations, incompatible edge) |
+| 3 | Usage error (unknown flag/arg) |
 
 ## Output formats
 
@@ -218,26 +230,9 @@ The CLI resolves the `.upg` file in 5 steps:
 4. `*.upg` files in the current directory.
 5. Falls through to `upg init` suggestion.
 
-## Authentication
-
-Cloud commands (`push`, `pull`, `products`) need credentials:
-
-```bash
-# Browser OAuth (opens login page, receives key via callback)
-upg login
-
-# Manual API key
-upg login --key upg_YOUR_KEY
-
-# Environment variable (for CI)
-UPG_API_KEY=xxx upg push
-```
-
-Credentials live in `~/.upg/credentials.json` at 0600.
-
 ## Positioning
 
-`@unified-product-graph/mcp` ships the **UPG open standard** (MIT). The CLI runs offline against `.upg` files; cloud commands connect to UPG cloud. `git` (open tool) → hosted Git provider (product).
+`@unified-product-graph/cli` ships the **UPG open standard** (MIT). The CLI runs offline against local `.upg` files. `git` (open tool) → hosted Git provider (product).
 
 ## Contributing
 

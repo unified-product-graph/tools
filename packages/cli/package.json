@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/cli",
-  "version": "0.8.2",
+  "version": "0.8.4",
   "description": "MCP server + CLI for the Unified Product Graph; drop into Claude Code or use the `upg` command.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
@@ -54,7 +54,7 @@
     "tsup": "^8.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.1.1"
+    "vitest": "^4.1.0"
   },
   "engines": {
     "node": ">=18"

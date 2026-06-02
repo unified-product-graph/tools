@@ -73,6 +73,9 @@ export * from './lib/resolver-hints.js'
 // ── Approach execution (framework playbooks) ────────────────────────────────
 export * from './lib/approach-execution.js'
 
+// ── Framework exercises (0.8.4): apply a framework + record results on edges ──
+export * from './lib/framework-exercise.js'
+
 // ── Classification (entity → business area / tier) ──────────────────────────
 export * from './classification.js'
 

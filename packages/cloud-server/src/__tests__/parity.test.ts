@@ -92,6 +92,11 @@ const CLOUD_NA = new Set([
   'migrate_properties',              // cloud has migrate_type but not these two
   'migrate_status',
   'start',                           // cold-start on-ramp; store-coupled, reads the local graph to recommend the first playbook. Cloud graphs could get the same on-ramp later (follow-up); local-only for 0.7.6.
+  // framework exercises (0.8.4): local-first. Bringing these to cloud needs
+  // edge-property storage in the Postgres schema + cloud tool handlers; tracked
+  // as a follow-up, dispositioned here so the parity audit stays green meanwhile.
+  'apply_framework',
+  'score_entity',
 ])
 
 describe('MCP parity audit: @unified-product-graph/cloud-server vs @unified-product-graph/mcp-server', () => {

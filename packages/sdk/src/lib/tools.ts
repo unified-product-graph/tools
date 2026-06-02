@@ -15,6 +15,7 @@ import {
   getReplacementType,
   resolveSlugCollision,
   UPG_EDGE_CATALOG,
+  edgeCarriesProperties,
 } from '@unified-product-graph/core'
 
 /**
@@ -975,6 +976,13 @@ export interface CreateEdgeArgs {
   target_type?: string
   /** Explicit canonical edge type. Omit to infer from (source.type → target.type). */
   type?: string
+  /**
+   * Edge-scoped properties. Permitted ONLY on edge types whose catalog
+   * definition sets `carries_properties` (currently
+   * `framework_exercise_includes_node`); rejected on any other edge. Used to
+   * store a framework exercise's per-entity result on the includes edge.
+   */
+  properties?: Record<string, unknown>
 }
 
 export type CreateEdgeResult =
@@ -1078,11 +1086,25 @@ export function createEdge(
     }
   }
 
+  // Gated edge properties: only edge types that opt in (carries_properties) may
+  // carry a payload. Reject otherwise — keeps plain semantic edges pure, so the
+  // only place an exercise's per-entity value can live is the includes edge.
+  const hasProps = args.properties !== undefined && Object.keys(args.properties).length > 0
+  if (hasProps && !edgeCarriesProperties(edgeType)) {
+    return {
+      error:
+        `Edge type "${edgeType}" does not carry properties. Only edges declared ` +
+        `with carries_properties (currently framework_exercise_includes_node) may ` +
+        `hold a payload: a value that belongs to the relationship, not the endpoints.`,
+    }
+  }
+
   const edge: UPGEdge = {
     id: edgeId(),
     source: args.source_id,
     target: targetId!,
     type: edgeType,
+    ...(hasProps ? { properties: args.properties } : {}),
   }
 
   store.addEdge(edge)

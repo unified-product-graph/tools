@@ -2,6 +2,17 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.4] - 2026-06-02
+
+Framework exercises, with the 0.8.3 launch fix folded in.
+
+### Added
+- `apply_framework` and `score_entity` tools: create a `framework_exercise` and record per-entity results on the includes edge (94 to 96 tools).
+- `create_edge` accepts gated `properties` (only edge types that opt in). `prioritise` accepts an optional `exercise_id` that sources scoring inputs from the includes edges and scores across any entity type.
+
+### Fixed
+- The server no longer crashes with `ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL` when launched via `upg mcp run` — `parseArgs` now tolerates stray positionals. The standalone `upg-mcp-server` bin is unaffected.
+
 ## [0.8.2] - 2026-06-02
 
 Co-version with the @unified-product-graph/* 0.8.2 release train.

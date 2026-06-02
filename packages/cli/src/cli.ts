@@ -43,6 +43,8 @@ import { linkCommand } from './commands/link.js'
 import { findCommand } from './commands/find.js'
 import { checkCommand } from './commands/check.js'
 import { fixCommand } from './commands/fix.js'
+import { applyCommand } from './commands/apply.js'
+import { scoreCommand } from './commands/score.js'
 import chalk from 'chalk'
 import { upgLogo } from './lib/formatter.js'
 import { applyColorPreference } from './lib/output.js'
@@ -65,6 +67,8 @@ const ALL_COMMANDS: Command[] = [
   // CRUD & manipulation
   createCommand, updateCommand, deleteCommand, connectCommand, gapsCommand,
   initCommand, workspaceCommand, importCommand, exportCommand, fmtCommand,
+  // Frameworks (exercises)
+  applyCommand, scoreCommand,
   // Setup
   installSkillsCommand, mcpCommand,
 ]
@@ -93,7 +97,7 @@ function printHelp() {
   console.log()
 
   console.log(chalk.bold('  Setup'))
-  console.log(cmd('mcp setup', '[options]', 'Write MCP server entry into .claude/settings.json'))
+  console.log(cmd('mcp setup', '[options]', 'Write MCP server entry into .mcp.json (or ~/.claude.json)'))
   console.log(cmd('mcp status', '', 'Report MCP server config across scopes'))
   console.log(cmd('install-skills', '[options]', 'Install bundled UPG skills into Claude Code'))
   console.log()
@@ -124,6 +128,11 @@ function printHelp() {
   console.log(cmd('update', '<id>', 'Update an entity. Unspecified fields preserved'))
   console.log(cmd('delete', '<id>', 'Delete an entity and its edges'))
   console.log(cmd('connect', '<src> <tgt>', 'Create an edge. Type auto-inferred'))
+  console.log()
+
+  console.log(chalk.bold('  Frameworks'))
+  console.log(cmd('apply', '<framework> [ids...]', 'Run a framework over entities (creates an exercise)'))
+  console.log(cmd('score', '<exercise> <entity>', "Record a framework's result on the includes edge"))
   console.log()
 
   console.log(chalk.bold('  Global flags'))
@@ -255,4 +264,36 @@ interceptHelp(process.argv)
 // coverage. (Referenced to keep the import meaningful for tree-shakers.)
 void helpTopics
 
-program.parse()
+// Usage errors (unknown flag/arg, bad option value) must exit 3 to match the
+// published exit-code table (0 success · 1 runtime · 2 validation/policy · 3
+// usage). Commander defaults these to 1; exitOverride lets us remap. Applied to
+// every subcommand so the code is consistent wherever the bad input lands.
+const USAGE_ERROR_CODES = new Set([
+  'commander.unknownOption',
+  'commander.unknownCommand',
+  'commander.excessArguments',
+  'commander.missingArgument',
+  'commander.optionMissingArgument',
+  'commander.missingMandatoryOptionValue',
+  'commander.invalidArgument',
+  'commander.invalidOptionArgument',
+])
+
+function applyExitOverride(cmd: Command): void {
+  cmd.exitOverride()
+  for (const sub of cmd.commands) applyExitOverride(sub)
+}
+applyExitOverride(program)
+
+try {
+  program.parse()
+} catch (err) {
+  const e = err as { code?: string; exitCode?: number; message?: string }
+  // Help/version: commander already printed; exit clean.
+  if (e.code === 'commander.helpDisplayed' || e.code === 'commander.help' || e.code === 'commander.version') {
+    process.exit(0)
+  }
+  if (e.message) process.stderr.write(e.message.endsWith('\n') ? e.message : e.message + '\n')
+  // Usage errors → 3; everything else keeps commander's intended code (default 1).
+  process.exit(e.code && USAGE_ERROR_CODES.has(e.code) ? 3 : (typeof e.exitCode === 'number' ? e.exitCode : 1))
+}

@@ -846,6 +846,38 @@ export class UPGFileStore {
     return edge
   }
 
+  /**
+   * Set (or merge) properties on an existing edge — the persistence path for a
+   * framework exercise's per-entity result on its `includes` edge. The gate
+   * (only `carries_properties` edge types may hold a payload) is enforced by the
+   * `createEdge` / `scoreEntity` callers; this is the low-level mutation.
+   *
+   * With `merge: true` (default) the patch is shallow-merged over existing
+   * properties; a key whose value is `null`/`undefined` is removed. When the
+   * resulting object is empty the `properties` field is dropped entirely (keeps
+   * the canonical form clean). The edge object is shared between `edgeMap` and
+   * `doc.edges`, so the mutation lands in both.
+   */
+  setEdgeProperties(
+    id: string,
+    properties: Record<string, unknown>,
+    opts: { merge?: boolean } = {},
+  ): UPGEdge {
+    const edge = this.edgeMap.get(id)
+    if (!edge) throw new Error(`Edge not found: ${id}`)
+    const merge = opts.merge ?? true
+    const next: Record<string, unknown> = merge ? { ...(edge.properties ?? {}) } : {}
+    for (const [k, v] of Object.entries(properties)) {
+      if (v === null || v === undefined) delete next[k]
+      else next[k] = v
+    }
+    if (Object.keys(next).length > 0) edge.properties = next
+    else delete edge.properties
+    this.logChange('update', 'edge', edge.id, edge.type, undefined)
+    this.scheduleSave()
+    return edge
+  }
+
   migrateType(
     fromType: string,
     toType: string,

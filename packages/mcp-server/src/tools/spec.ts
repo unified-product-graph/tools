@@ -525,14 +525,19 @@ export const inspect: ToolHandler = async (args, ctx): Promise<ToolResult> => {
  * @see trace
  */
 export const prioritise: ToolHandler = (args, ctx): ToolResult => {
-  const candidates = args.candidates as string[] | undefined
+  const candidates = (args.candidates as string[] | undefined) ?? []
   const frameworkId = args.framework_id as string | undefined
-  if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
-    return textError('Missing required parameter: candidates (entity_id[])')
-  }
+  const exerciseId = args.exercise_id as string | undefined
   if (!frameworkId) {
     return textError(
       'Missing required parameter: framework_id (e.g. "rice-scoring", "ice-scoring", "wsjf")',
+    )
+  }
+  // 0.8.4: an exercise_id supplies the candidates (its includes edges) and the
+  // per-entity inputs (those edges' properties), so candidates may be omitted.
+  if (!exerciseId && (!Array.isArray(candidates) || candidates.length === 0)) {
+    return textError(
+      'Provide candidates (entity_id[]), or an exercise_id whose includes edges supply the candidates and their scoring inputs.',
     )
   }
   const framework = UPG_FRAMEWORKS_BY_ID[frameworkId]
@@ -542,21 +547,22 @@ export const prioritise: ToolHandler = (args, ctx): ToolResult => {
     )
   }
 
-  const execResult = executePrioritise(framework, candidates, ctx.store)
+  const execResult = executePrioritise(framework, candidates, ctx.store, { exerciseId })
+  const params = { candidates, framework_id: frameworkId, ...(exerciseId ? { exercise_id: exerciseId } : {}) }
 
   if (execResult.kind === 'execution') {
     return approachEnvelope('prioritise', candidates, {
-      params: { candidates, framework_id: frameworkId },
+      params,
       framework_resolved: execResult.framework_used,
       ranked: execResult.ranked,
       required_properties: execResult.required_properties,
-      execution_mode: 'execution_v0_4_0',
+      execution_mode: exerciseId ? 'exercise_v0_8_4' : 'execution_v0_4_0',
     })
   }
 
   // Fallback: framework has no computed expression; surface the LLM hint.
   return approachEnvelope('prioritise', candidates, {
-    params: { candidates, framework_id: frameworkId },
+    params,
     framework_resolved: execResult.framework_used,
     hint: execResult.hint,
     execution_mode: 'definition_lookup_v0_4_0',

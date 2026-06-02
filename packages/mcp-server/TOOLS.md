@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 94 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 96 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -10,7 +10,7 @@ Reference for the 94 tools exposed by `@unified-product-graph/mcp-server`. Gener
 - [Areas & Change Log](#areas-change-log): 5 tools
 - [Workspace & Portfolios](#workspace-portfolios): 10 tools
 - [Schema](#schema): 1 tool
-- [Spec Introspection](#spec-introspection): 43 tools
+- [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
 - [Validation](#validation): 3 tools
 
@@ -767,6 +767,7 @@ Create one edge between two nodes. Edge type auto-infers when omitted. Target ac
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `properties` | object |  | Edge-scoped properties. Only permitted on edge types that opt in (currently framework_exercise_includes_node); rejected on plain semantic edges. |
 | `source_id` | string | ✓ | Source node ID |
 | `target_id` | string |  | Target node ID |
 | `target_title` | string |  | Target node title (alternative to target_id; requires target_type). |
@@ -1349,6 +1350,7 @@ edges_in, phases?, initial_phase?, terminal_phases?, domain_guide? }`.
 
 _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings. All from `@unified-product-graph/core`._
 
+- [`apply_framework`](#apply-framework)
 - [`get_anti_pattern`](#get-anti-pattern)
 - [`get_approach`](#get-approach)
 - [`get_domain_guide`](#get-domain-guide)
@@ -1391,7 +1393,34 @@ _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, reg
 - [`prioritise`](#prioritise)
 - [`reflect`](#reflect)
 - [`resolve_edge_for_pair`](#resolve-edge-for-pair)
+- [`score_entity`](#score-entity)
 - [`trace`](#trace)
+
+### `apply_framework`
+
+Apply a framework (MoSCoW, RICE, Kano, ...) to a set of entities: creates a framework_exercise node and an `includes` edge to each entity. The per-entity result is recorded on the edge via score_entity, never on the entity node, so the same entity can sit in many exercises and any entity type can be scored. Returns { exercise_id, exercise, included, warnings }.
+
+**Atomicity:** `atomic.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `entity_ids` | array |  | Entities to pull into the exercise (any type). |
+| `framework_id` | string | ✓ | Required. UPGFramework.id (e.g. "moscow", "rice-scoring"). |
+| `status` | string |  | Lifecycle phase: draft \| active \| archived (default draft). |
+| `title` | string |  | Human label for the exercise (default "<Framework> exercise"). |
+
+**Returns:**
+
+JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id }], warnings }`.
+
+**Throws:**
+
+- textError on a missing/unknown framework_id.
+
+**See also:** `score_entity`
+
 
 ### `get_anti_pattern`
 
@@ -2235,7 +2264,8 @@ execution_mode: "execution_v0_4_0" }`.
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `candidates` | array | ✓ | Required. entity_id[] to rank. |
+| `candidates` | array |  | entity_id[] to rank. Optional when exercise_id is given (the exercise supplies them). |
+| `exercise_id` | string |  | Optional (0.8.4). A framework_exercise id: reads each candidate's scoring inputs from its includes-edge properties instead of node.properties, and bypasses the target-type guard so any entity type can be scored. |
 | `framework_id` | string | ✓ | Required. UPGFramework.id of the scoring lens (e.g. "rice-scoring", "ice-scoring", "kano-model", "cost-of-delay", "wsjf"). |
 
 **Returns:**
@@ -2308,6 +2338,33 @@ Adapters MUST fall back to a polymorphic edge or skip the relationship,
 not synthesise a non-canonical key.
 
 **See also:** `list_edge_types`, `get_edge_type`, `create_edge`, `trace`
+
+
+### `score_entity`
+
+Record a framework's result for one entity on the exercise's includes edge (a MoSCoW bucket, a RICE score, a canvas slot). Auto-includes the entity if not already in scope. Merges into existing edge properties unless replace is set. Returns { edge, warnings }.
+
+**Atomicity:** `atomic.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `entity_id` | string | ✓ | Required. The entity being scored. |
+| `exercise_id` | string | ✓ | Required. The framework_exercise id. |
+| `replace` | boolean |  | Replace the edge properties instead of merging (default false). |
+| `values` | object | ✓ | Required. The result as { input: value }, e.g. { "moscow": "must" } or { "reach": 800, "impact": 3 }. |
+
+**Returns:**
+
+JSON: `{ edge, warnings }`.
+
+**Throws:**
+
+- textError when the exercise/entity is missing or the node is not a
+framework_exercise.
+
+**See also:** `apply_framework`
 
 
 ### `trace`

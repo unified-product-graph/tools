@@ -60,6 +60,7 @@ import {
   migrateCrossEdges,
 } from '../tools/workspace.js'
 import { getEntitySchema } from '../tools/schema.js'
+import { applyFramework, scoreEntity } from '../tools/frameworks.js'
 import {
   listPlaybooks,
   getPlaybook,
@@ -535,6 +536,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: 'string',
           description: 'Edge type. Auto-inferred if omitted.',
         },
+        properties: {
+          type: 'object' as const,
+          description: 'Edge-scoped properties. Only permitted on edge types that opt in (currently framework_exercise_includes_node); rejected on plain semantic edges.',
+        },
       },
       required: ['source_id'],
     },
@@ -868,10 +873,41 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {
-        candidates: { type: 'array', items: { type: 'string' }, description: 'Required. entity_id[] to rank.' },
+        candidates: { type: 'array', items: { type: 'string' }, description: 'entity_id[] to rank. Optional when exercise_id is given (the exercise supplies them).' },
         framework_id: { type: 'string', description: 'Required. UPGFramework.id of the scoring lens (e.g. "rice-scoring", "ice-scoring", "kano-model", "cost-of-delay", "wsjf").' },
+        exercise_id: { type: 'string', description: 'Optional (0.8.4). A framework_exercise id: reads each candidate\'s scoring inputs from its includes-edge properties instead of node.properties, and bypasses the target-type guard so any entity type can be scored.' },
       },
-      required: ['candidates', 'framework_id'],
+      required: ['framework_id'],
+    },
+  },
+  {
+    name: 'apply_framework',
+    description:
+      'Apply a framework (MoSCoW, RICE, Kano, ...) to a set of entities: creates a framework_exercise node and an `includes` edge to each entity. The per-entity result is recorded on the edge via score_entity, never on the entity node, so the same entity can sit in many exercises and any entity type can be scored. Returns { exercise_id, exercise, included, warnings }.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        framework_id: { type: 'string', description: 'Required. UPGFramework.id (e.g. "moscow", "rice-scoring").' },
+        title: { type: 'string', description: 'Human label for the exercise (default "<Framework> exercise").' },
+        entity_ids: { type: 'array', items: { type: 'string' }, description: 'Entities to pull into the exercise (any type).' },
+        status: { type: 'string', description: 'Lifecycle phase: draft | active | archived (default draft).' },
+      },
+      required: ['framework_id'],
+    },
+  },
+  {
+    name: 'score_entity',
+    description:
+      "Record a framework's result for one entity on the exercise's includes edge (a MoSCoW bucket, a RICE score, a canvas slot). Auto-includes the entity if not already in scope. Merges into existing edge properties unless replace is set. Returns { edge, warnings }.",
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        exercise_id: { type: 'string', description: 'Required. The framework_exercise id.' },
+        entity_id: { type: 'string', description: 'Required. The entity being scored.' },
+        values: { type: 'object' as const, description: 'Required. The result as { input: value }, e.g. { "moscow": "must" } or { "reach": 800, "impact": 3 }.' },
+        replace: { type: 'boolean', description: 'Replace the edge properties instead of merging (default false).' },
+      },
+      required: ['exercise_id', 'entity_id', 'values'],
     },
   },
   {
@@ -1572,6 +1608,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   batch_delete_nodes: batchDeleteNodes,
   batch_create_edges: batchCreateEdges,
   batch_delete_edges: batchDeleteEdges,
+  apply_framework: applyFramework,
+  score_entity: scoreEntity,
   repair_dangling_edges: repairDanglingEdges,
   export_edges: exportEdges,
   rename_edge_type: renameEdgeType,

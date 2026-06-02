@@ -50,7 +50,14 @@ export function validateEdgeTypePair(
   // surfaced via edge_drift (existing class) when validate_graph runs.
   if (!def) return { valid: true }
 
-  if (sourceNodeType === def.source_type && targetNodeType === def.target_type) {
+  // Polymorphic endpoints: a `'node'` wildcard on either end matches any node
+  // type (e.g. framework_exercise → node, node → team). Without this, no
+  // polymorphic edge could be created via an explicit `type` with concrete
+  // endpoints, since the concrete type never equals the literal `'node'`.
+  const WILDCARD = 'node'
+  const sourceOk = def.source_type === WILDCARD || sourceNodeType === def.source_type
+  const targetOk = def.target_type === WILDCARD || targetNodeType === def.target_type
+  if (sourceOk && targetOk) {
     return { valid: true }
   }
 

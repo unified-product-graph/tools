@@ -124,7 +124,25 @@ export function executePrioritise(
   framework: UPGFramework,
   candidateIds: string[],
   store: UPGFileStore,
+  opts: { exerciseId?: string } = {},
 ): PrioritiseExecutionResult | PrioritiseFallbackResult | PrioritiseTypeMismatchResult {
+  // Exercise-aware (0.8.4): when an exercise is given, each candidate's inputs
+  // come from its `framework_exercise_includes_node` edge properties (the
+  // exercise's recorded answers), not from `node.properties`. Entities that were
+  // deliberately included in an exercise also bypass the target-type guard —
+  // the whole point of the exercise model is that any entity type can be scored.
+  let ids = candidateIds
+  let edgeInputs: Map<string, Record<string, unknown>> | null = null
+  if (opts.exerciseId) {
+    edgeInputs = new Map()
+    for (const e of store.getEdgesForNode(opts.exerciseId)) {
+      if (e.type === 'framework_exercise_includes_node' && e.source === opts.exerciseId) {
+        edgeInputs.set(e.target, (e.properties as Record<string, unknown>) ?? {})
+      }
+    }
+    if (ids.length === 0) ids = [...edgeInputs.keys()]
+  }
+
   // (Seam 5): validate candidate types against the framework's target
   // BEFORE computing. RICE scores `feature`; given `opportunity` candidates the
   // formula either silently scores the wrong type or — when a divisor property
@@ -132,9 +150,9 @@ export function executePrioritise(
   // message instead. (The schema/entity decision of WHICH properties belong on
   // WHICH type is, Captain's call; this guard is correct regardless.)
   const targetTypes = frameworkTargetTypes(framework)
-  if (targetTypes.length > 0 && candidateIds.length > 0) {
+  if (!opts.exerciseId && targetTypes.length > 0 && ids.length > 0) {
     const mismatched: Array<{ entity_id: string; entity_type: string }> = []
-    for (const id of candidateIds) {
+    for (const id of ids) {
       const node = store.getNode(id)
       if (!node) continue // missing nodes handled in the compute loop below
       if (!targetTypes.includes(node.type as string)) {
@@ -144,7 +162,7 @@ export function executePrioritise(
     // Reject only when EVERY resolvable candidate is the wrong type; a mixed
     // set still computes the matching ones and reports the rest as missing
     // properties (existing behaviour) rather than failing the whole call.
-    const resolvable = candidateIds.map((id) => store.getNode(id)).filter(Boolean).length
+    const resolvable = ids.map((id) => store.getNode(id)).filter(Boolean).length
     if (resolvable > 0 && mismatched.length === resolvable) {
       const byType = new Map<string, number>()
       for (const m of mismatched) byType.set(m.entity_type, (byType.get(m.entity_type) ?? 0) + 1)
@@ -192,7 +210,7 @@ export function executePrioritise(
   const requiredProperties =
     probe.ok === false && probe.missing ? probe.missing : []
 
-  for (const id of candidateIds) {
+  for (const id of ids) {
     const node = store.getNode(id)
     if (!node) {
       ranked.push({
@@ -203,7 +221,7 @@ export function executePrioritise(
       continue
     }
 
-    const scope = collectNumericScope(node.properties)
+    const scope = collectNumericScope(edgeInputs ? (edgeInputs.get(id) ?? {}) : node.properties)
     const result = evaluateExpression(computed.expression, scope)
 
     if (result.ok) {

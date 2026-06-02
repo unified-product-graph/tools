@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/adapters",
-  "version": "0.8.2",
+  "version": "0.8.4",
   "description": "Import adapters for the Unified Product Graph: Markdown, Notion, Linear, GitHub, Jira, Dovetail, Vistaly, and 30+ more.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
@@ -59,7 +59,7 @@
   "devDependencies": {
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.0"
   },
   "bugs": {
     "url": "https://github.com/unified-product-graph/tools/issues"

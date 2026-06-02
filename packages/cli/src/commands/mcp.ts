@@ -28,12 +28,23 @@ export interface ClaudeSettings {
 
 // ── Path resolution ───────────────────────────────────────────────────────────
 
-/** Resolve the path to .claude/settings.json for the given scope. */
+/**
+ * Resolve the config file Claude Code actually reads for MCP server definitions.
+ *
+ * - project scope → `<cwd>/.mcp.json` (the file Claude Code reads for
+ *   project-scoped servers; commit it to share with the team).
+ * - user scope → `~/.claude.json` (top-level `mcpServers`, user-global).
+ *
+ * NOT `.claude/settings.json` — that file gates servers
+ * (`enabledMcpjsonServers`) and carries permissions/hooks, but Claude Code does
+ * NOT read server *definitions* from it. Writing there is why a fresh setup
+ * never connected until a `.mcp.json` was added by hand.
+ */
 function resolveSettingsPath(scope: McpScope): string {
   if (scope === 'user') {
-    return path.join(os.homedir(), '.claude', 'settings.json')
+    return path.join(os.homedir(), '.claude.json')
   }
-  return path.join(process.cwd(), '.claude', 'settings.json')
+  return path.join(process.cwd(), '.mcp.json')
 }
 
 /**
@@ -42,10 +53,13 @@ function resolveSettingsPath(scope: McpScope): string {
  * Detection order:
  *   1. --command override: split on spaces, first token is command, rest are args
  *   2. Monorepo layout: ./packages/upg-cli/dist/cli.cjs exists, use node
- *   3. Default fallback: npx @unified-product-graph/mcp mcp run
+ *   3. Default fallback: npx -y @unified-product-graph/mcp-server
  *
- * The MCP server is bundled into @unified-product-graph/mcp. Claude Desktop
- * invokes it via `upg mcp run`. One install, one canonical entry point.
+ * The server ships as its own package, @unified-product-graph/mcp-server, with a
+ * `upg-mcp-server` bin. The canonical launch is the package directly via npx —
+ * no `upg mcp run` indirection and no `mcp`/`run` positionals (which used to
+ * crash the server's arg parser). `-y` skips the npx install prompt so a fresh
+ * machine connects unattended.
  */
 export function detectMcpCommand(commandOverride?: string): McpServerEntry {
   // 1. Explicit override.
@@ -54,14 +68,14 @@ export function detectMcpCommand(commandOverride?: string): McpServerEntry {
     return { command: parts[0], args: parts.slice(1) }
   }
 
-  // 2. Monorepo layout.
-  const monorepoPath = path.join(process.cwd(), 'packages', 'upg-cli', 'dist', 'cli.cjs')
-  if (fs.existsSync(monorepoPath)) {
-    return { command: 'node', args: ['./packages/upg-cli/dist/cli.cjs', 'mcp', 'run'] }
+  // 2. Monorepo layout: run the server's own built entry, not via the CLI.
+  const monorepoServer = path.join(process.cwd(), 'packages', 'upg-mcp-server', 'dist', 'index.js')
+  if (fs.existsSync(monorepoServer)) {
+    return { command: 'node', args: ['./packages/upg-mcp-server/dist/index.js'] }
   }
 
-  // 3. Default: npx published package.
-  return { command: 'npx', args: ['@unified-product-graph/mcp', 'mcp', 'run'] }
+  // 3. Default: npx the published server package directly.
+  return { command: 'npx', args: ['-y', '@unified-product-graph/mcp-server'] }
 }
 
 // ── Settings file helpers ─────────────────────────────────────────────────────
@@ -198,20 +212,21 @@ export async function runMcpStatus(opts: StatusOptions = {}): Promise<StatusResu
 // ── Command output helpers ────────────────────────────────────────────────────
 
 function formatEntry(entry: McpServerEntry): string {
-  const json = JSON.stringify({ command: entry.command, args: entry.args }, null, 4)
+  // Show the entry exactly as it lands in the config file, nested under its key.
+  const block = { 'unified-product-graph': { command: entry.command, args: entry.args } }
+  return JSON.stringify(block, null, 2)
     .split('\n')
     .map((l) => '    ' + l)
     .join('\n')
-  return json
 }
 
 // ── Commander commands ────────────────────────────────────────────────────────
 
 const mcpSetupCommand = new Command('setup')
-  .description('Write the UPG MCP server entry into .claude/settings.json')
+  .description('Write the UPG MCP server entry into the config Claude Code reads')
   .option(
     '--scope <user|project>',
-    'project = <cwd>/.claude/settings.json. user = ~/.claude/settings.json',
+    'project = <cwd>/.mcp.json. user = ~/.claude.json',
     'project',
   )
   .option('--force', 'Overwrite an existing entry without prompting', false)
@@ -242,10 +257,7 @@ const mcpSetupCommand = new Command('setup')
       console.log()
       console.log(`  ${chalk.green('✓')} MCP server ${verb} ${chalk.dim(result.settingsPath)}`)
       console.log()
-      console.log(chalk.dim('    "unified-product-graph": {'))
-      const entryLines = formatEntry(result.entry)
-      console.log(chalk.dim(entryLines))
-      console.log(chalk.dim('    }'))
+      console.log(chalk.dim(formatEntry(result.entry)))
       console.log()
       console.log(`  Open Claude Code in this directory. The UPG tools will be available automatically.`)
       console.log()
