@@ -4,6 +4,10 @@ All notable changes to `@unified-product-graph/cloud-server` are documented in t
 
 This package co-versions with `@unified-product-graph/core` and `@unified-product-graph/mcp-server`. One version line covers the spec and both reference implementations.
 
+## 0.8.11 · 2026-06-03 · Co-versioned patch
+
+Co-versioned with the train. No cloud-server changes; the 0.8.11 fix is the local MCP server startup deprecation-warning correction (#1976).
+
 ## 0.8.10 · 2026-06-03 · Framework-score validation patch
 
 Co-version with the `@unified-product-graph/*` 0.8.10 patch train (core fixes a Kano sum-denominator false positive in framework-score validation). No cloud-server surface change; co-versioned for a clean install matrix.

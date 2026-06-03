@@ -2,6 +2,11 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.11] - 2026-06-03
+
+### Fixed
+- Startup deprecation check no longer flags canonical types. It used `getDeprecatedTypes()` (the historical migration union, which still contains `hypothesis` from the v0.2.8 split) and walked `UPG_MIGRATIONS` for the replacement, so a graph with canonical `hypothesis` nodes printed a bogus warning pointing a canonical type at a deprecated one. Detection and the suggested replacement now come from entity-meta (`isDeprecatedType` / `getReplacementType`). Genuinely deprecated types (`hypothesis_claim`, `pain_point`, `jtbd`) still warn, in the correct direction. (#1976)
+
 ## [0.8.10] - 2026-06-03
 
 Co-versioned 0.8.10 release, in lockstep with the package train. No changes to `@unified-product-graph/mcp-server` itself; it inherits the core framework-score validation fix (Kano sum-denominator false positive) via its `@unified-product-graph/core` dependency.

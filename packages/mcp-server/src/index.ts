@@ -18,7 +18,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createServer, SERVER_VERSION } from './server.js'
-import { UPG_VERSION, getDeprecatedTypes, UPG_MIGRATIONS, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
+import { UPG_VERSION, isDeprecatedType, getReplacementType, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
 import { nanoid } from 'nanoid'
 
 /**
@@ -179,23 +179,26 @@ export async function runMcpServer() {
   store.setWriter('upg-mcp-local', SERVER_VERSION)
   await store.load(resolvedPath)
 
-  // Check for deprecated types and warn
-  const deprecated = getDeprecatedTypes()
+  // Check for deprecated types and warn. Detection AND the suggested replacement
+  // both come from entity-meta (the source of truth for current maturity), NOT the
+  // historical migration union: a type can be a migration `from` in one version yet
+  // be canonical-stable today (e.g. `hypothesis` was split to `hypothesis_claim` at
+  // v0.2.8 and reverted at v0.4.0). Using isDeprecatedType / getReplacementType
+  // keeps the warning from flagging a canonical type and pointing at a deprecated one.
   const nodes = store.getAllNodes()
   const deprecatedCounts: Record<string, number> = {}
   for (const node of nodes) {
-    if (deprecated.has(node.type)) {
+    if (isDeprecatedType(node.type)) {
       deprecatedCounts[node.type] = (deprecatedCounts[node.type] ?? 0) + 1
     }
   }
 
   if (Object.keys(deprecatedCounts).length > 0) {
     const lines = Object.entries(deprecatedCounts).map(([type, count]) => {
-      for (const migrations of Object.values(UPG_MIGRATIONS)) {
-        const m = migrations.find((m) => m.from === type)
-        if (m) return `  \u26A0\uFE0F  ${count} "${type}" entities \u2192 should be "${m.to}"`
-      }
-      return `  \u26A0\uFE0F  ${count} "${type}" entities (deprecated)`
+      const replacement = getReplacementType(type)
+      return replacement
+        ? `  \u26A0\uFE0F  ${count} "${type}" entities \u2192 should be "${replacement}"`
+        : `  \u26A0\uFE0F  ${count} "${type}" entities (deprecated)`
     })
     process.stderr.write(`\nDeprecated types found in your graph:\n${lines.join('\n')}\n`)
     process.stderr.write(`Run /upg-fix-types to update them.\n\n`)
