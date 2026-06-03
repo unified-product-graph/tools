@@ -2,6 +2,10 @@
 
 Changes to `@unified-product-graph/cli` follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-06-03
+
+CLI hardening + cross-surface QA. New `upg show <exercise>` (read exercise scores back); `export --format` is validated (unknown value exits 3 instead of emitting nothing; `markdown` accepted as `md`); `init` honours `--file`/`$UPG_FILE` and a new `--yes` for non-interactive runs; last-writer provenance is stamped on every write; the `upg use design` help example is corrected to `ux_design`. Co-versions the @unified-product-graph/* 0.8.7 train.
+
 ## [0.8.5] - 2026-06-02
 
 Field-report fast-follow (tester report on 0.8.4).

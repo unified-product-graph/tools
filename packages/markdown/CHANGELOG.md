@@ -6,6 +6,10 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-06-03
+
+Co-version with the @unified-product-graph/* 0.8.7 release train.
+
 ## [0.8.5] - 2026-06-02
 
 Co-version with the @unified-product-graph/* 0.8.5 fast-follow (skill_audit + CLI/docs consistency + npx-cache fix). No surface change; co-versioned for a clean install matrix.

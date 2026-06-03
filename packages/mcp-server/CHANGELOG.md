@@ -2,6 +2,10 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.7] - 2026-06-03
+
+`list_frameworks` now returns a lightweight summary per framework (the full four-layer record was overflowing the tool-result token cap on the default call); `get_framework` returns the full record. `apply_framework` shares one cross-surface envelope with the CLI (`{ exercise_id, exercise, included, warnings }`). `get_framework` gives a helpful error on an unknown id. Last-writer provenance is stamped on writes. The `upg-prioritise` skill teaches the apply/score exercise flow. Co-versions the @unified-product-graph/* 0.8.7 train.
+
 ## [0.8.5] - 2026-06-02
 
 Field-report fast-follow (tester report on 0.8.4).

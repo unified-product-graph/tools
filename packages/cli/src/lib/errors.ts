@@ -47,18 +47,53 @@ export function runtimeError(message: string): CliError {
 }
 
 /**
- * Standard catch-block terminator. Prints the message to stderr and exits with
- * the error's classified code (defaulting to runtime/1 for unclassified throws —
+ * When true, `die` emits a machine-readable JSON error envelope on stdout
+ * instead of a human line on stderr. Set once, early, from `--json` in argv
+ * ( D1) so every error path — there are dozens of `die` call sites —
+ * becomes JSON-aware without threading the flag through each command.
+ */
+let jsonMode = false
+
+/** Set global `--json` error mode. Call once from the entry point, early. */
+export function setJsonErrorMode(on: boolean): void {
+  jsonMode = on
+}
+
+/** True when `--json` was passed (errors should be emitted as JSON). */
+export function isJsonErrorMode(): boolean {
+  return jsonMode
+}
+
+/** Classify a thrown value into an exit code (the shared `die` taxonomy). */
+function classify(err: unknown): ExitCode {
+  if (err instanceof CliError) return err.code
+  // AmbiguousFileError (graph.ts) and AmbiguousTitleError (cursor.ts) are usage
+  // errors → exit 3. Matched by name to avoid a circular import between
+  // lib/errors and lib/graph / lib/cursor.
+  if (err instanceof Error && (err.name === 'AmbiguousFileError' || err.name === 'AmbiguousTitleError')) {
+    return EXIT.USAGE
+  }
+  return EXIT.RUNTIME
+}
+
+/**
+ * Standard catch-block terminator. Prints the message and exits with the
+ * error's classified code (defaulting to runtime/1 for unclassified throws —
  * the common "file not found", "store failed" case). Validation/usage problems
  * should be raised as a `CliError` with the right code so they land on 2/3.
+ *
+ * Under `--json` ( D1) the error is emitted as a single-line JSON
+ * envelope on STDOUT — `{"ok":false,"error":{"code":<exit>,"message":"..."}}` —
+ * so a script that asked for JSON gets JSON on the error path too, never a bare
+ * human sentence it cannot parse. The process still exits with the right code.
  */
 export function die(err: unknown): never {
   const message = err instanceof Error ? err.message : String(err)
-  let code: ExitCode = EXIT.RUNTIME
-  if (err instanceof CliError) code = err.code
-  // AmbiguousFileError (from graph.ts) is a usage error → exit 3. Matched by
-  // name to avoid a circular import between lib/errors and lib/graph.
-  else if (err instanceof Error && err.name === 'AmbiguousFileError') code = EXIT.USAGE
-  console.error(message)
+  const code = classify(err)
+  if (jsonMode) {
+    process.stdout.write(JSON.stringify({ ok: false, error: { code, message } }) + '\n')
+  } else {
+    console.error(message)
+  }
   process.exit(code)
 }

@@ -3,10 +3,10 @@
  *
  * Sources: markdown, github, linear, jira, dovetail, vistaly, notion (via MCP).
  *
- * Example: `upg import --from markdown --file ./docs/ --dry-run`
+ * Example: `upg import --from markdown --input ./docs/ --dry-run`
  */
 
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 import * as fs from 'node:fs/promises'
 import * as fsSync from 'node:fs'
 import * as path from 'node:path'
@@ -496,7 +496,7 @@ function printComingSoon(tool: 'notion'): void {
       console.log(`    1. In Notion: Settings → Export → Markdown & CSV`)
       console.log(`    2. Unzip the export and run:`)
       console.log()
-      console.log(`       ${chalk.white('upg import --from markdown --file ./notion-export/')}`)
+      console.log(`       ${chalk.white('upg import --from markdown --input ./notion-export/')}`)
       console.log()
       console.log(`  ${chalk.dim('Full CLI support with live Notion API sync is in development.')}`)
       break
@@ -523,16 +523,26 @@ export { LIVE_TOOLS }
 
 export const importCommand = new Command('import')
   .description('Pull entities from an external tool into your .upg file.')
-  .requiredOption('--from <tool>', `Source tool: ${SUPPORTED_TOOLS.join(', ')}`)
-  .option('--file <path>', 'For markdown: path to .md file or directory. Defaults to .')
+  // Optional positional source path, e.g. `upg import --from markdown ./docs`.
+  .argument('[path]', 'For markdown: path to .md file or directory. Same as --input.')
+  // .choices() makes a bogus value a usage error (commander.invalidOptionArgument
+  // -> exit 3) instead of falling through to the action handler.
+  .addOption(
+    new Option('--from <tool>', `Source tool: ${SUPPORTED_TOOLS.join(', ')}`)
+      .choices(SUPPORTED_TOOLS)
+      .makeOptionMandatory(),
+  )
+  .option('--input <path>', 'For markdown: path to .md file or directory. Defaults to .')
+  .option('--file <path>', 'Alias for --input (kept for back-compat).')
   .option('--output <path>', 'Output .upg path. Defaults to auto-discover or ./product.upg')
   .option('--dry-run', 'Preview entities. Skips the write')
   .option('--yes', 'Skip confirmation prompts')
   .addHelpText('after', `
 Examples:
   upg import --from markdown
-  upg import --from markdown --file ./research/
-  upg import --from markdown --file ./notes.md --dry-run
+  upg import --from markdown --input ./research/
+  upg import --from markdown ./research/
+  upg import --from markdown --input ./notes.md --dry-run
   upg import --from notion
   upg import --from github
   upg import --from linear
@@ -546,20 +556,29 @@ Environment variables (avoids prompts):
   JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
   DOVETAIL_API_KEY
   VISTALY_API_KEY, VISTALY_WORKSPACE_ID`)
-  .action(async (opts) => {
+  .action(async (positionalPath: string | undefined, opts) => {
     const tool = opts.from as string
 
+    // .choices() already rejects bad --from values as a usage error (exit 3);
+    // this guard stays as a defensive net for any unexpected value.
     if (!SUPPORTED_TOOLS.includes(tool as SupportedTool)) {
       console.error(
         chalk.red(`Unknown tool: ${tool}\n`) +
         chalk.dim(`Supported: ${SUPPORTED_TOOLS.join(', ')}`),
       )
-      process.exit(1)
+      process.exit(3)
     }
+
+    // Source path precedence: --input, then the --file back-compat alias, then
+    // the optional positional argument. Any one of them feeds the adapter flow.
+    const sourcePath =
+      (opts.input as string | undefined) ??
+      (opts.file as string | undefined) ??
+      positionalPath
 
     const importOpts: ImportOptions = {
       from: tool as SupportedTool,
-      file: opts.file as string | undefined,
+      file: sourcePath,
       output: opts.output as string | undefined,
       dryRun: opts.dryRun as boolean | undefined,
       yes: opts.yes as boolean | undefined,

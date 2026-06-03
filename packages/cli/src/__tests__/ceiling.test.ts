@@ -140,8 +140,10 @@ describe('Tier-1 ceiling verbs', () => {
     expect(JSON.parse(r.stdout).edge).toBeNull()
   })
 
-  it('`new` rejects an unknown type (exit 1)', () => {
-    expect(run(args(['new', 'not_a_type', 'X']), tmp).status).toBe(1)
+  it('`new` rejects an unknown type (exit 2, validation)', () => {
+    // D2: an unknown entity type is a validation/policy violation
+    // (exit 2), matching `create`. (Was exit 1.)
+    expect(run(args(['new', 'not_a_type', 'X']), tmp).status).toBe(2)
   })
 
   // ── link: infer + auto-flip + prompt only on ambiguity ──────────────────────

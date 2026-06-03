@@ -1,6 +1,6 @@
 import { Command } from 'commander'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
-import { applyFramework } from '@unified-product-graph/sdk'
+import { applyFramework, applyFrameworkEnvelope } from '@unified-product-graph/sdk'
 import { EXIT, die, violation } from '../lib/errors.js'
 
 export const applyCommand = new Command('apply')
@@ -33,7 +33,8 @@ export const applyCommand = new Command('apply')
       store.stopWatching()
 
       if (opts.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n')
+        // Shared cross-surface envelope: identical to MCP apply_framework.
+        process.stdout.write(JSON.stringify(applyFrameworkEnvelope(result), null, 2) + '\n')
       } else {
         const n = result.edges.length
         process.stderr.write(

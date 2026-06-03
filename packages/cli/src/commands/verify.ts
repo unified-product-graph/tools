@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { validateUPGDocument, CONTENT_DEPTH_WARNING_RULES } from '@unified-product-graph/core'
 import { discoverUPGFile, loadStore, computeGraphDigest, getOrphans, BUSINESS_AREAS } from '../lib/graph.js'
 import { EXIT, die, violation } from '../lib/errors.js'
 
@@ -7,7 +8,8 @@ export const verifyCommand = new Command('verify')
   .option('--file <path>', 'Path to .upg file')
   .option('--no-orphans', 'Fail when orphan entities exist')
   .option('--no-broken-chains', 'Fail when any chain is incomplete')
-  .option('--max-orphan-rate <n>', 'Maximum orphan rate, 0.0–1.0', parseFloat)
+  .option('--no-content-depth', 'Skip property-type, enum, and self-loop checks')
+  .option('--max-orphan-rate <n>', 'Maximum orphan rate, 0.0-1.0', parseFloat)
   .option('--require-domains <list>', 'Comma-separated domains that must hold entities', (v) => v.split(','))
   .option('--json', 'Machine-readable JSON output')
   .action(async (opts) => {
@@ -19,6 +21,23 @@ export const verifyCommand = new Command('verify')
       const orphanRate = digest.health.orphan_rate
 
       const violations: Array<{ rule: string; message: string }> = []
+
+      // Structural validity. The SDK load path is now permissive (/629):
+      // it records content-invalidity on the integrity report instead of
+      // throwing, so reads and the delete/update that repairs a graph keep
+      // working. `verify` must therefore surface those recorded errors itself. A
+      // dangling edge, a missing node field, or a whitespace-only title lands in
+      // `validation.errors` and is a policy violation (exit 2), restoring the
+      // behaviour that used to come from load throwing "Invalid UPG document".
+      const validation = validateUPGDocument(store.getDocument())
+      if (validation.errors.length > 0) {
+        const examples = validation.errors.slice(0, 3).map((e) => `${e.path}: ${e.message}`).join('; ')
+        const more = validation.errors.length > 3 ? ` (+${validation.errors.length - 3} more)` : ''
+        violations.push({
+          rule: 'invalid-document',
+          message: `${validation.errors.length} document validation error(s). ${examples}${more}`,
+        })
+      }
 
       if (opts.noOrphans === false && orphans.length > 0) {
         violations.push({
@@ -55,6 +74,42 @@ export const verifyCommand = new Command('verify')
           } else if (cov.covered === 0) {
             violations.push({ rule: 'require-domains', message: `Domain "${domain}" has no entities` })
           }
+        }
+      }
+
+      // Content-depth checks: property TYPE, property ENUM, and
+      // self-loop edges. These are surfaced by the spec validator as WARNINGS
+      // (never errors) so a drifted-but-readable graph still loads. `verify`
+      // re-runs the validator on the loaded document and re-classifies the
+      // tagged warnings as policy violations, so a CI gate fails (exit 2)
+      // without the parser ever refusing to read the file.
+      if (opts.contentDepth !== false) {
+        const depthFindings = validation.warnings.filter(
+          (w) => w.rule !== undefined && CONTENT_DEPTH_WARNING_RULES.has(w.rule),
+        )
+        // Aggregate per rule so one violation line summarises N findings, with
+        // a few concrete examples, instead of flooding the output.
+        const byRule = new Map<string, typeof depthFindings>()
+        for (const f of depthFindings) {
+          const list = byRule.get(f.rule as string) ?? []
+          list.push(f)
+          byRule.set(f.rule as string, list)
+        }
+        const RULE_LABEL: Record<string, string> = {
+          'property-type': 'Property type mismatch',
+          'property-enum': 'Property value outside its allowed set',
+          'self-loop': 'Self-loop edge (source === target)',
+        }
+        for (const [rule, findings] of byRule) {
+          const examples = findings
+            .slice(0, 3)
+            .map((f) => `${f.path}: ${f.message}`)
+            .join('; ')
+          const more = findings.length > 3 ? ` (+${findings.length - 3} more)` : ''
+          violations.push({
+            rule,
+            message: `${RULE_LABEL[rule] ?? rule}: ${findings.length} finding(s). ${examples}${more}`,
+          })
         }
       }
 

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { createHash } from 'node:crypto'
+import lockfile from 'proper-lockfile'
 import type { FSWatcher } from 'chokidar'
 import {
   validateUPGDocument,
@@ -8,6 +9,7 @@ import {
   type UPGBaseNode,
   type UPGEdge,
   type UPGIntegrity,
+  type UPGValidationError,
   type UPGPortfolioDocument,
   type UPGCrossEdge,
   UPG_CROSS_EDGE_TYPES,
@@ -42,6 +44,19 @@ export interface IntegrityReport {
   quarantined: QuarantinedEntity[]
   /** Edges removed because they reference quarantined or missing nodes */
   orphanedEdges: number
+  /**
+   *: content-validity errors found at LOAD time on a structurally
+   * sound document (valid JSON + a present `$upg` envelope) that nonetheless
+   * fails one or more spec content checks (e.g. an unknown node type from a
+   * stricter spec, a dangling edge endpoint, an invalid enum value).
+   *
+   * The load path is PERMISSIVE about these: it warns to stderr and loads the
+   * graph anyway so reads, and the delete/update that could repair the file,
+   * still work. The errors are recorded here for the operator/agent to act on.
+   * The WRITE/flush path stays STRICT, so no new invalid state is persisted.
+   * Empty array = the document was content-valid at load.
+   */
+  contentValidationErrors: UPGValidationError[]
 }
 
 export interface ChangeEntry {
@@ -69,6 +84,8 @@ export class UPGFileStore {
   private saveTimer: ReturnType<typeof setTimeout> | null = null
   private selfWriteInProgress = false
   private watcher: FSWatcher | null = null
+  /** Identity of the tool writing through this store, stamped on every flush. */
+  private writer?: { tool: string; tool_version?: string }
 
   // Indexes for O(1) lookups
   private nodeMap = new Map<string, UPGBaseNode>()
@@ -107,6 +124,41 @@ export class UPGFileStore {
     return createHash('sha256').update(raw).digest('hex').slice(0, 32)
   }
 
+  /**
+   *: deterministic advisory-lock path, keyed on the RESOLVED `.upg`
+   * path so every process that writes the same file contends for the same
+   * lock. proper-lockfile creates a `<lockfilePath>` directory as the lock
+   * token (atomic mkdir), independent of the data file existing, which is why
+   * we set an explicit path + `realpath: false`: `save()` re-reads disk and
+   * the data file may have been deleted out from under us mid-flight.
+   */
+  private lockFilePathFor(filePath: string): string {
+    return filePath + '.lock'
+  }
+
+  /**
+   *: acquire the advisory file lock around the read-modify-write +
+   * atomic-rename window in `save()`. Without this, two concurrent writers
+   * each load the same baseline, each append a node, and the second `rename`
+   * clobbers the first writer's append (the lost-update bug verified via
+   * `for i in $(seq 1 12); do upg create ... & done; wait` → 11/12 persisted).
+   *
+   * Returns a `release()` thunk the caller MUST invoke in a `finally`. Retries
+   * with exponential backoff so a writer that finds the lock held SERIALIZES
+   * behind the holder instead of failing or losing its update. `stale` lets a
+   * crashed holder's lock be reclaimed so a dead process can't wedge writes.
+   */
+  private async acquireWriteLock(): Promise<() => Promise<void>> {
+    return lockfile.lock(this.filePath, {
+      lockfilePath: this.lockFilePathFor(this.filePath),
+      realpath: false,
+      stale: 15_000,
+      // 10 retries, exponential backoff (~10ms..~1s), tens of writers serialize
+      // cleanly in practice. minTimeout/maxTimeout bound the per-attempt wait.
+      retries: { retries: 10, factor: 2, minTimeout: 10, maxTimeout: 1_000, randomize: true },
+    })
+  }
+
   /** Compute integrity checksum over nodes + edges content (deterministic) */
   private computeIntegrityChecksum(): string {
     // Sort nodes and edges by ID for deterministic hash regardless of order
@@ -127,7 +179,7 @@ export class UPGFileStore {
 
   /** Verify integrity and quarantine invalid entities if file was modified externally */
   private verifyIntegrity(): IntegrityReport {
-    const report: IntegrityReport = { tampered: false, quarantined: [], orphanedEdges: 0 }
+    const report: IntegrityReport = { tampered: false, quarantined: [], orphanedEdges: 0, contentValidationErrors: [] }
 
     // Check if integrity stamp exists
     if (!this.doc._integrity) {
@@ -214,31 +266,107 @@ export class UPGFileStore {
     return this.lastMergeResult
   }
 
+  /**
+   *: split validator errors into the ones that mean "this isn't a UPG
+   * file at all" (structural / envelope) versus "this IS a UPG file but some
+   * content is spec-invalid" (content-validity).
+   *
+   * normalizeDocument() has already lifted the on-disk `$upg` envelope into the
+   * flat in-memory shape, so the validator reports envelope problems against
+   * the flat root paths below. A bare hand-authored `{ product, nodes, edges }`
+   * with no `$upg` block lands here as missing `$.upg_version` / `$.exported_at`
+   * / `$.source` (the envelope-derived fields), which is exactly what we treat
+   * as a HARD structural failure. Anything indexed into a node or edge
+   * (`$.nodes[i]...`, `$.edges[i]...`) is content-validity and must NOT brick a
+   * load: a stricter spec landing an unknown enum on one node should surface as
+   * a warning, not lock the operator out of the delete/update that repairs it.
+   */
+  private classifyValidationErrors(errors: UPGValidationError[]): {
+    structural: UPGValidationError[]
+    content: UPGValidationError[]
+  } {
+    // Envelope / document-root paths. These are the fields the canonical `$upg`
+    // block supplies; their absence means the file is not a UPG document.
+    const STRUCTURAL_ROOT_PATHS = new Set<string>([
+      '$',
+      '$.upg_version',
+      '$.exported_at',
+      '$.source',
+      '$.source.tool',
+      '$.product',
+      '$.product.id',
+      '$.product.title',
+      '$.nodes', // not-an-array (the container is malformed, not a node)
+      '$.edges', // not-an-array (the container is malformed, not an edge)
+    ])
+    const structural: UPGValidationError[] = []
+    const content: UPGValidationError[] = []
+    for (const e of errors) {
+      if (STRUCTURAL_ROOT_PATHS.has(e.path)) structural.push(e)
+      else content.push(e)
+    }
+    return { structural, content }
+  }
+
   async load(filePath: string): Promise<void> {
     this.filePath = path.resolve(filePath)
     const raw = await fs.readFile(this.filePath, 'utf-8')
     // normalizeDocument accepts BOTH the canonical `$upg` envelope and the
     // legacy flat envelope, returning the flat in-memory shape (and repairing
     // double-encoded properties/tags drift). This is the one read path.
+    //
+    // JSON.parse throwing here is a HARD failure on purpose: a non-JSON file is
+    // not a UPG document. We let it propagate (the caller's `catch` already
+    // surfaces it the same way it did before).
     const parsed = normalizeDocument(JSON.parse(raw))
 
     const result = validateUPGDocument(parsed)
+    let contentValidationErrors: UPGValidationError[] = []
     if (!result.valid) {
-      const msgs = result.errors
+      const { structural, content } = this.classifyValidationErrors(result.errors)
+
+      // ── HARD failure: structural / missing-envelope. Still throw. ──────────
+      // This is the "not a UPG file at all" path: missing `$upg` envelope, a
+      // malformed root, or `nodes`/`edges` that aren't arrays. Bricking the
+      // read is correct here; there is nothing to load and nothing to repair.
+      if (structural.length > 0) {
+        const msgs = structural
+          .map((e) => `  ${e.path}: ${e.message}`)
+          .join('\n')
+        // (S-12): the validator reports the envelope-internal path (e.g.
+        // `$.exported_at`), but in the on-disk canonical envelope that field
+        // lives at `$upg.provenance.exported_at`. A hand-authored `{ product,
+        // nodes, edges }` is missing the whole `$upg` block. Point there.
+        const missingEnvelope = structural.some((e) => /exported_at|provenance|\$upg|format_version/.test(`${e.path} ${e.message}`))
+        const hint = missingEnvelope
+          ? `\n\nThe \`$upg\` provenance envelope is required (real field path: ` +
+            `\`$upg.provenance.exported_at\`). Don't hand-author a bare ` +
+            `{ product, nodes, edges } file — scaffold via the CLI (\`upg init\`) ` +
+            `or clone an existing \`.upg\` file's \`$upg\` block.`
+          : ''
+        throw new Error(`Invalid UPG document:\n${msgs}${hint}`)
+      }
+
+      // ── PERMISSIVE: content-validity only. Load anyway, warn, record. ──────
+      //: mirrors the product.stage soft-coercion below — we warn to
+      // stderr and load the graph so reads and the delete/update that repairs
+      // the file keep working. The errors are recorded on the integrity report
+      // (see verifyIntegrity) for the operator/agent. Strict validation stays
+      // on the WRITE/flush path, so writers never persist NEW invalid state;
+      // only the LOAD boundary is permissive. This is what lets Spock's
+      // stricter property/enum checks surface as warnings, not new bricks.
+      contentValidationErrors = content
+      const msgs = content
         .map((e) => `  ${e.path}: ${e.message}`)
         .join('\n')
-      // (S-12): the validator reports the envelope-internal path (e.g.
-      // `$.exported_at`), but in the on-disk canonical envelope that field
-      // lives at `$upg.provenance.exported_at`. A hand-authored `{ product,
-      // nodes, edges }` is missing the whole `$upg` block. Point there.
-      const missingEnvelope = result.errors.some((e) => /exported_at|provenance|\$upg|format_version/.test(`${e.path} ${e.message}`))
-      const hint = missingEnvelope
-        ? `\n\nThe \`$upg\` provenance envelope is required (real field path: ` +
-          `\`$upg.provenance.exported_at\`). Don't hand-author a bare ` +
-          `{ product, nodes, edges } file — scaffold via the CLI (\`upg init\`) ` +
-          `or clone an existing \`.upg\` file's \`$upg\` block.`
-        : ''
-      throw new Error(`Invalid UPG document:\n${msgs}${hint}`)
+      process.stderr.write(
+        `[upg-load] ${content.length} content-validity ` +
+          `${content.length === 1 ? 'issue' : 'issues'} in an otherwise well-formed UPG document. ` +
+          `Loaded anyway (reads and repair stay available); writes remain strict so no new ` +
+          `invalid state is persisted. Run \`upg verify\` / \`validate_graph\` for the full report, ` +
+          `then update/delete the offending entities to repair.\n${msgs}\n` +
+          `File: ${this.filePath}\n`,
+      )
     }
 
     this.doc = parsed as UPGDocument
@@ -280,6 +408,12 @@ export class UPGFileStore {
 
     // Verify integrity: detect external modifications and quarantine invalid entities
     this.lastIntegrityReport = this.verifyIntegrity()
+    //: surface the LOAD-time content-validity errors on the same report
+    // so consumers (CLI `verify`, MCP integrity surface, client.verify()) see a
+    // permissively-loaded-but-invalid graph as NOT-ok without the load throwing.
+    if (contentValidationErrors.length > 0) {
+      this.lastIntegrityReport.contentValidationErrors = contentValidationErrors
+    }
 
     this.rebuildIndexes()
     this.computeHash()
@@ -359,6 +493,35 @@ export class UPGFileStore {
   async save(): Promise<void> {
     if (!this.dirty) return
 
+    // ──: serialize the WHOLE read-modify-write window ──────────────
+    // The lost-update race lives between the disk re-read (Layer 1) and the
+    // atomic rename: two writers each read the same baseline, each merge in
+    // their own change, then the second rename clobbers the first writer's
+    // append. Holding the advisory lock across the entire critical section
+    // means a second writer either (a) waits until we release, then re-reads
+    // OUR just-written file as its disk baseline and three-way-merges its
+    // change on top, or (b) reclaims a stale lock from a crashed holder. Either
+    // way every writer's update is preserved. The lock is keyed on the resolved
+    // `.upg` path, so cross-process writers (separate `upg create` invocations)
+    // contend for the same token.
+    const release = await this.acquireWriteLock()
+    try {
+      // Re-check dirty inside the lock: a queued writer that was waiting may
+      // have had its work folded in by a watcher-driven merge while it blocked.
+      if (!this.dirty) return
+      await this.saveLocked()
+    } finally {
+      await release().catch(() => {})
+    }
+  }
+
+  /**
+   * The actual read-modify-write + atomic rename. MUST run under the advisory
+   * lock held by `save()`; never call directly. Split out so the lock
+   * acquire/release lives in one place and the existing merge/conflict logic is
+   * unchanged inside the critical section.
+   */
+  private async saveLocked(): Promise<void> {
     // ── Layer 1: Read-before-write dirty check ────────────────────────────
     // Re-read the file from disk and check if another process modified it
     // since we last loaded or saved.
@@ -397,7 +560,20 @@ export class UPGFileStore {
 
     // ── Write to disk ─────────────────────────────────────────────────────
     this.doc.exported_at = new Date().toISOString()
-    if (!this.doc.source.tool) {
+    // Stamp the LAST writer's identity ( / M7). Each entry point
+    // (CLI, MCP server) declares who it is via setWriter(); without that we
+    // keep the prior behaviour of defaulting only a missing tool. This is why a
+    // file written by the CLI then by the MCP server now correctly reads
+    // tool/tool_version of whoever wrote it last, instead of freezing the first.
+    if (this.writer) {
+      this.doc.source = {
+        ...this.doc.source,
+        tool: this.writer.tool,
+        ...(this.writer.tool_version !== undefined
+          ? { tool_version: this.writer.tool_version }
+          : {}),
+      }
+    } else if (!this.doc.source.tool) {
       this.doc.source.tool = 'upg-mcp-local'
     }
 
@@ -673,6 +849,18 @@ export class UPGFileStore {
 
   getProduct() {
     return this.doc.product
+  }
+
+  /**
+   * Declare the tool writing through this store ( / M7). Its `tool` and
+   * `tool_version` are stamped into `source` (provenance) on every flush, so the
+   * file records its LAST writer. Call once after construction/load from each
+   * entry point (CLI: `upg-cli` + its version; MCP: `upg-mcp-server` + its
+   * version). When unset, the prior behaviour (default a missing tool only) is
+   * preserved.
+   */
+  setWriter(tool: string, tool_version?: string): void {
+    this.writer = { tool, tool_version }
   }
 
   getNode(id: string): UPGBaseNode | undefined {

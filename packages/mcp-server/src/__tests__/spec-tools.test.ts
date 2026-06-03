@@ -539,6 +539,30 @@ describe('list_frameworks / get_framework', () => {
  expect(call(getFramework, {}).ok).toBe(false)
  expect(call(getFramework, { id: 'no-such-framework' }).ok).toBe(false)
  })
+
+ it('list_frameworks returns lightweight summaries, not full records (H1)', () => {
+ const { body } = call(listFrameworks, {})
+ const b = body as { count: number; frameworks: Array<Record<string, unknown>> }
+ // default limit (50) >= 42 frameworks, so the natural discovery call lists all
+ expect(b.count).toBe(UPG_FRAMEWORKS.length)
+ const f = b.frameworks[0]
+ expect(f).toHaveProperty('id')
+ expect(f).toHaveProperty('name')
+ expect(f).toHaveProperty('category')
+ expect(f).toHaveProperty('description')
+ // the heavy four-layer fields must NOT be in the list projection
+ expect(f).not.toHaveProperty('data')
+ expect(f).not.toHaveProperty('presentation')
+ expect(f).not.toHaveProperty('education')
+ // the full default list now stays well under the tool-result token cap
+ expect(JSON.stringify(b).length).toBeLessThan(60_000)
+ })
+
+ it('get_framework names the catalog on an unknown id (L4)', () => {
+ const r = call(getFramework, { id: 'no-such-framework' })
+ expect(r.ok).toBe(false)
+ expect(String(r.body)).toMatch(/rice-scoring/)
+ })
 })
 
 // ── Edges ───────────────────────────────────────────────────────────────────

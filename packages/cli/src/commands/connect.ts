@@ -1,6 +1,6 @@
 import { Command } from 'commander'
-import { discoverUPGFile, loadStore, inferEdgeType, edgeId } from '../lib/graph.js'
-import { EXIT, die, runtimeError, violation } from '../lib/errors.js'
+import { discoverUPGFile, loadStore, inferEdgeType, edgeId, wrapEdgeInferenceError } from '../lib/graph.js'
+import { EXIT, die, runtimeError } from '../lib/errors.js'
 import type { UPGEdgeType } from '@unified-product-graph/core'
 
 export const connectCommand = new Command('connect')
@@ -28,8 +28,10 @@ export const connectCommand = new Command('connect')
           edgeType = inferEdgeType(source.type, target.type)
         } catch (err) {
           // Incompatible pair: a policy violation → exit 2 (CLI-FEEDBACK #6).
+          // wrapEdgeInferenceError replaces the leaked catalog string with a
+          // user-facing message ( E4).
           store.stopWatching()
-          die(violation(err instanceof Error ? err.message : String(err)))
+          die(wrapEdgeInferenceError(err))
         }
       }
 

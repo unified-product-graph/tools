@@ -20,7 +20,8 @@ This is the home of the **Prioritise** approach. Where Inspect tells you *what's
 Use the `mcp__unified-product-graph__*` MCP tools:
 - **Read candidates:** `list_nodes`, `search_nodes`, `get_node`, `get_product_context`
 - **Approach + frameworks:** `get_approach({ approach_id: "prioritise" })`, `get_framework({ framework_id: "..." })`
-- **Capture decisions (optional):** `create_node`, `update_node`, `create_edge`
+- **Run + record a framework (the result lives on the graph):** `apply_framework` (creates the exercise and pulls candidates in), `score_entity` (records each candidate's result on its edge). On the CLI: `upg apply <framework> [ids...]`, `upg score <exercise> <entity> --data '{...}'`, and `upg show <exercise>` to read the scores back.
+- **Capture a decision (optional):** `create_node`, `update_node`, `create_edge`
 
 ## The Prioritisation Frameworks
 
@@ -152,18 +153,32 @@ Always add a one-sentence interpretation below the output: what does the ranking
 
 ### Step 5: Capture the Results
 
-Prioritisation that stays in a conversation dies. After presenting the results, ask:
+Prioritisation that stays in a conversation dies. The scoring run you just
+facilitated is itself a first-class object: a **framework exercise**. Running a
+framework over a set of candidates creates a `framework_exercise` node, and each
+candidate's result is recorded on an `includes` edge from the exercise to that
+entity. The score lives on the **edge**, not the candidate node, so the same
+feature can be a "must" in one exercise and a "could" in another, and the entity
+stays clean and queryable.
 
-> **What do you want to capture from this?**
+Record the run (confirm before writing):
 
-Common patterns and where they go:
+- **MCP:** `apply_framework({ framework_id, entity_ids, title })` to create the
+  exercise and pull the candidates in, then `score_entity({ exercise_id,
+  entity_id, values })` per candidate. `values` is the result you computed, e.g.
+  `{ "moscow": "must" }` or `{ "reach": 4, "impact": 5, "confidence": 3, "effort": 2 }`.
+- **CLI:** `upg apply <framework> <id...> --title "..."`, then
+  `upg score <exercise> <entity> --data '{...}'`; read it back with
+  `upg show <exercise>`.
+
+You can also capture the *decision* the ranking led to, which is distinct from the
+scores themselves:
 
 | What to capture | How |
 |-----------------|-----|
-| A prioritisation decision (chosen framework + top-ranked candidate) | `create_node` with type `decision`, link to candidates |
-| An updated `priority` field on existing nodes | `update_node` on each candidate |
-| A now-explicit "Won't do" item | `create_node` with type `decision`, note the rationale for deferral |
-| The full scoring run, for reference | Add as a `note` field on a `decision` node |
+| The scoring run (every candidate's result) | `apply_framework` + `score_entity` (above) |
+| A prioritisation decision (chosen framework + what you will do) | `create_node` type `decision`, linked to the exercise and the top candidates |
+| A now-explicit "Won't do" item | `create_node` type `decision`, note the rationale for deferral |
 
 Always confirm before writing. Never silently mutate graph nodes.
 

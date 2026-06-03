@@ -1413,11 +1413,13 @@ Apply a framework (MoSCoW, RICE, Kano, ...) to a set of entities: creates a fram
 
 **Returns:**
 
-JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id }], warnings }`.
+JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id, edge_type }], warnings }`
+(the shared cross-surface envelope; identical to CLI `apply --json`).
 
 **Throws:**
 
-- textError on a missing/unknown framework_id.
+- textError on a missing/unknown framework_id, or when no requested
+entity resolves (no dangling exercise is left behind).
 
 **See also:** `score_entity`
 
@@ -2021,7 +2023,7 @@ JSON: `{ patterns: string[], total: number }`
 
 ### `list_frameworks`
 
-List the canonical `UPGFramework` definitions; the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.
+List the canonical `UPGFramework` definitions: the curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Returns a lightweight summary per framework (id, name, category, description, tags, approach_ids, structure_pattern); call `get_framework(id)` for the full record. Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2035,7 +2037,7 @@ List the canonical `UPGFramework` definitions; the 34 curated, famous product fr
 
 **Returns:**
 
-JSON: `{ total, count, next_cursor?, frameworks: UPGFramework[] }`
+JSON: `{ total, count, next_cursor?, frameworks: Array<{ id, name, category, description, tags, approach_ids, structure_pattern }> }`
 
 **See also:** `get_framework`, `list_framework_categories`, `list_framework_structure_patterns`, `prioritise`, `list_approaches`
 

@@ -242,12 +242,13 @@ export class UPGClient {
     const report = store.getIntegrityReport()
     if (!report) {
       // No report computed yet (should not happen post-load) → treat as clean.
-      return { ok: true, tampered: false, quarantined: [], orphanedEdges: 0 }
+      return { ok: true, tampered: false, quarantined: [], orphanedEdges: 0, contentValidationErrors: [] }
     }
     const ok =
       !report.tampered &&
       report.orphanedEdges === 0 &&
-      report.quarantined.length === 0
+      report.quarantined.length === 0 &&
+      report.contentValidationErrors.length === 0
     return { ok, ...report }
   }
 

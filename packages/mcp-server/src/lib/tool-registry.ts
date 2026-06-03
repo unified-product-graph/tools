@@ -966,7 +966,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_frameworks',
     description:
-      'List the canonical `UPGFramework` definitions; the 34 curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.',
+      'List the canonical `UPGFramework` definitions: the curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Returns a lightweight summary per framework (id, name, category, description, tags, approach_ids, structure_pattern); call `get_framework(id)` for the full record. Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.',
     inputSchema: {
       type: 'object' as const,
       properties: {

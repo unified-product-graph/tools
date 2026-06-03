@@ -16,6 +16,7 @@ import {
   createEdge,
   executePrioritise,
   applyFramework,
+  applyFrameworkEnvelope,
   scoreEntity,
 } from '../index.js'
 // Canonical public surface (core) — the frameworks the runtime actually serves.
@@ -70,6 +71,37 @@ describe('applyFramework', () => {
   it('rejects an unknown framework id', async () => {
     const { store } = await freshStore()
     expect(() => applyFramework(store, { framework_id: 'not-a-framework', entity_ids: [] })).toThrow(/Unknown framework/)
+  })
+
+  it('warns when an entity is not a declared target type, but still includes it (M3)', async () => {
+    const { store } = await freshStore()
+    // n_sol is a `solution`; rice targets feature/opportunity/need, not solution.
+    const res = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_sol'] })
+    expect(res.edges).toHaveLength(1)
+    expect(res.warnings.join(' ')).toMatch(/not a declared target type/)
+  })
+
+  it('rolls back and throws when no requested entity resolves (M4)', async () => {
+    const { store } = await freshStore()
+    const before = store.getAllNodes().filter((n) => n.type === 'framework_exercise').length
+    expect(() =>
+      applyFramework(store, { framework_id: 'moscow', entity_ids: ['nope_1', 'nope_2'] }),
+    ).toThrow(/No entities could be included/)
+    const after = store.getAllNodes().filter((n) => n.type === 'framework_exercise').length
+    expect(after).toBe(before) // no dangling empty exercise
+  })
+
+  it('applyFrameworkEnvelope is the shared cross-surface shape MCP and CLI both emit (M1)', async () => {
+    const { store } = await freshStore()
+    const result = applyFramework(store, { framework_id: 'moscow', entity_ids: ['n_sso', 'n_dark'] })
+    const env = applyFrameworkEnvelope(result)
+    expect(env.exercise_id).toBe(result.exercise.id)
+    expect(env.exercise.id).toBe(result.exercise.id)
+    expect(env.warnings).toEqual(result.warnings)
+    expect(env.included).toEqual(
+      result.edges.map((e) => ({ edge_id: e.id, entity_id: e.target, edge_type: e.type })),
+    )
+    expect(env.included.every((i) => i.edge_type === INCLUDES)).toBe(true)
   })
 })
 
@@ -127,6 +159,25 @@ describe('scoreEntity', () => {
     const r = scoreEntity(store, { exercise_id: ex.exercise.id, entity_id: 'n_sso', values: { moscow: 'must', bogus: 1 } })
     expect('edge' in r).toBe(true)
     if ('edge' in r) expect(r.warnings.join(' ')).toMatch(/bogus/)
+  })
+
+  it('warns on out-of-scale and wrong-type values for declared inputs, but still stores (M2)', async () => {
+    const { store } = await freshStore()
+    const ex = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_sso'] })
+    // reach is assessment on reach_5 (1..5) → 999 is out of scale; impact expects a number → "high" is wrong type.
+    const r = scoreEntity(store, {
+      exercise_id: ex.exercise.id,
+      entity_id: 'n_sso',
+      values: { reach: 999, impact: 'high' },
+    })
+    expect('edge' in r).toBe(true)
+    if ('edge' in r) {
+      const w = r.warnings.join(' ')
+      expect(w).toMatch(/reach.*(scale|outside)/)
+      expect(w).toMatch(/impact.*number/)
+      // permissive: the bad values are still stored
+      expect((r.edge.properties as { reach?: number }).reach).toBe(999)
+    }
   })
 })
 

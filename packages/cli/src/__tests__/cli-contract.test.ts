@@ -72,8 +72,10 @@ describe('CLI contract', () => {
     expect(run(['verify', '--file', path.join(tmp, 'nope.upg')], tmp).status).toBe(1)
   })
 
-  it('create with an unknown type exits 1 (bad value)', () => {
-    expect(run(['create', 'not_a_type', 'X', '--file', file], tmp).status).toBe(1)
+  it('create with an unknown type exits 2 (policy)', () => {
+    // D2: an unknown entity type is a validation/policy violation
+    // (exit 2), matching `create --status <bad>` and `new`. (Was exit 1.)
+    expect(run(['create', 'not_a_type', 'X', '--file', file], tmp).status).toBe(2)
   })
 
   it('connect of an incompatible pair exits 2 (policy)', () => {

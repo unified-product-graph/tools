@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/mcp-server",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "description": "Local MCP server for .upg files. Read and write product knowledge graphs offline.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
@@ -45,6 +45,7 @@
     "generate-tools:check": "tsx scripts/generate-tool-reference.ts --check",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke": "node scripts/upg-smoke.mjs --file test-fixtures/sample.upg",
     "lint": "eslint src/",
     "type-check": "tsc --noEmit",
     "prepublishOnly": "npm run build"

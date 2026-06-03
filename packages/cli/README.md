@@ -103,6 +103,7 @@ Open Claude Code. The MCP status indicator shows `unified-product-graph` connect
 
 | Command | Description |
 |---------|-------------|
+| `upg use [lens]` | Set the sticky operating lens (scopes vocabulary): `product`, `ux_design`, `engineering`, `growth`, `business`, `research`, `marketing`, `full`. No arg shows the current lens; `--clear` resets |
 | `upg list` | Query entities. `--type`, `--status`, `--orphans`, `--count` |
 | `upg tree` | Tree view. `upg tree persona`, `--depth=2` |
 | `upg search <query>` | Fuzzy search across titles and descriptions |
@@ -124,6 +125,7 @@ Run a framework over a set of entities. `apply` creates a `framework_exercise` a
 |---------|-------------|
 | `upg apply <framework> [ids...]` | Create an exercise + an `includes` edge per entity. `--title`, `--status` |
 | `upg score <exercise> <entity>` | Record the result on the edge. `--data='{"moscow":"must"}'`, `--replace` |
+| `upg show <exercise>` | Show an exercise: each included entity + its recorded scores, as a table. `--json` |
 
 ```bash
 upg apply moscow feat_sso feat_dark --title "Q3 Release Scope"   # → prints the exercise id

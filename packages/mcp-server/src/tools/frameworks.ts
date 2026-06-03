@@ -7,6 +7,7 @@ import type { ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
 import {
   applyFramework as applyFrameworkLib,
+  applyFrameworkEnvelope,
   scoreEntity as scoreEntityLib,
 } from '@unified-product-graph/sdk'
 
@@ -14,8 +15,10 @@ import {
  * Create a framework_exercise and an `includes` edge to each entity it scores.
  * Edges start blank; fill results with `score_entity`.
  *
- * @returns JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id }], warnings }`.
- * @throws textError on a missing/unknown framework_id.
+ * @returns JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id, edge_type }], warnings }`
+ *   (the shared cross-surface envelope; identical to CLI `apply --json`).
+ * @throws textError on a missing/unknown framework_id, or when no requested
+ *   entity resolves (no dangling exercise is left behind).
  * @atomicity atomic.
  * @see score_entity
  */
@@ -32,18 +35,7 @@ export const applyFramework: ToolHandler = (args, ctx): ToolResult => {
       entity_ids: (args.entity_ids as string[] | undefined) ?? [],
       status: args.status as 'draft' | 'active' | 'archived' | undefined,
     })
-    return text(
-      JSON.stringify(
-        {
-          exercise_id: result.exercise.id,
-          exercise: result.exercise,
-          included: result.edges.map((e) => ({ edge_id: e.id, entity_id: e.target })),
-          warnings: result.warnings,
-        },
-        null,
-        2,
-      ),
-    )
+    return text(JSON.stringify(applyFrameworkEnvelope(result), null, 2))
   } catch (err) {
     return textError((err as Error).message)
   }

@@ -45,11 +45,13 @@ import { checkCommand } from './commands/check.js'
 import { fixCommand } from './commands/fix.js'
 import { applyCommand } from './commands/apply.js'
 import { scoreCommand } from './commands/score.js'
+import { showCommand } from './commands/show.js'
 import chalk from 'chalk'
 import { upgLogo } from './lib/formatter.js'
 import { applyColorPreference } from './lib/output.js'
 import { commandHelp, helpTopics, type HelpEntry } from './lib/help.js'
 import { CLI_VERSION } from './lib/version.js'
+import { setJsonErrorMode, isJsonErrorMode } from './lib/errors.js'
 
 // Single source of truth for the version — read from package.json at runtime so
 // `upg --version`, the logo, and the `init` banner never drift (CLI-FEEDBACK #5).
@@ -68,7 +70,7 @@ const ALL_COMMANDS: Command[] = [
   createCommand, updateCommand, deleteCommand, connectCommand, gapsCommand,
   initCommand, workspaceCommand, importCommand, exportCommand, fmtCommand,
   // Frameworks (exercises)
-  applyCommand, scoreCommand,
+  applyCommand, scoreCommand, showCommand,
   // Setup
   installSkillsCommand, mcpCommand,
 ]
@@ -257,6 +259,12 @@ for (const c of ALL_COMMANDS) program.addCommand(c)
 // Apply --no-color / NO_COLOR before anything renders.
 applyColorPreference(process.argv.includes('--no-color'))
 
+// D1: detect `--json` once, early, so every error path (`die`) emits a
+// machine-readable JSON envelope instead of a human sentence. Cheap argv probe,
+// same pattern as `--no-color`; every command that supports `--json` accepts it
+// as a plain boolean flag, so a positional value can never look like this token.
+setJsonErrorMode(process.argv.includes('--json'))
+
 // Help is intercepted before parse so it can never execute a command.
 interceptHelp(process.argv)
 
@@ -293,7 +301,15 @@ try {
   if (e.code === 'commander.helpDisplayed' || e.code === 'commander.help' || e.code === 'commander.version') {
     process.exit(0)
   }
-  if (e.message) process.stderr.write(e.message.endsWith('\n') ? e.message : e.message + '\n')
   // Usage errors → 3; everything else keeps commander's intended code (default 1).
-  process.exit(e.code && USAGE_ERROR_CODES.has(e.code) ? 3 : (typeof e.exitCode === 'number' ? e.exitCode : 1))
+  const exit = e.code && USAGE_ERROR_CODES.has(e.code) ? 3 : (typeof e.exitCode === 'number' ? e.exitCode : 1)
+  const message = (e.message ?? '').replace(/\n+$/, '')
+  // D1: a `--json` invocation must get JSON even on commander's own
+  // usage errors (unknown flag, missing arg), not a bare human line.
+  if (isJsonErrorMode()) {
+    process.stdout.write(JSON.stringify({ ok: false, error: { code: exit, message } }) + '\n')
+  } else if (e.message) {
+    process.stderr.write(message + '\n')
+  }
+  process.exit(exit)
 }

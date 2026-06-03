@@ -40,7 +40,7 @@ export const helpTopics: Record<string, HelpEntry> = {
       { flag: '--clear', desc: 'Reset to the full (unfiltered) lens' },
     ],
     examples: [
-      { cmd: 'upg use design', comment: 'speak design vocabulary' },
+      { cmd: 'upg use ux_design', comment: 'speak the UX/design vocabulary' },
       { cmd: 'upg use', comment: 'show current lens + available' },
       { cmd: 'upg use --clear' },
     ],
@@ -108,6 +108,7 @@ export const helpTopics: Record<string, HelpEntry> = {
     examples: [
       { cmd: 'upg new need "Decide dinner in <2 min"', comment: 'created + linked to the cursor' },
       { cmd: 'upg new feature "Planner" --at n_persona --json' },
+      { cmd: 'upg new persona -- "--draft"', comment: 'use -- so a flag-like title is a title, not a flag' },
     ],
     seeAlso: 'upg link, upg create',
   },
@@ -259,6 +260,7 @@ export const helpTopics: Record<string, HelpEntry> = {
       { cmd: 'upg create persona "Busy Parent"' },
       { cmd: 'upg create feature "Meal planner" --parent n_abc --json', comment: 'capture the new id from JSON' },
       { cmd: 'ID=$(upg create job "Plan dinner" --json | jq -r .node.id)' },
+      { cmd: 'upg create persona -- "--draft"', comment: 'use -- so a flag-like title is a title, not a flag' },
     ],
     seeAlso: 'upg connect, upg update',
   },
@@ -336,7 +338,18 @@ export const helpTopics: Record<string, HelpEntry> = {
       { cmd: 'upg score n_fx_q3 feat_sso --data \'{"moscow":"must"}\'' },
       { cmd: 'upg score n_fx_q3 feat_dark --data \'{"moscow":"could"}\'' },
     ],
-    seeAlso: 'upg apply',
+    seeAlso: 'upg apply, upg show',
+  },
+  show: {
+    usage: 'upg show <exercise> [options]',
+    summary: 'Show a framework exercise: each included entity and the scores recorded on its edge, as a table.',
+    options: [FILE_OPT, JSON_OPT],
+    examples: [
+      { cmd: 'upg show n_fx_q3', comment: 'by id' },
+      { cmd: 'upg show "Q3 release scope"', comment: 'by title' },
+      { cmd: 'upg show n_fx_q3 --json' },
+    ],
+    seeAlso: 'upg apply, upg score',
   },
   gaps: {
     usage: 'upg gaps [options]',

@@ -9,7 +9,7 @@
  * exercises with different results, and any entity type can be scored, not just
  * `feature`. See ADR 2026-06-02-framework-exercises.
  */
-import { UPG_FRAMEWORKS_BY_ID, type UPGFramework } from '@unified-product-graph/core'
+import { UPG_FRAMEWORKS_BY_ID, UPG_SCALES, type UPGFramework } from '@unified-product-graph/core'
 import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
 import type { UPGFileStore } from '../store.js'
 import { createNode, createEdge } from './tools.js'
@@ -35,6 +35,70 @@ export function frameworkInputKeys(framework: UPGFramework): string[] {
     }
   }
   return [...out]
+}
+
+/** The declared input spec for one property (type, scale, enum). */
+interface FrameworkInputSpec {
+  property: string
+  type?: 'number' | 'string' | 'enum' | 'boolean' | 'assessment'
+  scale_id?: string
+  enum_values?: string[]
+}
+
+/** The scoring inputs a framework declares for a given entity type. */
+function frameworkInputSpecs(framework: UPGFramework, entityType: string): FrameworkInputSpec[] {
+  const req = (
+    framework.data as { required_properties?: Record<string, FrameworkInputSpec[]> } | undefined
+  )?.required_properties
+  return req?.[entityType] ?? []
+}
+
+/** The entity types a framework declares as targets (from data.entity_types). */
+function frameworkTargetTypes(framework: UPGFramework): Set<string> {
+  const ets = (framework.data as { entity_types?: Array<{ type?: string }> } | undefined)
+    ?.entity_types
+  return new Set((ets ?? []).map((e) => e.type).filter((t): t is string => !!t))
+}
+
+/**
+ * Validate one value against its declared input spec. Returns a human-readable
+ * warning when the value is the wrong type or outside the declared scale/enum,
+ * or null when it is fine. Storage stays permissive; this only warns.
+ */
+function validateInputValue(spec: FrameworkInputSpec, value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  switch (spec.type) {
+    case 'number':
+    case 'assessment': {
+      if (typeof value !== 'number') {
+        return `"${spec.property}" expects a number but got ${JSON.stringify(value)}`
+      }
+      if (spec.scale_id) {
+        const scale = UPG_SCALES[spec.scale_id]
+        if (scale && (value < scale.min || value > scale.max)) {
+          return `"${spec.property}" = ${value} is outside the ${spec.scale_id} scale (${scale.min} to ${scale.max})`
+        }
+      }
+      return null
+    }
+    case 'boolean':
+      return typeof value === 'boolean'
+        ? null
+        : `"${spec.property}" expects a boolean but got ${JSON.stringify(value)}`
+    case 'enum': {
+      const allowed = spec.enum_values ?? []
+      if (typeof value !== 'string' || (allowed.length > 0 && !allowed.includes(value))) {
+        return `"${spec.property}" = ${JSON.stringify(value)} is not one of: ${allowed.join(', ')}`
+      }
+      return null
+    }
+    case 'string':
+      return typeof value === 'string'
+        ? null
+        : `"${spec.property}" expects a string but got ${JSON.stringify(value)}`
+    default:
+      return null
+  }
 }
 
 export interface ApplyFrameworkArgs {
@@ -79,7 +143,19 @@ export function applyFramework(
   const edges: UPGEdge[] = []
   const warnings: string[] = []
   if (created.warning) warnings.push(created.warning)
-  for (const entityId of args.entity_ids ?? []) {
+  const requestedIds = args.entity_ids ?? []
+  const targetTypes = frameworkTargetTypes(framework)
+  for (const entityId of requestedIds) {
+    // Advise (permissively) when an entity is not a declared target type for
+    // this framework — so the 0.8.6 slot broadening is observable at apply time
+    // instead of any type being silently accepted.
+    const node = store.getNode(entityId)
+    if (node && targetTypes.size > 0 && !targetTypes.has(node.type)) {
+      warnings.push(
+        `${entityId} is a ${node.type}, not a declared target type for ${framework.id} ` +
+          `(declared: ${[...targetTypes].join(', ')}). Included anyway.`,
+      )
+    }
     const r = createEdge(store, {
       source_id: exercise.id,
       target_id: entityId,
@@ -91,7 +167,39 @@ export function applyFramework(
     }
     edges.push(r.edge)
   }
+  // If entities were requested but none could be included (e.g. all ids were
+  // typos), do not leave a dangling empty exercise. Roll it back and surface the
+  // failure so the caller sees a real error instead of a silent empty success.
+  if (requestedIds.length > 0 && edges.length === 0) {
+    store.removeNode(exercise.id)
+    throw new Error(
+      `No entities could be included in the ${framework.name} exercise; nothing was created.\n` +
+        warnings.map((w) => `  - ${w}`).join('\n'),
+    )
+  }
   return { exercise, edges, warnings }
+}
+
+/**
+ * The canonical serialized result of an apply, shared by every surface (MCP
+ * `apply_framework`, CLI `apply --json`) so the contract is identical across
+ * them. Built from `ApplyFrameworkResult` via `applyFrameworkEnvelope`.
+ */
+export interface ApplyFrameworkEnvelope {
+  exercise_id: string
+  exercise: UPGBaseNode
+  included: Array<{ edge_id: string; entity_id: string; edge_type: string }>
+  warnings: string[]
+}
+
+/** Serialize an apply result into the cross-surface envelope. */
+export function applyFrameworkEnvelope(result: ApplyFrameworkResult): ApplyFrameworkEnvelope {
+  return {
+    exercise_id: result.exercise.id,
+    exercise: result.exercise,
+    included: result.edges.map((e) => ({ edge_id: e.id, entity_id: e.target, edge_type: e.type })),
+    warnings: result.warnings,
+  }
 }
 
 export interface ScoreEntityArgs {
@@ -127,6 +235,22 @@ export function scoreEntity(store: UPGFileStore, args: ScoreEntityArgs): ScoreEn
         warnings.push(
           `Value key(s) not declared by ${frameworkId}: ${unknown.join(', ')}. Stored anyway (permissive).`,
         )
+      }
+    }
+    // Value validation: warn (permissively) when a DECLARED input's value is the
+    // wrong type or outside its declared scale/enum (e.g. reach=999 on a 1..5
+    // scale, or impact="high" where a number is declared). Storage stays
+    // permissive; this only warns.
+    const entityNode = store.getNode(args.entity_id)
+    if (entityNode) {
+      const specByProp = new Map(
+        frameworkInputSpecs(framework, entityNode.type).map((s) => [s.property, s]),
+      )
+      for (const [key, value] of Object.entries(args.values)) {
+        const spec = specByProp.get(key)
+        if (!spec) continue
+        const issue = validateInputValue(spec, value)
+        if (issue) warnings.push(`${frameworkId}: ${issue}. Stored anyway (permissive).`)
       }
     }
   }

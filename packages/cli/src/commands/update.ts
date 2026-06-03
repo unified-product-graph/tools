@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { discoverUPGFile, loadStore, validateStatusAgainstLifecycle } from '../lib/graph.js'
+import { discoverUPGFile, loadStore, validateStatusAgainstLifecycle, validateTitle, parseDataOption } from '../lib/graph.js'
 import { EXIT, die, violation, runtimeError } from '../lib/errors.js'
 
 export const updateCommand = new Command('update')
@@ -31,15 +31,25 @@ export const updateCommand = new Command('update')
         if (warning) { store.stopWatching(); die(violation(warning)) }
       }
 
+      // A provided --title must not blank out the node ( / F1+F10).
+      if (opts.title !== undefined) {
+        const titleError = validateTitle(opts.title)
+        if (titleError) { store.stopWatching(); die(violation(titleError)) }
+      }
+
       const patch: Record<string, unknown> = {}
       if (opts.title) patch.title = opts.title
       if (opts.description) patch.description = opts.description
       if (opts.status) patch.status = opts.status
       if (opts.tags) patch.tags = opts.tags
       if (opts.data) {
-        try { patch.properties = JSON.parse(opts.data) } catch {
+        // Bad/oversized --data is a usage error (exit 3), unified across
+        // create/update/score ( D2 / E5).
+        try {
+          patch.properties = parseDataOption(opts.data)
+        } catch (err) {
           store.stopWatching()
-          die(runtimeError('Invalid --data JSON'))
+          die(err)
         }
       }
 

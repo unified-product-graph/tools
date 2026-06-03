@@ -2,13 +2,16 @@
 // Not part of the test suite, meant for manual verification during PR review.
 //
 // Usage:
+//   npm run smoke                                 (uses test-fixtures/sample.upg)
 //   node scripts/upg-smoke.mjs --file path/to/product.upg
-//   node scripts/upg-smoke.mjs --file test-fixtures/sample.upg
+//
+// UPGFileStore + collectAntiPatternInputs moved to @unified-product-graph/sdk
+// (the package's own src/store.js + src/lib/anti-pattern-inputs.js are gone);
+// import from the package so this can't rot out of sync again.
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { UPGFileStore } from '../src/store.js'
-import { collectAntiPatternInputs } from '../src/lib/anti-pattern-inputs.js'
+import { UPGFileStore, collectAntiPatternInputs } from '@unified-product-graph/sdk'
 import { evaluateAntiPatterns } from '@unified-product-graph/core'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

@@ -172,6 +172,11 @@ export async function runMcpServer() {
 
   // Load the .upg file into memory
   const store = new UPGFileStore()
+  // Stamp this server (name + real version) as the writer so every file it
+  // saves records accurate, last-writer provenance ( / M7). 'upg-mcp-local'
+  // matches the blank-doc + store default and distinguishes the local server
+  // from the cloud one.
+  store.setWriter('upg-mcp-local', SERVER_VERSION)
   await store.load(resolvedPath)
 
   // Check for deprecated types and warn

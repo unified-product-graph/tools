@@ -18,12 +18,12 @@ import { Command } from 'commander'
 import chalk from 'chalk'
 import { select } from '@inquirer/prompts'
 import { getDomainForType, type UPGBaseNode, type UPGEdgeType } from '@unified-product-graph/core'
-import { discoverUPGFile, loadStore, nodeId, edgeId } from '../lib/graph.js'
+import { discoverUPGFile, loadStore, nodeId, edgeId, validateTitle } from '../lib/graph.js'
 import { allEdgesForCli } from '../lib/schema-facade.js'
 import { resolveCursor } from '../lib/cursor.js'
 import { writeSession } from '../lib/session.js'
 import { inferEdge, chooseEdge, edgeVerb, candidateMenu } from '../lib/inference.js'
-import { EXIT, die, runtimeError, usageError } from '../lib/errors.js'
+import { EXIT, die, violation, usageError } from '../lib/errors.js'
 import { isTTY } from '../lib/output.js'
 
 export const newCommand = new Command('new')
@@ -36,10 +36,15 @@ export const newCommand = new Command('new')
   .option('--json', 'Machine-readable JSON output')
   .action(async (type, title, opts) => {
     try {
-      // Validate the type up front (bad value → exit 1, matching `create`).
+      // Validate the type up front. An unknown entity type is a validation/
+      // policy problem (exit 2), matching `create` ( D2).
       if (!getDomainForType(type)) {
-        die(runtimeError(`Unknown entity type: "${type}". Use a valid UPG type (e.g. persona, job, feature).`))
+        die(violation(`Unknown entity type: "${type}". Use a valid UPG type (e.g. persona, job, feature).`))
       }
+
+      // Reject blank titles at the write boundary ( / F1+F10), same as `create`.
+      const titleError = validateTitle(title)
+      if (titleError) die(violation(titleError))
 
       const filePath = await discoverUPGFile(opts.file)
       const store = await loadStore(filePath)

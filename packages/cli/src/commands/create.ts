@@ -1,6 +1,6 @@
 import { Command } from 'commander'
 import chalk from 'chalk'
-import { discoverUPGFile, loadStore, inferEdgeType, nodeId, edgeId, validateStatusAgainstLifecycle } from '../lib/graph.js'
+import { discoverUPGFile, loadStore, inferEdgeType, nodeId, edgeId, validateStatusAgainstLifecycle, validateTitle, parseDataOption, wrapEdgeInferenceError } from '../lib/graph.js'
 import { getDomainForType, type UPGBaseNode, type UPGEdgeType } from '@unified-product-graph/core'
 import { EXIT, die, violation, runtimeError } from '../lib/errors.js'
 import { isTTY } from '../lib/output.js'
@@ -16,11 +16,18 @@ export const createCommand = new Command('create')
   .option('--json', 'Machine-readable JSON output')
   .action(async (type, title, opts) => {
     try {
-      // Validate type. Unknown type is a runtime/bad-value error → exit 1.
+      // Validate type. An unknown entity type is a validation/policy problem
+      // (exit 2), matching `create --status <bad>` and `new` ( D2).
       const domain = getDomainForType(type)
       if (!domain) {
-        die(runtimeError(`Unknown entity type: "${type}". Use a valid UPG type (e.g. persona, job, feature).`))
+        die(violation(`Unknown entity type: "${type}". Use a valid UPG type (e.g. persona, job, feature).`))
       }
+
+      // Reject blank titles at the write boundary ( / F1+F10). An empty
+      // or whitespace-only title persists an invalid node that then bricks every
+      // later read and the delete/update that could repair it.
+      const titleError = validateTitle(title)
+      if (titleError) die(violation(titleError))
 
       // Validate --status against the entity lifecycle BEFORE writing, so the
       // writer is never more permissive than health/verify (CLI-FEEDBACK #4).
@@ -40,9 +47,13 @@ export const createCommand = new Command('create')
       if (opts.status) node.status = opts.status
       if (opts.tags) node.tags = opts.tags
       if (opts.data) {
-        try { node.properties = JSON.parse(opts.data) } catch {
+        // Bad/oversized --data is a usage error (exit 3), unified across
+        // create/update/score ( D2 / E5).
+        try {
+          node.properties = parseDataOption(opts.data) as UPGBaseNode['properties']
+        } catch (err) {
           store.stopWatching()
-          die(runtimeError('Invalid --data JSON'))
+          die(err)
         }
       }
 
@@ -57,7 +68,16 @@ export const createCommand = new Command('create')
           store.stopWatching()
           die(runtimeError(`Parent node not found: ${opts.parent}`))
         }
-        const edgeType = inferEdgeType(parent.type, type)
+        let edgeType: UPGEdgeType
+        try {
+          edgeType = inferEdgeType(parent.type, type)
+        } catch (err) {
+          // Incompatible parent/child pair: wrap the leaked catalog string in a
+          // user-facing message ( E4). Policy violation → exit 2.
+          await store.flush()
+          store.stopWatching()
+          die(wrapEdgeInferenceError(err))
+        }
         edge = { id: edgeId(), source: opts.parent, target: node.id, type: edgeType }
         store.addEdge(edge)
       }

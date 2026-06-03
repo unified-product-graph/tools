@@ -771,9 +771,14 @@ export const getDomainGuide: ToolHandler = (args): ToolResult => {
 // ── Frameworks ──────────────────────────────────────────────────────────────
 
 /**
- * List the canonical UPGFramework definitions; the 34 curated, famous
- * frameworks that anchor the public catalog (spanning strategy, discovery,
- * prioritisation, design, growth, engineering, and the reflection classics).
+ * List the canonical UPGFramework definitions: the curated, famous frameworks
+ * that anchor the public catalog (spanning strategy, discovery, prioritisation,
+ * design, growth, engineering, and the reflection classics). Returns a
+ * lightweight SUMMARY per framework (id, name, category, description, tags,
+ * approach_ids, structure_pattern); call `get_framework(id)` for the full
+ * four-layer record (data, structure, presentation, education). The full
+ * objects are large (~3.7KB each), so returning them for a default list call
+ * overflows the tool-result token cap — hence the projection.
  * Paginated (default `limit: 50`, max 200).
  *
  * Cursor is opaque base64 (`offset:N`). Pass the `next_cursor` from a previous
@@ -782,7 +787,7 @@ export const getDomainGuide: ToolHandler = (args): ToolResult => {
  * "strategy", "prioritization", "discovery") and applied BEFORE pagination,
  * so `total` reflects the filtered count.
  *
- * @returns JSON: `{ total, count, next_cursor?, frameworks: UPGFramework[] }`
+ * @returns JSON: `{ total, count, next_cursor?, frameworks: Array<{ id, name, category, description, tags, approach_ids, structure_pattern }> }`
  * @atomicity atomic (read-only)
  * @see get_framework
  * @see list_framework_categories
@@ -803,10 +808,24 @@ export const listFrameworks: ToolHandler = (args): ToolResult => {
   const nextOffset = cursorOffset + slice.length
   const nextCursor = nextOffset < total ? encodeCursor(nextOffset) : undefined
 
+  // Lightweight summary projection. The full four-layer record (data,
+  // structure, presentation, education) averages ~3.7KB; returning all of it
+  // for the default list call (limit 50 >= 42 frameworks) overflows the
+  // tool-result token cap. Callers fetch the full object via get_framework(id).
+  const frameworks = slice.map((f) => ({
+    id: f.id,
+    name: f.name,
+    category: f.category,
+    description: f.description,
+    tags: f.tags,
+    approach_ids: f.approach_ids,
+    structure_pattern: f.structure?.pattern,
+  }))
+
   const body: Record<string, unknown> = {
     total,
     count: slice.length,
-    frameworks: slice,
+    frameworks,
   }
   if (nextCursor) body.next_cursor = nextCursor
 
@@ -830,7 +849,11 @@ export const getFramework: ToolHandler = (args): ToolResult => {
   const id = args.id as string | undefined
   if (!id) return textError('Missing required parameter: id')
   const framework = UPG_FRAMEWORKS_BY_ID[id]
-  if (!framework) return textError(`Unknown framework id: ${id}`)
+  if (!framework)
+    return textError(
+      `Unknown framework id: "${id}". Pass a framework id from the catalog ` +
+        `(e.g. 'moscow', 'rice-scoring', 'kano-model'). See list_frameworks for the full list.`,
+    )
   return text(JSON.stringify(framework, null, 2))
 }
 
