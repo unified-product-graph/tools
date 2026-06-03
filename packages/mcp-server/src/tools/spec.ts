@@ -837,8 +837,12 @@ export const listFrameworks: ToolHandler = (args): ToolResult => {
  * "lean-canvas"). Includes all four layers: data, structure, presentation,
  * education.
  *
+ * Accepts `id` (canonical) or its alias `framework_id` (the key apply_framework
+ * and prioritise use), so the read and write surfaces take the same argument.
+ *
  * @returns JSON: the full `UPGFramework` record.
- * @throws textError when `id` is missing or unknown.
+ * @throws textError when neither `id` nor `framework_id` is provided, or the
+ *   id is unknown.
  * @atomicity atomic (read-only)
  * @see list_frameworks
  * @see prioritise
@@ -846,8 +850,12 @@ export const listFrameworks: ToolHandler = (args): ToolResult => {
  * @see get_approach
  */
 export const getFramework: ToolHandler = (args): ToolResult => {
-  const id = args.id as string | undefined
-  if (!id) return textError('Missing required parameter: id')
+  // N2 (UPG QA 0.8.7): accept `framework_id` as an alias for `id`. The write
+  // side (apply_framework / prioritise) names this `framework_id`, so an agent
+  // reasonably tries the same key on the read side. Accept both; `id` wins if
+  // both are passed.
+  const id = (args.id ?? args.framework_id) as string | undefined
+  if (!id) return textError('Missing required parameter: id (alias: framework_id)')
   const framework = UPG_FRAMEWORKS_BY_ID[id]
   if (!framework)
     return textError(

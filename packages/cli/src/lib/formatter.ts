@@ -4,6 +4,7 @@
 
 import chalk from 'chalk'
 import type { UPGBaseNode } from '@unified-product-graph/core'
+import { sanitizeForTerminal } from './sanitize.js'
 
 // ── Entity type colors ─────────────────────────────────────────────────────
 
@@ -33,8 +34,10 @@ const TYPE_COLORS: Record<string, (s: string) => string> = {
 }
 
 function colorType(type: string): string {
+  // Look up the colour by the RAW type (so legacy aliases still match), but
+  // render the SANITISED text so a hostile `type` can't inject control bytes.
   const colorFn = TYPE_COLORS[type] ?? chalk.gray
-  return colorFn(type)
+  return colorFn(sanitizeForTerminal(type))
 }
 
 /** UPG logo. Shown on `upg` with no args or `upg --version`. */
@@ -66,8 +69,11 @@ export function upgHeader(subtitle?: string): string {
 
 /** Format a node as a compact one-liner with color */
 export function formatNode(node: UPGBaseNode, indent = ''): string {
-  const status = node.status ? chalk.dim(` [${node.status}]`) : ''
-  return `${indent}${colorType(node.type)}  ${chalk.white(`"${node.title}"`)}${status}`
+  // Sanitise every node-supplied value before it reaches the terminal:
+  // title, and the status which is rendered inline too. `colorType` sanitises
+  // the type itself.
+  const status = node.status ? chalk.dim(` [${sanitizeForTerminal(node.status)}]`) : ''
+  return `${indent}${colorType(node.type)}  ${chalk.white(`"${sanitizeForTerminal(node.title)}"`)}${status}`
 }
 
 /** Format an entity count table */
@@ -90,8 +96,8 @@ export function renderTree(
 
   function walk(node: UPGBaseNode, prefix: string, isLast: boolean, depth: number) {
     const connector = depth === 0 ? '' : isLast ? '└── ' : '├── '
-    const status = node.status ? chalk.dim(` [${node.status}]`) : ''
-    lines.push(`${chalk.dim(prefix + connector)}${colorType(node.type)}  ${chalk.white(`"${node.title}"`)}${status}`)
+    const status = node.status ? chalk.dim(` [${sanitizeForTerminal(node.status)}]`) : ''
+    lines.push(`${chalk.dim(prefix + connector)}${colorType(node.type)}  ${chalk.white(`"${sanitizeForTerminal(node.title)}"`)}${status}`)
 
     if (depth >= maxDepth) return
     const children = childrenOf(node.id)

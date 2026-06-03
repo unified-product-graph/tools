@@ -289,6 +289,14 @@ const USAGE_ERROR_CODES = new Set([
 
 function applyExitOverride(cmd: Command): void {
   cmd.exitOverride()
+  // N3 (UPG QA 0.8.7): Commander's default error path writes the message to
+  // stderr via `writeErr` AND throws. The catch block below is our single
+  // source of truth for usage-error output (it remaps the exit code to 3 and
+  // honours `--json`). Without suppressing Commander's own writer the message
+  // prints twice (e.g. `error: required option '--data <json>' not specified`
+  // ×2). Silence Commander's writeErr so the catch block emits exactly once.
+  // `writeOut` (help/version text) is left untouched.
+  cmd.configureOutput({ writeErr: () => {} })
   for (const sub of cmd.commands) applyExitOverride(sub)
 }
 applyExitOverride(program)

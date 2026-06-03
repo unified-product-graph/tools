@@ -197,21 +197,27 @@ export const listNodes: ToolHandler = (args, ctx): ToolResult => {
 /**
  * Get a single entity by ID with its full properties and all connected edges.
  *
+ * Accepts `node_id` (canonical) or its alias `id`.
+ *
  * @returns JSON: the node object plus an `edges` array. `compact_edges: true`
  *   omits `source_title` and `target_title` (saves ~30% on edge-heavy nodes).
- * @throws Returns a textError when `node_id` is missing or the node does not
- *   exist.
+ * @throws Returns a textError when neither `node_id` nor `id` is provided, or
+ *   the node does not exist.
  * @atomicity atomic (read-only)
  * @see get_nodes
  */
 export const getNode: ToolHandler = (args, ctx): ToolResult => {
   const { store } = ctx
-  if (!args.node_id) return textError(`Missing required parameter: node_id`)
+  // N2 (UPG QA 0.8.7): accept bare `id` as an alias for `node_id`. `node_id` is
+  // the canonical key (matches update_node / delete_node / batch ops); `id` is a
+  // common first guess. Accept both; `node_id` wins if both are passed.
+  const nodeId = (args.node_id ?? args.id) as string | undefined
+  if (!nodeId) return textError(`Missing required parameter: node_id (alias: id)`)
   const result = getNodeLib(store, {
-    node_id: args.node_id as string,
+    node_id: nodeId,
     compact_edges: (args.compact_edges as boolean) ?? false,
   })
-  if (!result) return textError(`Node not found: ${args.node_id}`)
+  if (!result) return textError(`Node not found: ${nodeId}`)
 
   // Surface unknown-property warnings on read, matching the shape
   // used by write paths (create_node / update_node). Nodes with deprecated

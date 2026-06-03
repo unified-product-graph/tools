@@ -74,6 +74,102 @@ describe('validate_graph: clean graph', () => {
  })
 })
 
+describe('validate_graph: structurally_valid (N4)', () => {
+ // Several product-health anti-patterns (e.g. features-without-hypotheses) are
+ // gated to `validation` stage or later, so the fixtures here set stage:'build'.
+ const buildStageDoc = (nodes: UPGBaseNode[], edges: UPGEdge[]): UPGDocument => ({
+ ...makeDoc(nodes, edges),
+ product: { id: 'p1', title: 'N4 fixture', stage: 'build' },
+ })
+
+ // A structurally-perfect graph (every drift class 0) that nonetheless trips
+ // product-health anti-patterns. `valid` must be false (combined verdict) while
+ // `structurally_valid` must be true (spec-conformance only). A CI gate on
+ // `structurally_valid` should pass this graph.
+ it('reports structurally_valid: true while valid is false on a clean-but-unhealthy graph', async () => {
+ const store = await loadStore(
+ buildStageDoc(
+ [
+ { id: 'feat1', type: 'feature' as UPGEntityType, title: 'Login flow' } as UPGBaseNode,
+ { id: 'feat2', type: 'feature' as UPGEntityType, title: 'Signup flow' } as UPGBaseNode,
+ { id: 'feat3', type: 'feature' as UPGEntityType, title: 'Password reset' } as UPGBaseNode,
+ ],
+ [],
+ ),
+ )
+ const ctx = makeCtx(store)
+ const result = await validateGraph({}, ctx)
+ expect(result.isError).toBeUndefined()
+ const body = JSON.parse(result.content[0].text)
+
+ // Every drift class is zero.
+ expect(body.summary.entity_drift).toBe(0)
+ expect(body.summary.edge_drift).toBe(0)
+ expect(body.summary.top_level_drift).toBe(0)
+ expect(body.summary.lifecycle_drift).toBe(0)
+ expect(body.summary.self_referential).toBe(0)
+ expect(body.summary.property_drift).toBe(0)
+ expect(body.summary.edge_type_pair_drift).toBe(0)
+ expect(body.summary.graph_topology_self_loops).toBe(0)
+ expect(body.summary.property_type_drift).toBe(0)
+
+ // At least one anti-pattern fired (e.g. features-without-hypotheses).
+ expect((body.anti_pattern_violations ?? []).length).toBeGreaterThan(0)
+
+ // The two verdicts split: structure clean, combined health not.
+ expect(body.structurally_valid).toBe(true)
+ expect(body.valid).toBe(false)
+ })
+
+ it('structurally_valid: false when a drift class is non-empty', async () => {
+ const store = await loadStore(
+ makeDoc(
+ [
+ { id: 'h1', type: 'hypothesis_evidence' as UPGEntityType, title: 'Deprecated type' } as UPGBaseNode,
+ ],
+ [],
+ ),
+ )
+ const ctx = makeCtx(store)
+ const result = await validateGraph({}, ctx)
+ const body = JSON.parse(result.content[0].text)
+ expect(body.summary.entity_drift).toBeGreaterThan(0)
+ expect(body.structurally_valid).toBe(false)
+ expect(body.valid).toBe(false)
+ })
+
+ it('omits structurally_valid when skip_drift is true (structure not assessed)', async () => {
+ const store = await loadStore(
+ makeDoc(
+ [
+ { id: 'feat1', type: 'feature' as UPGEntityType, title: 'Login flow' } as UPGBaseNode,
+ ],
+ [],
+ ),
+ )
+ const ctx = makeCtx(store)
+ const result = await validateGraph({ skip_drift: true }, ctx)
+ const body = JSON.parse(result.content[0].text)
+ expect(body.structurally_valid).toBeUndefined()
+ })
+
+ it('with skip_anti_patterns, valid tracks structure and matches structurally_valid', async () => {
+ const store = await loadStore(
+ makeDoc(
+ [
+ { id: 'feat1', type: 'feature' as UPGEntityType, title: 'Login flow' } as UPGBaseNode,
+ ],
+ [],
+ ),
+ )
+ const ctx = makeCtx(store)
+ const result = await validateGraph({ skip_anti_patterns: true }, ctx)
+ const body = JSON.parse(result.content[0].text)
+ expect(body.structurally_valid).toBe(true)
+ expect(body.valid).toBe(true)
+ })
+})
+
 describe('validate_graph: entity_drift', () => {
  it('flags deprecated types with suggested rename', async () => {
  const store = await loadStore(

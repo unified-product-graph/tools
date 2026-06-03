@@ -15,6 +15,7 @@
  */
 
 import { Command } from 'commander'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
 import chalk from 'chalk'
 import { select } from '@inquirer/prompts'
 import { getDomainForType, type UPGBaseNode, type UPGEdgeType } from '@unified-product-graph/core'
@@ -125,14 +126,14 @@ export const newCommand = new Command('new')
       }
 
       if (!anchor) {
-        process.stderr.write(`✓ ${chalk.bold(type)} "${title}" created ${chalk.dim('(no cursor; this is now your anchor)')}\n`)
+        process.stderr.write(`✓ ${chalk.bold(type)} "${sanitizeForTerminal(title)}" created ${chalk.dim('(no cursor; this is now your anchor)')}\n`)
       } else if (!inf) {
-        process.stderr.write(`✓ ${chalk.bold(type)} "${title}" created. ${chalk.yellow(`(no canonical edge to ${anchor.type}; left unlinked)`)}\n`)
+        process.stderr.write(`✓ ${chalk.bold(type)} "${sanitizeForTerminal(title)}" created. ${chalk.yellow(`(no canonical edge to ${anchor.type}; left unlinked)`)}\n`)
       } else if (edge) {
         const rel = flipped
           ? `${type} ${chalk.green('—' + edgeVerb(edge.type) + '→')} ${anchor.type}`
           : `${anchor.type} ${chalk.green('—' + edgeVerb(edge.type) + '→')} ${type}`
-        process.stderr.write(`✓ ${chalk.bold(type)} ${chalk.cyan(`"${title}"`)} created and linked: ${rel}\n`)
+        process.stderr.write(`✓ ${chalk.bold(type)} ${chalk.cyan(`"${sanitizeForTerminal(title)}"`)} created and linked: ${rel}\n`)
         if (flipped) process.stderr.write(chalk.dim('   (linked in the canonical direction)\n'))
       }
       process.stdout.write(node.id + '\n')

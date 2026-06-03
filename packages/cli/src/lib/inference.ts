@@ -43,6 +43,19 @@ export function edgeVerb(type: string): string {
 }
 
 /**
+ * (b): is `type` a real edge type in the canonical catalog?
+ *
+ * `connect --type` previously accepted ANY string (e.g. `total_nonsense_edge`)
+ * at exit 0, writing a non-canonical edge that later trips the schema-drift
+ * summary on every read. Validating against `UPG_EDGE_CATALOG` — the same source
+ * inference uses — lets `connect` reject an unknown explicit type at exit 2, the
+ * same class as an incompatible inferred pair.
+ */
+export function isKnownEdgeType(type: string): boolean {
+  return Object.prototype.hasOwnProperty.call(UPG_EDGE_CATALOG, type)
+}
+
+/**
  * Infer the canonical edge(s) between two types, trying the given orientation
  * first and auto-flipping if only the reverse direction is catalogued.
  *

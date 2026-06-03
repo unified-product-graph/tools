@@ -127,14 +127,16 @@ export const helpTopics: Record<string, HelpEntry> = {
   },
   check: {
     usage: 'upg check [options]',
-    summary: 'One ranked verdict: structure validity + health + gaps + anti-pattern lint. Exit 2 on violations.',
+    summary: 'One ranked verdict: structure validity + health + gaps + anti-pattern lint. Exit 2 on violations (structure invalid OR any high-severity anti-pattern). Use --structure-only to gate on spec-conformance alone.',
     options: [
       FILE_OPT, JSON_OPT,
       { flag: '--ci', desc: 'CI mode: JSON output, strict exit contract' },
+      { flag: '--structure-only', desc: 'Gate the exit code on structural validity alone; anti-patterns are reported but do not fail the run' },
     ],
     examples: [
       { cmd: 'upg check' },
       { cmd: 'upg check --ci', comment: 'pipeline gate' },
+      { cmd: 'upg check --structure-only --ci', comment: 'spec-conformance gate (ignores health)' },
     ],
     seeAlso: 'upg fix, upg verify, upg health',
   },
@@ -331,7 +333,7 @@ export const helpTopics: Record<string, HelpEntry> = {
     summary: "Record a framework's result for one entity on the exercise's includes edge (a MoSCoW bucket, a RICE score). Auto-includes the entity if it is not yet in scope.",
     options: [
       FILE_OPT, JSON_OPT,
-      { flag: '--data <json>', desc: 'Required. Result as JSON, e.g. \'{"moscow":"must"}\' or \'{"reach":800,"impact":3}\'' },
+      { flag: '--data <json>', desc: 'Required. Result as JSON, e.g. \'{"moscow":"must"}\' or \'{"reach":4,"impact":3,"confidence":4,"effort":2}\'' },
       { flag: '--replace', desc: 'Replace the edge properties instead of merging into them' },
     ],
     examples: [

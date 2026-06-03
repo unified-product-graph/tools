@@ -101,9 +101,11 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
  * workspace mode, accepts a bare filename (e.g. `client-project` or
  * `client-project.upg`) and resolves against `.upg/`.
  *
+ * Accepts `file` (canonical) or its alias `product`.
+ *
  * @returns JSON: `{ message, file, product: { title, stage }, entities }`.
- * @throws Returns a textError when the file cannot be resolved or the load
- *   fails (file watcher / parse error).
+ * @throws Returns a textError when neither `file` nor `product` is provided, or
+ *   the file cannot be resolved, or the load fails (file watcher / parse error).
  * @atomicity non-atomic. Flushes the current store, stops watching, and
  *   loads the new file as separate filesystem operations.
  * @warning Mutates server-side workspace state. After an MCP reconnect the
@@ -115,7 +117,15 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
  */
 export const switchProduct: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
-  const fileArg = args.file as string
+  // N2 (UPG QA 0.8.7): accept `product` as an alias for `file`. `file` is the
+  // canonical key, but a bare product name reads naturally as `product`, and
+  // that was the first guess. Validate presence BEFORE path.resolve so a missing
+  // value yields a named-key error instead of leaking the internal
+  // `paths[0] must be of type string` from node:path.
+  const fileArg = (args.file ?? args.product) as string | undefined
+  if (typeof fileArg !== 'string' || fileArg.length === 0) {
+    return textError('Missing required parameter: file (alias: product). Pass a .upg path or a bare product name.')
+  }
   let resolved = path.resolve(fileArg)
 
   if (!fs.existsSync(resolved)) {

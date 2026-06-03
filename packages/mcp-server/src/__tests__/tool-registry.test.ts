@@ -147,6 +147,23 @@ describe('Tool registry: dispatch parity', () => {
     expect(result.content[0].text).toMatch(/Missing required parameter/)
   })
 
+  // N2 (UPG QA 0.8.7): get_node accepts `id` as an alias for `node_id`.
+  it('get_node accepts the `id` alias for `node_id`', async () => {
+    const handler = getToolHandler('get_node')!
+    const result = await handler({ id: 'n1' }, ctx)
+    expect(result.isError).toBeUndefined()
+    const body = JSON.parse(result.content[0].text)
+    expect(body.node.title).toBe('Solo Builder')
+  })
+
+  // N2: the missing-param error names the expected key AND its alias.
+  it('get_node missing-param error names node_id and its alias', async () => {
+    const handler = getToolHandler('get_node')!
+    const result = await handler({}, ctx)
+    expect(result.content[0].text).toMatch(/node_id/)
+    expect(result.content[0].text).toMatch(/alias.*id/i)
+  })
+
   it('get_entity_schema returns the persona schema', async () => {
     const handler = getToolHandler('get_entity_schema')!
     const result = await handler({ type: 'persona' }, ctx)

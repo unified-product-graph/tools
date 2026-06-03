@@ -1107,8 +1107,12 @@ export function createEdge(
     ...(hasProps ? { properties: args.properties } : {}),
   }
 
-  store.addEdge(edge)
-  const response: { edge: UPGEdge; warning?: string } = { edge }
+  //: addEdge is idempotent on (source, target, type). On a duplicate it
+  // returns the EXISTING edge (not the fresh `edge` we minted above), so we
+  // report the id that actually lives in the graph. Re-running `connect P J`
+  // therefore returns the same edge id every time instead of appending dupes.
+  const stored = store.addEdge(edge)
+  const response: { edge: UPGEdge; warning?: string } = { edge: stored }
   if (edgeWarning) response.warning = edgeWarning
   return response
 }
@@ -1286,8 +1290,11 @@ export function moveNode(store: UPGFileStore, args: MoveNodeArgs): MoveNodeResul
   if (oldEdge) {
     store.removeEdge(oldEdge.id)
   }
+  //: capture the stored edge — on the rare dedup hit (a same-triple edge
+  // already existed under a different parent path), report the real one.
+  let storedEdge: UPGEdge
   try {
-    store.addEdge(newEdge)
+    storedEdge = store.addEdge(newEdge)
   } catch (err) {
     if (oldEdge) {
       // Restore: skipValidation because the old edge was already in the
@@ -1303,7 +1310,7 @@ export function moveNode(store: UPGFileStore, args: MoveNodeArgs): MoveNodeResul
   return {
     moved: true,
     node_id: args.node_id,
-    new_edge: newEdge,
+    new_edge: storedEdge,
     removed_edge_id: oldEdge?.id ?? null,
     ...(oldEdge ? { removed_edge: oldEdge } : {}),
     ...(aliasWarning ? { warning: aliasWarning } : {}),
@@ -1642,8 +1649,9 @@ export function batchCreateNodes(
           const inference = inferEdgeTypeWithTier(parent.type, newNode.type)
           if (inference.ok) {
             const edge: UPGEdge = { id: edgeId(), source: parentId, target: newNode.id, type: inference.edgeType }
-            store.addEdge(edge)
-            createdParentEdges.push(edge)
+            //: report the stored edge (existing on a dedup hit; new node
+            // ids never collide here, but stay truthful).
+            createdParentEdges.push(store.addEdge(edge))
           } else {
             const suggestion = inference.suggestions.length > 0
               ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
@@ -1672,8 +1680,10 @@ export function batchCreateNodes(
         edgeType = inference.edgeType
       }
       const newEdge: UPGEdge = { id: edgeId(), source: sourceId, target: targetId, type: edgeType }
-      store.addEdge(newEdge)
-      explicitCreated.push(newEdge)
+      //: explicit edges[] can connect PRE-EXISTING nodes, so a duplicate
+      // triple is genuinely possible. Report the stored edge (existing on a dedup
+      // hit) so batch_create_edges is idempotent like single create_edge.
+      explicitCreated.push(store.addEdge(newEdge))
     }
   } catch (err) {
     rollbackAll()

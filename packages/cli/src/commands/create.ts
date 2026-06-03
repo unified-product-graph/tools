@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
 import chalk from 'chalk'
 import { discoverUPGFile, loadStore, inferEdgeType, nodeId, edgeId, validateStatusAgainstLifecycle, validateTitle, parseDataOption, wrapEdgeInferenceError } from '../lib/graph.js'
 import { getDomainForType, type UPGBaseNode, type UPGEdgeType } from '@unified-product-graph/core'
@@ -91,8 +92,8 @@ export const createCommand = new Command('create')
       } else {
         // Chrome on stderr (TTY-styled), so `upg create … | …` stays clean.
         const line = isTTY()
-          ? chalk.green('✓') + ` Created ${chalk.dim(type)} "${chalk.white(title)}"  ${chalk.dim(node.id)}`
-          : `Created ${type} "${title}" ${node.id}`
+          ? chalk.green('✓') + ` Created ${chalk.dim(type)} "${chalk.white(sanitizeForTerminal(title))}"  ${chalk.dim(node.id)}`
+          : `Created ${type} "${sanitizeForTerminal(title)}" ${node.id}`
         process.stderr.write(line + '\n')
         // The new id is the one machine-relevant datum; emit it on stdout too
         // so a quick `$(upg create … | tail -1)` works without --json.

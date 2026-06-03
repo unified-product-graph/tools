@@ -178,9 +178,16 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  *     that has a more-specific typed alternative for its actual source/target
  *     pair. Advisory only; does not affect `valid`. Omitted by default.
  *
- * Top-level `valid` is true iff schema drift is empty AND no violations
- * fired. Polymorphic upgrade hints do NOT affect `valid`. Stricter health
- * check than drift alone.
+ * Two top-level verdicts, on two different axes (N4):
+ *   - `structurally_valid` — true iff EVERY schema-drift class is empty. This
+ *     is the spec-conformance signal, independent of product-health linting.
+ *     A well-formed graph that merely lacks a hypothesis is structurally
+ *     valid. CI conformance gates should read THIS. Omitted when
+ *     `skip_drift: true` (structure was not assessed).
+ *   - `valid` — true iff drift is empty AND no anti-pattern violations fired.
+ *     A COMBINED structure-plus-health verdict; stricter than structural
+ *     conformance. (Unchanged from prior behaviour.)
+ * Polymorphic upgrade hints do NOT affect either verdict.
  *
  * @example
  * // Run a full graph health check (schema drift + anti-pattern violations)
@@ -234,17 +241,20 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  *   "_hash": "sha256-abc123"
  * }
  *
- * @returns JSON: `{ valid, summary, entity_drift?, edge_drift?,
- *   property_drift?, top_level_drift?, lifecycle_drift?, self_referential?,
- *   anti_pattern_violations?, notes?, _hash }`. Per-class drift arrays appear
- *   only when the requested `scope` includes that class. Each array is capped
- *   at `limit` (default 100).
+ * @returns JSON: `{ valid, structurally_valid?, summary, entity_drift?,
+ *   edge_drift?, property_drift?, top_level_drift?, lifecycle_drift?,
+ *   self_referential?, anti_pattern_violations?, notes?, _hash }`. Per-class
+ *   drift arrays appear only when the requested `scope` includes that class.
+ *   Each array is capped at `limit` (default 100). `structurally_valid` is
+ *   omitted when `skip_drift: true`.
  * @throws Returns a textError when `scope` or `severity` is not one of the
  *   recognised values.
  * @atomicity atomic (read-only)
- * @warning Top-level `valid` is true ONLY when both drift is empty AND no
- *   anti-pattern violations fired. Set `skip_anti_patterns: true` for a
- *   pure spec-shape check; `skip_drift: true` for catalog-only.
+ * @warning `valid` is true ONLY when both drift is empty AND no anti-pattern
+ *   violations fired — it conflates structure and product-health. For a pure
+ *   spec-conformance check read `structurally_valid` (or set
+ *   `skip_anti_patterns: true`, which makes `valid` track structure alone).
+ *   `skip_drift: true` gives a catalog-only run and omits `structurally_valid`.
  * @see migrate_type
  * @see migrate_properties
  * @see rename_edge_type
@@ -769,24 +779,40 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   })
   if (guardOutcome.kind === 'refuse') return guardOutcome.result
 
-  // ── `valid` semantics ───────────────────────────────────────────
-  // Stricter than drift-only: false if any drift class is non-empty OR any
-  // anti-pattern violation fired. When `skip_drift` is true, drift counts are
-  // ignored; when `skip_anti_patterns` is true, violations are ignored.
-  const driftClean =
-    skipDrift ||
-    (summary.entity_drift === 0 &&
-      summary.edge_drift === 0 &&
-      summary.top_level_drift === 0 &&
-      summary.lifecycle_drift === 0 &&
-      summary.self_referential === 0 &&
-      summary.property_drift === 0 &&
-      edgeTypePairDrift.length === 0 &&
-      graphTopologySelfLoops.length === 0 &&
-      propertyTypeDrift.length === 0)
+  // ── `valid` / `structurally_valid` semantics ───────────────────
+  // Two distinct axes, surfaced separately (N4, UPG QA 0.8.7):
+  //
+  //   structurally_valid — the graph is spec-shaped: EVERY drift class is
+  //     empty. Independent of product-health anti-patterns. This is the signal
+  //     a CI conformance gate should read: a well-formed graph that merely
+  //     lacks a hypothesis is structurally valid.
+  //
+  //   valid — stricter, COMBINED health: structurally valid AND no
+  //     anti-pattern violations fired. UNCHANGED from prior behaviour (kept
+  //     intact so nothing downstream breaks).
+  //
+  // `structurallyClean` is the pure drift verdict, computed regardless of the
+  // skip flags so it reflects the actual graph. `structurally_valid` is only
+  // emitted when drift was actually evaluated (skip_drift omits it, since we
+  // didn't assess structure). `valid` keeps its existing skip semantics: when
+  // `skip_drift` is true drift is ignored; when `skip_anti_patterns` is true
+  // violations are ignored.
+  const structurallyClean =
+    summary.entity_drift === 0 &&
+    summary.edge_drift === 0 &&
+    summary.top_level_drift === 0 &&
+    summary.lifecycle_drift === 0 &&
+    summary.self_referential === 0 &&
+    summary.property_drift === 0 &&
+    edgeTypePairDrift.length === 0 &&
+    graphTopologySelfLoops.length === 0 &&
+    propertyTypeDrift.length === 0
+  const driftClean = skipDrift || structurallyClean
   const antiPatternClean =
     skipAntiPatterns || (antiPatternViolations?.length ?? 0) === 0
   const valid = driftClean && antiPatternClean
+  // Only meaningful when drift was actually evaluated.
+  const structurallyValid = skipDrift ? undefined : structurallyClean
 
   // ── Summary fields ─────────────────────────────────────
   let highCount = 0
@@ -810,6 +836,11 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // can read them via `response.edge_type_pair_drift` etc.
   const response = {
     valid,
+    // N4 (UPG QA 0.8.7): additive structural-conformance signal. true ⟺ every
+    // drift class is 0, independent of anti-pattern health. Omitted when
+    // `skip_drift` is true (structure was not assessed). A CI gate that wants
+    // "is this graph spec-shaped?" should read this, not `valid`.
+    ...(structurallyValid !== undefined ? { structurally_valid: structurallyValid } : {}),
     summary: {
       ...summary,
       spec_version: UPG_VERSION,
@@ -825,6 +856,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     },
     _hash: currentHash,
   } as ValidateGraphResult & {
+    structurally_valid?: boolean
     edge_type_pair_drift?: EdgeTypePairDriftEntry[]
     graph_topology_self_loops?: GraphTopologySelfLoopEntry[]
     property_type_drift?: PropertyTypeDriftEntry[]

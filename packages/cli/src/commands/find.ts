@@ -13,6 +13,7 @@ import { select } from '@inquirer/prompts'
 import { discoverUPGFile, loadStore, searchNodes } from '../lib/graph.js'
 import { writeSession } from '../lib/session.js'
 import { formatNode } from '../lib/formatter.js'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
 import { EXIT, die } from '../lib/errors.js'
 import { isTTY } from '../lib/output.js'
 
@@ -57,7 +58,7 @@ export const findCommand = new Command('find')
       if (results.length === 1) {
         const node = results[0]!.node
         writeSession(filePath, { cursor: node.id })
-        process.stderr.write(`▸ cursor → ${chalk.bold(node.type)} ${chalk.cyan(`"${node.title}"`)}  ${chalk.dim(node.id)}\n`)
+        process.stderr.write(`▸ cursor → ${chalk.bold(sanitizeForTerminal(node.type))} ${chalk.cyan(`"${sanitizeForTerminal(node.title)}"`)}  ${chalk.dim(node.id)}\n`)
         process.stdout.write(node.id + '\n')
         process.exit(EXIT.OK)
       }
@@ -65,7 +66,7 @@ export const findCommand = new Command('find')
       // TTY, several hits: pick one to land the cursor.
       const picked = await select<string>({
         message: `${results.length} matches for "${query}" — stand where?`,
-        choices: results.map((s) => ({ name: `${s.node.type}  "${s.node.title}"`, value: s.node.id })),
+        choices: results.map((s) => ({ name: `${sanitizeForTerminal(s.node.type)}  "${sanitizeForTerminal(s.node.title)}"`, value: s.node.id })),
       }).catch(() => undefined)
 
       if (!picked) {
@@ -75,7 +76,7 @@ export const findCommand = new Command('find')
 
       const node = store.getNode(picked)
       writeSession(filePath, { cursor: picked })
-      process.stderr.write(`▸ cursor → ${chalk.bold(node?.type ?? '?')} ${chalk.cyan(`"${node?.title ?? picked}"`)}  ${chalk.dim(picked)}\n`)
+      process.stderr.write(`▸ cursor → ${chalk.bold(sanitizeForTerminal(node?.type ?? '?'))} ${chalk.cyan(`"${sanitizeForTerminal(node?.title ?? picked)}"`)}  ${chalk.dim(picked)}\n`)
       process.stdout.write(picked + '\n')
       process.exit(EXIT.OK)
     } catch (err) {

@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
 import { discoverUPGFile, loadStore, validateStatusAgainstLifecycle, validateTitle, parseDataOption } from '../lib/graph.js'
 import { EXIT, die, violation, runtimeError } from '../lib/errors.js'
 
@@ -61,7 +62,7 @@ export const updateCommand = new Command('update')
         process.stdout.write(JSON.stringify({ node: updated }, null, 2) + '\n')
       } else {
         // Human line to stderr (chrome); the id stays on stdout for scripts.
-        process.stderr.write(`Updated: ${updated.type} "${updated.title}"\n`)
+        process.stderr.write(`Updated: ${updated.type} "${sanitizeForTerminal(updated.title)}"\n`)
         process.stdout.write(updated.id + '\n')
       }
       process.exit(EXIT.OK)

@@ -379,7 +379,8 @@ Get a single entity by ID, with full properties and all connected edges.
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `compact_edges` | boolean |  | Omit source_title/target_title from edges (saves ~30% on edge-heavy nodes) |
-| `node_id` | string | ✓ | The node ID |
+| `id` | string |  | Alias for `node_id`. |
+| `node_id` | string | ✓ | The node ID. Alias: `id`. |
 
 **Returns:**
 
@@ -388,8 +389,8 @@ omits `source_title` and `target_title` (saves ~30% on edge-heavy nodes).
 
 **Throws:**
 
-- Returns a textError when `node_id` is missing or the node does not
-exist.
+- Returns a textError when neither `node_id` nor `id` is provided, or
+the node does not exist.
 
 **See also:** `get_nodes`
 
@@ -1296,7 +1297,8 @@ loads the new file as separate filesystem operations.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `file` | string | ✓ | Path to the .upg file (relative, absolute, or a bare product name in workspace mode). |
+| `file` | string | ✓ | Path to the .upg file (relative, absolute, or a bare product name in workspace mode). Alias: `product`. |
+| `product` | string |  | Alias for `file`. |
 
 **Returns:**
 
@@ -1304,8 +1306,8 @@ JSON: `{ message, file, product: { title, stage }, entities }`.
 
 **Throws:**
 
-- Returns a textError when the file cannot be resolved or the load
-fails (file watcher / parse error).
+- Returns a textError when neither `file` nor `product` is provided, or
+the file cannot be resolved, or the load fails (file watcher / parse error).
 
 **Warnings (non-error surfaces):**
 
@@ -1568,7 +1570,8 @@ Return one `UPGFramework` by id (e.g. "rice-scoring", "lean-canvas"). Includes a
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Framework id (kebab-case). |
+| `framework_id` | string |  | Alias for `id` (matches the key used by apply_framework / prioritise). |
+| `id` | string | ✓ | Framework id (kebab-case). Alias: `framework_id`. |
 
 **Returns:**
 
@@ -1576,7 +1579,8 @@ JSON: the full `UPGFramework` record.
 
 **Throws:**
 
-- textError when `id` is missing or unknown.
+- textError when neither `id` nor `framework_id` is provided, or the
+id is unknown.
 
 **See also:** `list_frameworks`, `prioritise`, `get_playbook`, `get_approach`
 
@@ -2611,11 +2615,12 @@ Walk the loaded graph and return a per-class, per-node report of schema drift pl
 
 **Returns:**
 
-JSON: `{ valid, summary, entity_drift?, edge_drift?,
-property_drift?, top_level_drift?, lifecycle_drift?, self_referential?,
-anti_pattern_violations?, notes?, _hash }`. Per-class drift arrays appear
-only when the requested `scope` includes that class. Each array is capped
-at `limit` (default 100).
+JSON: `{ valid, structurally_valid?, summary, entity_drift?,
+edge_drift?, property_drift?, top_level_drift?, lifecycle_drift?,
+self_referential?, anti_pattern_violations?, notes?, _hash }`. Per-class
+drift arrays appear only when the requested `scope` includes that class.
+Each array is capped at `limit` (default 100). `structurally_valid` is
+omitted when `skip_drift: true`.
 
 **Throws:**
 
@@ -2624,9 +2629,11 @@ recognised values.
 
 **Warnings (non-error surfaces):**
 
-- Top-level `valid` is true ONLY when both drift is empty AND no
-anti-pattern violations fired. Set `skip_anti_patterns: true` for a
-pure spec-shape check; `skip_drift: true` for catalog-only.
+- `valid` is true ONLY when both drift is empty AND no anti-pattern
+violations fired — it conflates structure and product-health. For a pure
+spec-conformance check read `structurally_valid` (or set
+`skip_anti_patterns: true`, which makes `valid` track structure alone).
+`skip_drift: true` gives a catalog-only run and omits `structurally_valid`.
 
 **Examples:**
 

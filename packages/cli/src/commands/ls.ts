@@ -14,6 +14,7 @@ import { discoverUPGFile, loadStore } from '../lib/graph.js'
 import { buildAdjacentEdges } from '@unified-product-graph/sdk'
 import { resolveCursor } from '../lib/cursor.js'
 import { edgeVerb } from '../lib/inference.js'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
 import { EXIT, die, runtimeError } from '../lib/errors.js'
 
 export const lsCommand = new Command('ls')
@@ -60,15 +61,18 @@ export const lsCommand = new Command('ls')
         process.exit(EXIT.OK)
       }
 
-      process.stderr.write(`${chalk.bold(node.type)} ${chalk.cyan(`"${node.title}"`)}\n`)
+      // Sanitise node-supplied type/title before they reach the terminal
+      //. The JSON path above uses the raw titleOf/typeOf values, which
+      // JSON.stringify escapes safely on its own.
+      process.stderr.write(`${chalk.bold(sanitizeForTerminal(node.type))} ${chalk.cyan(`"${sanitizeForTerminal(node.title)}"`)}\n`)
       if (out.length === 0 && inc.length === 0) {
         process.stderr.write(chalk.dim('  (no neighbours yet)\n'))
       }
       for (const e of out) {
-        process.stderr.write(`  ${chalk.green(edgeVerb(e.type).padEnd(18))} → ${typeOf(e.target)} ${chalk.dim(`"${titleOf(e.target)}"`)}\n`)
+        process.stderr.write(`  ${chalk.green(edgeVerb(e.type).padEnd(18))} → ${sanitizeForTerminal(typeOf(e.target))} ${chalk.dim(`"${sanitizeForTerminal(titleOf(e.target))}"`)}\n`)
       }
       for (const e of inc) {
-        process.stderr.write(`  ${chalk.dim('←' + ' ' + edgeVerb(e.type).padEnd(16))} ${chalk.dim(`${typeOf(e.source)} "${titleOf(e.source)}"`)}\n`)
+        process.stderr.write(`  ${chalk.dim('←' + ' ' + edgeVerb(e.type).padEnd(16))} ${chalk.dim(`${sanitizeForTerminal(typeOf(e.source))} "${sanitizeForTerminal(titleOf(e.source))}"`)}\n`)
       }
       if (adjacent.length > 0) {
         process.stderr.write(chalk.dim(`  next here: ${adjacent.map((a) => a.target_type).join(', ')}\n`))

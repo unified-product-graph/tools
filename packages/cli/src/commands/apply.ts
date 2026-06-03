@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
 import { applyFramework, applyFrameworkEnvelope } from '@unified-product-graph/sdk'
 import { EXIT, die, violation } from '../lib/errors.js'
@@ -38,7 +39,7 @@ export const applyCommand = new Command('apply')
       } else {
         const n = result.edges.length
         process.stderr.write(
-          `Applied ${frameworkId}: exercise "${result.exercise.title}" includes ${n} entit${n === 1 ? 'y' : 'ies'}.\n`,
+          `Applied ${frameworkId}: exercise "${sanitizeForTerminal(result.exercise.title)}" includes ${n} entit${n === 1 ? 'y' : 'ies'}.\n`,
         )
         for (const w of result.warnings) process.stderr.write(`  warning: ${w}\n`)
         process.stdout.write(result.exercise.id + '\n')

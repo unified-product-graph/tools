@@ -16,7 +16,7 @@ import { discoverUPGFile, loadStore, edgeId } from '../lib/graph.js'
 import { allEdgesForCli } from '../lib/schema-facade.js'
 import { resolveNodeRef } from '../lib/cursor.js'
 import { inferEdge, chooseEdge, edgeVerb, candidateMenu } from '../lib/inference.js'
-import { EXIT, die, runtimeError, usageError, violation } from '../lib/errors.js'
+import { EXIT, die, usageError, violation } from '../lib/errors.js'
 import { isTTY } from '../lib/output.js'
 
 export const linkCommand = new Command('link')
@@ -33,8 +33,12 @@ export const linkCommand = new Command('link')
       const a = resolveNodeRef(store, aRef)
       const b = resolveNodeRef(store, bRef)
       if (!a || !b) {
+        // (c): an unresolvable endpoint is a policy violation (exit 2),
+        // matching `connect` and the "no canonical edge" branch below. (A
+        // genuinely ambiguous title still surfaces as a usage error via the
+        // AmbiguousTitleError thrown inside resolveNodeRef.)
         store.stopWatching()
-        die(runtimeError(`Could not resolve ${!a ? `"${aRef}"` : ''}${!a && !b ? ' and ' : ''}${!b ? `"${bRef}"` : ''}.`))
+        die(violation(`Could not resolve ${!a ? `"${aRef}"` : ''}${!a && !b ? ' and ' : ''}${!b ? `"${bRef}"` : ''}.`))
       }
 
       const inf = inferEdge(a.type, b.type, allEdgesForCli)

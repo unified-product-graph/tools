@@ -308,17 +308,85 @@ export class UPGFileStore {
     return { structural, content }
   }
 
+  /**
+   *(a): pre-`normalizeDocument` array-shape guard.
+   *
+   * `normalizeDocument` runs `(raw.nodes ?? []).map(...)` / reads `raw.edges`
+   * BEFORE the validator gets to run, so a `.upg` whose `nodes` or `edges` is
+   * present but not an Array (a string, a number, an object) throws a raw
+   * `(intermediate value).map is not a function` TypeError that leaks to the
+   * user as an opaque exit-1 crash with no actionable message. The `?? []`
+   * coalesce only catches null/undefined, never a wrong-typed value.
+   *
+   * A malformed CONTAINER is a HARD structural problem — there is no graph to
+   * load — so we throw the SAME "Invalid UPG document" error shape the
+   * structural-failure branch of `load()` already produces, with the SAME
+   * message the validator uses for `$.nodes` / `$.edges`
+   * ("... is required and must be an array"). This is intentionally NOT the
+   * permissive path: per-node / per-edge content issues are handled downstream
+   * and still load-with-warning. `null`/`undefined` (or absent) are left to the
+   * normaliser's `?? []` and the validator's own required-field check, so this
+   * guard fires ONLY on a present-but-wrong-typed container.
+   */
+  private assertArrayShaped(json: unknown): void {
+    if (json === null || typeof json !== 'object' || Array.isArray(json)) {
+      // Not an object at all (e.g. a bare JSON array/string/number). Let the
+      // normaliser/validator surface this the way they already do; the array
+      // container is not the relevant failure here.
+      return
+    }
+    const obj = json as Record<string, unknown>
+    const offenders: UPGValidationError[] = []
+    for (const key of ['nodes', 'edges'] as const) {
+      const value = obj[key]
+      // null / undefined are NOT structural here: the normaliser's `?? []`
+      // tolerates them and the validator reports the proper required-field
+      // error. We only reject a PRESENT, non-array container.
+      if (value !== undefined && value !== null && !Array.isArray(value)) {
+        offenders.push({
+          path: `$.${key}`,
+          message: `${key} is required and must be an array`,
+        })
+      }
+    }
+    if (offenders.length > 0) {
+      const msgs = offenders.map((e) => `  ${e.path}: ${e.message}`).join('\n')
+      throw new Error(`Invalid UPG document:\n${msgs}`)
+    }
+  }
+
   async load(filePath: string): Promise<void> {
     this.filePath = path.resolve(filePath)
     const raw = await fs.readFile(this.filePath, 'utf-8')
-    // normalizeDocument accepts BOTH the canonical `$upg` envelope and the
-    // legacy flat envelope, returning the flat in-memory shape (and repairing
-    // double-encoded properties/tags drift). This is the one read path.
-    //
+    //(b): strip a single leading UTF-8 BOM (U+FEFF) before parsing.
+    // Editors (Notepad, some PowerShell redirects) prepend a BOM that survives a
+    // `utf-8` read as a leading `﻿`; `JSON.parse` then rejects an otherwise
+    // valid `.upg` with "Unexpected token" → the user saw "Not a valid .upg
+    // file". The identical bytes load once the BOM is removed. We strip ONLY a
+    // single leading BOM and touch nothing else.
+    const rawNoBom = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw
+
     // JSON.parse throwing here is a HARD failure on purpose: a non-JSON file is
     // not a UPG document. We let it propagate (the caller's `catch` already
     // surfaces it the same way it did before).
-    const parsed = normalizeDocument(JSON.parse(raw))
+    const json = JSON.parse(rawNoBom)
+
+    //(a): array-shape guard BEFORE normalizeDocument. The shared
+    // normaliser does `(raw.nodes ?? []).map(...)` / `(raw.edges ?? [])`, so a
+    // `.upg` whose `nodes`/`edges` is present but NOT an array (a string, an
+    // object) throws a raw `(...).map is not a function` TypeError that leaks to
+    // the user as an opaque crash. A non-array container is a HARD structural
+    // problem (the same class the validator flags as `$.nodes`/`$.edges`
+    // "is required and must be an array"), so we throw the project's standard
+    // "Invalid UPG document" error here, before any `.map`. Wave-1 permissive
+    // load is unchanged: this only catches the malformed CONTAINER; per-node /
+    // per-edge content issues still load-with-warning downstream.
+    this.assertArrayShaped(json)
+
+    // normalizeDocument accepts BOTH the canonical `$upg` envelope and the
+    // legacy flat envelope, returning the flat in-memory shape (and repairing
+    // double-encoded properties/tags drift). This is the one read path.
+    const parsed = normalizeDocument(json)
 
     const result = validateUPGDocument(parsed)
     let contentValidationErrors: UPGValidationError[] = []
@@ -1006,12 +1074,39 @@ export class UPGFileStore {
     return { node, removedEdgeIds }
   }
 
-  addEdge(edge: UPGEdge, skipValidation = false): void {
+  /**
+   * Add an edge to the graph.
+   *
+   *: idempotent on the `(source, target, type)` triple. `upg connect P J`
+   * run three times used to append three identical `persona_pursues_job` edges;
+   * the same duplicate showed up on the MCP `create_edge` / `batch_create_edges`
+   * surface. Adding the dedup here, at the single store-level chokepoint every
+   * edge-create flows through, fixes BOTH surfaces at once. When an edge with the
+   * same source, target, and type already exists, we return the EXISTING edge
+   * unchanged (no append, no second `create` change-log entry, no extra save)
+   * instead of throwing — connect stays a safe, repeatable no-op.
+   *
+   * The returned edge is always the canonical one (existing on a dedup hit, the
+   * freshly-added one otherwise). Callers that mint a fresh id up-front (e.g.
+   * `createEdge`) MUST use this return value so the id they report back is the
+   * one that actually lives in the graph, not the discarded fresh id.
+   *
+   * Dedup is deliberately scoped to the VALIDATED path (`skipValidation` false).
+   * `skipValidation: true` is the internal restore/rollback channel — it re-adds
+   * a specific edge object by its exact id after a `removeEdge`, and must remain
+   * a faithful, un-deduped restore of that exact edge.
+   */
+  addEdge(edge: UPGEdge, skipValidation = false): UPGEdge {
     if (!skipValidation) {
       if (!this.nodeMap.has(edge.source))
         throw new Error(`Source node not found: ${edge.source}`)
       if (!this.nodeMap.has(edge.target))
         throw new Error(`Target node not found: ${edge.target}`)
+
+      //: collapse an identical (source, target, type) re-create onto the
+      // existing edge. Returns it truthfully so callers' reported id is real.
+      const existing = this.findEdgeByTriple(edge.source, edge.target, edge.type)
+      if (existing) return existing
     }
 
     this.doc.edges.push(edge)
@@ -1019,6 +1114,26 @@ export class UPGFileStore {
     this.indexEdgeForNode(edge)
     this.logChange('create', 'edge', edge.id, edge.type, undefined)
     this.scheduleSave()
+    return edge
+  }
+
+  /**
+   *: find an existing edge with the given (source, target, type) triple,
+   * or undefined. Uses the `edgesByNode` index off the source node so the scan is
+   * bounded by that node's degree, not the whole edge list.
+   */
+  private findEdgeByTriple(
+    source: string,
+    target: string,
+    type: string,
+  ): UPGEdge | undefined {
+    const edgeIds = this.edgesByNode.get(source)
+    if (!edgeIds) return undefined
+    for (const id of edgeIds) {
+      const e = this.edgeMap.get(id)
+      if (e && e.source === source && e.target === target && e.type === type) return e
+    }
+    return undefined
   }
 
   removeEdge(id: string): UPGEdge {

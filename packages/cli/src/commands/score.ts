@@ -1,27 +1,46 @@
 import { Command } from 'commander'
-import { discoverUPGFile, loadStore, parseDataOption } from '../lib/graph.js'
+import { discoverUPGFile, loadStore, parseDataOption, validateScoreData } from '../lib/graph.js'
 import { scoreEntity } from '@unified-product-graph/sdk'
-import { EXIT, die, violation, usageError } from '../lib/errors.js'
+import { EXIT, die, violation } from '../lib/errors.js'
 
 export const scoreCommand = new Command('score')
   .arguments('<exercise-id> <entity-id>')
   .description("Record a framework's result for one entity on the exercise's includes edge.")
   .option('--file <path>', 'Path to .upg file')
-  .requiredOption('--data <json>', 'Result as JSON, e.g. \'{"moscow":"must"}\' or \'{"reach":800,"impact":3}\'')
+  .requiredOption('--data <json>', 'Result as JSON, e.g. \'{"moscow":"must"}\' or \'{"reach":4,"impact":3,"confidence":4,"effort":2}\'')
   .option('--replace', 'Replace the edge properties instead of merging into them')
   .option('--json', 'Machine-readable JSON output')
   .action(async (exerciseId, entityId, opts) => {
     try {
-      // Bad/oversized --data is a usage error (exit 3) with the SAME message
-      // and code as create/update ( D2 / E5).
-      const parsed = parseDataOption(opts.data)
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        die(usageError('--data must be a JSON object of property to value, e.g. \'{"moscow":"must"}\''))
-      }
-      const values = parsed as Record<string, unknown>
+      // Bad/oversized/non-object --data is a usage error (exit 3) with the SAME
+      // message and code as create/update ( D2 / E5 / b).
+      // parseDataOption now enforces the plain-object shape at the shared parse
+      // point, so a stray array/primitive/null never reaches here.
+      const values = parseDataOption(opts.data)
 
       const filePath = await discoverUPGFile(opts.file)
       const store = await loadStore(filePath)
+
+      //: validate the result payload against the exercise's framework
+      // BEFORE writing. The SDK only warns (storage stays permissive), so the
+      // CLI is the gate that REJECTS an invalid bucket, a value off the wrong
+      // schema, a non-numeric/out-of-range score, or effort:0. Resolve the
+      // framework the same way `apply`/the SDK do — the framework_id stamped on
+      // the exercise node — and the scored entity's type for the right slot.
+      const exerciseNode = store.getNode(exerciseId)
+      const frameworkId = (exerciseNode?.properties as { framework_id?: string } | undefined)
+        ?.framework_id
+      const entityType = store.getNode(entityId)?.type
+      const problems = validateScoreData(frameworkId, entityType, values)
+      if (problems.length > 0) {
+        store.stopWatching()
+        die(
+          violation(
+            `Invalid --data for ${frameworkId ?? 'this'} exercise:\n` +
+              problems.map((p) => `  - ${p}`).join('\n'),
+          ),
+        )
+      }
 
       const result = scoreEntity(store, {
         exercise_id: exerciseId,

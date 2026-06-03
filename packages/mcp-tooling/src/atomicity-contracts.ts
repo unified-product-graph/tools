@@ -280,6 +280,11 @@ export interface ValidateGraphAntiPatternViolation {
  * Schema-drift fields and anti-pattern fields stay clearly separated so
  * the agent's mental model can keep them distinct.
  *
+ * `structurally_valid` (N4) is the spec-conformance axis on its own: true
+ * when every schema-drift class is empty, independent of anti-pattern
+ * health. CI conformance gates should read this rather than `valid`, which
+ * also fails on product-health anti-patterns.
+ *
  * `_warning` is the payload-guard soft-warning channel. When the
  * serialized response approaches the soft byte limit, the local server
  * attaches a human-readable hint (for example, "narrow scope, lower
@@ -292,6 +297,13 @@ export interface ValidateGraphResult {
    * is empty and `anti_pattern_violations` is empty.
    */
   valid?: boolean
+  /**
+   * Pure structural-conformance verdict (N4). True iff every schema-drift
+   * class is empty, independent of anti-pattern health. Omitted when the
+   * caller passes `skip_drift: true` (structure was not assessed). Read this,
+   * not `valid`, for a CI gate that asks "is this graph spec-shaped?".
+   */
+  structurally_valid?: boolean
   summary: ValidateGraphSummary
   entity_drift?: ValidateGraphEntityDrift[]
   edge_drift?: ValidateGraphEdgeDrift[]

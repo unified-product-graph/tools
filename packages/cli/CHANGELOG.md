@@ -2,6 +2,18 @@
 
 Changes to `@unified-product-graph/cli` follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-06-03
+
+CLI Hardening Wave 2 + cross-surface QA.
+
+### Added
+- `check --structure-only` for a spec-conformance-only verdict (pairs with the MCP `structurally_valid`).
+
+### Fixed
+- Hardened output sanitization, boundary/shape/range validation, and framework-score validation across the mutation and read commands; stripped control bytes from mutation success lines that echo stored, attacker-controllable titles.
+- Option errors now print once instead of twice (N3).
+- Corrected stale RICE examples to the shipped 1 to 5 assessment scale (`reach`/`impact`/`confidence`/`effort`), so help, create, and verify agree.
+
 ## [0.8.7] - 2026-06-03
 
 CLI hardening + cross-surface QA. New `upg show <exercise>` (read exercise scores back); `export --format` is validated (unknown value exits 3 instead of emitting nothing; `markdown` accepted as `md`); `init` honours `--file`/`$UPG_FILE` and a new `--yes` for non-interactive runs; last-writer provenance is stamped on every write; the `upg use design` help example is corrected to `ux_design`. Co-versions the @unified-product-graph/* 0.8.7 train.

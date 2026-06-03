@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
 import chalk from 'chalk'
 import { input, search } from '@inquirer/prompts'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
@@ -77,7 +78,7 @@ export const deleteCommand = new Command('delete')
         if (!interactive) {
           store.stopWatching()
           die(usageError(
-            `Refusing to delete ${node.type} "${node.title}" without confirmation in a non-interactive shell. ` +
+            `Refusing to delete ${node.type} "${sanitizeForTerminal(node.title)}" without confirmation in a non-interactive shell. ` +
             `Re-run with --yes (or -y).`,
           ))
         }
@@ -88,7 +89,7 @@ export const deleteCommand = new Command('delete')
         process.stderr.write('\n')
 
         const answer = await input({
-          message: `Type "${node.title}" to confirm deletion:`,
+          message: `Type "${sanitizeForTerminal(node.title)}" to confirm deletion:`,
         })
 
         if (answer !== node.title) {
@@ -109,7 +110,7 @@ export const deleteCommand = new Command('delete')
         process.stdout.write(JSON.stringify({ deleted, removed_edges: cascadedEdges }, null, 2) + '\n')
       } else {
         process.stderr.write(
-          chalk.green(`\n  ✓ Deleted: ${node.type} "${node.title}" (${removedEdgeIds.length} edges removed)\n`),
+          chalk.green(`\n  ✓ Deleted: ${node.type} "${sanitizeForTerminal(node.title)}" (${removedEdgeIds.length} edges removed)\n`),
         )
       }
       process.exit(EXIT.OK)

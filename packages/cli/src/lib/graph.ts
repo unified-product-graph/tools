@@ -7,9 +7,49 @@
 
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { InvalidArgumentError } from 'commander'
 import { UPGFileStore } from '@unified-product-graph/sdk'
+import { UPG_FRAMEWORKS_BY_ID, UPG_SCALES, type UPGFramework } from '@unified-product-graph/core'
 import { usageError, runtimeError, violation, type CliError } from './errors.js'
 import { CLI_VERSION } from './version.js'
+
+/**
+ * (a) — a Commander option coercion for a bounded numeric flag.
+ *
+ * The bug: an option declared with a bare `parseFloat` coercion silently accepts
+ * garbage. `parseFloat('abc')` / `parseFloat('')` is `NaN`, and EVERY comparison
+ * against `NaN` is false, so `--max-orphan-rate abc` made a 100%-orphan graph
+ * PASS at exit 0 (the gate became a no-op). `--max-orphan-rate 99` (a rate, not a
+ * percentage) and `Infinity` were likewise swallowed.
+ *
+ * The fix: reject anything that is not a finite number inside the inclusive
+ * [min, max] window, throwing Commander's `InvalidArgumentError`. The CLI entry
+ * point already maps that to a usage error (exit 3) via `USAGE_ERROR_CODES`, so
+ * bad input fails loudly at parse time, before any command logic runs. Returns a
+ * curried coercion suitable for `.option(..., boundedFloat(0, 1, 'flag'))`.
+ */
+export function boundedFloat(
+  min: number,
+  max: number,
+  flagLabel: string,
+): (raw: string) => number {
+  return (raw: string): number => {
+    // Number() (not parseFloat) so trailing garbage like "0.5x" is rejected
+    // rather than silently parsed to 0.5. Empty string → NaN → rejected.
+    const n = raw.trim() === '' ? Number.NaN : Number(raw)
+    if (!Number.isFinite(n)) {
+      throw new InvalidArgumentError(
+        `${flagLabel} must be a number between ${min} and ${max}; got "${raw}".`,
+      )
+    }
+    if (n < min || n > max) {
+      throw new InvalidArgumentError(
+        `${flagLabel} must be between ${min} and ${max}; got ${n}.`,
+      )
+    }
+    return n
+  }
+}
 
 export { UPGFileStore }
 
@@ -63,27 +103,257 @@ export const MAX_DATA_BYTES = 256 * 1024
  * valid JSON. Got: ..." and exited 3 (usage). The contract says a bad CLI
  * argument is a USAGE error (exit 3), so they now share this text and code.
  */
+// RICE fields are 1-5 ASSESSMENT scales in core (reach -> reach_5, etc.), so the
+// old `{"reach":800,...}` example was invalid under the model and contradicted
+// the verify-side scale check. Use an in-scale example so help <-> create <->
+// verify all agree ( seam with Spock's verify validator).
 export const DATA_INVALID_JSON_MSG =
-  '--data must be valid JSON, e.g. \'{"reach":800,"impact":3}\'.'
+  '--data must be valid JSON, e.g. \'{"reach":4,"impact":3,"confidence":4,"effort":2}\'.'
 
 /**
- * Parse a `--data` option value: enforce the size guard (E5) then JSON-parse.
- * Throws a usage error (exit 3) on either failure so every command treats a bad
- * `--data` argument identically ( D2 / E5). Returns the parsed
- * value; the caller decides whether it must be an object.
+ * One consistent error for a `--data` payload that parsed as JSON but is not a
+ * plain object ( b). `properties` is a map of property name → value, so
+ * an array, a primitive, or `null` is never a valid payload. Before this guard
+ * `[1,2,3]` / `42` / `true` were stored verbatim as `properties` (later tripping
+ * the fmt layer or silently corrupting the node), `null` was dropped, and a bare
+ * `"hello"` leaked a `[upg fmt]` string at exit 1. We now reject all of these up
+ * front at the write boundary as a usage error (exit 3) with the same message
+ * everywhere.
  */
-export function parseDataOption(raw: string): unknown {
+export const DATA_NOT_OBJECT_MSG =
+  "--data must be a JSON object of property to value, e.g. '{\"moscow\":\"must\"}'."
+
+/** True for a non-null, non-array plain object — the only valid `--data` shape. */
+export function isPlainDataObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Parse a `--data` option value: enforce the size guard (E5), JSON-parse, then
+ * require a plain object ( b). Throws a usage error (exit 3) on any
+ * failure so every command treats a bad `--data` argument identically
+ * ( D2 / E5 / b). Returns the parsed object.
+ *
+ * The object requirement lives HERE, at the single shared parse point, rather
+ * than in each caller, so `create` / `update` / `score` cannot drift: arrays,
+ * primitives, and `null` are rejected before they can ever reach `properties`.
+ */
+export function parseDataOption(raw: string): Record<string, unknown> {
   if (Buffer.byteLength(raw, 'utf-8') > MAX_DATA_BYTES) {
     throw usageError(
       `--data is too large (${Buffer.byteLength(raw, 'utf-8')} bytes; max ${MAX_DATA_BYTES}). ` +
         `Pass a smaller property map.`,
     )
   }
+  let parsed: unknown
   try {
-    return JSON.parse(raw)
+    parsed = JSON.parse(raw)
   } catch {
     throw usageError(DATA_INVALID_JSON_MSG)
   }
+  if (!isPlainDataObject(parsed)) {
+    throw usageError(DATA_NOT_OBJECT_MSG)
+  }
+  return parsed
+}
+
+/* ----------------------------------------------------------------------------
+ * — `score --data` framework validation (CLI half)
+ *
+ * The SDK's `scoreEntity` is deliberately PERMISSIVE: it only ever *warns* on a
+ * bad value and still persists it, because storage must not brick on drift. That
+ * means an invalid bucket ("definitely-maybe"), a value off the wrong schema
+ * ({reach:999} on a MoSCoW exercise), a string where a number is declared, an
+ * out-of-range score, or `effort:0` (which makes RICE's reach*impact*confidence
+ * /effort blow up to -Infinity) all slip through at exit 0 today.
+ *
+ * `score` is a deliberate WRITE of a framework result, so the CLI validates the
+ * `--data` payload against the framework definition BEFORE calling the SDK and
+ * REJECTS (exit 2, nothing persisted) when it does not fit. This is the CLI's
+ * own gate — self-contained, no new spec export needed. The framework + scale
+ * definitions are read from `@unified-product-graph/core`, the same source the
+ * SDK and `apply` use, so the two surfaces never disagree about what a framework
+ * declares.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The declared input spec for one framework property, as it appears in a
+ * framework's `data.required_properties[<entityType>]` array in core. Mirrors
+ * the (unexported) SDK shape so the CLI can read it without an SDK dependency.
+ */
+interface FrameworkInputSpec {
+  property: string
+  type?: 'number' | 'string' | 'enum' | 'boolean' | 'assessment'
+  required?: boolean
+  scale_id?: string
+  enum_values?: string[]
+}
+
+/** Read the per-entity-type input specs a framework declares. */
+function frameworkInputSpecs(framework: UPGFramework, entityType: string): FrameworkInputSpec[] {
+  const req = (
+    framework.data as { required_properties?: Record<string, FrameworkInputSpec[]> } | undefined
+  )?.required_properties
+  return req?.[entityType] ?? []
+}
+
+/**
+ * Union of input specs across EVERY entity-type slot a framework declares, keyed
+ * by property name. Used as a fallback when the scored entity's exact type slot
+ * is empty (e.g. an entity type the framework broadened to but has no bespoke
+ * slot for) so we still validate against the framework's known fields rather
+ * than waving the payload through.
+ */
+function frameworkInputSpecsAnyType(framework: UPGFramework): Map<string, FrameworkInputSpec> {
+  const out = new Map<string, FrameworkInputSpec>()
+  const req = (
+    framework.data as { required_properties?: Record<string, FrameworkInputSpec[]> } | undefined
+  )?.required_properties
+  for (const specs of Object.values(req ?? {})) {
+    for (const s of specs) if (s?.property && !out.has(s.property)) out.set(s.property, s)
+  }
+  return out
+}
+
+/**
+ * Resolve a numeric range for an input spec. Assessment / number inputs that name
+ * a `scale_id` inherit that scale's [min, max]. Bare `number` inputs (e.g. ICE's
+ * 1-10 fields, described only in prose) get a sane lower bound of 0 with no upper
+ * bound, which still catches negatives and the `effort:0` divide hazard. Returns
+ * `[min, max]` where either bound may be `undefined`.
+ */
+function numericRange(spec: FrameworkInputSpec): [number | undefined, number | undefined] {
+  if (spec.scale_id) {
+    const scale = UPG_SCALES[spec.scale_id]
+    if (scale) return [scale.min, scale.max]
+  }
+  return [0, undefined]
+}
+
+/**
+ * Validate a `score --data` payload against the exercise's framework. Returns a
+ * list of human-readable problems; empty means the payload is acceptable. The
+ * caller turns a non-empty list into a single exit-2 violation.
+ *
+ * Checks, in order:
+ *   1. unknown keys        — the payload names a property the framework does not
+ *                            declare (e.g. {reach:999} on a MoSCoW exercise:
+ *                            wrong schema entirely).
+ *   2. required presence   — a `required:true` input for this entity type slot is
+ *                            missing.
+ *   3. type                — enum value must be one of the declared buckets; a
+ *                            number/assessment input must be a finite number, not
+ *                            a string or NaN/Infinity; boolean must be boolean.
+ *   4. range               — numeric inputs must sit within their scale (or be
+ *                            >= 0 for bare-number inputs), which also rejects the
+ *                            `effort:0` -Infinity hazard (effort's scale min is 1).
+ *
+ * `frameworkId` may be undefined (exercise missing its framework_id property) or
+ * unknown to the catalog; in either case we cannot validate and return [] so the
+ * SDK's own handling stands. The exercise-type check and persistence still live
+ * in the SDK.
+ *
+ * NOTE (extension): all current scoring frameworks describe their inputs in
+ * `data.required_properties` with `type` + `scale_id`/`enum_values`, so this is
+ * fully data-driven across MoSCoW, RICE, ICE, Kano, etc. If a future framework
+ * ships richer input semantics (cross-field constraints, conditional requireds),
+ * extend the per-spec checks here rather than special-casing a framework id.
+ */
+export function validateScoreData(
+  frameworkId: string | undefined,
+  entityType: string | undefined,
+  values: Record<string, unknown>,
+): string[] {
+  if (!frameworkId) return []
+  const framework = UPG_FRAMEWORKS_BY_ID[frameworkId]
+  if (!framework) return []
+
+  // Prefer the scored entity's exact type slot; fall back to the union of all
+  // declared slots so a missing-slot type still validates against known fields.
+  const slot = entityType ? frameworkInputSpecs(framework, entityType) : []
+  const specByProp =
+    slot.length > 0
+      ? new Map(slot.map((s) => [s.property, s]))
+      : frameworkInputSpecsAnyType(framework)
+
+  // No declared inputs anywhere → nothing to validate against; defer to SDK.
+  if (specByProp.size === 0) return []
+
+  const problems: string[] = []
+  const allowed = [...specByProp.keys()]
+
+  // 1. Unknown keys — payload off the framework's schema.
+  for (const key of Object.keys(values)) {
+    if (!specByProp.has(key)) {
+      problems.push(
+        `"${key}" is not a ${frameworkId} input. Allowed: ${allowed.join(', ')}.`,
+      )
+    }
+  }
+
+  // 2. Required presence.
+  for (const spec of specByProp.values()) {
+    if (spec.required && !(spec.property in values)) {
+      problems.push(`Missing required "${spec.property}" for ${frameworkId}.`)
+    }
+  }
+
+  // 3 + 4. Per-value type and range.
+  for (const [key, value] of Object.entries(values)) {
+    const spec = specByProp.get(key)
+    if (!spec) continue // already flagged as unknown above
+    if (value === null || value === undefined) {
+      problems.push(`"${key}" must not be null for ${frameworkId}.`)
+      continue
+    }
+    switch (spec.type) {
+      case 'enum': {
+        const buckets = spec.enum_values ?? []
+        if (typeof value !== 'string' || (buckets.length > 0 && !buckets.includes(value))) {
+          problems.push(
+            `"${key}" = ${JSON.stringify(value)} is not a valid ${frameworkId} value. ` +
+              `Allowed: ${buckets.join(', ')}.`,
+          )
+        }
+        break
+      }
+      case 'number':
+      case 'assessment': {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          problems.push(`"${key}" must be a number for ${frameworkId}, got ${JSON.stringify(value)}.`)
+          break
+        }
+        const [min, max] = numericRange(spec)
+        if (min !== undefined && value < min) {
+          problems.push(
+            `"${key}" = ${value} is below the minimum ${min}` +
+              (spec.scale_id ? ` for the ${spec.scale_id} scale` : '') + `.`,
+          )
+        } else if (max !== undefined && value > max) {
+          problems.push(
+            `"${key}" = ${value} is above the maximum ${max}` +
+              (spec.scale_id ? ` for the ${spec.scale_id} scale` : '') + `.`,
+          )
+        }
+        break
+      }
+      case 'boolean':
+        if (typeof value !== 'boolean') {
+          problems.push(`"${key}" must be true or false for ${frameworkId}, got ${JSON.stringify(value)}.`)
+        }
+        break
+      case 'string':
+        if (typeof value !== 'string') {
+          problems.push(`"${key}" must be a string for ${frameworkId}, got ${JSON.stringify(value)}.`)
+        }
+        break
+      default:
+        // Spec declares the property but no type — nothing strict to assert.
+        break
+    }
+  }
+
+  return problems
 }
 
 /**

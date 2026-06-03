@@ -186,7 +186,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {
-        node_id: { type: 'string', description: 'The node ID' },
+        node_id: { type: 'string', description: 'The node ID. Alias: `id`.' },
+        id: { type: 'string', description: 'Alias for `node_id`.' },
         compact_edges: { type: 'boolean', description: 'Omit source_title/target_title from edges (saves ~30% on edge-heavy nodes)' },
       },
       required: ['node_id'],
@@ -652,7 +653,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         file: {
           type: 'string',
           description:
-            'Path to the .upg file (relative, absolute, or a bare product name in workspace mode).',
+            'Path to the .upg file (relative, absolute, or a bare product name in workspace mode). Alias: `product`.',
+        },
+        product: {
+          type: 'string',
+          description: 'Alias for `file`.',
         },
       },
       required: ['file'],
@@ -983,7 +988,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {
-        id: { type: 'string', description: 'Framework id (kebab-case).' },
+        id: { type: 'string', description: 'Framework id (kebab-case). Alias: `framework_id`.' },
+        framework_id: { type: 'string', description: 'Alias for `id` (matches the key used by apply_framework / prioritise).' },
       },
       required: ['id'],
     },

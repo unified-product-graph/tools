@@ -1,6 +1,6 @@
 import { Command } from 'commander'
 import { validateUPGDocument, CONTENT_DEPTH_WARNING_RULES } from '@unified-product-graph/core'
-import { discoverUPGFile, loadStore, computeGraphDigest, getOrphans, BUSINESS_AREAS } from '../lib/graph.js'
+import { discoverUPGFile, loadStore, computeGraphDigest, getOrphans, BUSINESS_AREAS, boundedFloat } from '../lib/graph.js'
 import { EXIT, die, violation } from '../lib/errors.js'
 
 export const verifyCommand = new Command('verify')
@@ -9,7 +9,11 @@ export const verifyCommand = new Command('verify')
   .option('--no-orphans', 'Fail when orphan entities exist')
   .option('--no-broken-chains', 'Fail when any chain is incomplete')
   .option('--no-content-depth', 'Skip property-type, enum, and self-loop checks')
-  .option('--max-orphan-rate <n>', 'Maximum orphan rate, 0.0-1.0', parseFloat)
+  // (a): a finite number in [0,1]. A bare `parseFloat` here let garbage
+  // ("abc", "", "99", "Infinity") through as NaN, and `rate > NaN` is always
+  // false, so a 100%-orphan graph PASSED the gate. boundedFloat rejects those
+  // with a usage error (exit 3) at parse time.
+  .option('--max-orphan-rate <n>', 'Maximum orphan rate, 0.0-1.0', boundedFloat(0, 1, '--max-orphan-rate'))
   .option('--require-domains <list>', 'Comma-separated domains that must hold entities', (v) => v.split(','))
   .option('--json', 'Machine-readable JSON output')
   .action(async (opts) => {

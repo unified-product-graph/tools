@@ -281,6 +281,51 @@ describe(' E5: --data size guard', () => {
   })
 })
 
+describe('UPG QA 0.8.7 N3: commander option-errors print exactly once', () => {
+  let tmp: string
+  let file: string
+  const args = (a: string[]) => [...a, '--file', file]
+
+  beforeEach(async () => {
+    tmp = await fsp.mkdtemp(path.join(os.tmpdir(), 'upg-n3-'))
+    file = path.join(tmp, 'product.upg')
+    await fsp.writeFile(file, JSON.stringify(fixtureDoc(), null, 2))
+  })
+  afterEach(async () => {
+    await fsp.rm(tmp, { recursive: true, force: true }).catch(() => { /* noop */ })
+  })
+
+  // Count how many lines on stderr match an `error: ` prefix. The defect was a
+  // double-log: Commander's default writeErr printed the message AND the catch
+  // block re-printed it, yielding two identical lines.
+  const errorLineCount = (stderr: string) =>
+    stderr.split('\n').filter((l) => l.startsWith('error: ')).length
+
+  it('a missing required option prints its error once (exit 3)', () => {
+    // `score` requires --data; omitting it triggers commander.missingMandatoryOptionValue.
+    const r = run(args(['score', 'n_ex', 'n_job']), tmp)
+    expect(r.status).toBe(3)
+    expect(r.stderr).toMatch(/required option '--data <json>' not specified/)
+    expect(errorLineCount(r.stderr)).toBe(1)
+  })
+
+  it('an unknown option prints its error once (exit 3)', () => {
+    const r = run(args(['list', '--definitely-not-a-flag']), tmp)
+    expect(r.status).toBe(3)
+    expect(r.stderr).toMatch(/unknown option/)
+    expect(errorLineCount(r.stderr)).toBe(1)
+  })
+
+  it('under --json the same option-error is a single envelope, no human line', () => {
+    const r = run(args(['score', 'n_ex', 'n_job', '--json']), tmp)
+    expect(r.status).toBe(3)
+    const out = JSON.parse(r.stdout)
+    expect(out.ok).toBe(false)
+    expect(out.error.code).toBe(3)
+    expect(r.stderr.trim()).toBe('')
+  })
+})
+
 describe(' E6: -- end-of-options escape for flag-like titles', () => {
   let tmp: string
   let file: string

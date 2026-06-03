@@ -73,7 +73,71 @@ function classify(err: unknown): ExitCode {
   if (err instanceof Error && (err.name === 'AmbiguousFileError' || err.name === 'AmbiguousTitleError')) {
     return EXIT.USAGE
   }
+  //: a structurally invalid document is a validation failure, so reads
+  // (`list`, `show`, `export`) must agree with `verify` and exit 2 — not the
+  // generic runtime 1 they would otherwise inherit from a bare load throw. The
+  // SDK throws an Error whose message starts "Invalid UPG document". Centralise
+  // the mapping here so EVERY error path through `die` is consistent, instead of
+  // each read command repeating the `startsWith` check.
+  if (err instanceof Error && err.message.startsWith('Invalid UPG document')) {
+    return EXIT.VIOLATION
+  }
   return EXIT.RUNTIME
+}
+
+/**
+ * Pull the absolute path out of a Node errno message, if present. Node formats
+ * these as `EACCES: permission denied, open '/abs/path'` — the path is the last
+ * single-quoted segment. Returns undefined when there is no quoted path (EISDIR
+ * on a read, for instance, omits it).
+ */
+function errnoPath(message: string): string | undefined {
+  const m = message.match(/'([^']+)'\s*$/)
+  return m?.[1]
+}
+
+/**
+ *: turn raw, internal failure strings into a human sentence.
+ *
+ * Two sources leak otherwise:
+ *   1. Node filesystem errno strings (`EISDIR: illegal operation ...`, `EACCES:
+ *      permission denied, open '/abs'`, `ENAMETOOLONG: name too long`) bubble up
+ *      from the SDK file store when `--file`/`UPG_FILE` points somewhere odd or a
+ *      file is unreadable. The bare `EISDIR`/`EACCES` prefix means nothing to a
+ *      user.
+ *   2. proper-lockfile throws `Lock file is already being held` when a second
+ *      process is mid-write — which reads as an internal assertion, not a
+ *      transient "try again" condition.
+ *
+ * Matched on the errno `code` (when present) and on the message, so it works
+ * whether the throw carries `NodeJS.ErrnoException.code` or just a string. All of
+ * these stay runtime errors (exit 1) — they are operational, not validation,
+ * problems; only the message is improved.
+ *
+ * Returns the original message unchanged when nothing matches.
+ */
+export function friendlyErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  const code = (err as NodeJS.ErrnoException | undefined)?.code
+
+  if (code === 'EISDIR' || /^EISDIR\b/.test(message)) {
+    const p = errnoPath(message)
+    return p
+      ? `Cannot read ${p}: it is a directory, not a .upg file.`
+      : 'Cannot read that path: it is a directory, not a .upg file.'
+  }
+  if (code === 'EACCES' || code === 'EPERM' || /^EACCES\b|^EPERM\b/.test(message)) {
+    const p = errnoPath(message)
+    return p ? `Permission denied accessing ${p}.` : 'Permission denied accessing that path.'
+  }
+  if (code === 'ENAMETOOLONG' || /^ENAMETOOLONG\b/.test(message)) {
+    const p = errnoPath(message)
+    return p ? `Path too long: ${p}` : 'Path too long.'
+  }
+  if (/Lock file is already being held/i.test(message)) {
+    return 'Another process is writing this graph; retry shortly.'
+  }
+  return message
 }
 
 /**
@@ -82,13 +146,16 @@ function classify(err: unknown): ExitCode {
  * the common "file not found", "store failed" case). Validation/usage problems
  * should be raised as a `CliError` with the right code so they land on 2/3.
  *
+ * Raw filesystem / lockfile failures are passed through `friendlyErrorMessage`
+ * so the user sees a sentence, not `EISDIR: illegal operation ...`.
+ *
  * Under `--json` ( D1) the error is emitted as a single-line JSON
  * envelope on STDOUT — `{"ok":false,"error":{"code":<exit>,"message":"..."}}` —
  * so a script that asked for JSON gets JSON on the error path too, never a bare
  * human sentence it cannot parse. The process still exits with the right code.
  */
 export function die(err: unknown): never {
-  const message = err instanceof Error ? err.message : String(err)
+  const message = friendlyErrorMessage(err)
   const code = classify(err)
   if (jsonMode) {
     process.stdout.write(JSON.stringify({ ok: false, error: { code, message } }) + '\n')
