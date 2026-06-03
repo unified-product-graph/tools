@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/cli",
-  "version": "0.8.11",
+  "version": "0.8.12",
   "description": "MCP server + CLI for the Unified Product Graph; drop into Claude Code or use the `upg` command.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",

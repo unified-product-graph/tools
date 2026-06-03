@@ -4,6 +4,10 @@ All notable changes to `@unified-product-graph/cloud-server` are documented in t
 
 This package co-versions with `@unified-product-graph/core` and `@unified-product-graph/mcp-server`. One version line covers the spec and both reference implementations.
 
+## 0.8.12 · 2026-06-04 · Co-versioned patch
+
+Co-versioned with the train. No cloud-server changes; bundles the core serialiser root-product reconcile fix (#1981).
+
 ## 0.8.11 · 2026-06-03 · Co-versioned patch
 
 Co-versioned with the train. No cloud-server changes; the 0.8.11 fix is the local MCP server startup deprecation-warning correction (#1976).

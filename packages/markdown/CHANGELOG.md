@@ -6,6 +6,10 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.12] - 2026-06-04
+
+Co-versioned with the train. No changes to this package; bundles the `@unified-product-graph/core` serialiser root-product reconcile fix (#1981).
+
 ## [0.8.11] - 2026-06-03
 
 Co-versioned with the train. No markdown changes; bundles the `@unified-product-graph/mcp-server` startup deprecation-warning fix (#1976).

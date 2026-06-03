@@ -2,6 +2,10 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.12] - 2026-06-04
+
+Co-versioned with the train. No changes to this package; bundles the `@unified-product-graph/core` serialiser root-product reconcile fix (#1981).
+
 ## [0.8.11] - 2026-06-03
 
 ### Fixed
