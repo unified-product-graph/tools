@@ -5,6 +5,10 @@ All notable changes to `@unified-product-graph/adapters` are documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.10] - 2026-06-03
+
+Co-versioned 0.8.10 release, in lockstep with the package train. No changes to `@unified-product-graph/adapters` itself; it inherits the core framework-score validation fix (Kano sum-denominator false positive) via its `@unified-product-graph/core` dependency.
+
 ## [0.8.9] - 2026-06-03
 
 Co-versioned with the 0.8.9 train. No functional change.

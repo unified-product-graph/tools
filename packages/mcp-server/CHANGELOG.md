@@ -2,6 +2,10 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.10] - 2026-06-03
+
+Co-versioned 0.8.10 release, in lockstep with the package train. No changes to `@unified-product-graph/mcp-server` itself; it inherits the core framework-score validation fix (Kano sum-denominator false positive) via its `@unified-product-graph/core` dependency.
+
 ## [0.8.9] - 2026-06-03
 
 ### Added
