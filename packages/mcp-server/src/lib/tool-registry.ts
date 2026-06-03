@@ -895,6 +895,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         framework_id: { type: 'string', description: 'Required. UPGFramework.id (e.g. "moscow", "rice-scoring").' },
         title: { type: 'string', description: 'Human label for the exercise (default "<Framework> exercise").' },
         entity_ids: { type: 'array', items: { type: 'string' }, description: 'Entities to pull into the exercise (any type).' },
+        slot_roles: { type: 'object' as const, description: 'Optional map of entity id → framework slot role (e.g. { "feat_x": "pain_reliever" }), stamped onto each entity\'s includes edge. Validated against the framework\'s declared slot roles (warn-only).' },
         status: { type: 'string', description: 'Lifecycle phase: draft | active | archived (default draft).' },
       },
       required: ['framework_id'],
@@ -909,7 +910,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         exercise_id: { type: 'string', description: 'Required. The framework_exercise id.' },
         entity_id: { type: 'string', description: 'Required. The entity being scored.' },
-        values: { type: 'object' as const, description: 'Required. The result as { input: value }, e.g. { "moscow": "must" } or { "reach": 800, "impact": 3 }.' },
+        values: { type: 'object' as const, description: 'Required. The result as { input: value }, e.g. { "moscow": "must" } or { "reach": 4, "impact": 3 }.' },
+        slot_role: { type: 'string', description: 'Optional framework slot role this entity plays (e.g. "pain_reliever"). Rides the same edge as the scores; validated against the framework\'s declared slot roles (warn-only).' },
         replace: { type: 'boolean', description: 'Replace the edge properties instead of merging (default false).' },
       },
       required: ['exercise_id', 'entity_id', 'values'],

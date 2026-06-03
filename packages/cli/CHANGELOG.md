@@ -2,6 +2,11 @@
 
 Changes to `@unified-product-graph/cli` follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.9] - 2026-06-03
+
+### Added
+- Slot roles in framework exercises (Phase 3b-2): `upg apply <framework> feat_x:pain_reliever` records a slot role inline, and `upg score <exercise> <entity> --slot-role <role>` adds it to a result.
+
 ## [0.8.8] - 2026-06-03
 
 CLI Hardening Wave 2 + cross-surface QA.

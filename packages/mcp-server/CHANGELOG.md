@@ -2,6 +2,14 @@
 
 All notable changes to `@unified-product-graph/mcp-server` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.9] - 2026-06-03
+
+### Added
+- `apply_framework` accepts `slot_roles` (entity id to role); `score_entity` accepts `slot_role` (Phase 3b-2), validated against the framework's declared slot roles.
+
+### Changed
+- Bundles core 0.8.9 (scoring_lens to scoring_method rename; slot_role on the exercise edge).
+
 ## [0.8.8] - 2026-06-03
 
 ### Added

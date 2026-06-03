@@ -6,7 +6,10 @@ import { EXIT, die, violation } from '../lib/errors.js'
 
 export const applyCommand = new Command('apply')
   .arguments('<framework-id> [entity-ids...]')
-  .description('Apply a framework to entities: creates a framework_exercise + an includes edge to each.')
+  .description(
+    'Apply a framework to entities: creates a framework_exercise + an includes edge to each. ' +
+      'An entity may carry its slot role inline as `id:role` (e.g. feat_x:pain_reliever).',
+  )
   .option('--file <path>', 'Path to .upg file')
   .option('--title <title>', 'Human label for the exercise')
   .option('--status <status>', 'Lifecycle phase: draft | active | archived (default draft)')
@@ -16,12 +19,29 @@ export const applyCommand = new Command('apply')
       const filePath = await discoverUPGFile(opts.file)
       const store = await loadStore(filePath)
 
+      // Phase 3b-2: each entity arg is `id` or `id:slot_role` (UPG ids have no
+      // colon), e.g. `apply value-proposition-canvas feat_x:pain_reliever`.
+      const ids: string[] = []
+      const slotRoles: Record<string, string> = {}
+      for (const raw of entityIds ?? []) {
+        const idx = raw.indexOf(':')
+        if (idx > 0) {
+          const id = raw.slice(0, idx)
+          const role = raw.slice(idx + 1)
+          ids.push(id)
+          if (role) slotRoles[id] = role
+        } else {
+          ids.push(raw)
+        }
+      }
+
       let result
       try {
         result = applyFramework(store, {
           framework_id: frameworkId,
           title: opts.title,
-          entity_ids: entityIds ?? [],
+          entity_ids: ids,
+          slot_roles: Object.keys(slotRoles).length > 0 ? slotRoles : undefined,
           status: opts.status,
         })
       } catch (err) {

@@ -105,6 +105,71 @@ describe('applyFramework', () => {
   })
 })
 
+describe('slot roles (Phase 3b-2)', () => {
+  it('applyFramework stamps slot_role onto the includes edge + surfaces it in the envelope', async () => {
+    const { store } = await freshStore()
+    const res = applyFramework(store, {
+      framework_id: 'value-proposition-canvas',
+      entity_ids: ['n_sso', 'n_dark'],
+      slot_roles: { n_sso: 'pain_reliever', n_dark: 'gain_creator' },
+    })
+    const ssoEdge = res.edges.find((e) => e.target === 'n_sso')
+    expect((ssoEdge?.properties as { slot_role?: string }).slot_role).toBe('pain_reliever')
+    const env = applyFrameworkEnvelope(res)
+    expect(env.included.find((i) => i.entity_id === 'n_sso')?.slot_role).toBe('pain_reliever')
+    expect(env.included.find((i) => i.entity_id === 'n_dark')?.slot_role).toBe('gain_creator')
+    expect(res.warnings).toEqual([])
+  })
+
+  it('warns on an undeclared slot_role but stores it (permissive)', async () => {
+    const { store } = await freshStore()
+    const res = applyFramework(store, {
+      framework_id: 'value-proposition-canvas',
+      entity_ids: ['n_sso'],
+      slot_roles: { n_sso: 'not_a_role' },
+    })
+    expect(res.warnings.join(' ')).toMatch(/not a declared slot role/)
+    const e = res.edges.find((x) => x.target === 'n_sso')
+    expect((e?.properties as { slot_role?: string }).slot_role).toBe('not_a_role') // stored anyway
+  })
+
+  it('scoreEntity merges slot_role without flagging it as an unknown input key', async () => {
+    const { store } = await freshStore()
+    // ice-scoring carries BOTH input keys (impact/confidence/ease) and slot roles.
+    const res = applyFramework(store, { framework_id: 'ice-scoring', entity_ids: ['n_sso'] })
+    const scored = scoreEntity(store, {
+      exercise_id: res.exercise.id,
+      entity_id: 'n_sso',
+      values: { impact: 5, confidence: 4, ease: 3 },
+      slot_role: 'candidate',
+    })
+    expect('error' in scored).toBe(false)
+    if (!('error' in scored)) {
+      const props = scored.edge.properties as { slot_role?: string; impact?: number }
+      expect(props.slot_role).toBe('candidate')
+      expect(props.impact).toBe(5)
+      // slot_role is checked against slot roles, not scoring inputs → no false warning.
+      expect(scored.warnings.join(' ')).not.toMatch(/not declared/)
+    }
+  })
+
+  it('scoreEntity warns on an undeclared slot_role but stores it', async () => {
+    const { store } = await freshStore()
+    const res = applyFramework(store, { framework_id: 'ice-scoring', entity_ids: ['n_sso'] })
+    const scored = scoreEntity(store, {
+      exercise_id: res.exercise.id,
+      entity_id: 'n_sso',
+      values: {},
+      slot_role: 'bogus_role',
+    })
+    expect('error' in scored).toBe(false)
+    if (!('error' in scored)) {
+      expect(scored.warnings.join(' ')).toMatch(/not a declared slot role/)
+      expect((scored.edge.properties as { slot_role?: string }).slot_role).toBe('bogus_role')
+    }
+  })
+})
+
 describe('gated edge properties', () => {
   it('rejects properties on a non-carrying (plain semantic) edge', async () => {
     const { store } = await freshStore()

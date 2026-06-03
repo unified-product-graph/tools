@@ -9,6 +9,7 @@ export const scoreCommand = new Command('score')
   .option('--file <path>', 'Path to .upg file')
   .requiredOption('--data <json>', 'Result as JSON, e.g. \'{"moscow":"must"}\' or \'{"reach":4,"impact":3,"confidence":4,"effort":2}\'')
   .option('--replace', 'Replace the edge properties instead of merging into them')
+  .option('--slot-role <role>', 'Framework slot role this entity plays (e.g. pain_reliever); rides the same edge as the result')
   .option('--json', 'Machine-readable JSON output')
   .action(async (exerciseId, entityId, opts) => {
     try {
@@ -46,6 +47,7 @@ export const scoreCommand = new Command('score')
         exercise_id: exerciseId,
         entity_id: entityId,
         values,
+        slot_role: opts.slotRole,
         replace: opts.replace,
       })
       if ('error' in result) {

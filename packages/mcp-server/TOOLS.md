@@ -1410,12 +1410,13 @@ Apply a framework (MoSCoW, RICE, Kano, ...) to a set of entities: creates a fram
 | ---- | ---- | -------- | ----------- |
 | `entity_ids` | array |  | Entities to pull into the exercise (any type). |
 | `framework_id` | string | ✓ | Required. UPGFramework.id (e.g. "moscow", "rice-scoring"). |
+| `slot_roles` | object |  | Optional map of entity id → framework slot role (e.g. { "feat_x": "pain_reliever" }), stamped onto each entity's includes edge. Validated against the framework's declared slot roles (warn-only). |
 | `status` | string |  | Lifecycle phase: draft \| active \| archived (default draft). |
 | `title` | string |  | Human label for the exercise (default "<Framework> exercise"). |
 
 **Returns:**
 
-JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id, edge_type }], warnings }`
+JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id, edge_type, slot_role? }], warnings }`
 (the shared cross-surface envelope; identical to CLI `apply --json`).
 
 **Throws:**
@@ -2359,7 +2360,8 @@ Record a framework's result for one entity on the exercise's includes edge (a Mo
 | `entity_id` | string | ✓ | Required. The entity being scored. |
 | `exercise_id` | string | ✓ | Required. The framework_exercise id. |
 | `replace` | boolean |  | Replace the edge properties instead of merging (default false). |
-| `values` | object | ✓ | Required. The result as { input: value }, e.g. { "moscow": "must" } or { "reach": 800, "impact": 3 }. |
+| `slot_role` | string |  | Optional framework slot role this entity plays (e.g. "pain_reliever"). Rides the same edge as the scores; validated against the framework's declared slot roles (warn-only). |
+| `values` | object | ✓ | Required. The result as { input: value }, e.g. { "moscow": "must" } or { "reach": 4, "impact": 3 }. |
 
 **Returns:**
 

@@ -4,6 +4,10 @@ All notable changes to `@unified-product-graph/cloud-server` are documented in t
 
 This package co-versions with `@unified-product-graph/core` and `@unified-product-graph/mcp-server`. One version line covers the spec and both reference implementations.
 
+## 0.8.9 · 2026-06-03 · Composition model completion
+
+Co-version with the `@unified-product-graph/*` 0.8.9 train (slot_role on the framework exercise edge, scoring_lens to scoring_method rename, UPG_VERSION lockstep). No cloud-server surface change; co-versioned for a clean install matrix.
+
 ## 0.8.8 · 2026-06-03 · Composition model + scoring-lens completion
 
 Co-version with the `@unified-product-graph/*` 0.8.8 release train (framework slot `role`, kano/raid-log `scoring_lens`, framework-score + structural validator additions, CLI hardening Wave 2, cross-surface QA; led by `core`/`cli`/`mcp-server`). No cloud-server surface change; co-versioned for a clean install matrix.

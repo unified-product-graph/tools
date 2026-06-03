@@ -101,6 +101,28 @@ function validateInputValue(spec: FrameworkInputSpec, value: unknown): string | 
   }
 }
 
+/**
+ * The slot roles a framework declares (the semantic `role` on each slot,
+ * Phase 3b-1). Empty for frameworks authored before slot roles, or whose slots
+ * carry none — in which case slot_role validation is skipped (permissive).
+ */
+export function frameworkSlotRoles(framework: UPGFramework): Set<string> {
+  const slots = (framework as { slots?: Array<{ role?: string }> }).slots ?? []
+  return new Set(slots.map((s) => s.role).filter((r): r is string => !!r))
+}
+
+/**
+ * Validate a slot_role against the framework's declared slot roles. Returns a
+ * human-readable warning when the role is not one the framework declares, or
+ * null when it is fine (or the framework declares no slot roles). Storage stays
+ * permissive; this only warns (mirrors the input-value posture).
+ */
+function validateSlotRole(framework: UPGFramework, slotRole: string): string | null {
+  const roles = frameworkSlotRoles(framework)
+  if (roles.size === 0 || roles.has(slotRole)) return null
+  return `slot_role "${slotRole}" is not a declared slot role of ${framework.id} (declared: ${[...roles].join(', ')})`
+}
+
 export interface ApplyFrameworkArgs {
   /** Framework id from the catalog (e.g. 'moscow', 'rice-scoring'). */
   framework_id: string
@@ -108,6 +130,13 @@ export interface ApplyFrameworkArgs {
   title?: string
   /** Entities to pull into the exercise's scope (any type). */
   entity_ids?: string[]
+  /**
+   * Optional per-entity slot role (Phase 3b-2): a map of entity id to the
+   * framework slot role it plays (e.g. `{ feat_x: 'pain_reliever' }`). Stamped
+   * onto that entity's `framework_exercise_includes_node` edge as `slot_role`.
+   * Validated against the framework's declared slot roles (warn-only); optional.
+   */
+  slot_roles?: Record<string, string>
   /** Initial lifecycle phase. Defaults to 'draft'. */
   status?: 'draft' | 'active' | 'archived'
 }
@@ -156,10 +185,17 @@ export function applyFramework(
           `(declared: ${[...targetTypes].join(', ')}). Included anyway.`,
       )
     }
+    // Phase 3b-2: stamp the entity's slot role onto the includes edge, if given.
+    const slotRole = args.slot_roles?.[entityId]
+    if (slotRole) {
+      const issue = validateSlotRole(framework, slotRole)
+      if (issue) warnings.push(`${issue}. Stored anyway (permissive).`)
+    }
     const r = createEdge(store, {
       source_id: exercise.id,
       target_id: entityId,
       type: FRAMEWORK_EXERCISE_INCLUDES_EDGE,
+      ...(slotRole ? { properties: { slot_role: slotRole } } : {}),
     })
     if ('error' in r) {
       warnings.push(`Could not include ${entityId}: ${r.error}`)
@@ -188,7 +224,7 @@ export function applyFramework(
 export interface ApplyFrameworkEnvelope {
   exercise_id: string
   exercise: UPGBaseNode
-  included: Array<{ edge_id: string; entity_id: string; edge_type: string }>
+  included: Array<{ edge_id: string; entity_id: string; edge_type: string; slot_role?: string }>
   warnings: string[]
 }
 
@@ -197,7 +233,15 @@ export function applyFrameworkEnvelope(result: ApplyFrameworkResult): ApplyFrame
   return {
     exercise_id: result.exercise.id,
     exercise: result.exercise,
-    included: result.edges.map((e) => ({ edge_id: e.id, entity_id: e.target, edge_type: e.type })),
+    included: result.edges.map((e) => {
+      const slotRole = (e.properties as { slot_role?: unknown } | undefined)?.slot_role
+      return {
+        edge_id: e.id,
+        entity_id: e.target,
+        edge_type: e.type,
+        ...(typeof slotRole === 'string' ? { slot_role: slotRole } : {}),
+      }
+    }),
     warnings: result.warnings,
   }
 }
@@ -207,6 +251,13 @@ export interface ScoreEntityArgs {
   entity_id: string
   /** The framework's result for this entity (bucket / score / slot / stage). */
   values: Record<string, unknown>
+  /**
+   * Optional slot role this entity plays in the framework (Phase 3b-2), e.g.
+   * `'pain_reliever'`. Merged onto the edge as `slot_role`, validated against the
+   * framework's declared slot roles (warn-only). Kept separate from `values` so
+   * it is checked against slot roles, not scoring inputs.
+   */
+  slot_role?: string
   /** Replace the edge's properties instead of merging (default: merge). */
   replace?: boolean
 }
@@ -253,7 +304,18 @@ export function scoreEntity(store: UPGFileStore, args: ScoreEntityArgs): ScoreEn
         if (issue) warnings.push(`${frameworkId}: ${issue}. Stored anyway (permissive).`)
       }
     }
+    // Phase 3b-2: validate the slot role against the framework's declared roles.
+    if (args.slot_role !== undefined) {
+      const issue = validateSlotRole(framework, args.slot_role)
+      if (issue) warnings.push(`${issue}. Stored anyway (permissive).`)
+    }
   }
+
+  // Phase 3b-2: slot_role rides the same includes edge as the scores, kept
+  // separate from `values` above so it is validated against slot roles, not
+  // scoring inputs, and never trips the unknown-input-key warning.
+  const writeValues =
+    args.slot_role !== undefined ? { ...args.values, slot_role: args.slot_role } : args.values
 
   // Find the existing includes edge exercise -> entity.
   const existing = store
@@ -265,7 +327,7 @@ export function scoreEntity(store: UPGFileStore, args: ScoreEntityArgs): ScoreEn
         e.target === args.entity_id,
     )
   if (existing) {
-    const edge = store.setEdgeProperties(existing.id, args.values, { merge: !args.replace })
+    const edge = store.setEdgeProperties(existing.id, writeValues, { merge: !args.replace })
     return { edge, warnings }
   }
 
@@ -274,7 +336,7 @@ export function scoreEntity(store: UPGFileStore, args: ScoreEntityArgs): ScoreEn
     source_id: args.exercise_id,
     target_id: args.entity_id,
     type: FRAMEWORK_EXERCISE_INCLUDES_EDGE,
-    properties: args.values,
+    properties: writeValues,
   })
   if ('error' in r) return { error: r.error }
   return { edge: r.edge, warnings }

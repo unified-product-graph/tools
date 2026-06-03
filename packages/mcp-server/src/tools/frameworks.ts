@@ -15,7 +15,12 @@ import {
  * Create a framework_exercise and an `includes` edge to each entity it scores.
  * Edges start blank; fill results with `score_entity`.
  *
- * @returns JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id, edge_type }], warnings }`
+ * Pass `slot_roles` (a map of entity id → slot role) to record which part each
+ * entity plays in the framework (e.g. `{ feat_x: "pain_reliever" }`); the role
+ * is stamped onto that entity's includes edge and validated against the
+ * framework's declared slot roles (warn-only).
+ *
+ * @returns JSON: `{ exercise_id, exercise, included: [{ edge_id, entity_id, edge_type, slot_role? }], warnings }`
  *   (the shared cross-surface envelope; identical to CLI `apply --json`).
  * @throws textError on a missing/unknown framework_id, or when no requested
  *   entity resolves (no dangling exercise is left behind).
@@ -33,6 +38,7 @@ export const applyFramework: ToolHandler = (args, ctx): ToolResult => {
       framework_id: frameworkId,
       title: args.title as string | undefined,
       entity_ids: (args.entity_ids as string[] | undefined) ?? [],
+      slot_roles: args.slot_roles as Record<string, string> | undefined,
       status: args.status as 'draft' | 'active' | 'archived' | undefined,
     })
     return text(JSON.stringify(applyFrameworkEnvelope(result), null, 2))
@@ -44,7 +50,9 @@ export const applyFramework: ToolHandler = (args, ctx): ToolResult => {
 /**
  * Record a framework's result for one entity on the exercise's `includes` edge.
  * Auto-includes the entity when it is not yet in scope. Merges into existing
- * edge properties unless `replace` is set.
+ * edge properties unless `replace` is set. Pass `slot_role` to record which part
+ * the entity plays (e.g. "pain_reliever"); it rides the same edge and is
+ * validated against the framework's declared slot roles (warn-only).
  *
  * @returns JSON: `{ edge, warnings }`.
  * @throws textError when the exercise/entity is missing or the node is not a
@@ -68,6 +76,7 @@ export const scoreEntity: ToolHandler = (args, ctx): ToolResult => {
     exercise_id: exerciseId,
     entity_id: entityId,
     values,
+    slot_role: args.slot_role as string | undefined,
     replace: args.replace as boolean | undefined,
   })
   if ('error' in result) return textError(result.error)
