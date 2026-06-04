@@ -1826,7 +1826,7 @@ JSON: `{ patterns: string[], total: number }`
 
 ### `list_frameworks`
 
-List canonical UPGFramework definitions (351 total at v0.3.0). Paginated (default limit 50, max 200) to avoid transport overflow. Cursor is opaque; pass next_cursor from a previous response to advance. Optional category filter is exact-match against UPGFramework.category and applied before pagination.
+List the canonical UPGFramework definitions: the curated, famous product frameworks that anchor the public catalog. Paginated (default limit 50, max 200) to avoid transport overflow. Cursor is opaque; pass next_cursor from a previous response to advance. Optional category filter is exact-match against UPGFramework.category and applied before pagination.
 
 **Atomicity:** `atomic (read-only)`
 

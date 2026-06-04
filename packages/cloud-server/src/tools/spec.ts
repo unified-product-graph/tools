@@ -535,9 +535,10 @@ export const getDomainGuide: ToolHandler = (args): ToolResult => {
 // ── Frameworks ──────────────────────────────────────────────────────────────
 
 /**
- * List canonical UPGFramework definitions (351 total at v0.3.0). Paginated
- * (default `limit: 50`, max 200) because the full payload is large enough
- * to overflow MCP transports if returned in one shot.
+ * List the canonical UPGFramework definitions: the curated, famous product
+ * frameworks that anchor the public catalog. Paginated (default `limit: 50`,
+ * max 200) because the full payload is large enough to overflow MCP transports
+ * if returned in one shot.
  *
  * Cursor is opaque base64 (`offset:N`). Pass the `next_cursor` from a previous
  * response to advance; omit to start from the first page. The optional
