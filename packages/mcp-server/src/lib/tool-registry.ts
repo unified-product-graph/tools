@@ -69,6 +69,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
+import { portfolioQuery, portfolioDigest } from '../tools/portfolio-read.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
 import {
@@ -1109,7 +1110,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_cross_edge_types',
     description:
-      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.',
+      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
@@ -1615,7 +1616,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'create_cross_product_edge',
     description:
-      'Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted).',
+      'Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted), `contributes_to` (a product strategy entity rolls up to a higher-level one, e.g. product objective → company objective, product key_result → company key_result; directed subordinate to superior).',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -1623,7 +1624,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         target_id: { type: 'string', description: 'Target node ID' },
         type: {
           type: 'string',
-          enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts'],
+          enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts', 'contributes_to'],
           description: 'Cross-product relationship type',
         },
         source_product_id: { type: 'string', description: 'Product ID of the source node' },
@@ -1661,7 +1662,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               target_id: { type: 'string', description: 'Target node ID (bare or qualified {product_id}/{node_id})' },
               type: {
                 type: 'string',
-                enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts'],
+                enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts', 'contributes_to'],
                 description: 'Cross-product relationship type',
               },
               source_product_id: { type: 'string', description: 'Product ID of the source node (qualifies a bare source_id)' },
@@ -1680,6 +1681,60 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description:
       'List all cross-product edges stored in the portfolio document (`.upg/portfolio.upg`). Empty list when the portfolio document is absent.',
     inputSchema: { type: 'object' as const, properties: {} },
+  },
+  {
+    name: 'portfolio_query',
+    description:
+      'Traverse the graph ACROSS products in one call (the multi-product `query`). Runs the same BFS (typed-edge traversal + field projection) against every product in scope and tags each subgraph with its source `product_id`, without `switch_product` (the active product is read live; others are read-only). Use for portfolio-level questions ("every product\'s strategy region", "which products have a persona"). `from_id` only matches in its owning product. Read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        from: { type: 'string', description: 'Start from all nodes of this type (in each product)' },
+        from_id: { type: 'string', description: 'Start from a specific node ID. Node IDs are product-local; only the owning product returns results.' },
+        traverse: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Edge types to follow at each level (in order). If omitted, follows all edges. Prefix with ! to exclude.',
+        },
+        depth: { type: 'number', description: 'Max traversal depth (default 3, max 10)' },
+        include: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Fields per node: "title", "status", "tags", "description", "properties" (default: title, status, type)',
+        },
+        limit: { type: 'number', description: 'Max nodes per product (default 100, max 1000)' },
+        edge_include: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Edge fields to return: "id", "type", "source", "target". Empty array = no edges. Default: all fields.',
+        },
+        property_include: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'When "properties" is in include, only return these property keys.',
+        },
+        scope: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Product IDs (or files) to query. Omit to query ALL products in the workspace. Match by product id, relative file, or basename.',
+        },
+      },
+    },
+  },
+  {
+    name: 'portfolio_digest',
+    description:
+      'Roll up every product\'s counts, health, and stage-coverage in one call (the multi-product `get_graph_digest`). The strategic-surface read that otherwise required `switch_product` + `get_graph_digest` per graph. Returns per-product summaries plus a portfolio rollup (totals, products-by-stage). Read-only; never mutates active-product state.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        scope: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Product IDs (or files) to summarise. Omit to summarise ALL products in the workspace.',
+        },
+      },
+    },
   },
   {
     name: 'migrate_cross_edges',
@@ -1877,6 +1932,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   attach_product_to_portfolio: attachProductToPortfolioTool,
   detach_product_from_portfolio: detachProductFromPortfolioTool,
   list_portfolio_cross_edges: listPortfolioCrossEdges,
+  portfolio_query: portfolioQuery,
+  portfolio_digest: portfolioDigest,
   migrate_cross_edges: migrateCrossEdges,
   get_sync_state: getSyncState,
   apply_pull_changeset: applyPullChangeset,

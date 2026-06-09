@@ -1685,7 +1685,7 @@ JSON: `{ kind, total, count, benchmarks: ... }`
 
 ### `list_cross_edge_types`
 
-List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG.
+List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2157,7 +2157,7 @@ _Cross-product edges and portfolio view._
 
 ### `create_cross_product_edge`
 
-Create a cross-product edge linking entities across different products. Type must be one of the canonical UPG cross-edge types: shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts.
+Create a cross-product edge linking entities across different products. Type must be one of the canonical UPG cross-edge types: shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to.
 
 **Atomicity:** `atomic`
 
@@ -2168,7 +2168,7 @@ Create a cross-product edge linking entities across different products. Type mus
 | `product_id` | string | ✓ | The product creating this cross-edge |
 | `source` | string | ✓ | Qualified source: {product_id}/{node_id} |
 | `target` | string | ✓ | Qualified target: {product_id}/{node_id} |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` | ✓ | Cross-edge type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` | ✓ | Cross-edge type |
 
 **Returns:**
 

@@ -109,6 +109,12 @@ const CLOUD_NA = new Set([
   'detach_product_from_portfolio',
   'delete_cross_product_edge',
   'batch_create_cross_product_edges',
+  // cross-product read layer (0.9.1, batch-3 #13): read node content / digests
+  // ACROSS products in one call. Local-only — they sweep the .upg-file workspace
+  // (multiple .upg files in a folder), which has no cloud analogue (the cloud
+  // server is single-product-per-request). Cloud parity is a tracked follow-up.
+  'portfolio_query',
+  'portfolio_digest',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).

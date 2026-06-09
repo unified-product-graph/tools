@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 106 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 108 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 106 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 15 tools
+- [Workspace & Portfolios](#workspace-portfolios): 17 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1219,6 +1219,8 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`list_portfolio_cross_edges`](#list-portfolio-cross-edges)
 - [`list_portfolios`](#list-portfolios)
 - [`migrate_cross_edges`](#migrate-cross-edges)
+- [`portfolio_digest`](#portfolio-digest)
+- [`portfolio_query`](#portfolio-query)
 - [`switch_product`](#switch-product)
 - [`update_product`](#update-product)
 
@@ -1276,7 +1278,7 @@ or when no portfolio document exists (pass `auto_create_portfolio: true` to mint
 
 ### `create_cross_product_edge`
 
-Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted).
+Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted), `contributes_to` (a product strategy entity rolls up to a higher-level one, e.g. product objective → company objective, product key_result → company key_result; directed subordinate to superior).
 
 **Atomicity:** `non-atomic. Portfolio file create (if new) + edge append are
 separate filesystem operations.`
@@ -1289,7 +1291,7 @@ separate filesystem operations.`
 | `source_product_id` | string |  | Product ID of the source node |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -1528,6 +1530,61 @@ on retry: a second `dry_run: false` after a successful migration finds zero
 inline cross-edges and reports `migrated: []`.
 
 **See also:** `create_cross_product_edge`, `list_portfolio_cross_edges`, `list_cross_edge_types`, `init_workspace`
+
+
+### `portfolio_digest`
+
+Roll up every product's counts, health, and stage-coverage in one call (the multi-product `get_graph_digest`). The strategic-surface read that otherwise required `switch_product` + `get_graph_digest` per graph. Returns per-product summaries plus a portfolio rollup (totals, products-by-stage). Read-only; never mutates active-product state.
+
+**Atomicity:** `atomic (read-only). Never mutates active-product state.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `scope` | array |  | Product IDs (or files) to summarise. Omit to summarise ALL products in the workspace. |
+
+**Returns:**
+
+JSON: `{ products: Array<{ product_id, file, title, stage,
+total_nodes, total_edges, health, coverage_pct, top_types }>, rollup:
+{ products, total_nodes, total_edges, by_stage }, errored_products?,
+unmatched_scope? }`. `health`/`coverage_pct` come from `computeGraphDigest`,
+identical to what `get_graph_digest` reports per product.
+
+**See also:** `get_graph_digest`, `portfolio_query`
+
+
+### `portfolio_query`
+
+Traverse the graph ACROSS products in one call (the multi-product `query`). Runs the same BFS (typed-edge traversal + field projection) against every product in scope and tags each subgraph with its source `product_id`, without `switch_product` (the active product is read live; others are read-only). Use for portfolio-level questions ("every product's strategy region", "which products have a persona"). `from_id` only matches in its owning product. Read-only.
+
+**Atomicity:** `atomic (read-only). Never mutates active-product state.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `depth` | number |  | Max traversal depth (default 3, max 10) |
+| `edge_include` | array |  | Edge fields to return: "id", "type", "source", "target". Empty array = no edges. Default: all fields. |
+| `from` | string |  | Start from all nodes of this type (in each product) |
+| `from_id` | string |  | Start from a specific node ID. Node IDs are product-local; only the owning product returns results. |
+| `include` | array |  | Fields per node: "title", "status", "tags", "description", "properties" (default: title, status, type) |
+| `limit` | number |  | Max nodes per product (default 100, max 1000) |
+| `property_include` | array |  | When "properties" is in include, only return these property keys. |
+| `scope` | array |  | Product IDs (or files) to query. Omit to query ALL products in the workspace. Match by product id, relative file, or basename. |
+| `traverse` | array |  | Edge types to follow at each level (in order). If omitted, follows all edges. Prefix with ! to exclude. |
+
+**Returns:**
+
+JSON: `{ products: Array<{ product_id, file, title, total_nodes,
+total_edges, nodes, edges, truncated? }>, products_searched,
+products_with_matches, empty_products, unmatched_scope? }`. Products that
+matched zero nodes are summarised in `empty_products`, not expanded, to
+keep the payload lean. `from_id` only matches in its owning product; the
+rest report empty.
+
+**See also:** `query`, `portfolio_digest`, `list_local_products`
 
 
 ### `switch_product`
@@ -2159,7 +2216,7 @@ JSON: `{ kind, total, count, benchmarks: ... }`
 
 ### `list_cross_edge_types`
 
-List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.
+List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.
 
 **Atomicity:** `atomic (read-only)`
 

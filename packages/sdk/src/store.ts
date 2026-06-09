@@ -356,6 +356,22 @@ export class UPGFileStore {
   }
 
   async load(filePath: string): Promise<void> {
+    return this.loadInternal(filePath, { watch: true })
+  }
+
+  /**
+   * Read-only load: parse + normalise + validate + index a `.upg` file WITHOUT
+   * starting a file watcher or taking any lock. The portfolio read layer
+   * (`portfolio_query` / `portfolio_digest`) uses this to pull non-active
+   * products into transient stores, read them through the same getters as the
+   * active store, then discard — no watcher leak, no effect on the active
+   * product. Never call `save()` / `flush()` on a read-only-loaded store.
+   */
+  async loadReadOnly(filePath: string): Promise<void> {
+    return this.loadInternal(filePath, { watch: false })
+  }
+
+  private async loadInternal(filePath: string, opts: { watch: boolean }): Promise<void> {
     this.filePath = path.resolve(filePath)
     const raw = await fs.readFile(this.filePath, 'utf-8')
     //(b): strip a single leading UTF-8 BOM (U+FEFF) before parsing.
@@ -504,7 +520,9 @@ export class UPGFileStore {
     const driftRendered = renderDriftSummary(this.lastDriftSummary, this.filePath, { quietWhenClean: true })
     if (driftRendered) process.stderr.write(driftRendered + '\n')
 
-    await this.startWatching()
+    if (opts.watch) {
+      await this.startWatching()
+    }
   }
 
   /**

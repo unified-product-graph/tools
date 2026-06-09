@@ -64,8 +64,9 @@ export const listPortfolioCrossEdges: ToolHandler = async (args, { store }) => {
 
 /**
  * Create a cross-product edge owned by the given product. The edge type must
- * be one of the seven UPG cross-edge types (`shares_persona`, `shares_competitor`,
- * `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`). Source and
+ * be one of the eight UPG cross-edge types (`shares_persona`, `shares_competitor`,
+ * `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`,
+ * `contributes_to`). Source and
  * target are qualified IDs: `{product_id}/{node_id}`.
  *
  * @returns JSON: `{ edge: { id, source, target, type, created_by_product_id } }`

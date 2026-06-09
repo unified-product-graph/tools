@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 106 tools', () => {
+  it('exposes the expected 108 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -109,7 +109,9 @@ describe('Tool registry: completeness', () => {
     //   remove_product_from_area, delete_area, move_product_to_area,
     //   detach_product_from_portfolio, delete_cross_product_edge,
     //   batch_create_cross_product_edges. → 106.
-    expect(TOOL_DEFINITIONS).toHaveLength(106)
+    // + 2 cross-product read-layer tools (0.9.1 batch-3 #13): portfolio_query,
+    //   portfolio_digest. → 108.
+    expect(TOOL_DEFINITIONS).toHaveLength(108)
   })
 })
 

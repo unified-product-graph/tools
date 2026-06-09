@@ -999,7 +999,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_cross_edge_types',
     description:
-      'List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG.',
+      'List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG.',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
@@ -1370,14 +1370,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     "name": "create_cross_product_edge",
-    "description": "Create a cross-product edge linking entities across different products. Type must be one of the canonical UPG cross-edge types: shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts.",
+    "description": "Create a cross-product edge linking entities across different products. Type must be one of the canonical UPG cross-edge types: shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "product_id": { "type": "string", "description": "The product creating this cross-edge" },
         "source": { "type": "string", "description": "Qualified source: {product_id}/{node_id}" },
         "target": { "type": "string", "description": "Qualified target: {product_id}/{node_id}" },
-        "type": { "type": "string", "description": "Cross-edge type", "enum": ["shares_persona", "shares_competitor", "shares_metric", "depends_on_product", "cannibalises", "succeeds", "hosts"] }
+        "type": { "type": "string", "description": "Cross-edge type", "enum": ["shares_persona", "shares_competitor", "shares_metric", "depends_on_product", "cannibalises", "succeeds", "hosts", "contributes_to"] }
       },
       "required": ["product_id", "source", "target", "type"]
     }

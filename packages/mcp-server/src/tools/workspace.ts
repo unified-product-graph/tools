@@ -34,6 +34,56 @@ import {
 import { coerceProductStage } from '@unified-product-graph/core'
 
 /**
+ * True only when `p` exists AND is a regular file. Used by `switch_product`
+ * resolution so a directory whose name collides with a bare product name
+ * (e.g. a `sanity/` source dir vs `.upg/sanity.upg`) never satisfies
+ * resolution — the old `fs.existsSync` check matched the directory and then
+ * `store.load` threw `EISDIR` (UPG batch-3 #12). Follows symlinks (a symlink
+ * to a file is a file).
+ */
+function isExistingFile(p: string): boolean {
+  try {
+    return fs.statSync(p).isFile()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Discover every `.upg` file in the workspace: the project root plus its
+ * immediate subdirectories (including `.upg/`). Skips dotfiles other than
+ * `.upg/`. Returns absolute paths. Shared by `list_local_products` and the
+ * portfolio read layer (`portfolio_query` / `portfolio_digest`) so product
+ * discovery stays consistent across them. (batch-3 #13)
+ */
+export function findWorkspaceUpgFiles(cwd: string): string[] {
+  const candidates: string[] = []
+  let topEntries: fs.Dirent[]
+  try {
+    topEntries = fs.readdirSync(cwd, { withFileTypes: true })
+  } catch {
+    return candidates
+  }
+  for (const entry of topEntries) {
+    if (entry.isFile() && entry.name.endsWith('.upg')) {
+      candidates.push(path.join(cwd, entry.name))
+    } else if (entry.isDirectory() && (entry.name === '.upg' || !entry.name.startsWith('.'))) {
+      try {
+        const subEntries = fs.readdirSync(path.join(cwd, entry.name), { withFileTypes: true })
+        for (const sub of subEntries) {
+          if (sub.isFile() && sub.name.endsWith('.upg')) {
+            candidates.push(path.join(cwd, entry.name, sub.name))
+          }
+        }
+      } catch {
+        // permission error or similar; skip
+      }
+    }
+  }
+  return candidates
+}
+
+/**
  * Find all `.upg` files in the current directory and its immediate
  * subdirectories. Skips dotfiles other than `.upg/`.
  *
@@ -85,27 +135,7 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
     // no portfolio.upg / unreadable — products listed without membership
   }
 
-  const candidates: string[] = []
-  const topEntries = fs.readdirSync(cwd, { withFileTypes: true })
-  for (const entry of topEntries) {
-    if (entry.isFile() && entry.name.endsWith('.upg')) {
-      candidates.push(path.join(cwd, entry.name))
-    } else if (entry.isDirectory() && (entry.name === '.upg' || !entry.name.startsWith('.'))) {
-      try {
-        const subEntries = fs.readdirSync(
-          path.join(cwd, entry.name),
-          { withFileTypes: true },
-        )
-        for (const sub of subEntries) {
-          if (sub.isFile() && sub.name.endsWith('.upg')) {
-            candidates.push(path.join(cwd, entry.name, sub.name))
-          }
-        }
-      } catch {
-        // permission error or similar; skip
-      }
-    }
-  }
+  const candidates = findWorkspaceUpgFiles(cwd)
 
   for (const filePath of candidates) {
     try {
@@ -168,22 +198,31 @@ export const switchProduct: ToolHandler = async (args, ctx): Promise<ToolResult>
   if (typeof fileArg !== 'string' || fileArg.length === 0) {
     return textError('Missing required parameter: file (alias: product). Pass a .upg path or a bare product name.')
   }
-  let resolved = path.resolve(fileArg)
 
-  if (!fs.existsSync(resolved)) {
-    const cwd = process.cwd()
-    const workspaceCandidates = [
-      path.join(cwd, '.upg', fileArg),
-      path.join(cwd, '.upg', fileArg + '.upg'),
-    ]
-    const found = workspaceCandidates.find((c) => fs.existsSync(c))
-    if (found) {
-      resolved = found
-    } else {
-      return textError(
-        `File not found: ${resolved} (also checked .upg/${fileArg} and .upg/${fileArg}.upg)`,
-      )
-    }
+  // Resolve the target to an existing FILE. Order matters: a bare product name
+  // ("sanity") must anchor to the workspace `.upg/` directory FIRST, before the
+  // cwd-relative resolution — otherwise a same-named sibling in the project root
+  // (e.g. a `sanity/` source directory) shadows `.upg/sanity.upg`. The old code
+  // gated the `.upg/` fallback on `!fs.existsSync(resolved)`, so a bare name that
+  // collided with a *directory* skipped the fallback and `store.load`-ed the
+  // directory itself → `EISDIR`. We now (a) try workspace `.upg/` candidates
+  // first and (b) require each candidate to be a regular file, so a directory
+  // never satisfies resolution. Explicit paths (`.upg/foo.upg`, absolute) still
+  // resolve via the `direct` candidates. (UPG batch-3 #12.)
+  const cwd = process.cwd()
+  const direct = path.resolve(fileArg)
+  const candidates = [
+    path.join(cwd, '.upg', fileArg),
+    path.join(cwd, '.upg', `${fileArg}.upg`),
+    direct,
+    `${direct}.upg`,
+  ]
+  const resolved = candidates.find(isExistingFile)
+  if (!resolved) {
+    return textError(
+      `File not found: ${direct} (also checked .upg/${fileArg} and .upg/${fileArg}.upg). ` +
+        `Pass a .upg path or a bare product name from list_local_products.`,
+    )
   }
 
   try {
