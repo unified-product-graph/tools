@@ -119,6 +119,11 @@ const CLOUD_NA = new Set([
   // .upg-file workspace in one call. Local-only for the same reason as the
   // portfolio read layer — no cloud analogue (single-product-per-request).
   'portfolio_validate',
+  // cross-product shape clone (0.9.4, batch-4 #17): reads an exemplar .upg and
+  // stamps its shape into another .upg in the workspace. Local-only — it spans
+  // multiple .upg files, which the single-product-per-request cloud has no
+  // analogue for.
+  'clone_structure',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).

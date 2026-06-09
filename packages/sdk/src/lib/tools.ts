@@ -333,6 +333,25 @@ export interface CoverageStageSummary {
   overall_pct: number
 }
 
+/**
+ * Batch-4 #22: coverage scored against a caller-chosen region set instead of
+ * the product stage's default. Lets a deliberately-scoped product (e.g. a
+ * structural spine) read its parity without GTM / pricing / business regions
+ * dragging the headline down. Same per-region-pct-then-average math as
+ * `CoverageStageSummary`, restricted to `regions`.
+ */
+export interface CoverageProfileSummary {
+  /** The region ids that were scored (the intersection of the request and known regions). */
+  regions: string[]
+  regions_counted: number
+  regions_complete: number
+  regions_partial: number
+  /** Whole-number percentage 0-100, averaged across the profile regions only. */
+  overall_pct: number
+  /** Requested ids that are not known coverage regions (ignored in the score). */
+  unknown_regions?: string[]
+}
+
 export interface GraphDigest {
   product: { title: string; stage: string }
   counts: { total_nodes: number; total_edges: number; by_type: Record<string, number> }
@@ -353,11 +372,17 @@ export interface GraphDigest {
    * NOTE: callers iterating `Object.entries(coverage)` should skip the
    * `stage_summary` key; it carries a different shape.
    */
-  coverage: Record<string, CoverageRegion> & { stage_summary?: CoverageStageSummary }
+  coverage: Record<string, CoverageRegion> & {
+    stage_summary?: CoverageStageSummary
+    profile_summary?: CoverageProfileSummary
+  }
   lifecycle: Record<string, number>
 }
 
-export function computeGraphDigest(store: UPGFileStore): GraphDigest {
+export function computeGraphDigest(
+  store: UPGFileStore,
+  opts?: { coverageProfile?: string[] },
+): GraphDigest {
   const nodes = store.getAllNodes()
   const edges = store.getAllEdges()
   const product = store.getProduct()
@@ -554,6 +579,32 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
     regions_complete: regionsComplete,
     regions_partial: regionsPartial,
     overall_pct: overallPct,
+  }
+
+  // Batch-4 #22: optional target-profile coverage. Re-average the headline over
+  // a caller-chosen region set so an intentionally-scoped product reads its
+  // parity without out-of-scope regions dragging it down. Same per-region-pct
+  // then-average math as stage_summary.
+  if (opts?.coverageProfile && opts.coverageProfile.length > 0) {
+    const profileAreas: string[] = []
+    const unknown: string[] = []
+    for (const id of opts.coverageProfile) {
+      if (id !== 'stage_summary' && id !== 'profile_summary' && id in coverage) profileAreas.push(id)
+      else unknown.push(id)
+    }
+    const stats = profileAreas.map((id) => coverage[id] as CoverageRegion)
+    const pComplete = stats.filter((s) => s.total > 0 && s.covered === s.total).length
+    const pPartial = stats.filter((s) => s.covered > 0 && s.covered < s.total).length
+    const pPcts = stats.map((s) => (s.total === 0 ? 100 : (s.covered / s.total) * 100))
+    const pPct = pPcts.length === 0 ? 0 : Math.round(pPcts.reduce((a, b) => a + b, 0) / pPcts.length)
+    coverage.profile_summary = {
+      regions: profileAreas,
+      regions_counted: profileAreas.length,
+      regions_complete: pComplete,
+      regions_partial: pPartial,
+      overall_pct: pPct,
+      ...(unknown.length > 0 ? { unknown_regions: unknown } : {}),
+    }
   }
 
   // Lifecycle balance: count via canonical types so `hypothesis`

@@ -70,6 +70,7 @@ import {
   migrateCrossEdges,
 } from '../tools/workspace.js'
 import { portfolioQuery, portfolioDigest, portfolioValidate } from '../tools/portfolio-read.js'
+import { cloneStructure } from '../tools/clone-structure.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
 import {
@@ -159,6 +160,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       type: 'object' as const,
       properties: {
         if_changed_since: { type: 'string', description: 'Hash from a previous response. Returns { changed: false } if graph unchanged (saves ~470 tokens).' },
+        coverage_profile: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Batch-4 #22: coverage region ids (the keys of the `coverage` block: identity, understanding, discovery, validation, reaching, converting, building, sustaining, learning, operations) to score against instead of the product stage default. Adds `coverage.profile_summary` (overall_pct over just these regions), so a deliberately-scoped product (e.g. a structural spine) reads its parity without out-of-scope regions dragging the headline down.',
+        },
       },
     },
   },
@@ -1447,6 +1453,34 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         skip_anti_patterns: { type: 'boolean', description: 'Skip anti-pattern evaluation. Only returns schema drift.' },
         if_changed_since: { type: 'string', description: 'Hash from a previous response. Returns { changed: false } if graph unchanged.' },
         include_polymorphic_upgrades: { type: 'boolean', description: 'When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only; omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions.' },
+        pending_nodes: {
+          type: 'array',
+          description: 'Batch-4 #18 pre-commit preview: nodes you are ABOUT to create. When supplied (with/without pending_edges), validate_graph evaluates anti-patterns against the CURRENT graph PLUS this delta WITHOUT writing, and returns which violations the delta would newly trigger or resolve. Each item: `{ type, title?, status?, tags?, properties? }`.',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', description: 'UPG entity type' },
+              title: { type: 'string' },
+              status: { type: 'string' },
+              tags: { type: 'array', items: { type: 'string' } },
+              properties: { type: 'object' },
+            },
+            required: ['type'],
+          },
+        },
+        pending_edges: {
+          type: 'array',
+          description: 'Pre-commit preview edges (paired with pending_nodes). Each item: `{ from, to, type? }`, where from/to is an existing node id OR a `$N` index into pending_nodes; type is inferred from endpoints when omitted.',
+          items: {
+            type: 'object',
+            properties: {
+              from: { type: 'string', description: 'Existing node id or $N pending ref' },
+              to: { type: 'string', description: 'Existing node id or $N pending ref' },
+              type: { type: 'string', description: 'Edge type (inferred when omitted)' },
+            },
+            required: ['from', 'to'],
+          },
+        },
       },
     },
   },
@@ -1762,6 +1796,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: { type: 'string' },
           description: 'Product IDs (or files) to summarise. Omit to summarise ALL products in the workspace.',
         },
+        coverage_profile: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Batch-4 #22: coverage region ids (keys of the `coverage` block, e.g. understanding, discovery, building) to score each product against, so "is this product at parity?" is a direct read across the portfolio. Adds `coverage_profile_pct` to every product summary.',
+        },
       },
     },
   },
@@ -1791,6 +1830,34 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: 'Max anti-pattern violations listed per product (default 5, max 25).',
         },
       },
+    },
+  },
+  {
+    name: 'clone_structure',
+    description:
+      'Stamp the SHAPE of one product (typed nodes + canonical edges + hierarchy, with `TODO:` placeholder titles) into another, without re-authoring the skeleton. Content (descriptions, properties, real titles, statuses) never crosses; only the structure does. The lever for multi-product structural parity: one stamp plus a content pass replaces a multi-batch rebuild. `from_product` is the read-only exemplar; `into` is the write target and DEFAULTS to the active product (name a non-active product to write there with no `switch_product`). `regions` scopes the clone to entity types in those super-domains. `dry_run: true` previews the plan without writing. Local-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        from_product: {
+          type: 'string',
+          description: 'Exemplar product (id, file, or basename) whose shape is copied. Read-only.',
+        },
+        into: {
+          type: 'string',
+          description: 'Target product to stamp the shape into. Defaults to the ACTIVE product; name a non-active product to write there without switch_product.',
+        },
+        regions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional region ids (or labels) to scope the clone to entity types in those super-domains. Omit to clone the whole shape.',
+        },
+        dry_run: {
+          type: 'boolean',
+          description: 'Preview the plan (counts by type, edges, sample titles) without writing. Default false.',
+        },
+      },
+      required: ['from_product'],
     },
   },
   {
@@ -1992,6 +2059,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
   portfolio_validate: portfolioValidate,
+  clone_structure: cloneStructure,
   migrate_cross_edges: migrateCrossEdges,
   get_sync_state: getSyncState,
   apply_pull_changeset: applyPullChangeset,

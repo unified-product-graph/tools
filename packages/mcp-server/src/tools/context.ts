@@ -246,7 +246,13 @@ export const getGraphDigest: ToolHandler = (args, ctx): ToolResult => {
     return text(JSON.stringify({ changed: false, _hash: currentHash }, null, 2))
   }
 
-  const digest = computeGraphDigest(store)
+  // Batch-4 #22: optional target-profile coverage. Scores the headline against
+  // a caller-chosen region set so an intentionally-scoped product reads its
+  // parity (added as `coverage.profile_summary`).
+  const coverageProfile = Array.isArray(args.coverage_profile)
+    ? (args.coverage_profile as unknown[]).filter((r): r is string => typeof r === 'string')
+    : undefined
+  const digest = computeGraphDigest(store, coverageProfile ? { coverageProfile } : undefined)
   const allNodes = store.getAllNodes()
   const allEdges = store.getAllEdges()
   let lensDigest: Record<string, unknown> = {}

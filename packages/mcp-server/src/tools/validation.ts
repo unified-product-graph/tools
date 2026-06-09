@@ -14,6 +14,7 @@
 
 import {
   UPG_TYPES,
+  UPG_TYPES_SET,
   UPG_EDGE_CATALOG,
   UPG_MIGRATIONS,
   UPG_SPLIT_MIGRATIONS,
@@ -30,7 +31,7 @@ import {
   type UPGAntiPatternSeverity,
   type UPGProductStage,
 } from '@unified-product-graph/core'
-import type { UPGSplitMigration } from '@unified-product-graph/core'
+import type { UPGSplitMigration, UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
 import { preflightPayload } from '../lib/payload-guard.js'
@@ -38,6 +39,7 @@ import { computeSchemaDriftSummary } from '@unified-product-graph/sdk'
 import { collectAntiPatternInputs } from '@unified-product-graph/sdk'
 import { validateEdgeTypePair } from '@unified-product-graph/sdk'
 import { checkPropertyTypes } from '@unified-product-graph/sdk'
+import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
 import type {
   ValidateGraphResult,
   ValidateGraphScope,
@@ -270,6 +272,17 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   const currentHash = store.getContentHash()
   if (ifChangedSince && ifChangedSince === currentHash) {
     return text(JSON.stringify({ changed: false, _hash: currentHash }, null, 2))
+  }
+
+  // Batch-4 #18: pre-commit hypothetical. When pending_nodes / pending_edges are
+  // supplied, evaluate anti-patterns against the CURRENT graph PLUS that delta
+  // WITHOUT writing, and report which violations the delta would newly trigger
+  // or resolve. Lets an agent converge to clean in one pass instead of
+  // write -> validate -> patch cycles.
+  const pendingNodesIn = args.pending_nodes as Array<Record<string, unknown>> | undefined
+  const pendingEdgesIn = args.pending_edges as Array<Record<string, unknown>> | undefined
+  if ((pendingNodesIn && pendingNodesIn.length > 0) || (pendingEdgesIn && pendingEdgesIn.length > 0)) {
+    return previewPendingDelta(store, args, pendingNodesIn ?? [], pendingEdgesIn ?? [])
   }
 
   const scope = ((args.scope as string) ?? 'all') as Scope
@@ -889,6 +902,139 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     response._payload_bytes = guardOutcome.fields._payload_bytes
   }
 
+  return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * Batch-4 #18: evaluate anti-patterns against the current graph plus a proposed
+ * (pending) delta WITHOUT writing, and diff the verdict against the current
+ * graph. The graph is augmented in a synthetic read-only view
+ * (`collectAntiPatternInputs` touches only `getAllNodes` / `getAllEdges`), so
+ * nothing is ever mutated or persisted. `pending_edges` endpoints may be an
+ * existing node id or a `$N` index into `pending_nodes`; edge type is inferred
+ * from endpoints when omitted.
+ */
+function previewPendingDelta(
+  store: ToolContext['store'],
+  args: Record<string, unknown>,
+  pendingNodesIn: Array<Record<string, unknown>>,
+  pendingEdgesIn: Array<Record<string, unknown>>,
+): ToolResult {
+  const severityArg = args.severity as string | undefined
+  if (severityArg !== undefined && !VALID_SEVERITIES.has(severityArg as UPGAntiPatternSeverity)) {
+    return textError(`Unknown severity: "${severityArg}". Valid: high, medium, low.`)
+  }
+  const antiPatternIds = Array.isArray(args.anti_pattern_ids)
+    ? (args.anti_pattern_ids as unknown[]).filter((v): v is string => typeof v === 'string')
+    : undefined
+
+  const errors: string[] = []
+
+  // Resolve pending nodes → synthetic nodes with stable temp ids.
+  const pendingNodes: UPGBaseNode[] = []
+  for (let i = 0; i < pendingNodesIn.length; i++) {
+    const n = pendingNodesIn[i]
+    const type = n.type as string | undefined
+    if (!type) { errors.push(`pending_nodes[${i}]: missing "type"`); continue }
+    if (!UPG_TYPES_SET.has(type)) { errors.push(`pending_nodes[${i}]: unknown entity type "${type}"`); continue }
+    const node = { id: `pending_${i}`, type, title: (n.title as string) ?? `Pending ${type}` } as UPGBaseNode
+    if (typeof n.status === 'string') (node as { status?: string }).status = n.status
+    if (Array.isArray(n.tags)) (node as { tags?: unknown }).tags = n.tags
+    if (n.properties && typeof n.properties === 'object') (node as { properties?: unknown }).properties = n.properties
+    pendingNodes.push(node)
+  }
+
+  // Resolve pending edges. from/to may be an existing node id or a `$N` index
+  // into pending_nodes; type is inferred from endpoint types when omitted.
+  const existingIds = new Set(store.getAllNodes().map((n) => n.id))
+  const typeOfEndpoint = (id: string): string | undefined => {
+    if (id.startsWith('pending_')) return pendingNodes.find((p) => p.id === id)?.type as string | undefined
+    return store.getNode(id)?.type as string | undefined
+  }
+  const resolveEnd = (raw: unknown, label: string, i: number): string | null => {
+    if (typeof raw !== 'string' || raw.length === 0) { errors.push(`pending_edges[${i}]: missing "${label}"`); return null }
+    const m = raw.match(/^\$(\d+)$/)
+    if (m) {
+      const idx = parseInt(m[1], 10)
+      if (idx >= pendingNodes.length) { errors.push(`pending_edges[${i}]: ${label} "${raw}" out of range (${pendingNodes.length} pending nodes)`); return null }
+      return `pending_${idx}`
+    }
+    if (!existingIds.has(raw)) { errors.push(`pending_edges[${i}]: ${label} "${raw}" is not an existing node id or a $N pending ref`); return null }
+    return raw
+  }
+  const pendingEdges: UPGEdge[] = []
+  for (let i = 0; i < pendingEdgesIn.length; i++) {
+    const e = pendingEdgesIn[i]
+    const from = resolveEnd(e.from, 'from', i)
+    const to = resolveEnd(e.to, 'to', i)
+    if (!from || !to) continue
+    let type = e.type as string | undefined
+    if (!type) {
+      const st = typeOfEndpoint(from)
+      const tt = typeOfEndpoint(to)
+      if (st && tt) {
+        const inf = inferEdgeTypeWithTier(st, tt)
+        if (inf.ok) type = inf.edgeType
+      }
+    }
+    if (!type) { errors.push(`pending_edges[${i}]: no "type" given and none inferable from endpoints`); continue }
+    pendingEdges.push({ id: `pe_${i}`, source: from, target: to, type } as UPGEdge)
+  }
+
+  if (errors.length > 0) {
+    return { content: [{ type: 'text', text: JSON.stringify({ error: errors[0], errors }, null, 2) }], isError: true }
+  }
+
+  // Synthetic augmented view (no mutation, no persistence).
+  const augNodes = [...store.getAllNodes(), ...pendingNodes]
+  const augEdges = [...store.getAllEdges(), ...pendingEdges]
+  const product = store.getProduct()
+  const synthetic = {
+    getAllNodes: () => augNodes,
+    getAllEdges: () => augEdges,
+    getProduct: () => product,
+  } as unknown as Parameters<typeof collectAntiPatternInputs>[0]
+  const stage = (product as { stage?: string }).stage as UPGProductStage | undefined
+
+  const evalOpts = { severity: severityArg as UPGAntiPatternSeverity | undefined, anti_pattern_ids: antiPatternIds }
+  const hyp = evaluateAntiPatterns(collectAntiPatternInputs(synthetic, stage), evalOpts)
+  const cur = evaluateAntiPatterns(collectAntiPatternInputs(store, stage), evalOpts)
+  const curIds = new Set(cur.map((v) => v.anti_pattern_id))
+  const hypIds = new Set(hyp.map((v) => v.anti_pattern_id))
+  const short = (v: { anti_pattern_id: string; name: string; severity: string }) => ({
+    anti_pattern_id: v.anti_pattern_id, name: v.name, severity: v.severity,
+  })
+
+  let high = 0, medium = 0, low = 0
+  for (const v of hyp) {
+    if (v.severity === 'high') high++
+    else if (v.severity === 'medium') medium++
+    else if (v.severity === 'low') low++
+  }
+
+  const response = {
+    preview: true,
+    pending: { nodes: pendingNodes.length, edges: pendingEdges.length },
+    would_be_valid: hyp.length === 0,
+    summary: {
+      hypothetical_violations: hyp.length,
+      current_violations: cur.length,
+      anti_pattern_violations_high: high,
+      anti_pattern_violations_medium: medium,
+      anti_pattern_violations_low: low,
+    },
+    delta: {
+      newly_triggered: hyp.filter((v) => !curIds.has(v.anti_pattern_id)).map(short),
+      newly_resolved: cur.filter((v) => !hypIds.has(v.anti_pattern_id)).map(short),
+    },
+    anti_pattern_violations: hyp.map((v) => ({
+      anti_pattern_id: v.anti_pattern_id,
+      name: v.name,
+      severity: v.severity,
+      target_entities: v.target_entities,
+      remediation: v.remediation,
+    })),
+  }
   return text(JSON.stringify(response, null, 2))
 }
 

@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 109 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 110 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 109 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 18 tools
+- [Workspace & Portfolios](#workspace-portfolios): 19 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -34,6 +34,7 @@ Pre-computed graph analytics in one call: counts, health, chain completeness, bu
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `coverage_profile` | array |  | Batch-4 #22: coverage region ids (the keys of the `coverage` block: identity, understanding, discovery, validation, reaching, converting, building, sustaining, learning, operations) to score against instead of the product stage default. Adds `coverage.profile_summary` (overall_pct over just these regions), so a deliberately-scoped product (e.g. a structural spine) reads its parity without out-of-scope regions dragging the headline down. |
 | `if_changed_since` | string |  | Hash from a previous response. Returns { changed: false } if graph unchanged (saves ~470 tokens). |
 
 **Returns:**
@@ -1222,6 +1223,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 
 - [`attach_product_to_portfolio`](#attach-product-to-portfolio)
 - [`batch_create_cross_product_edges`](#batch-create-cross-product-edges)
+- [`clone_structure`](#clone-structure)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_product`](#create-product)
 - [`delete_cross_product_edge`](#delete-cross-product-edge)
@@ -1289,6 +1291,40 @@ registered_products? }`.
 or when no portfolio document exists (pass `auto_create_portfolio: true` to mint one).
 
 **See also:** `create_cross_product_edge`, `list_cross_edge_types`
+
+
+### `clone_structure`
+
+Stamp the SHAPE of one product (typed nodes + canonical edges + hierarchy, with `TODO:` placeholder titles) into another, without re-authoring the skeleton. Content (descriptions, properties, real titles, statuses) never crosses; only the structure does. The lever for multi-product structural parity: one stamp plus a content pass replaces a multi-batch rebuild. `from_product` is the read-only exemplar; `into` is the write target and DEFAULTS to the active product (name a non-active product to write there with no `switch_product`). `regions` scopes the clone to entity types in those super-domains. `dry_run: true` previews the plan without writing. Local-only.
+
+**Atomicity:** `atomic-with-rollback on commit (created twins + edges are rolled
+back if a hard error lands mid-clone; catalog-invalid source edges are
+skipped and reported, not fatal). `dry_run` never writes.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `dry_run` | boolean |  | Preview the plan (counts by type, edges, sample titles) without writing. Default false. |
+| `from_product` | string | ✓ | Exemplar product (id, file, or basename) whose shape is copied. Read-only. |
+| `into` | string |  | Target product to stamp the shape into. Defaults to the ACTIVE product; name a non-active product to write there without switch_product. |
+| `regions` | array |  | Optional region ids (or labels) to scope the clone to entity types in those super-domains. Omit to clone the whole shape. |
+
+**Returns:**
+
+JSON: on `dry_run`, `{ dry_run, from, into, into_is_active,
+would_clone: { nodes, edges, by_type }, region_scope?, unmatched_regions?,
+target_existing_stubs?, sample_titles }`. On commit, `{ cloned: true, from,
+into, into_is_active, nodes_created, edges_created, edges_skipped?, by_type,
+warnings? }`.
+
+**Throws:**
+
+- Returns a textError when `from_product` is missing/unresolvable, when
+`into` is unresolvable, when source and target are the same product, or when
+the source has no clonable shape under the given scope.
+
+**See also:** `portfolio_validate`, `batch_create_nodes`, `switch_product`
 
 
 ### `create_cross_product_edge`
@@ -1557,6 +1593,7 @@ Roll up every product's counts, health, and stage-coverage in one call (the mult
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `coverage_profile` | array |  | Batch-4 #22: coverage region ids (keys of the `coverage` block, e.g. understanding, discovery, building) to score each product against, so "is this product at parity?" is a direct read across the portfolio. Adds `coverage_profile_pct` to every product summary. |
 | `scope` | array |  | Product IDs (or files) to summarise. Omit to summarise ALL products in the workspace. |
 
 **Returns:**
@@ -2981,6 +3018,8 @@ Walk the loaded graph and return a per-class, per-node report of schema drift pl
 | `if_changed_since` | string |  | Hash from a previous response. Returns { changed: false } if graph unchanged. |
 | `include_polymorphic_upgrades` | boolean |  | When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only; omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions. |
 | `limit` | number |  | Max entries per class (default 100, max 1000) |
+| `pending_edges` | array |  | Pre-commit preview edges (paired with pending_nodes). Each item: `{ from, to, type? }`, where from/to is an existing node id OR a `$N` index into pending_nodes; type is inferred from endpoints when omitted. |
+| `pending_nodes` | array |  | Batch-4 #18 pre-commit preview: nodes you are ABOUT to create. When supplied (with/without pending_edges), validate_graph evaluates anti-patterns against the CURRENT graph PLUS this delta WITHOUT writing, and returns which violations the delta would newly trigger or resolve. Each item: `{ type, title?, status?, tags?, properties? }`. |
 | `scope` | `all` \| `entity_drift` \| `edge_drift` \| `property_drift` \| `top_level_drift` \| `lifecycle_drift` \| `self_referential` |  | Which drift class(es) to include in the response (default "all"). Counts in `summary` are always returned for every class. |
 | `severity` | `high` \| `medium` \| `low` |  | Filter anti-pattern violations to one severity tier. |
 | `skip_anti_patterns` | boolean |  | Skip anti-pattern evaluation. Only returns schema drift. |

@@ -244,6 +244,11 @@ export const portfolioQuery: ToolHandler = async (args, ctx): Promise<ToolResult
 export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
   const scope = args.scope as string[] | undefined
+  // Batch-4 #22: a target coverage profile, applied to every product so
+  // "is this product at parity?" is a direct read across the portfolio.
+  const coverageProfile = Array.isArray(args.coverage_profile)
+    ? (args.coverage_profile as unknown[]).filter((r): r is string => typeof r === 'string')
+    : undefined
   const cwd = process.cwd()
   const { products, unmatched } = resolveScopedProducts(cwd, scope)
 
@@ -256,7 +261,7 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
   for (const product of products) {
     try {
       const { store: reader } = await readerFor(product, store)
-      const digest = computeGraphDigest(reader)
+      const digest = computeGraphDigest(reader, coverageProfile ? { coverageProfile } : undefined)
       const stage = digest.product.stage || 'unset'
       byStage[stage] = (byStage[stage] ?? 0) + 1
       totalNodes += digest.counts.total_nodes
@@ -276,6 +281,7 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
         total_edges: digest.counts.total_edges,
         health: digest.health,
         coverage_pct: digest.coverage.stage_summary?.overall_pct ?? null,
+        ...(coverageProfile ? { coverage_profile_pct: digest.coverage.profile_summary?.overall_pct ?? null } : {}),
         top_types: topTypes,
       })
     } catch (err) {
@@ -292,6 +298,7 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
       by_stage: byStage,
     },
   }
+  if (coverageProfile) response.coverage_profile = coverageProfile
   if (errored.length > 0) response.errored_products = errored
   if (unmatched.length > 0) response.unmatched_scope = unmatched
   if (products.length === 0) {
