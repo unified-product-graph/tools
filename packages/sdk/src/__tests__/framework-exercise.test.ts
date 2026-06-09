@@ -42,6 +42,7 @@ function fixtureDoc() {
       { id: 'n_feat', type: 'feature', title: 'Export', slug: 'export', status: 'proposed' },
       { id: 'n_sol', type: 'solution', title: 'A solution', slug: 'a-solution', status: 'proposed' },
       { id: 'n_need', type: 'need', title: 'Right portions', slug: 'right-portions', status: 'raw' },
+      { id: 'n_persona', type: 'persona', title: 'Solo Cook', slug: 'solo-cook' },
     ],
     edges: [],
   }
@@ -75,8 +76,8 @@ describe('applyFramework', () => {
 
   it('warns when an entity is not a declared target type, but still includes it (M3)', async () => {
     const { store } = await freshStore()
-    // n_sol is a `solution`; rice targets feature/opportunity/need, not solution.
-    const res = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_sol'] })
+    // n_persona is a `persona`; rice targets feature/opportunity/solution/need, not persona.
+    const res = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_persona'] })
     expect(res.edges).toHaveLength(1)
     expect(res.warnings.join(' ')).toMatch(/not a declared target type/)
   })
@@ -270,14 +271,14 @@ describe('exercise-aware executePrioritise', () => {
     const { store } = await freshStore()
     const rice = UPG_FRAMEWORKS_BY_ID['rice-scoring']!
 
-    // n_sol is a `solution` — still NOT a RICE target after the 0.8.6 broadening
-    // (which added opportunity/need, not solution). Direct path → type_mismatch.
-    const direct = executePrioritise(rice, ['n_sol'], store)
+    // n_persona is a `persona` — NOT a RICE target (feature/opportunity/solution/need).
+    // Direct path → type_mismatch.
+    const direct = executePrioritise(rice, ['n_persona'], store)
     expect(direct.kind).toBe('type_mismatch')
 
     // Via an exercise: deliberately included, so the guard is bypassed and it scores.
-    const ex = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_sol'] })
-    scoreEntity(store, { exercise_id: ex.exercise.id, entity_id: 'n_sol', values: { reach: 500, impact: 2, confidence: 0.8, effort: 2 } })
+    const ex = applyFramework(store, { framework_id: 'rice-scoring', entity_ids: ['n_persona'] })
+    scoreEntity(store, { exercise_id: ex.exercise.id, entity_id: 'n_persona', values: { reach: 500, impact: 2, confidence: 0.8, effort: 2 } })
     const viaExercise = executePrioritise(rice, [], store, { exerciseId: ex.exercise.id })
     expect(viaExercise.kind).toBe('execution')
   })

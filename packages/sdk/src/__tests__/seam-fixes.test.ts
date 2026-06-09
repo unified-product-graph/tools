@@ -182,13 +182,13 @@ describe(' prioritise type guard', () => {
   it('returns a clear type_mismatch (not a div-by-zero) for wrong-type candidates', async () => {
     const store = await freshStore()
     const rice = UPG_FRAMEWORKS_BY_ID['rice-scoring']!
-    // n_sol is a `solution` — NOT one of RICE's targets (feature/opportunity/need
-    // after the 0.8.6 broadening), so the guard must still fire loud.
-    const r = executePrioritise(rice, ['n_sol'], store)
+    // n_job is a `job` — NOT one of RICE's targets (feature/opportunity/solution/need),
+    // so the guard must still fire loud. (`solution` is now a RICE target as of 0.9.0.)
+    const r = executePrioritise(rice, ['n_job'], store)
     expect(r.kind).toBe('type_mismatch')
     if (r.kind === 'type_mismatch') {
       expect(r.target_entity_types).toContain('feature')
-      expect(r.hint).toMatch(/solution/)
+      expect(r.hint).toMatch(/job/)
     }
   })
 
