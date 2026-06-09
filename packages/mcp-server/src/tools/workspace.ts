@@ -19,6 +19,8 @@ import {
   registerProductOnPortfolio,
   findProductFileById,
   attachProductToPortfolio,
+  detachProductFromPortfolio,
+  deleteCrossProductEdge,
 } from '@unified-product-graph/sdk'
 import {
   createProduct,
@@ -46,12 +48,42 @@ import { coerceProductStage } from '@unified-product-graph/core'
 export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
   const cwd = process.cwd()
   const products: {
+    id: string | null
     file: string
     title: string
     stage: string | null
     nodes: number
     edges: number
+    areas?: string[]
+    portfolios?: string[]
   }[] = []
+
+  // Build a product-id → membership map from portfolio.upg so callers can see which
+  // area/portfolio each product sits in without a second round-trip ( §11a).
+  // Best-effort: absent in single-file or pre-portfolio workspaces.
+  const membership = new Map<string, { areas: string[]; portfolios: string[] }>()
+  try {
+    const pdoc = JSON.parse(fs.readFileSync(path.join(cwd, '.upg', 'portfolio.upg'), 'utf-8')) as {
+      product_areas?: Array<{ id: string; title?: string; products?: string[] }>
+      portfolios?: Array<{ id: string; title?: string; products?: string[] }>
+    }
+    for (const area of pdoc.product_areas ?? []) {
+      for (const pid of area.products ?? []) {
+        const m = membership.get(pid) ?? { areas: [], portfolios: [] }
+        m.areas.push(area.title ?? area.id)
+        membership.set(pid, m)
+      }
+    }
+    for (const pf of pdoc.portfolios ?? []) {
+      for (const pid of pf.products ?? []) {
+        const m = membership.get(pid) ?? { areas: [], portfolios: [] }
+        m.portfolios.push(pf.title ?? pf.id)
+        membership.set(pid, m)
+      }
+    }
+  } catch {
+    // no portfolio.upg / unreadable — products listed without membership
+  }
 
   const candidates: string[] = []
   const topEntries = fs.readdirSync(cwd, { withFileTypes: true })
@@ -79,16 +111,24 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
     try {
       const raw = fs.readFileSync(filePath, 'utf-8')
       const doc = JSON.parse(raw)
+      // Skip non-product docs: portfolio.upg has no `product` header (it carries
+      // organization / product_areas / portfolios) and is not a product. §11a.
+      if (!doc.product) continue
       // Coerce the raw on-disk stage to canonical (same rule the store applies
       // at load) so this read agrees with get_product_context. Unknown / unset
       // → null (not the old "unknown" sentinel) to match the context tool.
       const coerced = coerceProductStage(doc.product?.stage)
+      const pid = (doc.product?.id as string | undefined) ?? null
+      const m = pid ? membership.get(pid) : undefined
       products.push({
+        id: pid,
         file: path.relative(cwd, filePath),
         title: doc.product?.title ?? '(untitled)',
         stage: coerced.canonical ?? null,
         nodes: Array.isArray(doc.nodes) ? doc.nodes.length : 0,
         edges: Array.isArray(doc.edges) ? doc.edges.length : 0,
+        ...(m && m.areas.length > 0 ? { areas: m.areas } : {}),
+        ...(m && m.portfolios.length > 0 ? { portfolios: m.portfolios } : {}),
       })
     } catch {
       // malformed JSON; skip
@@ -748,6 +788,179 @@ export const attachProductToPortfolioTool: ToolHandler = async (args, _ctx): Pro
   } catch (err) {
     return textError((err as Error).message)
   }
+}
+
+/**
+ * Remove a product from a portfolio's `products[]` (it stays registered and in any
+ * other container). The inverse of `attach_product_to_portfolio`. §8.
+ *
+ * @returns JSON: `{ product_id, container_id, container_kind: "portfolio",
+ *   container_title?, removed }`. `removed: false` (not an error) when the product was
+ *   not a member, so retries are idempotent.
+ * @throws textError on a missing workspace or an unknown portfolio id.
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see attach_product_to_portfolio
+ */
+export const detachProductFromPortfolioTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const productId = args.product_id as string | undefined
+  const portfolioId = args.portfolio_id as string | undefined
+  if (!productId) return textError('Missing required parameter: product_id')
+  if (!portfolioId) return textError('Missing required parameter: portfolio_id')
+  try {
+    const result = await detachProductFromPortfolio(process.cwd(), {
+      product_id: productId,
+      portfolio_id: portfolioId,
+    })
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Delete a cross-product edge from `.upg/portfolio.upg` by id. The inverse of
+ * `create_cross_product_edge`. §8.
+ *
+ * @returns JSON: `{ edge_id, deleted, edge? }`. `deleted: false` (not an error) when
+ *   no edge with that id exists, so retries are idempotent.
+ * @throws textError on a missing workspace.
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see create_cross_product_edge
+ * @see list_portfolio_cross_edges
+ */
+export const deleteCrossProductEdgeTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const edgeIdArg = args.edge_id as string | undefined
+  if (!edgeIdArg) return textError('Missing required parameter: edge_id')
+  try {
+    const result = await deleteCrossProductEdge(process.cwd(), edgeIdArg)
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Create many cross-product edges in one atomic write (mirror of `batch_create_edges`
+ * for the portfolio tier). Every edge is validated and qualified BEFORE anything is
+ * written: if any is invalid the whole batch is rejected and `portfolio.upg` is left
+ * untouched. Referenced products are auto-registered; all edges land in one flush.
+ * §10.
+ *
+ * Each edge: `{ source_id, target_id, type, source_product_id?, target_product_id? }`
+ * (same qualification rules as `create_cross_product_edge`). Max 50 per call.
+ *
+ * @returns JSON: `{ message, created: UPGCrossEdge[], count, portfolio_file,
+ *   registered_products? }`.
+ * @throws textError when `edges` is missing/empty/oversized, when any edge is invalid,
+ *   or when no portfolio document exists (pass `auto_create_portfolio: true` to mint one).
+ * @atomicity atomic. All edges validated first, then a single portfolio.upg flush.
+ * @see create_cross_product_edge
+ * @see list_cross_edge_types
+ */
+export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const edgesArg = args.edges as Array<Record<string, unknown>> | undefined
+  if (!Array.isArray(edgesArg) || edgesArg.length === 0) {
+    return textError('Missing required parameter: edges (a non-empty array).')
+  }
+  if (edgesArg.length > 50) {
+    return textError(`Too many edges: ${edgesArg.length}. Max 50 per batch_create_cross_product_edges call.`)
+  }
+
+  const cwd = process.cwd()
+  const portfolioPath = resolvePortfolioPath(cwd)
+  if (!portfolioPath) {
+    return textError('No workspace found. Run `init_workspace` first to enable portfolio cross-product edges.')
+  }
+  const autoCreatePortfolio = (args.auto_create_portfolio as boolean | undefined) ?? false
+  const portfolioExisted = fs.existsSync(portfolioPath)
+  if (!portfolioExisted && !autoCreatePortfolio) {
+    return textError(
+      'No portfolio document found at .upg/portfolio.upg. Cross-product edges express portfolio-level relationships ' +
+      'and should be anchored to a portfolio that contains the products. Create a portfolio first ' +
+      '(`create_node({type: "portfolio", title: "..."})`), or pass `auto_create_portfolio: true`.',
+    )
+  }
+
+  // Validate + qualify EVERY edge before touching the store (all-or-nothing).
+  const prepared: UPGCrossEdge[] = []
+  for (let i = 0; i < edgesArg.length; i++) {
+    const e = edgesArg[i]
+    const sourceIdArg = e.source_id as string | undefined
+    const targetIdArg = e.target_id as string | undefined
+    const edgeTypeArg = e.type as string | undefined
+    const sourceProductId = e.source_product_id as string | undefined
+    const targetProductId = e.target_product_id as string | undefined
+    if (!sourceIdArg) return textError(`edges[${i}]: missing source_id`)
+    if (!targetIdArg) return textError(`edges[${i}]: missing target_id`)
+    if (!edgeTypeArg) return textError(`edges[${i}]: missing type`)
+    if (!UPG_CROSS_EDGE_TYPES.includes(edgeTypeArg as UPGCrossEdgeType)) {
+      return textError(`edges[${i}]: invalid cross-product edge type "${edgeTypeArg}". Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`)
+    }
+    let qualifiedSource: string
+    if (sourceIdArg.includes('/')) qualifiedSource = sourceIdArg
+    else if (sourceProductId) qualifiedSource = `${sourceProductId}/${sourceIdArg}`
+    else return textError(`edges[${i}]: source_id "${sourceIdArg}" is a bare node id. Supply source_product_id or a qualified {product_id}/{node_id}.`)
+    let qualifiedTarget: string
+    if (targetIdArg.includes('/')) qualifiedTarget = targetIdArg
+    else if (targetProductId) qualifiedTarget = `${targetProductId}/${targetIdArg}`
+    else return textError(`edges[${i}]: target_id "${targetIdArg}" is a bare node id. Supply target_product_id or a qualified {product_id}/{node_id}.`)
+    prepared.push({
+      id: edgeId(),
+      source: qualifiedSource,
+      target: qualifiedTarget,
+      type: edgeTypeArg as UPGCrossEdgeType,
+      source_product_id: sourceProductId ?? qualifiedSource.split('/')[0],
+      target_product_id: targetProductId ?? qualifiedTarget.split('/')[0],
+    })
+  }
+
+  const portfolioStore = new UPGPortfolioStore()
+  try {
+    await portfolioStore.loadOrInit(portfolioPath)
+  } catch (err) {
+    return textError(`Failed to load portfolio document: ${(err as Error).message}`)
+  }
+
+  // Auto-register every referenced product (dedup), then add all edges + one flush.
+  const registeredProducts: Array<{ id: string; file_path?: string; title?: string }> = []
+  const portfolioDoc = portfolioStore.getDocument()
+  if (portfolioDoc) {
+    const productIds = new Set<string>()
+    for (const e of prepared) {
+      if (e.source_product_id) productIds.add(e.source_product_id)
+      if (e.target_product_id) productIds.add(e.target_product_id)
+    }
+    for (const pid of productIds) {
+      const lookup = findProductFileById(cwd, pid)
+      const wasNew = registerProductOnPortfolio(portfolioDoc, {
+        id: pid,
+        ...(lookup ? { file_path: lookup.file_path, title: lookup.title } : {}),
+      })
+      if (wasNew) registeredProducts.push({ id: pid, ...(lookup ? { file_path: lookup.file_path, title: lookup.title } : {}) })
+    }
+    if (registeredProducts.length > 0) portfolioStore.markDirty()
+  }
+
+  try {
+    for (const e of prepared) portfolioStore.addCrossEdge(e)
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to write cross-product edges: ${(err as Error).message}`)
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        message: `Created ${prepared.length} cross-product edge(s)`,
+        created: prepared,
+        count: prepared.length,
+        portfolio_file: path.relative(cwd, portfolioPath),
+        ...(registeredProducts.length > 0 ? { registered_products: registeredProducts } : {}),
+      },
+      null,
+      2,
+    ),
+  )
 }
 
 export type { ToolContext }

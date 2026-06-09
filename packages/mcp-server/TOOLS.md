@@ -1,14 +1,14 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 99 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 106 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
 - [Context & Session](#context-session): 5 tools
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
-- [Areas & Change Log](#areas-change-log): 6 tools
-- [Workspace & Portfolios](#workspace-portfolios): 12 tools
+- [Areas & Change Log](#areas-change-log): 10 tools
+- [Workspace & Portfolios](#workspace-portfolios): 15 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -948,10 +948,14 @@ _Product areas, the `.upg-area.json` cwd scoper, and the session change log._
 
 - [`assign_product_to_area`](#assign-product-to-area)
 - [`create_area`](#create-area)
+- [`delete_area`](#delete-area)
 - [`get_area_context`](#get-area-context)
 - [`get_area_graph`](#get-area-graph)
 - [`get_changes`](#get-changes)
 - [`list_product_areas`](#list-product-areas)
+- [`move_product_to_area`](#move-product-to-area)
+- [`remove_product_from_area`](#remove-product-from-area)
+- [`update_area`](#update-area)
 
 ### `assign_product_to_area`
 
@@ -1007,6 +1011,31 @@ JSON: `{ node, portfolio_file, written_to }`. `node` is the typed
 fails.
 
 **See also:** `list_product_areas`
+
+
+### `delete_area`
+
+Delete a product area from `.upg/portfolio.upg`. Guarded: refuses while the area still has products unless `force: true`. Child areas are un-nested (their parent link is cleared) so no parent reference dangles.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `area_id` | string | ✓ | Product area id to delete (from list_product_areas) |
+| `force` | boolean |  | Delete even if the area still has products (default false) |
+
+**Returns:**
+
+JSON: `{ message, area_id, deleted, unnested_children: string[] }`.
+
+**Throws:**
+
+- textError on a missing workspace, unknown area, or a non-empty area without
+`force`.
+
+**See also:** `create_area`, `remove_product_from_area`
 
 
 ### `get_area_context`
@@ -1093,13 +1122,96 @@ parent_area_id?, products? }>, total }`.
 **See also:** `create_area`, `get_area_graph`
 
 
+### `move_product_to_area`
+
+Move a product to a different product area: remove it from `from_area_id` (or, when omitted, from every area it currently sits in) and add it to `to_area_id`. Convenience over remove_product_from_area + assign_product_to_area.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `from_area_id` | string |  | Source area id to remove from; omit to remove from all areas |
+| `product_id` | string | ✓ | Product id (from list_local_products) |
+| `to_area_id` | string | ✓ | Destination product area id (from list_product_areas) |
+
+**Returns:**
+
+JSON: `{ product_id, to_area_id, to_area_title?, removed_from: string[], added }`.
+
+**Throws:**
+
+- textError on a missing workspace, unknown product, or unknown target area.
+
+**See also:** `assign_product_to_area`, `remove_product_from_area`
+
+
+### `remove_product_from_area`
+
+Remove a product from a product area's `products[]` in `.upg/portfolio.upg` (the product stays registered on the portfolio and in any other container). The inverse of `assign_product_to_area`.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `area_id` | string | ✓ | Product area id (from list_product_areas) |
+| `product_id` | string | ✓ | Product id (from list_local_products) |
+
+**Returns:**
+
+JSON: `{ product_id, container_id, container_kind: "product_area",
+container_title?, removed }`. `removed: false` (not an error) when the product
+was not a member, so retries are idempotent.
+
+**Throws:**
+
+- textError on a missing workspace or an unknown area id.
+
+**See also:** `assign_product_to_area`, `move_product_to_area`
+
+
+### `update_area`
+
+Edit a product area in `.upg/portfolio.upg` (title, description, strategic_priority, owner) and/or re-parent it via `parent_area_id`. The mirror of `update_product` for the organisational axis. `parent_area_id` is tri-state: omit to leave unchanged, pass null to un-nest (top-level), or pass an area id to re-parent (rejected if it would create a cycle).
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `area_id` | string | ✓ | Product area id to edit (from list_product_areas) |
+| `description` | string |  | New area description |
+| `owner` | string |  | Person or team that owns this area |
+| `parent_area_id` | string,null |  | Re-parent under this area id; null un-nests (top-level); omit to leave unchanged |
+| `strategic_priority` | `urgent` \| `high` \| `medium` \| `low` \| `none` |  | Strategic priority (canonical Priority scale) |
+| `title` | string |  | New area title |
+
+**Returns:**
+
+JSON: `{ message, area, updated: string[] }`.
+
+**Throws:**
+
+- textError on a missing workspace, unknown area/parent, a re-parent cycle, or
+when no editable field is supplied.
+
+**See also:** `create_area`, `list_product_areas`
+
+
 ## Workspace & Portfolios
 
 _Multi-product discovery, switching, init, cross-product edges._
 
 - [`attach_product_to_portfolio`](#attach-product-to-portfolio)
+- [`batch_create_cross_product_edges`](#batch-create-cross-product-edges)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_product`](#create-product)
+- [`delete_cross_product_edge`](#delete-cross-product-edge)
+- [`detach_product_from_portfolio`](#detach-product-from-portfolio)
 - [`get_organization`](#get-organization)
 - [`get_workspace_info`](#get-workspace-info)
 - [`init_workspace`](#init-workspace)
@@ -1136,9 +1248,35 @@ portfolio id (the message points at list_portfolios / list_local_products).
 **See also:** `assign_product_to_area`, `create_product`
 
 
+### `batch_create_cross_product_edges`
+
+Create up to 50 cross-product edges in one atomic write (the portfolio-tier mirror of batch_create_edges). Every edge is validated and qualified before anything is written; if any is invalid the whole batch is rejected. Referenced products are auto-registered.
+
+**Atomicity:** `atomic. All edges validated first, then a single portfolio.upg flush.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `auto_create_portfolio` | boolean |  | Create an empty portfolio document if none exists (default false) |
+| `edges` | array | ✓ | Cross-product edges to create (max 50). Each: { source_id, target_id, type, source_product_id?, target_product_id? }. |
+
+**Returns:**
+
+JSON: `{ message, created: UPGCrossEdge[], count, portfolio_file,
+registered_products? }`.
+
+**Throws:**
+
+- textError when `edges` is missing/empty/oversized, when any edge is invalid,
+or when no portfolio document exists (pass `auto_create_portfolio: true` to mint one).
+
+**See also:** `create_cross_product_edge`, `list_cross_edge_types`
+
+
 ### `create_cross_product_edge`
 
-Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`.
+Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted).
 
 **Atomicity:** `non-atomic. Portfolio file create (if new) + edge append are
 separate filesystem operations.`
@@ -1151,7 +1289,7 @@ separate filesystem operations.`
 | `source_product_id` | string |  | Product ID of the source node |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -1195,6 +1333,56 @@ JSON: `{ message, ...result }`. `result` carries `id`, `title`,
 (`InvalidProductNameError`).
 
 **See also:** `init_workspace`
+
+
+### `delete_cross_product_edge`
+
+Delete a cross-product edge from `.upg/portfolio.upg` by id. The inverse of `create_cross_product_edge`. Returns `deleted: false` (not an error) when no edge with that id exists.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `edge_id` | string | ✓ | Cross-product edge id (from list_portfolio_cross_edges) |
+
+**Returns:**
+
+JSON: `{ edge_id, deleted, edge? }`. `deleted: false` (not an error) when
+no edge with that id exists, so retries are idempotent.
+
+**Throws:**
+
+- textError on a missing workspace.
+
+**See also:** `create_cross_product_edge`, `list_portfolio_cross_edges`
+
+
+### `detach_product_from_portfolio`
+
+Remove a product from a portfolio's `products[]` in `.upg/portfolio.upg` (the product stays registered and in any other container). The inverse of `attach_product_to_portfolio`.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `portfolio_id` | string | ✓ | Portfolio id (from list_portfolios) |
+| `product_id` | string | ✓ | Product id (from list_local_products) |
+
+**Returns:**
+
+JSON: `{ product_id, container_id, container_kind: "portfolio",
+container_title?, removed }`. `removed: false` (not an error) when the product was
+not a member, so retries are idempotent.
+
+**Throws:**
+
+- textError on a missing workspace or an unknown portfolio id.
+
+**See also:** `attach_product_to_portfolio`
 
 
 ### `get_organization`
@@ -1971,7 +2159,7 @@ JSON: `{ kind, total, count, benchmarks: ... }`
 
 ### `list_cross_edge_types`
 
-List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.
+List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.
 
 **Atomicity:** `atomic (read-only)`
 

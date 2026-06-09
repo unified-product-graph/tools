@@ -28,6 +28,7 @@ import type {
   UPGPortfolio,
   UPGProductArea,
   UPGOrganization,
+  UPGCrossEdge,
 } from '@unified-product-graph/core'
 
 /** Entity types that live in `.upg/portfolio.upg` instead of a product graph. */
@@ -524,4 +525,323 @@ export function attachProductToPortfolio(
   args: { product_id: string; portfolio_id: string },
 ): Promise<ProductMembershipResult> {
   return attachProductToContainer(cwd, args.product_id, args.portfolio_id, 'portfolio')
+}
+
+// ── Area editing + re-parenting ( §7) ─────────────────────────────────
+
+/** Coerce a raw priority to the canonical scale, mapping legacy 'critical' → 'urgent'. */
+function coerceStrategicPriority(
+  raw: unknown,
+): UPGProductArea['strategic_priority'] | undefined {
+  const sp = raw === 'critical' ? 'urgent' : raw
+  if (sp === 'urgent' || sp === 'high' || sp === 'medium' || sp === 'low' || sp === 'none') return sp
+  return undefined
+}
+
+export interface UpdateAreaArgs {
+  title?: string
+  description?: string
+  /** Canonical Priority; legacy 'critical' is coerced to 'urgent'. */
+  strategic_priority?: string
+  /** Re-parent target. `null` un-nests (makes the area top-level). Omit to leave unchanged. */
+  parent_area_id?: string | null
+  owner?: string
+}
+
+export interface UpdateAreaResult {
+  area: UPGProductArea
+  /** Names of the fields that changed. */
+  updated: string[]
+}
+
+/**
+ * Edit a `product_area` in `portfolio.upg` (title / description / strategic_priority /
+ * owner) and/or re-parent it via `parent_area_id` (`null` un-nests). Re-parenting is
+ * validated: the parent must exist, cannot be the area itself, and must not create a
+ * cycle. The mirror of `updateProduct` for the organisational axis. Throws
+ * `PortfolioRoutingError` on a missing workspace, unknown area/parent, or a cycle.
+ */
+export async function updateProductArea(
+  cwd: string,
+  areaId: string,
+  args: UpdateAreaArgs,
+): Promise<UpdateAreaResult> {
+  const store = await openPortfolioStoreIfExists(cwd)
+  if (!store) {
+    throw new PortfolioRoutingError(
+      'No portfolio document in this workspace. Create a product area (create_area) first.',
+    )
+  }
+  const doc = store.getDocument()
+  if (!doc) throw new PortfolioRoutingError('Portfolio document failed to load.')
+  const area = doc.product_areas.find((a) => a.id === areaId)
+  if (!area) {
+    throw new PortfolioRoutingError(
+      `Product area not found in portfolio.upg: "${areaId}". List them with list_product_areas.`,
+    )
+  }
+
+  const updated: string[] = []
+  if (typeof args.title === 'string') {
+    area.title = args.title
+    updated.push('title')
+  }
+  if (typeof args.description === 'string') {
+    area.description = args.description
+    updated.push('description')
+  }
+  if (args.strategic_priority !== undefined) {
+    const sp = coerceStrategicPriority(args.strategic_priority)
+    if (sp === undefined) {
+      throw new PortfolioRoutingError(
+        `Invalid strategic_priority: "${args.strategic_priority}". Valid: urgent, high, medium, low, none.`,
+      )
+    }
+    area.strategic_priority = sp
+    updated.push('strategic_priority')
+  }
+  if (typeof args.owner === 'string') {
+    area.owner = args.owner
+    updated.push('owner')
+  }
+  if (args.parent_area_id !== undefined) {
+    if (args.parent_area_id === null) {
+      area.parent_area_id = null
+    } else {
+      const parentId = args.parent_area_id
+      if (parentId === areaId) {
+        throw new PortfolioRoutingError('A product area cannot be its own parent.')
+      }
+      if (!doc.product_areas.some((a) => a.id === parentId)) {
+        throw new PortfolioRoutingError(
+          `Parent area not found in portfolio.upg: "${parentId}". List them with list_product_areas.`,
+        )
+      }
+      // Cycle guard: walk up from the proposed parent; reaching areaId is a cycle.
+      const seen = new Set<string>()
+      let cursor: string | null | undefined = parentId
+      while (cursor) {
+        if (cursor === areaId) {
+          throw new PortfolioRoutingError(
+            `Re-parenting "${areaId}" under "${parentId}" would create a cycle.`,
+          )
+        }
+        if (seen.has(cursor)) break
+        seen.add(cursor)
+        cursor = doc.product_areas.find((a) => a.id === cursor)?.parent_area_id ?? null
+      }
+      area.parent_area_id = parentId
+    }
+    updated.push('parent_area_id')
+  }
+
+  if (updated.length > 0) {
+    store.markDirty()
+    await store.flush()
+  }
+  return { area, updated }
+}
+
+// ── Portfolio-tier removal / detach / delete ( §8) ────────────────────
+
+export interface RemoveMembershipResult {
+  product_id: string
+  container_id: string
+  container_kind: 'product_area' | 'portfolio'
+  container_title?: string
+  /** True when the product was a member and was removed. */
+  removed: boolean
+}
+
+async function removeProductFromContainer(
+  cwd: string,
+  productId: string,
+  containerId: string,
+  kind: 'product_area' | 'portfolio',
+): Promise<RemoveMembershipResult> {
+  const store = await openPortfolioStoreIfExists(cwd)
+  if (!store) throw new PortfolioRoutingError('No portfolio document in this workspace.')
+  const doc = store.getDocument()
+  if (!doc) throw new PortfolioRoutingError('Portfolio document failed to load.')
+  const container =
+    kind === 'product_area'
+      ? doc.product_areas.find((a) => a.id === containerId)
+      : doc.portfolios.find((p) => p.id === containerId)
+  if (!container) {
+    const label = kind === 'product_area' ? 'Product area' : 'Portfolio'
+    const lister = kind === 'product_area' ? 'list_product_areas' : 'list_portfolios'
+    throw new PortfolioRoutingError(
+      `${label} not found in portfolio.upg: "${containerId}". List them with ${lister}.`,
+    )
+  }
+  const members = container.products ?? []
+  const removed = members.includes(productId)
+  if (removed) {
+    container.products = members.filter((p) => p !== productId)
+    store.markDirty()
+    await store.flush()
+  }
+  return {
+    product_id: productId,
+    container_id: containerId,
+    container_kind: kind,
+    container_title: container.title,
+    removed,
+  }
+}
+
+/**
+ * Remove a product from a `product_area`'s `products[]` (it stays registered on the
+ * portfolio and in any other container). The inverse of `assignProductToArea`.
+ */
+export function removeProductFromArea(
+  cwd: string,
+  args: { product_id: string; area_id: string },
+): Promise<RemoveMembershipResult> {
+  return removeProductFromContainer(cwd, args.product_id, args.area_id, 'product_area')
+}
+
+/**
+ * Remove a product from a `portfolio`'s `products[]` (it stays registered and in any
+ * other container). The inverse of `attachProductToPortfolio`.
+ */
+export function detachProductFromPortfolio(
+  cwd: string,
+  args: { product_id: string; portfolio_id: string },
+): Promise<RemoveMembershipResult> {
+  return removeProductFromContainer(cwd, args.product_id, args.portfolio_id, 'portfolio')
+}
+
+export interface DeleteAreaResult {
+  area_id: string
+  deleted: boolean
+  /** Child areas that were un-nested (parent_area_id set to null) as a side effect. */
+  unnested_children: string[]
+}
+
+/**
+ * Delete a `product_area` from `portfolio.upg`. Guarded: refuses while the area still
+ * has products unless `force` is set (so a mis-delete can't silently strand
+ * memberships). Child areas are un-nested (their `parent_area_id` is set to null) so
+ * no parent reference dangles. Throws `PortfolioRoutingError` on a missing workspace,
+ * unknown area, or a non-empty area without `force`.
+ */
+export async function deleteArea(
+  cwd: string,
+  areaId: string,
+  opts?: { force?: boolean },
+): Promise<DeleteAreaResult> {
+  const store = await openPortfolioStoreIfExists(cwd)
+  if (!store) throw new PortfolioRoutingError('No portfolio document in this workspace.')
+  const doc = store.getDocument()
+  if (!doc) throw new PortfolioRoutingError('Portfolio document failed to load.')
+  const idx = doc.product_areas.findIndex((a) => a.id === areaId)
+  if (idx === -1) {
+    throw new PortfolioRoutingError(
+      `Product area not found in portfolio.upg: "${areaId}". List them with list_product_areas.`,
+    )
+  }
+  const memberCount = doc.product_areas[idx].products?.length ?? 0
+  if (memberCount > 0 && !opts?.force) {
+    throw new PortfolioRoutingError(
+      `Product area "${areaId}" still has ${memberCount} product(s). Remove them ` +
+        `(remove_product_from_area / move_product_to_area) first, or pass force: true.`,
+    )
+  }
+  const unnestedChildren: string[] = []
+  for (const a of doc.product_areas) {
+    if (a.parent_area_id === areaId) {
+      a.parent_area_id = null
+      unnestedChildren.push(a.id)
+    }
+  }
+  doc.product_areas.splice(idx, 1)
+  store.markDirty()
+  await store.flush()
+  return { area_id: areaId, deleted: true, unnested_children: unnestedChildren }
+}
+
+export interface DeleteCrossEdgeResult {
+  edge_id: string
+  deleted: boolean
+  edge?: UPGCrossEdge
+}
+
+/**
+ * Delete a cross-product edge from `portfolio.upg` by id. The inverse of
+ * `createCrossProductEdge`. Returns `deleted: false` (not an error) when no edge with
+ * that id exists, so retries are idempotent.
+ */
+export async function deleteCrossProductEdge(
+  cwd: string,
+  edgeId: string,
+): Promise<DeleteCrossEdgeResult> {
+  const store = await openPortfolioStoreIfExists(cwd)
+  if (!store) throw new PortfolioRoutingError('No portfolio document in this workspace.')
+  const removed = store.removeCrossEdge(edgeId)
+  if (removed) await store.flush()
+  return { edge_id: edgeId, deleted: removed !== null, ...(removed ? { edge: removed } : {}) }
+}
+
+export interface MoveProductResult {
+  product_id: string
+  to_area_id: string
+  to_area_title?: string
+  /** Area ids the product was removed from as part of the move. */
+  removed_from: string[]
+  /** True when the product was newly added to the target (false if already a member). */
+  added: boolean
+}
+
+/**
+ * Move a product to a different `product_area`: remove it from `from_area_id` (or, when
+ * omitted, from every area it currently sits in) and add it to `to_area_id` (dedup).
+ * Convenience over remove + assign. Throws `PortfolioRoutingError` on a missing
+ * workspace, unknown product, or unknown target area.
+ */
+export async function moveProductToArea(
+  cwd: string,
+  args: { product_id: string; to_area_id: string; from_area_id?: string },
+): Promise<MoveProductResult> {
+  const store = await openPortfolioStoreIfExists(cwd)
+  if (!store) throw new PortfolioRoutingError('No portfolio document in this workspace.')
+  const doc = store.getDocument()
+  if (!doc) throw new PortfolioRoutingError('Portfolio document failed to load.')
+  const toArea = doc.product_areas.find((a) => a.id === args.to_area_id)
+  if (!toArea) {
+    throw new PortfolioRoutingError(
+      `Target product area not found in portfolio.upg: "${args.to_area_id}". List them with list_product_areas.`,
+    )
+  }
+  const lookup = findProductFileById(cwd, args.product_id)
+  if (!lookup) {
+    throw new PortfolioRoutingError(
+      `Product not found in this workspace: "${args.product_id}". Create it with create_product, or check list_local_products.`,
+    )
+  }
+  const removedFrom: string[] = []
+  for (const a of doc.product_areas) {
+    if (a.id === args.to_area_id) continue
+    if (args.from_area_id && a.id !== args.from_area_id) continue
+    const members = a.products ?? []
+    if (members.includes(args.product_id)) {
+      a.products = members.filter((p) => p !== args.product_id)
+      removedFrom.push(a.id)
+    }
+  }
+  const add = addProductToArea(doc, args.to_area_id, args.product_id)
+  registerProductOnPortfolio(doc, {
+    id: args.product_id,
+    file_path: lookup.file_path,
+    title: lookup.title,
+  })
+  store.markDirty()
+  await store.flush()
+  return {
+    product_id: args.product_id,
+    to_area_id: args.to_area_id,
+    to_area_title: toArea.title,
+    removed_from: removedFrom,
+    added: !add.already,
+  }
 }

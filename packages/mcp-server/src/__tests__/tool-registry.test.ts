@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 99 tools', () => {
+  it('exposes the expected 106 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -105,7 +105,11 @@ describe('Tool registry: completeness', () => {
     // + apply_framework + score_entity (0.8.4 framework exercises). → 96.
     // + assign_product_to_area + attach_product_to_portfolio + update_product
     //   (0.8.15 workspace write surface/654). → 99.
-    expect(TOOL_DEFINITIONS).toHaveLength(99)
+    // + 7 portfolio edit/cleanup-tier tools (0.8.16): update_area,
+    //   remove_product_from_area, delete_area, move_product_to_area,
+    //   detach_product_from_portfolio, delete_cross_product_edge,
+    //   batch_create_cross_product_edges. → 106.
+    expect(TOOL_DEFINITIONS).toHaveLength(106)
   })
 })
 

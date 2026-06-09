@@ -18,7 +18,7 @@ import * as fsp from 'node:fs/promises'
 import * as path from 'node:path'
 import { createHash } from 'node:crypto'
 import type { UPGFileStore } from '../store.js'
-import type { UPGDocument, UPGProductStage } from '@unified-product-graph/core'
+import type { UPGDocument, UPGProductStage, UPGBaseNode } from '@unified-product-graph/core'
 import {
   generateSlug,
   resolveSlugCollision,
@@ -320,6 +320,18 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
   // Build a minimal valid UPGDocument. validateUPGDocument() at load-time will
   // confirm shape; integrity is stamped here so the new file is immediately
   // tamper-detectable.
+  // Seed a `product` node in the new graph's nodes[] (id === $upg.product.id) so
+  // within-graph product_* edges (product_organises_into_feature_area, …) have an
+  // anchor immediately, without a manual create_node first. Carries the stage in
+  // properties.stage so node-first stage reads (get_graph_digest) agree with the
+  // header. §11b.
+  const productNode: UPGBaseNode = {
+    id: newProductId,
+    type: 'product',
+    title: trimmedName,
+    ...(description ? { description } : {}),
+    ...(stage ? { properties: { stage } } : {}),
+  }
   const newDoc: UPGDocument = {
     upg_version: UPG_VERSION,
     exported_at: new Date().toISOString(),
@@ -330,7 +342,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
       ...(description ? { description } : {}),
       ...(stage ? { stage } : {}),
     },
-    nodes: [],
+    nodes: [productNode],
     edges: [],
   }
   newDoc._integrity = {

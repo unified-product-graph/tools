@@ -125,6 +125,10 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getAreaContext: 'get_area_context',
   createArea: 'create_area',
   assignProductToAreaTool: 'assign_product_to_area',
+  updateAreaTool: 'update_area',
+  removeProductFromAreaTool: 'remove_product_from_area',
+  deleteAreaTool: 'delete_area',
+  moveProductToAreaTool: 'move_product_to_area',
   getChanges: 'get_changes',
   // workspace
   listLocalProducts: 'list_local_products',
@@ -136,7 +140,10 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listPortfolios: 'list_portfolios',
   getOrganization: 'get_organization',
   createCrossProductEdge: 'create_cross_product_edge',
+  deleteCrossProductEdgeTool: 'delete_cross_product_edge',
+  batchCreateCrossProductEdges: 'batch_create_cross_product_edges',
   attachProductToPortfolioTool: 'attach_product_to_portfolio',
+  detachProductFromPortfolioTool: 'detach_product_from_portfolio',
   listPortfolioCrossEdges: 'list_portfolio_cross_edges',
   migrateCrossEdges: 'migrate_cross_edges',
   // migrations

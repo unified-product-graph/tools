@@ -98,6 +98,17 @@ const CLOUD_NA = new Set([
   'assign_product_to_area',
   'attach_product_to_portfolio',
   'update_product',
+  // portfolio edit / cleanup tier (0.8.16): area editing + re-parenting,
+  // membership removal, deletes, and atomic batch cross-edges. Same rationale as the
+  // 0.8.15 write surface — portfolio.upg is a .upg-file workspace concept; cloud
+  // parity is a tracked follow-up.
+  'update_area',
+  'remove_product_from_area',
+  'delete_area',
+  'move_product_to_area',
+  'detach_product_from_portfolio',
+  'delete_cross_product_edge',
+  'batch_create_cross_product_edges',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).

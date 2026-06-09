@@ -256,8 +256,8 @@ describe('createCrossProductEdge handler', () => {
     expect(parsed.edge.type).toBe('shares_persona')
   })
 
-  it('accepts all 6 valid cross-edge types', async () => {
-    const validTypes = ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds']
+  it('accepts all 7 valid cross-edge types', async () => {
+    const validTypes = ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts']
     for (const type of validTypes) {
       const returned = { id: 'e_x', source: 'p1/n1', target: 'p2/n2', type, created_by_product_id: 'p1', created_at: '2026-01-01' }
       const { pool } = createMockPool(

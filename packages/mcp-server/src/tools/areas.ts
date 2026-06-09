@@ -13,6 +13,10 @@ import {
   writePortfolioScopedNode,
   openPortfolioStoreIfExists,
   assignProductToArea,
+  updateProductArea,
+  removeProductFromArea,
+  deleteArea,
+  moveProductToArea,
   PortfolioRoutingError,
 } from '@unified-product-graph/sdk'
 import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
@@ -343,6 +347,136 @@ export const getChanges: ToolHandler = (args, ctx): ToolResult => {
       2,
     ),
   )
+}
+
+/**
+ * Edit a product area in `portfolio.upg` (title / description / strategic_priority /
+ * owner) and/or re-parent it via `parent_area_id` (`null` un-nests). The mirror of
+ * `update_product` for the organisational axis. §7.
+ *
+ * `parent_area_id` is tri-state: omit to leave the parent unchanged, pass `null` to
+ * un-nest (make top-level), or pass an area id to re-parent (validated against cycles).
+ *
+ * @returns JSON: `{ message, area, updated: string[] }`.
+ * @throws textError on a missing workspace, unknown area/parent, a re-parent cycle, or
+ *   when no editable field is supplied.
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see create_area
+ * @see list_product_areas
+ */
+export const updateAreaTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const areaId = args.area_id as string | undefined
+  if (!areaId) return textError('Missing required parameter: area_id')
+  const hasField =
+    args.title !== undefined ||
+    args.description !== undefined ||
+    args.strategic_priority !== undefined ||
+    args.owner !== undefined ||
+    'parent_area_id' in args
+  if (!hasField) {
+    return textError(
+      'Nothing to update: pass at least one of: title, description, strategic_priority, owner, parent_area_id.',
+    )
+  }
+  try {
+    const result = await updateProductArea(process.cwd(), areaId, {
+      title: args.title as string | undefined,
+      description: args.description as string | undefined,
+      strategic_priority: args.strategic_priority as string | undefined,
+      owner: args.owner as string | undefined,
+      // Tri-state: present (incl. null) re-parents/un-nests; absent leaves unchanged.
+      ...('parent_area_id' in args
+        ? { parent_area_id: (args.parent_area_id as string | null) ?? null }
+        : {}),
+    })
+    return text(
+      JSON.stringify({ message: `Updated area (${result.updated.join(', ')})`, ...result }, null, 2),
+    )
+  } catch (err) {
+    if (err instanceof PortfolioRoutingError) return textError(err.message)
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Remove a product from a product area's `products[]` (it stays registered on the
+ * portfolio and in any other container). The inverse of `assign_product_to_area`.
+ * §8.
+ *
+ * @returns JSON: `{ product_id, container_id, container_kind: "product_area",
+ *   container_title?, removed }`. `removed: false` (not an error) when the product
+ *   was not a member, so retries are idempotent.
+ * @throws textError on a missing workspace or an unknown area id.
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see assign_product_to_area
+ * @see move_product_to_area
+ */
+export const removeProductFromAreaTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const productId = args.product_id as string | undefined
+  const areaId = args.area_id as string | undefined
+  if (!productId) return textError('Missing required parameter: product_id')
+  if (!areaId) return textError('Missing required parameter: area_id')
+  try {
+    const result = await removeProductFromArea(process.cwd(), { product_id: productId, area_id: areaId })
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    if (err instanceof PortfolioRoutingError) return textError(err.message)
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Delete a product area from `portfolio.upg`. Guarded: refuses while the area still
+ * has products unless `force: true` is passed, so a mis-delete can't silently strand
+ * memberships. Child areas are un-nested (their `parent_area_id` set to null) so no
+ * parent reference dangles. §8.
+ *
+ * @returns JSON: `{ message, area_id, deleted, unnested_children: string[] }`.
+ * @throws textError on a missing workspace, unknown area, or a non-empty area without
+ *   `force`.
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see create_area
+ * @see remove_product_from_area
+ */
+export const deleteAreaTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const areaId = args.area_id as string | undefined
+  if (!areaId) return textError('Missing required parameter: area_id')
+  try {
+    const result = await deleteArea(process.cwd(), areaId, { force: args.force as boolean | undefined })
+    return text(JSON.stringify({ message: `Deleted area ${areaId}`, ...result }, null, 2))
+  } catch (err) {
+    if (err instanceof PortfolioRoutingError) return textError(err.message)
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Move a product to a different product area: remove it from `from_area_id` (or, when
+ * omitted, from every area it currently sits in) and add it to `to_area_id` (dedup).
+ * Convenience over remove + assign. §8.
+ *
+ * @returns JSON: `{ product_id, to_area_id, to_area_title?, removed_from: string[], added }`.
+ * @throws textError on a missing workspace, unknown product, or unknown target area.
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see assign_product_to_area
+ * @see remove_product_from_area
+ */
+export const moveProductToAreaTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const productId = args.product_id as string | undefined
+  const toAreaId = args.to_area_id as string | undefined
+  if (!productId) return textError('Missing required parameter: product_id')
+  if (!toAreaId) return textError('Missing required parameter: to_area_id')
+  try {
+    const result = await moveProductToArea(process.cwd(), {
+      product_id: productId,
+      to_area_id: toAreaId,
+      from_area_id: args.from_area_id as string | undefined,
+    })
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    if (err instanceof PortfolioRoutingError) return textError(err.message)
+    return textError((err as Error).message)
+  }
 }
 
 export type { ToolContext }

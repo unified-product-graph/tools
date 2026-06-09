@@ -17,12 +17,26 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createNode } from '../tools/nodes.js'
-import { createArea, listProductAreas, assignProductToAreaTool } from '../tools/areas.js'
+import {
+  createArea,
+  listProductAreas,
+  assignProductToAreaTool,
+  updateAreaTool,
+  removeProductFromAreaTool,
+  deleteAreaTool,
+  moveProductToAreaTool,
+} from '../tools/areas.js'
 import {
   listPortfolios,
   getOrganization,
   createCrossProductEdge,
   attachProductToPortfolioTool,
+  detachProductFromPortfolioTool,
+  deleteCrossProductEdgeTool,
+  batchCreateCrossProductEdges,
+  createProductTool,
+  listLocalProducts,
+  listPortfolioCrossEdges,
 } from '../tools/workspace.js'
 import type { UPGDocument } from '@unified-product-graph/core'
 import {
@@ -561,5 +575,216 @@ describe('0.8.15 · owner property + assign/attach product ( §C / §A)', () => 
     expect(r.isError).toBeUndefined()
     const after = readPortfolio(cwd)?.portfolios as Array<{ id: string; products?: string[] }>
     expect(after[0].products).toContain('p_test')
+  })
+})
+
+// ── 0.8.16 · portfolio edit / cleanup tier ─────────────────────────
+
+describe('0.8.16 · portfolio edit/cleanup tier', () => {
+  let cwd: string
+  let originalCwd: string
+  let store: UPGFileStore
+  let ctx: ToolContext
+
+  beforeEach(async () => {
+    originalCwd = process.cwd()
+    cwd = mkdtempSync(join(tmpdir(), 'upg-0816-'))
+    mkdirSync(join(cwd, '.upg'))
+    process.chdir(cwd)
+    store = await makeStoreAt(join(cwd, '.upg', 'product.upg'))
+    ctx = makeCtx(store)
+  })
+
+  afterEach(async () => {
+    process.chdir(originalCwd)
+    await store.flush()
+    store.stopWatching()
+    rmSync(cwd, { recursive: true, force: true })
+  })
+
+  async function makeArea(title: string, extra: Record<string, unknown> = {}): Promise<string> {
+    const r = await parseHandlerResult(createArea({ title, ...extra }, ctx))
+    return (r.body?.node as { id: string }).id
+  }
+
+  // #7 update_area
+  it('#7 update_area edits title / strategic_priority / owner', async () => {
+    const id = await makeArea('Platform', { strategic_priority: 'low' })
+    const r = await parseHandlerResult(
+      updateAreaTool({ area_id: id, title: 'Platform and APIs', strategic_priority: 'high', owner: 'Team P' }, ctx),
+    )
+    expect(r.isError).toBeUndefined()
+    const areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; title: string; strategic_priority?: string; owner?: string }>
+    const a = areas.find((x) => x.id === id)!
+    expect(a.title).toBe('Platform and APIs')
+    expect(a.strategic_priority).toBe('high')
+    expect(a.owner).toBe('Team P')
+  })
+
+  it('#7 update_area coerces legacy critical to urgent', async () => {
+    const id = await makeArea('Risk')
+    await parseHandlerResult(updateAreaTool({ area_id: id, strategic_priority: 'critical' }, ctx))
+    const areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; strategic_priority?: string }>
+    expect(areas.find((x) => x.id === id)?.strategic_priority).toBe('urgent')
+  })
+
+  it('#7 update_area re-parents then un-nests via parent_area_id', async () => {
+    const parent = await makeArea('Platform')
+    const child = await makeArea('Billing')
+    await parseHandlerResult(updateAreaTool({ area_id: child, parent_area_id: parent }, ctx))
+    let areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; parent_area_id?: string | null }>
+    expect(areas.find((x) => x.id === child)?.parent_area_id).toBe(parent)
+    await parseHandlerResult(updateAreaTool({ area_id: child, parent_area_id: null }, ctx))
+    areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; parent_area_id?: string | null }>
+    // Un-nested: the canonical serializer drops a null parent_area_id, so absent === top-level.
+    expect(areas.find((x) => x.id === child)?.parent_area_id ?? null).toBeNull()
+  })
+
+  it('#7 update_area rejects a re-parent cycle', async () => {
+    const a = await makeArea('A')
+    const b = await makeArea('B')
+    await parseHandlerResult(updateAreaTool({ area_id: b, parent_area_id: a }, ctx))
+    const r = await parseHandlerResult(updateAreaTool({ area_id: a, parent_area_id: b }, ctx))
+    expect(r.isError).toBe(true)
+    expect(r.error).toMatch(/cycle/i)
+  })
+
+  it('#7 update_area errors on unknown area and unknown parent', async () => {
+    const id = await makeArea('Solo')
+    const r1 = await parseHandlerResult(updateAreaTool({ area_id: 'n_nope', title: 'x' }, ctx))
+    expect(r1.isError).toBe(true)
+    const r2 = await parseHandlerResult(updateAreaTool({ area_id: id, parent_area_id: 'n_missing' }, ctx))
+    expect(r2.isError).toBe(true)
+    expect(r2.error).toMatch(/parent area not found/i)
+  })
+
+  // #8 remove / detach / delete / move
+  it('#8 remove_product_from_area removes membership and is idempotent', async () => {
+    const id = await makeArea('Platform')
+    await parseHandlerResult(assignProductToAreaTool({ product_id: 'p_test', area_id: id }, ctx))
+    const r1 = await parseHandlerResult(removeProductFromAreaTool({ product_id: 'p_test', area_id: id }, ctx))
+    expect((r1.body as { removed?: boolean }).removed).toBe(true)
+    const areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; products?: string[] }>
+    expect(areas.find((a) => a.id === id)?.products ?? []).not.toContain('p_test')
+    const r2 = await parseHandlerResult(removeProductFromAreaTool({ product_id: 'p_test', area_id: id }, ctx))
+    expect((r2.body as { removed?: boolean }).removed).toBe(false)
+  })
+
+  it('#8 detach_product_from_portfolio removes from portfolio.products[]', async () => {
+    await parseHandlerResult(createNode({ type: 'portfolio', title: 'Bets' }, ctx))
+    const pid = (readPortfolio(cwd)?.portfolios as Array<{ id: string }>)[0].id
+    await parseHandlerResult(attachProductToPortfolioTool({ product_id: 'p_test', portfolio_id: pid }, ctx))
+    const r = await parseHandlerResult(detachProductFromPortfolioTool({ product_id: 'p_test', portfolio_id: pid }, ctx))
+    expect((r.body as { removed?: boolean }).removed).toBe(true)
+    const pf = readPortfolio(cwd)?.portfolios as Array<{ id: string; products?: string[] }>
+    expect(pf[0].products ?? []).not.toContain('p_test')
+  })
+
+  it('#8 delete_area is guarded, but force deletes and un-nests children', async () => {
+    const parent = await makeArea('Platform')
+    const child = await makeArea('Billing')
+    await parseHandlerResult(updateAreaTool({ area_id: child, parent_area_id: parent }, ctx))
+    await parseHandlerResult(assignProductToAreaTool({ product_id: 'p_test', area_id: parent }, ctx))
+    const guarded = await parseHandlerResult(deleteAreaTool({ area_id: parent }, ctx))
+    expect(guarded.isError).toBe(true)
+    expect(guarded.error).toMatch(/still has/i)
+    const forced = await parseHandlerResult(deleteAreaTool({ area_id: parent, force: true }, ctx))
+    expect(forced.isError).toBeUndefined()
+    const areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; parent_area_id?: string | null }>
+    expect(areas.find((a) => a.id === parent)).toBeUndefined()
+    // Child un-nested; null parent_area_id is dropped on serialize, so absent === top-level.
+    expect(areas.find((a) => a.id === child)?.parent_area_id ?? null).toBeNull()
+  })
+
+  it('#8 move_product_to_area moves between areas', async () => {
+    const a = await makeArea('A')
+    const b = await makeArea('B')
+    await parseHandlerResult(assignProductToAreaTool({ product_id: 'p_test', area_id: a }, ctx))
+    const r = await parseHandlerResult(moveProductToAreaTool({ product_id: 'p_test', to_area_id: b }, ctx))
+    expect(r.isError).toBeUndefined()
+    const areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; products?: string[] }>
+    expect(areas.find((x) => x.id === a)?.products ?? []).not.toContain('p_test')
+    expect(areas.find((x) => x.id === b)?.products).toContain('p_test')
+  })
+
+  // #10 batch + #8 delete_cross_product_edge
+  it('#10 batch_create_cross_product_edges writes many atomically (incl. hosts); #8 delete removes one', async () => {
+    const res = await parseHandlerResult(
+      batchCreateCrossProductEdges(
+        {
+          auto_create_portfolio: true,
+          edges: [
+            { source_id: 'p_a/n1', target_id: 'p_b/n2', type: 'hosts' },
+            { source_id: 'p_a/n3', target_id: 'p_c/n4', type: 'depends_on_product' },
+          ],
+        },
+        ctx,
+      ),
+    )
+    expect(res.isError).toBeUndefined()
+    expect((res.body as { count?: number }).count).toBe(2)
+    const list = await parseHandlerResult(listPortfolioCrossEdges({}, ctx))
+    const edges = (list.body as { cross_edges: Array<{ id: string; type: string }> }).cross_edges
+    expect(edges).toHaveLength(2)
+    expect(edges.some((e) => e.type === 'hosts')).toBe(true)
+    const del = await parseHandlerResult(deleteCrossProductEdgeTool({ edge_id: edges[0].id }, ctx))
+    expect((del.body as { deleted?: boolean }).deleted).toBe(true)
+    const after = await parseHandlerResult(listPortfolioCrossEdges({}, ctx))
+    expect((after.body as { cross_edges: unknown[] }).cross_edges).toHaveLength(1)
+  })
+
+  it('#10 batch_create_cross_product_edges rejects the whole batch on one invalid edge (atomic)', async () => {
+    const res = await parseHandlerResult(
+      batchCreateCrossProductEdges(
+        {
+          auto_create_portfolio: true,
+          edges: [
+            { source_id: 'p_a/n1', target_id: 'p_b/n2', type: 'hosts' },
+            { source_id: 'p_a/n3', target_id: 'p_c/n4', type: 'not_a_type' },
+          ],
+        },
+        ctx,
+      ),
+    )
+    expect(res.isError).toBe(true)
+    expect(res.error).toMatch(/invalid cross-product edge type/i)
+    const list = await parseHandlerResult(listPortfolioCrossEdges({}, ctx))
+    expect((list.body as { cross_edges: unknown[] }).cross_edges).toHaveLength(0)
+  })
+
+  // #11a / #11b
+  it('#11b create_product seeds a product node; #11a list_local_products returns id + membership and skips portfolio.upg', async () => {
+    writeFileSync(
+      join(cwd, '.upg', 'workspace.json'),
+      JSON.stringify(
+        { version: '1', default_product: 'product.upg', products: [{ file: 'product.upg', title: 'Test Product' }] },
+        null,
+        2,
+      ),
+    )
+    const created = await parseHandlerResult(createProductTool({ name: 'Studio', stage: 'build' }, ctx))
+    expect(created.isError).toBeUndefined()
+    const newId = (created.body as { id: string }).id
+    const newFile = (created.body as { file: string }).file
+    // #11b: the new product graph carries a seeded product node anchored to $upg.product.id
+    const doc = JSON.parse(readFileSync(join(cwd, '.upg', newFile), 'utf-8')) as {
+      nodes: Array<{ id: string; type: string; properties?: { stage?: string } }>
+    }
+    const pn = doc.nodes.find((n) => n.type === 'product')
+    expect(pn).toBeDefined()
+    expect(pn?.id).toBe(newId)
+    expect(pn?.properties?.stage).toBe('build')
+
+    // #11a: id + area membership surfaced; portfolio.upg excluded from the product list
+    const areaId = await makeArea('Apps')
+    await parseHandlerResult(assignProductToAreaTool({ product_id: newId, area_id: areaId }, ctx))
+    const list = await parseHandlerResult(listLocalProducts({}, ctx))
+    const products = (list.body as {
+      products: Array<{ id: string | null; file: string; title: string; areas?: string[] }>
+    }).products
+    expect(products.every((p) => !p.file.endsWith('portfolio.upg'))).toBe(true)
+    const studio = products.find((p) => p.id === newId)
+    expect(studio).toBeDefined()
+    expect(studio?.areas).toContain('Apps')
   })
 })

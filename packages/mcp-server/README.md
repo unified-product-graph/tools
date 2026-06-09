@@ -21,7 +21,7 @@ For Claude Code, add to `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "upg": {
+    "unified-product-graph": {
       "command": "npx",
       "args": ["upg-mcp-server"]
     }
@@ -34,7 +34,7 @@ The server auto-discovers `.upg` files in the current directory. To point at a s
 ```json
 {
   "mcpServers": {
-    "upg": {
+    "unified-product-graph": {
       "command": "npx",
       "args": ["upg-mcp-server", "--file", "path/to/product.upg"]
     }

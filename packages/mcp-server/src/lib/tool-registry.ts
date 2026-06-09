@@ -46,6 +46,10 @@ import {
   getAreaContext,
   createArea,
   assignProductToAreaTool,
+  updateAreaTool,
+  removeProductFromAreaTool,
+  deleteAreaTool,
+  moveProductToAreaTool,
   getChanges,
 } from '../tools/areas.js'
 import {
@@ -58,7 +62,10 @@ import {
   listPortfolios,
   getOrganization,
   createCrossProductEdge,
+  batchCreateCrossProductEdges,
+  deleteCrossProductEdgeTool,
   attachProductToPortfolioTool,
+  detachProductFromPortfolioTool,
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
@@ -1102,7 +1109,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_cross_edge_types',
     description:
-      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.',
+      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
@@ -1504,6 +1511,70 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'update_area',
+    description:
+      'Edit a product area in `.upg/portfolio.upg` (title, description, strategic_priority, owner) and/or re-parent it via `parent_area_id`. The mirror of `update_product` for the organisational axis. `parent_area_id` is tri-state: omit to leave unchanged, pass null to un-nest (top-level), or pass an area id to re-parent (rejected if it would create a cycle).',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        area_id: { type: 'string', description: 'Product area id to edit (from list_product_areas)' },
+        title: { type: 'string', description: 'New area title' },
+        description: { type: 'string', description: 'New area description' },
+        strategic_priority: {
+          type: 'string',
+          enum: ['urgent', 'high', 'medium', 'low', 'none'],
+          description: 'Strategic priority (canonical Priority scale)',
+        },
+        parent_area_id: {
+          type: ['string', 'null'],
+          description: 'Re-parent under this area id; null un-nests (top-level); omit to leave unchanged',
+        },
+        owner: { type: 'string', description: 'Person or team that owns this area' },
+      },
+      required: ['area_id'],
+    },
+  },
+  {
+    name: 'remove_product_from_area',
+    description:
+      "Remove a product from a product area's `products[]` in `.upg/portfolio.upg` (the product stays registered on the portfolio and in any other container). The inverse of `assign_product_to_area`.",
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        product_id: { type: 'string', description: 'Product id (from list_local_products)' },
+        area_id: { type: 'string', description: 'Product area id (from list_product_areas)' },
+      },
+      required: ['product_id', 'area_id'],
+    },
+  },
+  {
+    name: 'delete_area',
+    description:
+      'Delete a product area from `.upg/portfolio.upg`. Guarded: refuses while the area still has products unless `force: true`. Child areas are un-nested (their parent link is cleared) so no parent reference dangles.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        area_id: { type: 'string', description: 'Product area id to delete (from list_product_areas)' },
+        force: { type: 'boolean', description: 'Delete even if the area still has products (default false)' },
+      },
+      required: ['area_id'],
+    },
+  },
+  {
+    name: 'move_product_to_area',
+    description:
+      'Move a product to a different product area: remove it from `from_area_id` (or, when omitted, from every area it currently sits in) and add it to `to_area_id`. Convenience over remove_product_from_area + assign_product_to_area.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        product_id: { type: 'string', description: 'Product id (from list_local_products)' },
+        to_area_id: { type: 'string', description: 'Destination product area id (from list_product_areas)' },
+        from_area_id: { type: 'string', description: 'Source area id to remove from; omit to remove from all areas' },
+      },
+      required: ['product_id', 'to_area_id'],
+    },
+  },
+  {
     name: 'attach_product_to_portfolio',
     description:
       "Place an existing product under a portfolio (adds it to the portfolio's `products[]` in `.upg/portfolio.upg`). Resolves the portfolio against the portfolio document and auto-registers the product on the portfolio registry. Use after `create_product`, or pass `portfolio_id` to `create_product` directly.",
@@ -1511,6 +1582,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       type: 'object' as const,
       properties: {
         product_id: { type: 'string', description: 'Product id (from create_product / list_local_products)' },
+        portfolio_id: { type: 'string', description: 'Portfolio id (from list_portfolios)' },
+      },
+      required: ['product_id', 'portfolio_id'],
+    },
+  },
+  {
+    name: 'detach_product_from_portfolio',
+    description:
+      "Remove a product from a portfolio's `products[]` in `.upg/portfolio.upg` (the product stays registered and in any other container). The inverse of `attach_product_to_portfolio`.",
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        product_id: { type: 'string', description: 'Product id (from list_local_products)' },
         portfolio_id: { type: 'string', description: 'Portfolio id (from list_portfolios)' },
       },
       required: ['product_id', 'portfolio_id'],
@@ -1531,7 +1615,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'create_cross_product_edge',
     description:
-      'Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`.',
+      'Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted).',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -1539,13 +1623,56 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         target_id: { type: 'string', description: 'Target node ID' },
         type: {
           type: 'string',
-          enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds'],
+          enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts'],
           description: 'Cross-product relationship type',
         },
         source_product_id: { type: 'string', description: 'Product ID of the source node' },
         target_product_id: { type: 'string', description: 'Product ID of the target node' },
       },
       required: ['source_id', 'target_id', 'type'],
+    },
+  },
+  {
+    name: 'delete_cross_product_edge',
+    description:
+      'Delete a cross-product edge from `.upg/portfolio.upg` by id. The inverse of `create_cross_product_edge`. Returns `deleted: false` (not an error) when no edge with that id exists.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        edge_id: { type: 'string', description: 'Cross-product edge id (from list_portfolio_cross_edges)' },
+      },
+      required: ['edge_id'],
+    },
+  },
+  {
+    name: 'batch_create_cross_product_edges',
+    description:
+      'Create up to 50 cross-product edges in one atomic write (the portfolio-tier mirror of batch_create_edges). Every edge is validated and qualified before anything is written; if any is invalid the whole batch is rejected. Referenced products are auto-registered.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        edges: {
+          type: 'array',
+          description: 'Cross-product edges to create (max 50). Each: { source_id, target_id, type, source_product_id?, target_product_id? }.',
+          items: {
+            type: 'object',
+            properties: {
+              source_id: { type: 'string', description: 'Source node ID (bare or qualified {product_id}/{node_id})' },
+              target_id: { type: 'string', description: 'Target node ID (bare or qualified {product_id}/{node_id})' },
+              type: {
+                type: 'string',
+                enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts'],
+                description: 'Cross-product relationship type',
+              },
+              source_product_id: { type: 'string', description: 'Product ID of the source node (qualifies a bare source_id)' },
+              target_product_id: { type: 'string', description: 'Product ID of the target node (qualifies a bare target_id)' },
+            },
+            required: ['source_id', 'target_id', 'type'],
+          },
+        },
+        auto_create_portfolio: { type: 'boolean', description: 'Create an empty portfolio document if none exists (default false)' },
+      },
+      required: ['edges'],
     },
   },
   {
@@ -1738,10 +1865,17 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_area_context: getAreaContext,
   create_area: createArea,
   assign_product_to_area: assignProductToAreaTool,
+  update_area: updateAreaTool,
+  remove_product_from_area: removeProductFromAreaTool,
+  delete_area: deleteAreaTool,
+  move_product_to_area: moveProductToAreaTool,
   list_portfolios: listPortfolios,
   get_organization: getOrganization,
   create_cross_product_edge: createCrossProductEdge,
+  delete_cross_product_edge: deleteCrossProductEdgeTool,
+  batch_create_cross_product_edges: batchCreateCrossProductEdges,
   attach_product_to_portfolio: attachProductToPortfolioTool,
+  detach_product_from_portfolio: detachProductFromPortfolioTool,
   list_portfolio_cross_edges: listPortfolioCrossEdges,
   migrate_cross_edges: migrateCrossEdges,
   get_sync_state: getSyncState,
