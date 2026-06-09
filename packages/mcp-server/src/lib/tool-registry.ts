@@ -69,7 +69,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
-import { portfolioQuery, portfolioDigest } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioValidate } from '../tools/portfolio-read.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
 import {
@@ -349,7 +349,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'batch_create_nodes',
     description:
-      'Create up to 50 entities in one atomic call, optionally with explicit edges in the same transaction. Use `parent_ref` ("$0", "$1") to reference nodes created earlier in the same batch. The optional `edges` array accepts the same `$N` refs (or existing node IDs) for both endpoints. All nodes and edges validate up front; on failure nothing lands.',
+      'Create up to 50 entities in one atomic call, optionally with explicit edges in the same transaction. Reference earlier nodes from `parent_ref` / `edges` by a positional `$N` ("$0", "$1") OR by a batch-local `ref` alias declared on a node (e.g. ref:"persona_dev" then from_ref:"persona_dev"); aliases remove the index-counting that most often breaks a batch. `edges` endpoints also accept existing node IDs. All nodes and edges validate up front; on failure nothing lands and the response carries the full `errors` list plus the alias `ref_map`. Pass `validate_only: true` for a dry-run that reports every would-be error WITHOUT writing.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -364,8 +364,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               status: { type: 'string', description: 'Lifecycle status' },
               tags: { type: 'array', items: { type: 'string' }, description: 'Freeform tags' },
               properties: { type: 'object', description: 'Type-specific fields' },
+              ref: { type: 'string', description: 'Optional batch-local alias for this node, usable from parent_ref / edges instead of a positional $N. Must be unique and not look like "$N".' },
               parent_id: { type: 'string', description: 'Parent node ID. Creates an edge automatically.' },
-              parent_ref: { type: 'string', description: 'Reference a node created earlier in this batch by index, e.g. "$0", "$1"' },
+              parent_ref: { type: 'string', description: 'Reference a node created earlier in this batch by positional index ("$0", "$1") or by its declared `ref` alias.' },
             },
             required: ['type', 'title'],
           },
@@ -374,17 +375,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         edges: {
           type: 'array',
           description:
-            'Optional edges to create alongside the nodes (same atomic transaction). Each edge\'s from/to may be a `$N` ref into the `nodes` array OR an existing node ID.',
+            'Optional edges to create alongside the nodes (same atomic transaction). Each edge\'s from/to may be a `$N` ref into the `nodes` array, a declared `ref` alias, OR an existing node ID.',
           items: {
             type: 'object',
             properties: {
               from_ref: {
                 type: 'string',
-                description: '`$N` ref or existing node id for the source endpoint',
+                description: '`$N` ref, declared `ref` alias, or existing node id for the source endpoint',
               },
               to_ref: {
                 type: 'string',
-                description: '`$N` ref or existing node id for the target endpoint',
+                description: '`$N` ref, declared `ref` alias, or existing node id for the target endpoint',
               },
               type: {
                 type: 'string',
@@ -393,6 +394,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             },
             required: ['from_ref', 'to_ref'],
           },
+        },
+        validate_only: {
+          type: 'boolean',
+          description: 'Dry-run: run the full validation pass and report `{ valid, errors, would_create_nodes, would_create_edges }` WITHOUT writing. Lets an agent self-correct the whole batch before committing.',
+        },
+        expect_product: {
+          type: 'string',
+          description: 'Optional guard: abort if the active product is not this id/title/file. Cheap insurance against a forgotten switch_product writing into the wrong graph.',
         },
       },
       required: ['nodes'],
@@ -421,6 +430,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           },
           description: 'Array of updates to apply (max 50)',
         },
+        expect_product: {
+          type: 'string',
+          description: 'Optional guard: abort if the active product is not this id/title/file.',
+        },
       },
       required: ['updates'],
     },
@@ -437,6 +450,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: { type: 'string' },
           description: 'Array of node IDs to delete (max 50)',
         },
+        expect_product: {
+          type: 'string',
+          description: 'Optional guard: abort if the active product is not this id/title/file.',
+        },
       },
       required: ['node_ids'],
     },
@@ -444,7 +461,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'batch_create_edges',
     description:
-      'Create up to 50 edges in one atomic call. Use this for 3+ edges instead of looping `create_edge`. Edge type auto-infers when omitted.',
+      'Create up to 50 edges in one atomic call. Use this for 3+ edges instead of looping `create_edge`. Edge type auto-infers when omitted. Pass `validate_only: true` for a dry-run that reports every would-be error WITHOUT writing.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -461,6 +478,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           },
           description: 'Array of edges to create (max 50)',
         },
+        validate_only: {
+          type: 'boolean',
+          description: 'Dry-run: validate every edge and report `{ valid, errors, would_create_edges }` WITHOUT writing.',
+        },
+        expect_product: {
+          type: 'string',
+          description: 'Optional guard: abort if the active product is not this id/title/file.',
+        },
       },
       required: ['edges'],
     },
@@ -476,6 +501,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: 'array',
           items: { type: 'string' },
           description: 'Array of edge IDs to delete (max 50)',
+        },
+        expect_product: {
+          type: 'string',
+          description: 'Optional guard: abort if the active product is not this id/title/file.',
         },
       },
       required: ['edge_ids'],
@@ -1737,6 +1766,34 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'portfolio_validate',
+    description:
+      'Run `validate_graph` ACROSS every product in scope in one call (the audit counterpart to `portfolio_digest`). Replaces the `switch_product` + `validate_graph` round-trip per product. Each product is checked by the SAME single-product code path (schema drift + anti-patterns), so per-product verdicts never diverge. Returns a per-product `valid` / `structurally_valid` + drift + anti-pattern counts, plus a portfolio rollup with `all_valid`. Read-only; the active product is read live, the rest read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        scope: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Product IDs (or files) to validate. Omit to validate ALL products in the workspace.',
+        },
+        severity: {
+          type: 'string',
+          enum: ['high', 'medium', 'low'],
+          description: 'Restrict anti-pattern evaluation to this severity (passed through to validate_graph).',
+        },
+        include_violations: {
+          type: 'boolean',
+          description: 'Include a per-product `top_violations` list (default true).',
+        },
+        violation_limit: {
+          type: 'number',
+          description: 'Max anti-pattern violations listed per product (default 5, max 25).',
+        },
+      },
+    },
+  },
+  {
     name: 'migrate_cross_edges',
     description:
       'Migrate inline cross-product edges from the current product\'s `edges[]` into the portfolio document (`.upg/portfolio.upg`) with qualified IDs. `dry_run: true` (default) previews; `dry_run: false` applies. Requires `source_product_id` to qualify source node IDs.',
@@ -1934,6 +1991,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   list_portfolio_cross_edges: listPortfolioCrossEdges,
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
+  portfolio_validate: portfolioValidate,
   migrate_cross_edges: migrateCrossEdges,
   get_sync_state: getSyncState,
   apply_pull_changeset: applyPullChangeset,

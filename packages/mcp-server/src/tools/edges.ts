@@ -200,11 +200,19 @@ export const batchMoveNodes: ToolHandler = (args, ctx): ToolResult => {
  * inference is validated up front so a single bad item rejects the
  * entire batch BEFORE any mutation.
  *
- * @returns JSON: `{ created, count }`.
- * @throws Returns a textError when `edges` is missing/non-array, empty,
- *   longer than 50, or any item references a missing endpoint or unresolvable
- *   edge type.
+ * Pass `validate_only: true` (Batch-4 #15) for a dry-run: every edge is checked
+ * (endpoint existence, self-loops, explicit-type catalog/pair, inference) and
+ * the COMPLETE `errors` list is returned WITHOUT writing, so an agent can fix
+ * every bad edge in one pass instead of losing the batch to the first.
+ *
+ * @returns JSON: on commit, `{ created, count }`. On `validate_only`,
+ *   `{ validate_only, valid, errors, would_create_edges }`.
+ * @throws Returns a textError (or resolver-enriched envelope) when `edges` is
+ *   missing/non-array, empty, longer than 50, or any item references a missing
+ *   endpoint or unresolvable edge type. The commit path rejects on the first
+ *   error; `validate_only` reports them all.
  * @atomicity atomic. Full validation pass before any mutation lands.
+ *   `validate_only` never mutates.
  * @see create_edge
  */
 export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
@@ -214,23 +222,35 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
   if (edges.length === 0) return textError('edges array is empty')
   if (edges.length > 50) return textError('Maximum 50 edges per batch')
 
-  const resolvedEdgeTypes: UPGEdgeType[] = []
+  const validateOnly = (args.validate_only as boolean) ?? false
+
+  // Batch-4 #15: accumulate every edge error so a dry-run reports the full fix
+  // list. The commit path still rejects on the first error (byte-identical to
+  // prior behaviour, including resolver enrichment); only `validate_only`
+  // surfaces them all.
+  interface EdgeError { message: string; resolver?: { source: string; target: string } }
+  const errors: EdgeError[] = []
+  const resolvedEdgeTypes: Array<UPGEdgeType | null> = []
+
   for (let i = 0; i < edges.length; i++) {
     const e = edges[i]
-    if (!e.source_id) return textError(`Edge at index ${i}: missing required field "source_id"`)
-    if (!e.target_id) return textError(`Edge at index ${i}: missing required field "target_id"`)
+    if (!e.source_id) { errors.push({ message: `Edge at index ${i}: missing required field "source_id"` }); resolvedEdgeTypes.push(null); continue }
+    if (!e.target_id) { errors.push({ message: `Edge at index ${i}: missing required field "target_id"` }); resolvedEdgeTypes.push(null); continue }
     const sourceNode = store.getNode(e.source_id as string)
     const targetNode = store.getNode(e.target_id as string)
-    if (!sourceNode) return textError(`Edge at index ${i}: source node "${e.source_id}" not found`)
-    if (!targetNode) return textError(`Edge at index ${i}: target node "${e.target_id}" not found`)
+    if (!sourceNode) { errors.push({ message: `Edge at index ${i}: source node "${e.source_id}" not found` }); resolvedEdgeTypes.push(null); continue }
+    if (!targetNode) { errors.push({ message: `Edge at index ${i}: target node "${e.target_id}" not found` }); resolvedEdgeTypes.push(null); continue }
 
     // Refuse graph-topology self-loops. No canonical UPG edge type is
     // currently self-referential. F2 (2026-05-20).
     if (e.source_id === e.target_id) {
-      return textError(
-        `Edge at index ${i}: self-loop refused; source and target resolve to the same node "${e.source_id}". ` +
-        `No canonical UPG edge type is self-referential.`,
-      )
+      errors.push({
+        message:
+          `Edge at index ${i}: self-loop refused; source and target resolve to the same node "${e.source_id}". ` +
+          `No canonical UPG edge type is self-referential.`,
+      })
+      resolvedEdgeTypes.push(null)
+      continue
     }
 
     if (e.type) {
@@ -247,7 +267,9 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
         targetNode.type as string,
       )
       if (typeCheck.errors.length > 0) {
-        return textError(`Edge at index ${i}: ${typeCheck.errors.join(' ')}`)
+        errors.push({ message: `Edge at index ${i}: ${typeCheck.errors.join(' ')}` })
+        resolvedEdgeTypes.push(null)
+        continue
       }
       resolvedEdgeTypes.push(e.type as UPGEdgeType)
     } else {
@@ -256,17 +278,43 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
         const suggestion = inference.suggestions.length > 0
           ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
           : ''
-        // +: enrich with anchor_hint / alternate_anchors /
-        // adjacent_edges so the failure boundary teaches the author what
-        // the catalog actually wires from this pair.
-        return edgeResolverError(
-          `Edge at index ${i}: no canonical edge for ${sourceNode.type} → ${targetNode.type}.${suggestion} Pass an explicit \`type\` per edge to override.`,
-          sourceNode.type as string,
-          targetNode.type as string,
-        )
+        // +: track source/target so the commit path can enrich
+        // the first such failure with anchor_hint / alternate_anchors /
+        // adjacent_edges, teaching the author what the catalog wires.
+        errors.push({
+          message: `Edge at index ${i}: no canonical edge for ${sourceNode.type} → ${targetNode.type}.${suggestion} Pass an explicit \`type\` per edge to override.`,
+          resolver: { source: sourceNode.type as string, target: targetNode.type as string },
+        })
+        resolvedEdgeTypes.push(null)
+        continue
       }
       resolvedEdgeTypes.push(inference.edgeType)
     }
+  }
+
+  if (validateOnly) {
+    return text(
+      JSON.stringify(
+        {
+          validate_only: true,
+          valid: errors.length === 0,
+          errors: errors.map((er) => er.message),
+          would_create_edges: edges.length - errors.length,
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  // Commit path: reject on the first error, preserving the prior wire shape
+  // (resolver-enriched envelope for a no-canonical-edge miss, plain otherwise).
+  if (errors.length > 0) {
+    const first = errors[0]
+    if (first.resolver) {
+      return edgeResolverError(first.message, first.resolver.source, first.resolver.target)
+    }
+    return textError(first.message)
   }
 
   const createdEdges: UPGEdge[] = []
@@ -276,7 +324,7 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
       id: edgeId(),
       source: e.source_id as string,
       target: e.target_id as string,
-      type: resolvedEdgeTypes[i],
+      type: resolvedEdgeTypes[i] as UPGEdgeType,
     }
     store.addEdge(edge)
     createdEdges.push(edge)

@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 108 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 109 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 108 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 17 tools
+- [Workspace & Portfolios](#workspace-portfolios): 18 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -195,25 +195,31 @@ _Read, search, traverse, mutate, batch, migrate type/properties/status, dedupe._
 
 ### `batch_create_nodes`
 
-Create up to 50 entities in one atomic call, optionally with explicit edges in the same transaction. Use `parent_ref` ("$0", "$1") to reference nodes created earlier in the same batch. The optional `edges` array accepts the same `$N` refs (or existing node IDs) for both endpoints. All nodes and edges validate up front; on failure nothing lands.
+Create up to 50 entities in one atomic call, optionally with explicit edges in the same transaction. Reference earlier nodes from `parent_ref` / `edges` by a positional `$N` ("$0", "$1") OR by a batch-local `ref` alias declared on a node (e.g. ref:"persona_dev" then from_ref:"persona_dev"); aliases remove the index-counting that most often breaks a batch. `edges` endpoints also accept existing node IDs. All nodes and edges validate up front; on failure nothing lands and the response carries the full `errors` list plus the alias `ref_map`. Pass `validate_only: true` for a dry-run that reports every would-be error WITHOUT writing.
 
-**Atomicity:** `atomic-with-rollback. Full validation pass first, then commit.`
+**Atomicity:** `atomic-with-rollback. Full validation pass first, then commit.
+`validate_only` never mutates.`
 
 **Arguments:**
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `edges` | array |  | Optional edges to create alongside the nodes (same atomic transaction). Each edge's from/to may be a `$N` ref into the `nodes` array OR an existing node ID. |
+| `edges` | array |  | Optional edges to create alongside the nodes (same atomic transaction). Each edge's from/to may be a `$N` ref into the `nodes` array, a declared `ref` alias, OR an existing node ID. |
+| `expect_product` | string |  | Optional guard: abort if the active product is not this id/title/file. Cheap insurance against a forgotten switch_product writing into the wrong graph. |
 | `nodes` | array | ✓ | Array of nodes to create (max 50) |
+| `validate_only` | boolean |  | Dry-run: run the full validation pass and report `{ valid, errors, would_create_nodes, would_create_edges }` WITHOUT writing. Lets an agent self-correct the whole batch before committing. |
 
 **Returns:**
 
-JSON: `{ created, edges_created, count, edges_count, warnings? }`.
+JSON: on commit, `{ created, edges, explicit_edges?, count,
+warnings? }`. On `validate_only`, `{ validate_only, valid, errors,
+would_create_nodes, would_create_edges, ref_map?, warnings? }`. On a failed
+commit, a `{ error, errors?, ref_map? }` error envelope.
 
 **Throws:**
 
-- Returns a textError when `nodes` is missing/non-array or any
-validation fails.
+- Returns an error envelope when `nodes` is missing/non-array or any
+validation fails (the batch is rejected atomically).
 
 **See also:** `create_node`, `batch_create_edges`
 
@@ -229,6 +235,7 @@ mutation lands.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `expect_product` | string |  | Optional guard: abort if the active product is not this id/title/file. |
 | `node_ids` | array | ✓ | Array of node IDs to delete (max 50) |
 
 **Returns:**
@@ -254,6 +261,7 @@ mutation lands.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `expect_product` | string |  | Optional guard: abort if the active product is not this id/title/file. |
 | `updates` | array | ✓ | Array of updates to apply (max 50) |
 
 **Returns:**
@@ -685,25 +693,30 @@ _Single create/delete/move plus matching atomic batches._
 
 ### `batch_create_edges`
 
-Create up to 50 edges in one atomic call. Use this for 3+ edges instead of looping `create_edge`. Edge type auto-infers when omitted.
+Create up to 50 edges in one atomic call. Use this for 3+ edges instead of looping `create_edge`. Edge type auto-infers when omitted. Pass `validate_only: true` for a dry-run that reports every would-be error WITHOUT writing.
 
-**Atomicity:** `atomic. Full validation pass before any mutation lands.`
+**Atomicity:** `atomic. Full validation pass before any mutation lands.
+`validate_only` never mutates.`
 
 **Arguments:**
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `edges` | array | ✓ | Array of edges to create (max 50) |
+| `expect_product` | string |  | Optional guard: abort if the active product is not this id/title/file. |
+| `validate_only` | boolean |  | Dry-run: validate every edge and report `{ valid, errors, would_create_edges }` WITHOUT writing. |
 
 **Returns:**
 
-JSON: `{ created, count }`.
+JSON: on commit, `{ created, count }`. On `validate_only`,
+`{ validate_only, valid, errors, would_create_edges }`.
 
 **Throws:**
 
-- Returns a textError when `edges` is missing/non-array, empty,
-longer than 50, or any item references a missing endpoint or unresolvable
-edge type.
+- Returns a textError (or resolver-enriched envelope) when `edges` is
+missing/non-array, empty, longer than 50, or any item references a missing
+endpoint or unresolvable edge type. The commit path rejects on the first
+error; `validate_only` reports them all.
 
 **See also:** `create_edge`
 
@@ -720,6 +733,7 @@ lands.`
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `edge_ids` | array | ✓ | Array of edge IDs to delete (max 50) |
+| `expect_product` | string |  | Optional guard: abort if the active product is not this id/title/file. |
 
 **Returns:**
 
@@ -1221,6 +1235,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`migrate_cross_edges`](#migrate-cross-edges)
 - [`portfolio_digest`](#portfolio-digest)
 - [`portfolio_query`](#portfolio-query)
+- [`portfolio_validate`](#portfolio-validate)
 - [`switch_product`](#switch-product)
 - [`update_product`](#update-product)
 
@@ -1585,6 +1600,33 @@ keep the payload lean. `from_id` only matches in its owning product; the
 rest report empty.
 
 **See also:** `query`, `portfolio_digest`, `list_local_products`
+
+
+### `portfolio_validate`
+
+Run `validate_graph` ACROSS every product in scope in one call (the audit counterpart to `portfolio_digest`). Replaces the `switch_product` + `validate_graph` round-trip per product. Each product is checked by the SAME single-product code path (schema drift + anti-patterns), so per-product verdicts never diverge. Returns a per-product `valid` / `structurally_valid` + drift + anti-pattern counts, plus a portfolio rollup with `all_valid`. Read-only; the active product is read live, the rest read-only.
+
+**Atomicity:** `atomic (read-only). Never mutates active-product state.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `include_violations` | boolean |  | Include a per-product `top_violations` list (default true). |
+| `scope` | array |  | Product IDs (or files) to validate. Omit to validate ALL products in the workspace. |
+| `severity` | `high` \| `medium` \| `low` |  | Restrict anti-pattern evaluation to this severity (passed through to validate_graph). |
+| `violation_limit` | number |  | Max anti-pattern violations listed per product (default 5, max 25). |
+
+**Returns:**
+
+JSON: `{ products: Array<{ product_id, file, title, valid,
+structurally_valid, drift, anti_patterns: { high, medium, low },
+top_violations? }>, rollup: { products, valid, invalid, structurally_valid,
+anti_pattern_violations, all_valid }, errored_products?, unmatched_scope? }`.
+`severity` filters anti-patterns; `include_violations: false` drops the
+per-product `top_violations` list.
+
+**See also:** `validate_graph`, `portfolio_digest`, `portfolio_query`
 
 
 ### `switch_product`

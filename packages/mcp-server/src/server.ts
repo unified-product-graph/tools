@@ -22,6 +22,7 @@ import {
   textError,
   isCanonicalLens,
   type ToolContext,
+  type ToolResult,
   type UPGLens,
 } from './lib/server-context.js'
 
@@ -102,6 +103,71 @@ function resolvePackageVersion(): string {
 
 export const SERVER_VERSION = resolvePackageVersion()
 
+/**
+ * Batch-4 #20: tools that mutate the ACTIVE product's graph (its `nodes[]` /
+ * `edges[]`). Their successful responses echo `active_product` so a forgotten
+ * `switch_product` can't silently write into the wrong graph, and they honour
+ * an optional `expect_product` guard that aborts on a mismatch — cheap
+ * insurance for multi-product sessions and parallel agents sharing the server.
+ *
+ * Portfolio-document writes (`create_area`, cross-product edges) and
+ * product-lifecycle tools (`create_product`, `switch_product`) are
+ * intentionally excluded: they do not target the active product's graph.
+ */
+export const ACTIVE_PRODUCT_WRITE_TOOLS = new Set<string>([
+  'create_node', 'update_node', 'delete_node',
+  'batch_create_nodes', 'batch_update_nodes', 'batch_delete_nodes',
+  'create_edge', 'delete_edge', 'move_node', 'batch_move_nodes',
+  'batch_create_edges', 'batch_delete_edges',
+  'migrate_type', 'migrate_status', 'migrate_properties',
+  'deduplicate_nodes', 'rename_edge_type', 'repair_dangling_edges',
+])
+
+export interface ActiveProductIdentity {
+  id: string | null
+  title: string | null
+  file: string | null
+}
+
+export function activeProductIdentity(store: UPGFileStore): ActiveProductIdentity {
+  const product = store.getProduct() as { id?: string; title?: string } | undefined
+  let file: string | null = null
+  try {
+    const fp = store.getFilePath()
+    if (fp) file = path.basename(fp)
+  } catch {
+    /* no file bound */
+  }
+  return { id: product?.id ?? null, title: product?.title ?? null, file }
+}
+
+/** True when `expect` names the active product by id, title, file, or file stem. */
+export function matchesActiveProduct(expect: string, ident: ActiveProductIdentity): boolean {
+  if (ident.id && expect === ident.id) return true
+  if (ident.title && expect === ident.title) return true
+  if (ident.file && (expect === ident.file || expect === ident.file.replace(/\.upg$/, ''))) return true
+  return false
+}
+
+/**
+ * Inject `active_product: { id, title }` into a write tool's JSON response.
+ * Best-effort: leaves non-JSON or non-object bodies untouched.
+ */
+export function withActiveProductEcho(result: ToolResult, store: UPGFileStore): ToolResult {
+  const first = result.content[0]
+  if (!first || first.type !== 'text') return result
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(first.text)
+  } catch {
+    return result
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return result
+  const ident = activeProductIdentity(store)
+  ;(parsed as Record<string, unknown>).active_product = { id: ident.id, title: ident.title }
+  return { content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }] }
+}
+
 export function createServer(store: UPGFileStore) {
   const server = new Server(
     { name: 'unified-product-graph', version: SERVER_VERSION },
@@ -143,7 +209,31 @@ export function createServer(store: UPGFileStore) {
     const { name, arguments: args = {} } = request.params
     const handler = getToolHandler(name)
     const t0 = logFile ? Date.now() : 0
-    const result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
+
+    // Batch-4 #20: expect_product guard on active-product writes — abort before
+    // the handler runs if the active product isn't the one the caller expected.
+    const isActiveWrite = ACTIVE_PRODUCT_WRITE_TOOLS.has(name)
+    if (isActiveWrite && typeof args.expect_product === 'string' && args.expect_product.length > 0) {
+      const ident = activeProductIdentity(ctx.store)
+      if (!matchesActiveProduct(args.expect_product, ident)) {
+        const guard = textError(
+          `expect_product guard: active product is "${ident.title ?? ident.id ?? '(unknown)'}"` +
+          `${ident.id ? ` (id: ${ident.id})` : ''}, but this call expected "${args.expect_product}". ` +
+          `Refusing to write. Run switch_product to the intended product first, or drop expect_product.`,
+        )
+        if (logFile) {
+          fs.appendFileSync(logFile, JSON.stringify({ ts: t0, tool: name, params: args, result: guard, durationMs: 0 }) + '\n')
+        }
+        return guard as { content: typeof guard.content; isError?: true }
+      }
+    }
+
+    let result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
+
+    // Batch-4 #20: echo the active product on successful active-product writes.
+    if (isActiveWrite && !result.isError) {
+      result = withActiveProductEcho(result, ctx.store)
+    }
     if (logFile) {
       const entry = JSON.stringify({ ts: t0, tool: name, params: args, result, durationMs: Date.now() - t0 })
       fs.appendFileSync(logFile, entry + '\n')

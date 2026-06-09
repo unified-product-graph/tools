@@ -1431,6 +1431,14 @@ export interface BatchNodeInput {
   parent_ref?: string
   /**: per-node strictness — promote unknown-property warnings to a batch rejection. */
   strict?: boolean
+  /**
+   * Batch-4 #16: a batch-local alias for this node, referenceable by
+   * `parent_ref` and by `edges[].from_ref` / `to_ref` instead of a positional
+   * `$N`. Removes the index-counting that was the #1 cause of failed batches.
+   * Aliases must be unique within the batch and must not look like a positional
+   * ref (`$0`, `$1`, ...).
+   */
+  ref?: string
 }
 
 export interface BatchEdgeInput {
@@ -1442,6 +1450,13 @@ export interface BatchEdgeInput {
 export interface BatchCreateArgs {
   nodes: BatchNodeInput[]
   edges?: BatchEdgeInput[]
+  /**
+   * Batch-4 #15: dry-run. Run the FULL validation pass (types, status, refs,
+   * edge directions/pairs) and report every would-be error WITHOUT writing, so
+   * an agent can self-correct a whole batch before committing instead of losing
+   * it to the first bad item.
+   */
+  validateOnly?: boolean
 }
 
 export interface BatchCreateOk {
@@ -1453,12 +1468,39 @@ export interface BatchCreateOk {
   warnings?: string[]
 }
 
+/**
+ * Batch-4 #16: a resolved alias/positional ref, echoed on dry-run and on
+ * failure so the author can see what each token maps to and debug a mis-count.
+ */
+export interface BatchRefMapEntry {
+  token: string
+  index: number
+  type: string
+  title: string
+}
+
+/** Batch-4 #15: dry-run result. No mutation occurred. */
+export interface BatchValidateResult {
+  ok: true
+  validate_only: true
+  valid: boolean
+  errors: string[]
+  would_create_nodes: number
+  would_create_edges: number
+  ref_map?: BatchRefMapEntry[]
+  warnings?: string[]
+}
+
 export interface BatchCreateFail {
   ok: false
   error: string
+  /** Batch-4 #15: every validation error found (error === errors[0]). Present only when more than one fired. */
+  errors?: string[]
+  /** Batch-4 #16: declared alias → {index, type, title} map, to debug a ref mis-count. */
+  ref_map?: BatchRefMapEntry[]
 }
 
-export type BatchCreateResult = BatchCreateOk | BatchCreateFail
+export type BatchCreateResult = BatchCreateOk | BatchCreateFail | BatchValidateResult
 
 /**
  * Atomic batch creation: nodes plus optional explicit edges in a single
@@ -1472,12 +1514,20 @@ export type BatchCreateResult = BatchCreateOk | BatchCreateFail
  * then creates the explicit edges. If ANY apply step throws, rolls back
  * every already-applied node + edge so the graph is bit-for-bit identical
  * to the pre-call state.
+ *
+ * Batch-4 #15 (`validateOnly`): run the full validation pass and return a
+ * `BatchValidateResult` (`valid`, the complete `errors` list, would-be counts)
+ * WITHOUT touching the graph — for self-correcting a batch before committing.
+ * Batch-4 #16: a node may declare a batch-local `ref` alias, usable from
+ * `parent_ref` / `edges[].from_ref` / `to_ref` in place of a positional `$N`;
+ * stray `$`-prefixed tokens that resolve to nothing are now rejected, not
+ * silently treated as node ids. Failures echo the alias `ref_map`.
  */
 export function batchCreateNodes(
   store: UPGFileStore,
   args: BatchCreateArgs,
 ): BatchCreateResult {
-  const { nodes, edges: explicitEdges = [] } = args
+  const { nodes, edges: explicitEdges = [], validateOnly = false } = args
   if (!Array.isArray(nodes)) return { ok: false, error: 'Missing required parameter: nodes (array)' }
   if (nodes.length === 0) return { ok: false, error: 'nodes array is empty' }
   if (nodes.length > 50) return { ok: false, error: 'Maximum 50 nodes per batch' }
@@ -1485,37 +1535,87 @@ export function batchCreateNodes(
     return { ok: false, error: `Maximum 50 items per batch (got ${nodes.length} nodes + ${explicitEdges.length} edges)` }
   }
 
-  // ── Validation pass ─────────────────────────────────────────────────────
+  // Batch-4 #15: errors accumulate across the whole batch instead of returning
+  // on the first, so a dry-run (or a failed commit) reports the full fix list.
+  const errors: string[] = []
+
+  // ── Pass 0: collect ref aliases (Batch-4 #16) ───────────────────────────
+  // Aliases are batch-local names a node declares via `ref`, usable in place of
+  // positional `$N` from parent_ref / edges. Built first so an edge may target
+  // any aliased node regardless of declaration order.
+  const aliasToIndex = new Map<string, number>()
+  for (let i = 0; i < nodes.length; i++) {
+    const ref = nodes[i].ref
+    if (ref === undefined) continue
+    if (typeof ref !== 'string' || ref.length === 0) {
+      errors.push(`Node at index ${i}: "ref" must be a non-empty string`)
+      continue
+    }
+    if (/^\$\d+$/.test(ref)) {
+      errors.push(`Node at index ${i}: "ref" alias "${ref}" must not look like a positional $N ref`)
+      continue
+    }
+    const prior = aliasToIndex.get(ref)
+    if (prior !== undefined) {
+      errors.push(`Node at index ${i}: duplicate ref alias "${ref}" (already declared at index ${prior})`)
+      continue
+    }
+    aliasToIndex.set(ref, i)
+  }
+
+  // Resolve a parent_ref token to an earlier node index. Accepts a positional
+  // `$N` or a declared `ref` alias; NOT an existing graph id (use parent_id).
+  const resolveParentRef = (raw: string, i: number): { index: number } | { error: string } => {
+    const m = raw.match(/^\$(\d+)$/)
+    if (m) {
+      const idx = parseInt(m[1], 10)
+      if (idx >= i) return { error: `Node at index ${i}: parent_ref "${raw}" must reference an earlier index (0–${i - 1})` }
+      return { index: idx }
+    }
+    const aliasIdx = aliasToIndex.get(raw)
+    if (aliasIdx !== undefined) {
+      if (aliasIdx >= i) return { error: `Node at index ${i}: parent_ref alias "${raw}" must reference a node declared earlier in this batch` }
+      return { index: aliasIdx }
+    }
+    if (raw.startsWith('$')) {
+      return { error: `Node at index ${i}: parent_ref "${raw}" looks like a positional ref but is not "$0".."$${i - 1}"; use a valid index or a declared ref alias.` }
+    }
+    return { error: `Node at index ${i}: invalid parent_ref "${raw}"; use "$0"/"$1" (positional) or a ref alias declared earlier. For an existing graph node, pass parent_id instead.` }
+  }
+
+  // ── Validation pass (accumulating, side-effect-free) ─────────────────────
   // (Seam 1): identical posture to single createNode. STRICT on type
-  // (unknown → reject) and status (invalid → reject; previously this batch path
-  // only WARNED); PERMISSIVE on properties (unknown keys → warning; previously
-  // SILENT here). `strict: true` on a node promotes its property warnings to a
-  // rejection. Single and batch now agree for the same input.
+  // (unknown → reject) and status (invalid → reject); PERMISSIVE on properties
+  // (unknown keys → warning), promoted to a rejection by per-node `strict`.
+  // `resolvedTypes` stays index-aligned (sentinel '' for an invalid node) so
+  // edge refs still resolve; `parentIndexOf` caches the resolved parent index
+  // for the apply pass.
   const resolvedTypes: string[] = []
+  const parentIndexOf: Array<number | null> = []
   const aliasWarnings: string[] = []
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i]
-    if (!n.type) return { ok: false, error: `Node at index ${i}: missing required field "type"` }
-    if (!n.title) return { ok: false, error: `Node at index ${i}: missing required field "title"` }
+    parentIndexOf.push(null)
+    if (!n.type) { errors.push(`Node at index ${i}: missing required field "type"`); resolvedTypes.push(''); continue }
+    if (!n.title) { errors.push(`Node at index ${i}: missing required field "title"`); resolvedTypes.push(''); continue }
     const validation = validateNodeWrite(
       { type: n.type, status: n.status, properties: n.properties },
       { strict: n.strict },
     )
     if (validation.errors.length > 0) {
-      return { ok: false, error: `Node at index ${i}: ${validation.errors.join(' ')}` }
-    }
-    resolvedTypes.push(validation.canonicalType)
-    for (const w of validation.warnings) {
-      aliasWarnings.push(`Node at index ${i}: ${w}`)
+      errors.push(`Node at index ${i}: ${validation.errors.join(' ')}`)
+      resolvedTypes.push('')
+    } else {
+      resolvedTypes.push(validation.canonicalType)
+      for (const w of validation.warnings) aliasWarnings.push(`Node at index ${i}: ${w}`)
     }
     if (n.parent_ref !== undefined) {
-      const match = n.parent_ref.match(/^\$(\d+)$/)
-      if (!match) return { ok: false, error: `Node at index ${i}: invalid parent_ref "${n.parent_ref}"; use "$0", "$1", etc.` }
-      const refIndex = parseInt(match[1], 10)
-      if (refIndex >= i) return { ok: false, error: `Node at index ${i}: parent_ref "${n.parent_ref}" must reference an earlier index (0–${i - 1})` }
+      const pr = resolveParentRef(n.parent_ref, i)
+      if ('error' in pr) errors.push(pr.error)
+      else parentIndexOf[i] = pr.index
     }
     if (n.parent_id !== undefined && !store.getNode(n.parent_id)) {
-      return { ok: false, error: `Node at index ${i}: parent_id "${n.parent_id}" not found in graph` }
+      errors.push(`Node at index ${i}: parent_id "${n.parent_id}" not found in graph`)
     }
   }
 
@@ -1537,24 +1637,32 @@ export function batchCreateNodes(
     if (refMatch) {
       const idx = parseInt(refMatch[1], 10)
       if (idx >= nodes.length) {
-        return { error: `Edge at index ${edgeIndex}: ${label} "${raw}" out of range; only ${nodes.length} nodes in this batch.` }
+        return { error: `Edge at index ${edgeIndex}: ${label} "${raw}" out of range; only ${nodes.length} nodes in this batch (valid $0–$${nodes.length - 1}).` }
       }
       return { kind: 'ref', index: idx }
     }
+    const aliasIdx = aliasToIndex.get(raw)
+    if (aliasIdx !== undefined) return { kind: 'ref', index: aliasIdx }
+    // Batch-4 #16: a stray `$`-prefixed token that is neither a valid $N nor a
+    // declared alias was previously treated as a node id and surfaced a vague
+    // "not found"; reject it explicitly so the mis-typed ref is obvious.
+    if (raw.startsWith('$')) {
+      return { error: `Edge at index ${edgeIndex}: ${label} "${raw}" looks like a positional ref but is not "$0".."$${nodes.length - 1}", and is not a declared ref alias.` }
+    }
     if (!store.getNode(raw)) {
-      return { error: `Edge at index ${edgeIndex}: ${label} "${raw}" not found in graph (and is not a $N ref into this batch).` }
+      return { error: `Edge at index ${edgeIndex}: ${label} "${raw}" not found in graph (and is not a $N ref or ref alias into this batch).` }
     }
     return { kind: 'id', id: raw }
   }
-  const refSourceType = (ref: ResolvedEdgeRef): string =>
-    ref.kind === 'ref' ? resolvedTypes[ref.index] : store.getNode(ref.id)!.type
+  const refType = (ref: ResolvedEdgeRef): string =>
+    ref.kind === 'ref' ? resolvedTypes[ref.index] : (store.getNode(ref.id)?.type ?? '')
 
   for (let i = 0; i < explicitEdges.length; i++) {
     const e = explicitEdges[i]
     const fromResolved = resolveEdgeRef(e.from_ref, 'from_ref', i)
-    if ('error' in fromResolved) return { ok: false, error: fromResolved.error }
+    if ('error' in fromResolved) { errors.push(fromResolved.error); continue }
     const toResolved = resolveEdgeRef(e.to_ref, 'to_ref', i)
-    if ('error' in toResolved) return { ok: false, error: toResolved.error }
+    if ('error' in toResolved) { errors.push(toResolved.error); continue }
 
     // Self-loop refusal: both sides resolve to the same ref OR the same
     // pre-existing node id. No canonical UPG edge type is self-referential.
@@ -1564,40 +1672,84 @@ export function batchCreateNodes(
     const sameId =
       fromResolved.kind === 'id' && toResolved.kind === 'id' && fromResolved.id === toResolved.id
     if (sameRef || sameId) {
-      return {
-        ok: false,
-        error:
-          `Edge at index ${i}: self-loop refused; source and target resolve to the same node. ` +
-          `No canonical UPG edge type is self-referential.`,
-      }
+      errors.push(`Edge at index ${i}: self-loop refused; source and target resolve to the same node. No canonical UPG edge type is self-referential.`)
+      continue
+    }
+
+    const sourceType = refType(fromResolved)
+    const targetType = refType(toResolved)
+    // Skip the type/pair check when an endpoint references a node that itself
+    // failed validation (sentinel ''); its real error is already recorded and a
+    // secondary "no edge for '' → x" would only be noise.
+    if (sourceType === '' || targetType === '') {
+      validatedEdges.push({ from: fromResolved, to: toResolved })
+      continue
     }
 
     let typeOverride: UPGEdgeType | undefined
     if (e.type !== undefined) {
       if (!UPG_EDGE_CATALOG[e.type as UPGEdgeType]) {
-        return { ok: false, error: `Edge at index ${i}: type "${e.type}" not in UPG_EDGE_CATALOG.` }
+        errors.push(`Edge at index ${i}: type "${e.type}" not in UPG_EDGE_CATALOG.`)
+        continue
       }
       // Catalog pair validation against the resolved source/target types.
       // F1 (2026-05-20).
-      const sourceType = refSourceType(fromResolved)
-      const targetType = refSourceType(toResolved)
       const pairCheck = validateEdgeTypePair(e.type, sourceType, targetType)
-      if (!pairCheck.valid) {
-        return { ok: false, error: `Edge at index ${i}: ${pairCheck.reason}` }
-      }
+      if (!pairCheck.valid) { errors.push(`Edge at index ${i}: ${pairCheck.reason}`); continue }
       typeOverride = e.type as UPGEdgeType
     } else {
-      const sourceType = refSourceType(fromResolved)
-      const targetType = refSourceType(toResolved)
       const inference = inferEdgeTypeWithTier(sourceType, targetType)
       if (!inference.ok) {
         const suggestion = inference.suggestions.length > 0
           ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
           : ''
-        return { ok: false, error: `Edge at index ${i}: no canonical edge for ${sourceType} → ${targetType}.${suggestion} Pass an explicit \`type\` to override.` }
+        errors.push(`Edge at index ${i}: no canonical edge for ${sourceType} → ${targetType}.${suggestion} Pass an explicit \`type\` to override.`)
+        continue
       }
     }
     validatedEdges.push({ from: fromResolved, to: toResolved, typeOverride })
+  }
+
+  // Build the declared-alias → {index, type, title} map echoed on dry-run and
+  // failure (Batch-4 #16). Positional `$N` refs are implicit and omitted.
+  const buildRefMap = (): BatchRefMapEntry[] => {
+    const out: BatchRefMapEntry[] = []
+    for (const [token, index] of aliasToIndex) {
+      out.push({
+        token,
+        index,
+        type: resolvedTypes[index] || nodes[index]?.type || '',
+        title: nodes[index]?.title ?? '',
+      })
+    }
+    return out
+  }
+
+  // ── Dry-run (Batch-4 #15): report, never write ───────────────────────────
+  if (validateOnly) {
+    const parentLinks =
+      parentIndexOf.filter((p) => p !== null).length +
+      nodes.filter((n) => n.parent_id !== undefined && store.getNode(n.parent_id)).length
+    const refMap = buildRefMap()
+    const dryResult: BatchValidateResult = {
+      ok: true,
+      validate_only: true,
+      valid: errors.length === 0,
+      errors,
+      would_create_nodes: nodes.length,
+      would_create_edges: validatedEdges.length + parentLinks,
+    }
+    if (refMap.length > 0) dryResult.ref_map = refMap
+    if (aliasWarnings.length > 0) dryResult.warnings = aliasWarnings
+    return dryResult
+  }
+
+  if (errors.length > 0) {
+    const refMap = buildRefMap()
+    const fail: BatchCreateFail = { ok: false, error: errors[0] }
+    if (errors.length > 1) fail.errors = errors
+    if (refMap.length > 0) fail.ref_map = refMap
+    return fail
   }
 
   // ── Apply pass with full rollback ───────────────────────────────────────
@@ -1646,9 +1798,11 @@ export function batchCreateNodes(
       createdNodeRefs.push(newNode)
 
       let parentId = n.parent_id
-      if (n.parent_ref !== undefined) {
-        const refIndex = parseInt(n.parent_ref.slice(1), 10)
-        parentId = createdNodes[refIndex].id
+      // Batch-4 #16: parent_ref (positional $N or a declared alias) was resolved
+      // to an earlier node index during validation; map it to the created id.
+      const pIdx = parentIndexOf[i]
+      if (pIdx !== null) {
+        parentId = createdNodes[pIdx].id
       }
       if (parentId) {
         const parent = store.getNode(parentId)

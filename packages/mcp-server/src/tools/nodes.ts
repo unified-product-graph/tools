@@ -1003,16 +1003,28 @@ export const deleteNode: ToolHandler = (args, ctx): ToolResult => {
 
 /**
  * Create up to 50 entities in a single call, optionally with explicit edges in
- * the same atomic transaction. Supports `parent_ref` chaining (`"$0"`, `"$1"`)
- * to reference nodes created earlier in the same batch. The optional `edges`
- * array uses the same `$N` ref convention (or existing node IDs) for both
- * endpoints. All nodes + edges are validated against the schema BEFORE any
- * mutation; on failure nothing lands.
+ * the same atomic transaction. Reference nodes created earlier in the batch via
+ * `parent_ref` / `edges[].from_ref` / `to_ref`, using either a positional `$N`
+ * (`"$0"`, `"$1"`) or a batch-local `ref` alias declared on a node (Batch-4
+ * #16) — aliases remove the index-counting that most often breaks a batch. The
+ * `edges` endpoints also accept existing node IDs. All nodes + edges are
+ * validated against the schema BEFORE any mutation; on failure nothing lands
+ * and the response carries the full `errors` list plus the alias `ref_map`.
  *
- * @returns JSON: `{ created, edges_created, count, edges_count, warnings? }`.
- * @throws Returns a textError when `nodes` is missing/non-array or any
- *   validation fails.
+ * Pass `validate_only: true` (Batch-4 #15) for a dry-run: the full validation
+ * pass runs and reports `{ valid, errors, would_create_nodes,
+ * would_create_edges }` WITHOUT writing, so an agent can self-correct an entire
+ * batch (bad type, wrong edge direction, invalid status, mis-counted ref)
+ * before committing.
+ *
+ * @returns JSON: on commit, `{ created, edges, explicit_edges?, count,
+ *   warnings? }`. On `validate_only`, `{ validate_only, valid, errors,
+ *   would_create_nodes, would_create_edges, ref_map?, warnings? }`. On a failed
+ *   commit, a `{ error, errors?, ref_map? }` error envelope.
+ * @throws Returns an error envelope when `nodes` is missing/non-array or any
+ *   validation fails (the batch is rejected atomically).
  * @atomicity atomic-with-rollback. Full validation pass first, then commit.
+ *   `validate_only` never mutates.
  * @see create_node
  * @see batch_create_edges
  */
@@ -1025,8 +1037,19 @@ export const batchCreateNodes: ToolHandler = (args, ctx): ToolResult => {
   const result = batchCreateNodesLib(store, {
     nodes: nodes as never,
     edges: explicitEdges as never,
+    validateOnly: (args.validate_only as boolean) ?? false,
   })
-  if (!result.ok) return textError(result.error)
+  if (!result.ok) {
+    // Batch-4 #15/#16: surface the full error list + alias ref_map as a JSON
+    // envelope so the caller can self-correct, not just the first message.
+    if ((result.errors && result.errors.length > 0) || result.ref_map) {
+      const body: Record<string, unknown> = { error: result.error }
+      if (result.errors) body.errors = result.errors
+      if (result.ref_map) body.ref_map = result.ref_map
+      return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }], isError: true }
+    }
+    return textError(result.error)
+  }
   const { ok: _ok, ...payload } = result
   void _ok
   return text(JSON.stringify(payload, null, 2))

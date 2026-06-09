@@ -150,6 +150,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listPortfolioCrossEdges: 'list_portfolio_cross_edges',
   portfolioQuery: 'portfolio_query',
   portfolioDigest: 'portfolio_digest',
+  portfolioValidate: 'portfolio_validate',
   migrateCrossEdges: 'migrate_cross_edges',
   // migrations
   migrateStatus: 'migrate_status',

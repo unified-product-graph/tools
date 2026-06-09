@@ -115,6 +115,10 @@ const CLOUD_NA = new Set([
   // server is single-product-per-request). Cloud parity is a tracked follow-up.
   'portfolio_query',
   'portfolio_digest',
+  // portfolio-wide audit (0.9.3, batch-4 #19): runs validate_graph across the
+  // .upg-file workspace in one call. Local-only for the same reason as the
+  // portfolio read layer — no cloud analogue (single-product-per-request).
+  'portfolio_validate',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).
