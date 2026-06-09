@@ -92,6 +92,12 @@ const CLOUD_NA = new Set([
   'migrate_properties',              // cloud has migrate_type but not these two
   'migrate_status',
   'start',                           // cold-start on-ramp; store-coupled, reads the local graph to recommend the first playbook. Cloud graphs could get the same on-ramp later (follow-up); local-only for 0.7.6.
+  // workspace write surface (0.8.15/654): portfolio.upg membership +
+  // product-header writes. Local-only today (portfolio.upg is a .upg-file
+  // workspace concept); cloud parity is a tracked follow-up.
+  'assign_product_to_area',
+  'attach_product_to_portfolio',
+  'update_product',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).

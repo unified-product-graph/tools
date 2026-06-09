@@ -26,6 +26,9 @@ import {
   renderDriftSummary,
   renderDanglingReport,
   registerProductOnPortfolio,
+  updateProduct,
+  computeGraphDigest,
+  InvalidProductStageError,
 } from '../index.js'
 // Frameworks are asserted against the CANONICAL public surface (core), the
 // surface the mcp-server/CLI actually serve at runtime — not the raw internal
@@ -439,5 +442,31 @@ describe(' / DT-SIM-2: two-product guard', () => {
     expect(second.warning).toMatch(/init_workspace/)
     // it WARNS (does not hard-reject): the node still lands
     expect(second.node.type).toBe('product')
+  })
+})
+
+// ── §B: product stage updatable + header↔node sync + digest precedence ──
+
+describe(' §B product stage write surface', () => {
+  it('updateProduct writes the header stage and rejects a non-canonical stage', async () => {
+    const store = await freshStore()
+    const r = updateProduct({ store, stage: 'build' })
+    expect(r.updated).toContain('stage')
+    expect((store.getProduct() as { stage?: string }).stage).toBe('build')
+    expect(() => updateProduct({ store, stage: 'mvp' as never })).toThrow(InvalidProductStageError)
+  })
+
+  it('update_node on a product node syncs $upg.product.stage (closes the desync)', async () => {
+    const store = await freshStore()
+    const created = createNode(store, { type: 'product', title: 'P', properties: { stage: 'concept' } })
+    updateNode(store, { node_id: created.node.id, properties: { stage: 'growth' } })
+    expect((store.getProduct() as { stage?: string }).stage).toBe('growth')
+  })
+
+  it('get_graph_digest resolves the product stage node-first (header fallback)', async () => {
+    const store = await freshStore()
+    createNode(store, { type: 'product', title: 'P', properties: { stage: 'growth' } })
+    const digest = computeGraphDigest(store)
+    expect(digest.product.stage).toBe('growth')
   })
 })

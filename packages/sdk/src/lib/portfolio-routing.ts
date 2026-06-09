@@ -217,14 +217,14 @@ function appendProductArea(
   if (typeof props.parent_area_id === 'string' || props.parent_area_id === null) {
     entity.parent_area_id = props.parent_area_id as string | null
   }
-  if (
-    props.strategic_priority === 'critical' ||
-    props.strategic_priority === 'high' ||
-    props.strategic_priority === 'medium' ||
-    props.strategic_priority === 'low'
-  ) {
-    entity.strategic_priority = props.strategic_priority
+  // Canonical Priority scale. Coerce legacy 'critical' → 'urgent' (the
+  // closest canonical level) so older data and callers degrade gracefully rather
+  // than being silently dropped.
+  const sp = props.strategic_priority === 'critical' ? 'urgent' : props.strategic_priority
+  if (sp === 'urgent' || sp === 'high' || sp === 'medium' || sp === 'low' || sp === 'none') {
+    entity.strategic_priority = sp
   }
+  if (typeof props.owner === 'string') entity.owner = props.owner
   if (Array.isArray(props.products)) {
     entity.products = props.products.filter((p): p is string => typeof p === 'string')
   }
@@ -400,4 +400,128 @@ export function findProductFileById(
     }
   }
   return null
+}
+
+// ── Product → container membership ( §A) ──────────────────────────────
+
+export interface ProductMembershipResult {
+  product_id: string
+  container_id: string
+  container_kind: 'product_area' | 'portfolio'
+  container_title?: string
+  /** True when the product was already a member (no-op append). */
+  already_member: boolean
+  /** True when the product was newly added to portfolio.upg.products[]. */
+  registered: boolean
+}
+
+/**
+ * Add a product id to a `product_area`'s `products[]` (dedup). Doc-level, no I/O —
+ * the caller owns flushing. Returns `found: false` when no area matches.
+ */
+export function addProductToArea(
+  doc: UPGPortfolioDocument,
+  areaId: string,
+  productId: string,
+): { found: boolean; title?: string; already: boolean } {
+  const area = doc.product_areas.find((a) => a.id === areaId)
+  if (!area) return { found: false, already: false }
+  const members = area.products ?? []
+  const already = members.includes(productId)
+  if (!already) area.products = [...members, productId]
+  return { found: true, title: area.title, already }
+}
+
+/**
+ * Add a product id to a `portfolio`'s `products[]` (dedup). Doc-level, no I/O.
+ * Returns `found: false` when no portfolio matches.
+ */
+export function addProductToPortfolio(
+  doc: UPGPortfolioDocument,
+  portfolioId: string,
+  productId: string,
+): { found: boolean; title?: string; already: boolean } {
+  const portfolio = doc.portfolios.find((p) => p.id === portfolioId)
+  if (!portfolio) return { found: false, already: false }
+  const members = portfolio.products ?? []
+  const already = members.includes(productId)
+  if (!already) portfolio.products = [...members, productId]
+  return { found: true, title: portfolio.title, already }
+}
+
+async function attachProductToContainer(
+  cwd: string,
+  productId: string,
+  containerId: string,
+  kind: 'product_area' | 'portfolio',
+): Promise<ProductMembershipResult> {
+  const store = await openPortfolioStoreIfExists(cwd)
+  if (!store) {
+    throw new PortfolioRoutingError(
+      `No portfolio document in this workspace. Create a ${kind === 'product_area' ? 'product area (create_area)' : 'portfolio (create_node {type:"portfolio"})'} first.`,
+    )
+  }
+  const doc = store.getDocument()
+  if (!doc) throw new PortfolioRoutingError('Portfolio document failed to load.')
+  const lookup = findProductFileById(cwd, productId)
+  if (!lookup) {
+    throw new PortfolioRoutingError(
+      `Product not found in this workspace: "${productId}". Create it with create_product, or check list_local_products.`,
+    )
+  }
+  const add =
+    kind === 'product_area'
+      ? addProductToArea(doc, containerId, productId)
+      : addProductToPortfolio(doc, containerId, productId)
+  if (!add.found) {
+    const label = kind === 'product_area' ? 'Product area' : 'Portfolio'
+    const lister = kind === 'product_area' ? 'list_product_areas' : 'list_portfolios'
+    throw new PortfolioRoutingError(
+      `${label} not found in portfolio.upg: "${containerId}". List them with ${lister}.`,
+    )
+  }
+  // Keep the product in the portfolio.upg registry too, so cross-surface lookups
+  // resolve. registerProductOnPortfolio is a no-op when already present.
+  const registered = registerProductOnPortfolio(doc, {
+    id: productId,
+    file_path: lookup.file_path,
+    title: lookup.title,
+  })
+  if (!add.already || registered) {
+    store.markDirty()
+    await store.flush()
+  }
+  return {
+    product_id: productId,
+    container_id: containerId,
+    container_kind: kind,
+    container_title: add.title,
+    already_member: add.already,
+    registered,
+  }
+}
+
+/**
+ * Place a product inside a `product_area` (`area.products[]`) — resolving the area
+ * against `portfolio.upg`, NOT the active product graph. Auto-registers the product
+ * on the portfolio registry. Throws `PortfolioRoutingError` on a missing workspace,
+ * product, or area.
+ */
+export function assignProductToArea(
+  cwd: string,
+  args: { product_id: string; area_id: string },
+): Promise<ProductMembershipResult> {
+  return attachProductToContainer(cwd, args.product_id, args.area_id, 'product_area')
+}
+
+/**
+ * Place a product inside a `portfolio` (`portfolio.products[]`) — resolving the
+ * portfolio against `portfolio.upg`. Auto-registers the product on the registry.
+ * Throws `PortfolioRoutingError` on a missing workspace, product, or portfolio.
+ */
+export function attachProductToPortfolio(
+  cwd: string,
+  args: { product_id: string; portfolio_id: string },
+): Promise<ProductMembershipResult> {
+  return attachProductToContainer(cwd, args.product_id, args.portfolio_id, 'portfolio')
 }

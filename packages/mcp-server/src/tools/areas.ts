@@ -12,6 +12,7 @@ import { degradeProgressively } from '../lib/payload-degrader.js'
 import {
   writePortfolioScopedNode,
   openPortfolioStoreIfExists,
+  assignProductToArea,
   PortfolioRoutingError,
 } from '@unified-product-graph/sdk'
 import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
@@ -42,10 +43,38 @@ export const listProductAreas: ToolHandler = async (_args, _ctx): Promise<ToolRe
     if (area.description) row.description = area.description
     if (area.parent_area_id !== undefined) row.parent_area_id = area.parent_area_id
     if (area.strategic_priority) row.strategic_priority = area.strategic_priority
+    if (area.owner) row.owner = area.owner
     if (area.products) row.products = area.products
     return row
   })
   return text(JSON.stringify({ areas: result, total: result.length }, null, 2))
+}
+
+/**
+ * Place an existing product under a product_area (`area.products[]`), resolving
+ * the area against `portfolio.upg` (NOT the active product graph). The product
+ * is also auto-registered on the portfolio registry. §A — the area side
+ * of the workspace write surface.
+ *
+ * @returns JSON: `{ product_id, container_id, container_kind: "product_area",
+ *   container_title?, already_member, registered }`.
+ * @throws textError on a missing workspace, an unknown product, or an unknown
+ *   area id (the message points at list_product_areas / list_local_products).
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see attach_product_to_portfolio
+ * @see create_product
+ */
+export const assignProductToAreaTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const productId = args.product_id as string | undefined
+  const areaId = args.area_id as string | undefined
+  if (!productId) return textError('Missing required parameter: product_id')
+  if (!areaId) return textError('Missing required parameter: area_id')
+  try {
+    const result = await assignProductToArea(process.cwd(), { product_id: productId, area_id: areaId })
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    return textError((err as Error).message)
+  }
 }
 
 /**
@@ -261,13 +290,13 @@ export const getAreaContext: ToolHandler = async (_args, _ctx): Promise<ToolResu
 export const createArea: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
   if (!args.title) return textError('Missing required parameter: title')
 
-  // Mirror the legacy properties bag; strategic_priority + parent_area_id are
-  // hoisted onto the typed UPGProductArea record by writePortfolioScopedNode.
-  // `owner` has no slot on UPGProductArea so it is dropped silently (it lived
-  // on the deprecated free-form properties bag).
+  // strategic_priority + parent_area_id + owner are hoisted onto the typed
+  // UPGProductArea record by writePortfolioScopedNode (owner is a declared
+  // product_area property as of 0.8.15 / §C).
   const properties: Record<string, unknown> = {}
   if (args.strategic_priority) properties.strategic_priority = args.strategic_priority
   if (args.parent_area_id) properties.parent_area_id = args.parent_area_id
+  if (args.owner) properties.owner = args.owner
 
   try {
     const result = await writePortfolioScopedNode(process.cwd(), {

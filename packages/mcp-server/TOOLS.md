@@ -1,14 +1,14 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 96 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 99 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
 - [Context & Session](#context-session): 5 tools
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
-- [Areas & Change Log](#areas-change-log): 5 tools
-- [Workspace & Portfolios](#workspace-portfolios): 10 tools
+- [Areas & Change Log](#areas-change-log): 6 tools
+- [Workspace & Portfolios](#workspace-portfolios): 12 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -946,11 +946,38 @@ re-computed on next save; a subsequent reload won't bring them back.
 
 _Product areas, the `.upg-area.json` cwd scoper, and the session change log._
 
+- [`assign_product_to_area`](#assign-product-to-area)
 - [`create_area`](#create-area)
 - [`get_area_context`](#get-area-context)
 - [`get_area_graph`](#get-area-graph)
 - [`get_changes`](#get-changes)
 - [`list_product_areas`](#list-product-areas)
+
+### `assign_product_to_area`
+
+Place an existing product under a product area (adds it to the area's `products[]` in `.upg/portfolio.upg`). Resolves the area against the portfolio document and auto-registers the product on the portfolio registry. Use after `create_product`, or pass `area_id` to `create_product` directly.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `area_id` | string | ✓ | Product area id (from list_product_areas) |
+| `product_id` | string | ✓ | Product id (from create_product / list_local_products) |
+
+**Returns:**
+
+JSON: `{ product_id, container_id, container_kind: "product_area",
+container_title?, already_member, registered }`.
+
+**Throws:**
+
+- textError on a missing workspace, an unknown product, or an unknown
+area id (the message points at list_product_areas / list_local_products).
+
+**See also:** `attach_product_to_portfolio`, `create_product`
+
 
 ### `create_area`
 
@@ -966,7 +993,7 @@ flushed in one pass.`
 | `description` | string |  | What this area covers |
 | `owner` | string |  | Person or team that owns this area |
 | `parent_area_id` | string |  | Parent area ID for creating a sub-area |
-| `strategic_priority` | `critical` \| `high` \| `medium` \| `low` |  | Strategic priority of this area |
+| `strategic_priority` | `urgent` \| `high` \| `medium` \| `low` \| `none` |  | Strategic priority of this area (canonical Priority scale) |
 | `title` | string | ✓ | Area name (e.g. "Search", "Payments") |
 
 **Returns:**
@@ -1070,6 +1097,7 @@ parent_area_id?, products? }>, total }`.
 
 _Multi-product discovery, switching, init, cross-product edges._
 
+- [`attach_product_to_portfolio`](#attach-product-to-portfolio)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_product`](#create-product)
 - [`get_organization`](#get-organization)
@@ -1080,6 +1108,33 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`list_portfolios`](#list-portfolios)
 - [`migrate_cross_edges`](#migrate-cross-edges)
 - [`switch_product`](#switch-product)
+- [`update_product`](#update-product)
+
+### `attach_product_to_portfolio`
+
+Place an existing product under a portfolio (adds it to the portfolio's `products[]` in `.upg/portfolio.upg`). Resolves the portfolio against the portfolio document and auto-registers the product on the portfolio registry. Use after `create_product`, or pass `portfolio_id` to `create_product` directly.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `portfolio_id` | string | ✓ | Portfolio id (from list_portfolios) |
+| `product_id` | string | ✓ | Product id (from create_product / list_local_products) |
+
+**Returns:**
+
+JSON: `{ product_id, container_id, container_kind: "portfolio",
+container_title?, already_member, registered }`.
+
+**Throws:**
+
+- textError on a missing workspace, an unknown product, or an unknown
+portfolio id (the message points at list_portfolios / list_local_products).
+
+**See also:** `assign_product_to_area`, `create_product`
+
 
 ### `create_cross_product_edge`
 
@@ -1121,9 +1176,10 @@ portfolio edge are separate mutations.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `area_id` | string |  | Optional product_area id (resolved against portfolio.upg) to place the new product under. |
 | `description` | string |  | Optional product description |
 | `name` | string | ✓ | Product display title (required, non-empty). |
-| `portfolio_id` | string |  | Optional portfolio node id in the current store. When provided, a `portfolio_contains_product` edge is created in the current graph. |
+| `portfolio_id` | string |  | Optional portfolio id (resolved against portfolio.upg) to place the new product under. A portfolio id that resolves only in the active graph still attaches via an in-graph edge (DEPRECATED; prefer attach_product_to_portfolio). |
 | `slug` | string |  | Optional slug for the .upg filename. Defaults to a slug derived from `name`. Collisions append `-2`, `-3`, … |
 | `stage` | string |  | Product lifecycle stage. See UPGProductStage in @unified-product-graph/core. |
 
@@ -1316,6 +1372,34 @@ server reverts to the workspace default. Call `get_workspace_info`
 before any read/mutation to confirm the active product.
 
 **See also:** `get_workspace_info`, `list_local_products`, `init_workspace`
+
+
+### `update_product`
+
+Update the product header (`$upg.product`): stage, title, description, health_status, url. The supported way to advance a product's lifecycle stage; it writes the value get_graph_digest reads, without hand-editing the .upg file.
+
+**Atomicity:** `atomic (single flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `description` | string |  | Product description. |
+| `health_status` | string |  | Product health (free-form, e.g. on_track / at_risk). |
+| `stage` | string |  | Product lifecycle stage (canonical UPGProductStage). |
+| `title` | string |  | Product display title. |
+| `url` | string |  | Product URL. |
+
+**Returns:**
+
+JSON: `{ product, updated: string[] }` (the fields changed).
+
+**Throws:**
+
+- textError when no field is supplied, when there is no product header,
+or when `stage` is non-canonical (same strict validation as create_product).
+
+**See also:** `create_product`
 
 
 ## Schema

@@ -351,4 +351,34 @@ describe('createProduct', () => {
       store.getAllEdges().filter((e) => e.target === result.id),
     ).toHaveLength(0)
   })
+
+  it('registers the new product on portfolio.upg.products[] when a portfolio exists', async () => {
+    const store = await bootstrapWorkspace()
+    // Stand up a portfolio document alongside the workspace.
+    const { UPGPortfolioStore } = await import('@unified-product-graph/sdk')
+    const portfolioPath = join(cwd, '.upg', 'portfolio.upg')
+    const pstore = new UPGPortfolioStore()
+    await pstore.loadOrInit(portfolioPath)
+    await pstore.flush()
+
+    const result = await createProduct({ cwd, store, name: 'Sanity Studio' })
+
+    // The portfolio registry — and its serialiser-derived $upg.counts.products —
+    // must now track the product, not just workspace.json.
+    const pdoc = JSON.parse(readFileSync(portfolioPath, 'utf-8')) as {
+      $upg?: { counts?: { products?: number } }
+      products?: Array<{ id: string; title?: string; file_path?: string }>
+    }
+    expect(pdoc.products?.some((p) => p.id === result.id && p.title === 'Sanity Studio')).toBe(true)
+    expect(pdoc.$upg?.counts?.products).toBe(1)
+  })
+
+  it('createProduct leaves no portfolio registry behind when no portfolio.upg exists', async () => {
+    const store = await bootstrapWorkspace()
+    const result = await createProduct({ cwd, store, name: 'No Portfolio' })
+    // No portfolio document in the workspace → nothing to register, and we must
+    // not fabricate one.
+    expect(existsSync(join(cwd, '.upg', 'portfolio.upg'))).toBe(false)
+    expect(result.id).toMatch(/^p_/)
+  })
 })

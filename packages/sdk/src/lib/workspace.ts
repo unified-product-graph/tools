@@ -27,6 +27,12 @@ import {
   serializeCanonical,
 } from '@unified-product-graph/core'
 import { edgeId, productId } from './id.js'
+import {
+  openPortfolioStoreIfExists,
+  registerProductOnPortfolio,
+  addProductToArea,
+  addProductToPortfolio,
+} from './portfolio-routing.js'
 
 export interface WorkspaceProduct {
   file: string
@@ -232,11 +238,16 @@ export interface CreateProductArgs {
   description?: string
   stage?: UPGProductStage
   /**
-   * Optional portfolio node id in the CURRENT loaded store. When provided,
-   * a `product` node + `portfolio_contains_product` edge are created in the
-   * current store to express the hierarchy (portfolios live in a single .upg).
+   * Optional portfolio id to place the new product under. As of 0.8.15 this
+   * resolves against `portfolio.upg` (the product is added to that portfolio's
+   * `products[]`). For back-compat a portfolio id that resolves only in the
+   * active product graph still attaches via an in-graph
+   * `portfolio_contains_product` edge — but that path is DEPRECATED; prefer a
+   * portfolio id from portfolio.upg (see `attachProductToPortfolio`).
    */
   portfolio_id?: string
+  /** Optional `product_area` id (resolved against portfolio.upg) to place the new product under. */
+  area_id?: string
 }
 
 export interface CreateProductResult {
@@ -246,6 +257,10 @@ export interface CreateProductResult {
   title: string
   workspace_path: string
   portfolio_attached: boolean
+  /** True when the product was placed under a `product_area` in portfolio.upg. */
+  area_attached?: boolean
+  /** Non-fatal advisories (unresolved area_id, deprecated active-store attach, …). */
+  warnings?: string[]
 }
 
 /** Compute the integrity checksum a freshly written .upg file would carry. */
@@ -257,7 +272,7 @@ function computeIntegrityChecksum(doc: UPGDocument): string {
 }
 
 export async function createProduct(args: CreateProductArgs): Promise<CreateProductResult> {
-  const { cwd, store, name, slug: slugArg, description, stage, portfolio_id } = args
+  const { cwd, store, name, slug: slugArg, description, stage, portfolio_id, area_id } = args
   const upgDir = path.resolve(cwd, '.upg')
 
   // Workspace mode required; single-file mode has no place to put the new sibling.
@@ -353,15 +368,54 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
     'utf-8',
   )
 
-  // Optional portfolio attachment in the CURRENT store. The portfolio lives in
-  // a single .upg file; portfolio_contains_product is an in-graph hierarchy
-  // edge, not a cross-product one.
+  // Register the new product on portfolio.upg, and place it under any requested
+  // area/portfolio — all resolved against portfolio.upg ( registry +
+  // §A membership). Without the registry, list_local_products sees the
+  // product but portfolio views and $upg.counts.products do not. The canonical
+  // serialiser derives counts.products from products.length on flush, so one
+  // flush keeps the registry, the count, and the membership arrays in sync.
   let portfolioAttached = false
-  if (portfolio_id) {
+  let areaAttached = false
+  const warnings: string[] = []
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (portfolioStore) {
+    const portfolioDoc = portfolioStore.getDocument()
+    if (portfolioDoc) {
+      let dirty = registerProductOnPortfolio(portfolioDoc, {
+        id: newProductId,
+        file_path: path.join('.upg', filename),
+        title: trimmedName,
+      })
+      if (area_id) {
+        const a = addProductToArea(portfolioDoc, area_id, newProductId)
+        if (a.found) {
+          areaAttached = true
+          if (!a.already) dirty = true
+        } else {
+          warnings.push(`area_id "${area_id}" not found in portfolio.upg — product registered but not placed in an area.`)
+        }
+      }
+      if (portfolio_id) {
+        const p = addProductToPortfolio(portfolioDoc, portfolio_id, newProductId)
+        if (p.found) {
+          portfolioAttached = true
+          if (!p.already) dirty = true
+        }
+      }
+      if (dirty) {
+        portfolioStore.markDirty()
+        await portfolioStore.flush()
+      }
+    }
+  }
+
+  // Back-compat (DEPRECATED, removal targeted after the 0.8.15 window): a
+  // portfolio_id that resolves only in the ACTIVE product graph. Pre-0.8.15
+  // createProduct mirrored a product node + portfolio_contains_product edge into
+  // the active graph; that is superseded by the portfolio.upg resolution above.
+  if (portfolio_id && !portfolioAttached) {
     const portfolio = store.getNode(portfolio_id)
     if (portfolio && portfolio.type === 'portfolio') {
-      // Mirror the new product as a node in the current store so the edge can
-      // attach to a real target. The node id matches the new product's id.
       store.addNode({
         id: newProductId,
         type: 'product',
@@ -375,6 +429,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
         type: 'portfolio_contains_product',
       })
       portfolioAttached = true
+      warnings.push('portfolio_id resolved in the active product graph (deprecated): attached via an in-graph edge. Prefer a portfolio id from portfolio.upg via attach_product_to_portfolio.')
     }
   }
 
@@ -385,5 +440,67 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
     title: trimmedName,
     workspace_path: '.upg/',
     portfolio_attached: portfolioAttached,
+    ...(areaAttached ? { area_attached: true } : {}),
+    ...(warnings.length > 0 ? { warnings } : {}),
   }
+}
+
+// ─── update_product ( §B) ────────────────────────────────────
+
+export interface UpdateProductArgs {
+  store: UPGFileStore
+  stage?: UPGProductStage
+  title?: string
+  description?: string
+  health_status?: string
+  url?: string
+}
+
+export interface UpdateProductResult {
+  product: Record<string, unknown>
+  /** Which header fields were changed. */
+  updated: string[]
+}
+
+/**
+ * Update the product header (`$upg.product`): the canonical home of a product's
+ * lifecycle `stage` (the value `get_graph_digest` reads), plus title /
+ * description / health_status / url. Strict stage validation mirrors
+ * createProduct. Mutates the header in place + marks the store dirty; the caller
+ * flushes. Closes the gap where the only way to set a product's stage was to
+ * hand-edit the integrity-hashed file.
+ */
+export function updateProduct(args: UpdateProductArgs): UpdateProductResult {
+  const { store, stage, title, description, health_status, url } = args
+  const product = store.getProduct() as unknown as
+    | (Record<string, unknown> & { stage?: string; title?: string })
+    | undefined
+  if (!product) throw new Error('No product header to update in this graph.')
+  if (stage !== undefined) {
+    const stageError = validateProductStageStrict(stage)
+    if (stageError !== null) throw new InvalidProductStageError(stageError)
+  }
+  const updated: string[] = []
+  if (stage !== undefined) {
+    product.stage = stage
+    updated.push('stage')
+  }
+  if (title !== undefined) {
+    product.title = title
+    updated.push('title')
+  }
+  if (description !== undefined) {
+    product.description = description
+    updated.push('description')
+  }
+  if (health_status !== undefined) {
+    product.health_status = health_status
+    updated.push('health_status')
+  }
+  if (url !== undefined) {
+    product.url = url
+    updated.push('url')
+  }
+  if (updated.length > 0) store.markDirty()
+  return { product, updated }
 }

@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 94 tools', () => {
+  it('exposes the expected 99 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -103,7 +103,9 @@ describe('Tool registry: completeness', () => {
     // + skill_audit ( source-vs-deployed integrity for skills). → 93.
     // + start ( zero-state on-ramp). → 94.
     // + apply_framework + score_entity (0.8.4 framework exercises). → 96.
-    expect(TOOL_DEFINITIONS).toHaveLength(96)
+    // + assign_product_to_area + attach_product_to_portfolio + update_product
+    //   (0.8.15 workspace write surface/654). → 99.
+    expect(TOOL_DEFINITIONS).toHaveLength(99)
   })
 })
 

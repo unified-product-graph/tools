@@ -18,9 +18,11 @@ import {
   openPortfolioStoreIfExists,
   registerProductOnPortfolio,
   findProductFileById,
+  attachProductToPortfolio,
 } from '@unified-product-graph/sdk'
 import {
   createProduct,
+  updateProduct,
   initWorkspace,
   InvalidProductNameError,
   InvalidProductStageError,
@@ -301,6 +303,7 @@ export const createProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
       description: args.description as string | undefined,
       stage: args.stage as never,
       portfolio_id: args.portfolio_id as string | undefined,
+      area_id: args.area_id as string | undefined,
     })
     return text(
       JSON.stringify({ message: `Created product: ${result.title}`, ...result }, null, 2),
@@ -315,6 +318,44 @@ export const createProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
       return textError(err.message)
     }
     return textError(`create_product failed: ${(err as Error).message}`)
+  }
+}
+
+/**
+ * Update the product header (`$upg.product`): `stage` (the canonical lifecycle
+ * stage `get_graph_digest` reads), `title`, `description`, `health_status`, `url`.
+ * The supported way to advance a product's stage without hand-editing the
+ * integrity-hashed `.upg` file. §B.
+ *
+ * @returns JSON: `{ product, updated: string[] }` (the fields changed).
+ * @throws textError when no field is supplied, when there is no product header,
+ *   or when `stage` is non-canonical (same strict validation as create_product).
+ * @atomicity atomic (single flush).
+ * @see create_product
+ */
+export const updateProductTool: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const { store } = ctx
+  try {
+    const result = updateProduct({
+      store,
+      stage: args.stage as never,
+      title: args.title as string | undefined,
+      description: args.description as string | undefined,
+      health_status: args.health_status as string | undefined,
+      url: args.url as string | undefined,
+    })
+    if (result.updated.length === 0) {
+      return textError(
+        'Nothing to update: pass at least one of: stage, title, description, health_status, url.',
+      )
+    }
+    await store.flush()
+    return text(
+      JSON.stringify({ message: `Updated product (${result.updated.join(', ')})`, ...result }, null, 2),
+    )
+  } catch (err) {
+    if (err instanceof InvalidProductStageError) return textError(err.message)
+    return textError(`update_product failed: ${(err as Error).message}`)
   }
 }
 
@@ -677,6 +718,36 @@ export const migrateCrossEdges: ToolHandler = async (args, ctx): Promise<ToolRes
       2,
     ),
   )
+}
+
+/**
+ * Place an existing product under a portfolio (`portfolio.products[]`), resolving
+ * the portfolio against `portfolio.upg` (NOT the active product graph). The
+ * product is also auto-registered on the portfolio registry. §A — the
+ * portfolio side of the workspace write surface.
+ *
+ * @returns JSON: `{ product_id, container_id, container_kind: "portfolio",
+ *   container_title?, already_member, registered }`.
+ * @throws textError on a missing workspace, an unknown product, or an unknown
+ *   portfolio id (the message points at list_portfolios / list_local_products).
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see assign_product_to_area
+ * @see create_product
+ */
+export const attachProductToPortfolioTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const productId = args.product_id as string | undefined
+  const portfolioId = args.portfolio_id as string | undefined
+  if (!productId) return textError('Missing required parameter: product_id')
+  if (!portfolioId) return textError('Missing required parameter: portfolio_id')
+  try {
+    const result = await attachProductToPortfolio(process.cwd(), {
+      product_id: productId,
+      portfolio_id: portfolioId,
+    })
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    return textError((err as Error).message)
+  }
 }
 
 export type { ToolContext }

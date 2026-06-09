@@ -45,6 +45,7 @@ import {
   getAreaGraph,
   getAreaContext,
   createArea,
+  assignProductToAreaTool,
   getChanges,
 } from '../tools/areas.js'
 import {
@@ -53,9 +54,11 @@ import {
   getWorkspaceInfo,
   initWorkspaceTool,
   createProductTool,
+  updateProductTool,
   listPortfolios,
   getOrganization,
   createCrossProductEdge,
+  attachProductToPortfolioTool,
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
@@ -708,10 +711,29 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         portfolio_id: {
           type: 'string',
           description:
-            'Optional portfolio node id in the current store. When provided, a `portfolio_contains_product` edge is created in the current graph.',
+            'Optional portfolio id (resolved against portfolio.upg) to place the new product under. A portfolio id that resolves only in the active graph still attaches via an in-graph edge (DEPRECATED; prefer attach_product_to_portfolio).',
+        },
+        area_id: {
+          type: 'string',
+          description: 'Optional product_area id (resolved against portfolio.upg) to place the new product under.',
         },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'update_product',
+    description:
+      "Update the product header (`$upg.product`): stage, title, description, health_status, url. The supported way to advance a product's lifecycle stage; it writes the value get_graph_digest reads, without hand-editing the .upg file.",
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        stage: { type: 'string', description: 'Product lifecycle stage (canonical UPGProductStage).' },
+        title: { type: 'string', description: 'Product display title.' },
+        description: { type: 'string', description: 'Product description.' },
+        health_status: { type: 'string', description: 'Product health (free-form, e.g. on_track / at_risk).' },
+        url: { type: 'string', description: 'Product URL.' },
+      },
     },
   },
   {
@@ -1460,12 +1482,38 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         strategic_priority: {
           type: 'string',
-          enum: ['critical', 'high', 'medium', 'low'],
-          description: 'Strategic priority of this area',
+          enum: ['urgent', 'high', 'medium', 'low', 'none'],
+          description: 'Strategic priority of this area (canonical Priority scale)',
         },
         owner: { type: 'string', description: 'Person or team that owns this area' },
       },
       required: ['title'],
+    },
+  },
+  {
+    name: 'assign_product_to_area',
+    description:
+      "Place an existing product under a product area (adds it to the area's `products[]` in `.upg/portfolio.upg`). Resolves the area against the portfolio document and auto-registers the product on the portfolio registry. Use after `create_product`, or pass `area_id` to `create_product` directly.",
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        product_id: { type: 'string', description: 'Product id (from create_product / list_local_products)' },
+        area_id: { type: 'string', description: 'Product area id (from list_product_areas)' },
+      },
+      required: ['product_id', 'area_id'],
+    },
+  },
+  {
+    name: 'attach_product_to_portfolio',
+    description:
+      "Place an existing product under a portfolio (adds it to the portfolio's `products[]` in `.upg/portfolio.upg`). Resolves the portfolio against the portfolio document and auto-registers the product on the portfolio registry. Use after `create_product`, or pass `portfolio_id` to `create_product` directly.",
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        product_id: { type: 'string', description: 'Product id (from create_product / list_local_products)' },
+        portfolio_id: { type: 'string', description: 'Portfolio id (from list_portfolios)' },
+      },
+      required: ['product_id', 'portfolio_id'],
     },
   },
   {
@@ -1633,6 +1681,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_workspace_info: getWorkspaceInfo,
   init_workspace: initWorkspaceTool,
   create_product: createProductTool,
+  update_product: updateProductTool,
   migrate_type: migrateType,
   migrate_properties: migrateProperties,
   migrate_status: migrateStatus,
@@ -1688,9 +1737,11 @@ const HANDLERS: Record<string, ToolHandler> = {
   skill_audit: skillAudit,
   get_area_context: getAreaContext,
   create_area: createArea,
+  assign_product_to_area: assignProductToAreaTool,
   list_portfolios: listPortfolios,
   get_organization: getOrganization,
   create_cross_product_edge: createCrossProductEdge,
+  attach_product_to_portfolio: attachProductToPortfolioTool,
   list_portfolio_cross_edges: listPortfolioCrossEdges,
   migrate_cross_edges: migrateCrossEdges,
   get_sync_state: getSyncState,

@@ -17,11 +17,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createNode } from '../tools/nodes.js'
-import { createArea, listProductAreas } from '../tools/areas.js'
+import { createArea, listProductAreas, assignProductToAreaTool } from '../tools/areas.js'
 import {
   listPortfolios,
   getOrganization,
   createCrossProductEdge,
+  attachProductToPortfolioTool,
 } from '../tools/workspace.js'
 import type { UPGDocument } from '@unified-product-graph/core'
 import {
@@ -298,6 +299,7 @@ describe(' · list_portfolios / list_product_areas / get_organization read from 
   })
 
   it('list_product_areas returns the product_area entity created via create_node', async () => {
+    // Legacy non-canonical 'critical' coerces to the canonical 'urgent'.
     await parseHandlerResult(
       createNode(
         { type: 'product_area', title: 'Billing', properties: { strategic_priority: 'critical' } },
@@ -313,7 +315,7 @@ describe(' · list_portfolios / list_product_areas / get_organization read from 
     }
     expect(body.total).toBe(1)
     expect(body.areas[0].title).toBe('Billing')
-    expect(body.areas[0].strategic_priority).toBe('critical')
+    expect(body.areas[0].strategic_priority).toBe('urgent')
   })
 
   it('get_organization returns the organisation set via create_node', async () => {
@@ -493,5 +495,71 @@ describe(' · create_cross_product_edge auto-registers products on portfolio.upg
     // Second call registers nothing new
     const body = second.body as { registered_products?: unknown[] }
     expect(body.registered_products).toBeUndefined()
+  })
+})
+
+// ── 0.8.15 · product_area owner + product→container attachment ────────────────
+
+describe('0.8.15 · owner property + assign/attach product ( §C / §A)', () => {
+  let cwd: string
+  let originalCwd: string
+  let store: UPGFileStore
+  let ctx: ToolContext
+
+  beforeEach(async () => {
+    originalCwd = process.cwd()
+    cwd = mkdtempSync(join(tmpdir(), 'upg-0815-'))
+    mkdirSync(join(cwd, '.upg'))
+    process.chdir(cwd)
+    store = await makeStoreAt(join(cwd, '.upg', 'product.upg'))
+    ctx = makeCtx(store)
+  })
+
+  afterEach(async () => {
+    process.chdir(originalCwd)
+    await store.flush()
+    store.stopWatching()
+    rmSync(cwd, { recursive: true, force: true })
+  })
+
+  it('§C: create_area persists owner and list_product_areas surfaces it', async () => {
+    await parseHandlerResult(createArea({ title: 'Payments', owner: 'Team Cash' }, ctx))
+    const list = await parseHandlerResult(listProductAreas({}, ctx))
+    const body = list.body as { areas: Array<{ title: string; owner?: string }> }
+    expect(body.areas[0].owner).toBe('Team Cash')
+    const areas = readPortfolio(cwd)?.product_areas as Array<{ owner?: string }>
+    expect(areas[0].owner).toBe('Team Cash')
+  })
+
+  it('§A: assign_product_to_area adds the product to area.products[] in portfolio.upg', async () => {
+    const created = await parseHandlerResult(createArea({ title: 'Platform' }, ctx))
+    const areaId = (created.body?.node as { id: string }).id
+    const r = await parseHandlerResult(
+      assignProductToAreaTool({ product_id: 'p_test', area_id: areaId }, ctx),
+    )
+    expect(r.isError).toBeUndefined()
+    expect((r.body as { container_kind?: string }).container_kind).toBe('product_area')
+    const areas = readPortfolio(cwd)?.product_areas as Array<{ id: string; products?: string[] }>
+    expect(areas.find((a) => a.id === areaId)?.products).toContain('p_test')
+  })
+
+  it('§A: assign_product_to_area errors on an unknown area id', async () => {
+    await parseHandlerResult(createArea({ title: 'Anything' }, ctx)) // ensure portfolio.upg exists
+    const r = await parseHandlerResult(
+      assignProductToAreaTool({ product_id: 'p_test', area_id: 'n_nope' }, ctx),
+    )
+    expect(r.isError).toBe(true)
+    expect(r.error).toMatch(/not found in portfolio\.upg/i)
+  })
+
+  it('§A: attach_product_to_portfolio adds the product to portfolio.products[]', async () => {
+    await parseHandlerResult(createNode({ type: 'portfolio', title: 'Bets' }, ctx))
+    const portfolioId = (readPortfolio(cwd)?.portfolios as Array<{ id: string }>)[0].id
+    const r = await parseHandlerResult(
+      attachProductToPortfolioTool({ product_id: 'p_test', portfolio_id: portfolioId }, ctx),
+    )
+    expect(r.isError).toBeUndefined()
+    const after = readPortfolio(cwd)?.portfolios as Array<{ id: string; products?: string[] }>
+    expect(after[0].products).toContain('p_test')
   })
 })

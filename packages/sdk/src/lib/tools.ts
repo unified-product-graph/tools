@@ -9,6 +9,7 @@ import type { UPGFileStore } from '../store.js'
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType, UPGProductStage } from '@unified-product-graph/core'
 import {
   coerceProductStage,
+  validateProductStageStrict,
   collectSlugsForType,
   generateSlug,
   getLifecycleForType,
@@ -510,7 +511,13 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   // `types_present` / `types_missing` are populated for ALL regions
   // regardless of stage; only `counted_toward_stage` and the
   // `stage_summary` aggregate distinguish counted from informational.
-  const rawStage = product.stage ?? (nodes.find((n) => n.type === 'product')?.properties as Record<string, unknown> | undefined)?.stage
+  // Node-first, header fallback ( §B): a product node's own stage is the
+  // live value; the $upg.product.stage header can lag in legacy/desynced files.
+  // update_node now syncs the header, so for fresh writes they agree.
+  const rawStage =
+    ((nodes.find((n) => n.type === 'product')?.properties as Record<string, unknown> | undefined)?.stage as
+      | string
+      | undefined) ?? product.stage
   const resolvedStage = resolveCoverageStage(rawStage)
   const countedRegions = new Set(STAGE_COVERAGE_TARGETS[resolvedStage] ?? [])
 
@@ -566,8 +573,8 @@ export function computeGraphDigest(store: UPGFileStore): GraphDigest {
   return {
     product: {
       title: product.title,
-      stage: (product.stage
-        ?? (nodes.find((n) => n.type === 'product')?.properties as Record<string, unknown> | undefined)?.stage as string | undefined
+      stage: (((nodes.find((n) => n.type === 'product')?.properties as Record<string, unknown> | undefined)?.stage as string | undefined)
+        ?? product.stage
         ?? 'unknown'),
     },
     counts: { total_nodes: nodes.length, total_edges: edges.length, by_type: byType },
@@ -1944,6 +1951,23 @@ export function updateNode(
     const r = store.unsetNodeProperties(args.node_id, args.unset_properties)
     node = r.node
     if (r.removed.length > 0) removed = r.removed
+  }
+
+  // §B: keep $upg.product.stage in sync with a product node's stage so
+  // get_graph_digest never reports a stale header. Sync from the node's
+  // properties.stage (preferred), or a `status` that is itself a canonical stage
+  // (the form the bug report used: update_node(product, status:"growth")). The
+  // surrounding store.updateNode already scheduled a save, so the header
+  // mutation rides the same flush.
+  if (existing.type === 'product') {
+    const nodeStage = (node.properties as Record<string, unknown> | undefined)?.stage
+    const candidate =
+      (typeof nodeStage === 'string' ? nodeStage : undefined) ??
+      (typeof node.status === 'string' ? node.status : undefined)
+    if (candidate !== undefined && validateProductStageStrict(candidate) === null) {
+      const header = store.getProduct() as { stage?: string } | undefined
+      if (header && header.stage !== candidate) header.stage = candidate
+    }
   }
 
   const warning = validation.warnings.length > 0 ? validation.warnings.join(' | ') : undefined
