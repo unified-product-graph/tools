@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 119 tools', () => {
+  it('exposes the expected 120 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -119,7 +119,9 @@ describe('Tool registry: completeness', () => {
     //   batch_define_canonical_entity, batch_register_instance, promote_to_canonical,
     //   link_area_to_audience. → 118.
     // + list_status_values (0.9.11 batch-6 #35): per-type status pre-flight. → 119.
-    expect(TOOL_DEFINITIONS).toHaveLength(119)
+    // + create_registry_edge (0.9.13 foundations follow-ups): author registry-internal
+    //   edges (registry.edges), e.g. specification governed_by organization. → 120.
+    expect(TOOL_DEFINITIONS).toHaveLength(120)
   })
 })
 

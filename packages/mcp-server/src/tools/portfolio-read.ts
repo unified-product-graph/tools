@@ -424,6 +424,172 @@ async function registryDriftReport(
   }
 }
 
+// Cross-edge types that count as "implementing / conforming to" a specification.
+const SPEC_IMPLEMENTER_EDGES = new Set<string>([
+  'product_implements_specification',
+  'product_exposes_specification',
+  'feature_conforms_to_specification',
+  'api_contract_speaks_specification',
+])
+// Product-level implementations (used for the reimplementation detector — a
+// feature conforming or an api_contract speaking does not count as a product
+// owning a parallel implementation).
+const PRODUCT_SPEC_IMPL_EDGES = new Set<string>([
+  'product_implements_specification',
+  'product_exposes_specification',
+])
+const FOUNDATIONS_CROSS_EDGES = new Set<string>([
+  ...SPEC_IMPLEMENTER_EDGES,
+  'product_exposes_primitive',
+  'feature_manipulates_primitive',
+  'primitive_stored_as_data_type',
+])
+
+/**
+ * Evaluate the portfolio-scoped (`scope: 'portfolio'`) foundations anti-patterns
+ * (0.9.13). These read the shared registry + cross-product edges + product-local
+ * primitive nodes, context the single-graph `evaluateAntiPatterns` cannot express,
+ * so they live here instead of in `validate_graph`:
+ *   - specification-without-implementer: a registry specification no product /
+ *     feature / api_contract implements or conforms to.
+ *   - primitive-scattered-without-canonical: the same primitive title appears as a
+ *     product-local node in 2+ products with no registry canonical unifying them.
+ *   - product-reimplements-specification: 2+ products independently implement the
+ *     same registry specification.
+ * Returns undefined for portfolios with no foundations usage, so non-foundations
+ * portfolios keep their existing output.
+ */
+async function portfolioAntiPatternReport(
+  cwd: string,
+  activeStore: UPGFileStore,
+  limit: number,
+): Promise<Record<string, unknown> | undefined> {
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) return undefined
+  const registryNodes = portfolioStore.listRegistryNodes()
+  const crossEdges = portfolioStore.getAllCrossEdges()
+  const specs = registryNodes.filter((n) => n.type === 'specification')
+  const registryPrimitiveTitles = new Set(
+    registryNodes.filter((n) => n.type === 'primitive').map((n) => n.title.toLowerCase()),
+  )
+  const prefix = `${REGISTRY_PRODUCT_ID}/`
+  const bare = (ref: string) => (ref.startsWith(prefix) ? ref.slice(prefix.length) : ref)
+
+  // Product-local primitive nodes across the workspace (active product read live,
+  // others read from disk), grouped by lowercased title.
+  const activeId = (() => {
+    try {
+      return activeStore.getDocument()?.product?.id
+    } catch {
+      return undefined
+    }
+  })()
+  const primitiveProductsByTitle = new Map<string, { display: string; products: Set<string> }>()
+  let localPrimitiveCount = 0
+  const recordPrimitive = (title: string, productId: string) => {
+    const key = title.toLowerCase()
+    const entry = primitiveProductsByTitle.get(key) ?? { display: title, products: new Set<string>() }
+    entry.products.add(productId)
+    primitiveProductsByTitle.set(key, entry)
+    localPrimitiveCount++
+  }
+  for (const absPath of findWorkspaceUpgFiles(cwd)) {
+    try {
+      const doc = JSON.parse(fs.readFileSync(absPath, 'utf-8')) as {
+        product?: { id?: string }
+        nodes?: Array<{ type?: string; title?: string }>
+      }
+      const productId = doc.product?.id
+      if (!productId) continue // skip portfolio.upg / non-product docs
+      const nodes =
+        activeId && productId === activeId
+          ? (activeStore.getDocument()?.nodes ?? [])
+          : doc.nodes ?? []
+      for (const node of nodes) {
+        if (node.type === 'primitive' && node.title) recordPrimitive(node.title, productId)
+      }
+    } catch {
+      // skip malformed
+    }
+  }
+
+  const foundationsPresent =
+    specs.length > 0 ||
+    registryPrimitiveTitles.size > 0 ||
+    localPrimitiveCount > 0 ||
+    crossEdges.some((e) => FOUNDATIONS_CROSS_EDGES.has(e.type))
+  if (!foundationsPresent) return undefined
+
+  const violations: Array<Record<string, unknown>> = []
+
+  // 1 · specification-without-implementer
+  const unimplemented = specs
+    .filter((spec) => {
+      const target = `${prefix}${spec.id}`
+      return !crossEdges.some((e) => SPEC_IMPLEMENTER_EDGES.has(e.type) && e.target === target)
+    })
+    .map((spec) => ({ specification: spec.id, title: spec.title }))
+  if (unimplemented.length > 0) {
+    violations.push({
+      anti_pattern_id: 'specification-without-implementer',
+      severity: 'medium',
+      count: unimplemented.length,
+      instances: unimplemented.slice(0, limit),
+    })
+  }
+
+  // 2 · primitive-scattered-without-canonical
+  const scattered: Array<Record<string, unknown>> = []
+  for (const [key, entry] of primitiveProductsByTitle) {
+    if (entry.products.size >= 2 && !registryPrimitiveTitles.has(key)) {
+      scattered.push({ primitive: entry.display, products: [...entry.products].sort() })
+    }
+  }
+  if (scattered.length > 0) {
+    violations.push({
+      anti_pattern_id: 'primitive-scattered-without-canonical',
+      severity: 'medium',
+      count: scattered.length,
+      instances: scattered.slice(0, limit),
+    })
+  }
+
+  // 3 · product-reimplements-specification
+  const productsBySpec = new Map<string, Set<string>>()
+  for (const e of crossEdges) {
+    if (!PRODUCT_SPEC_IMPL_EDGES.has(e.type)) continue
+    const product = e.source_product_id ?? e.source.split('/')[0]
+    if (!product) continue
+    const set = productsBySpec.get(e.target) ?? new Set<string>()
+    set.add(product)
+    productsBySpec.set(e.target, set)
+  }
+  const reimplemented = [...productsBySpec.entries()]
+    .filter(([, products]) => products.size >= 2)
+    .map(([target, products]) => ({ specification: bare(target), products: [...products].sort() }))
+  if (reimplemented.length > 0) {
+    violations.push({
+      anti_pattern_id: 'product-reimplements-specification',
+      severity: 'low',
+      count: reimplemented.length,
+      instances: reimplemented.slice(0, limit),
+    })
+  }
+
+  const issuesTotal = violations.reduce((sum, v) => sum + (v.count as number), 0)
+  return {
+    evaluated: [
+      'specification-without-implementer',
+      'primitive-scattered-without-canonical',
+      'product-reimplements-specification',
+    ],
+    specifications: specs.length,
+    violations,
+    issues_total: issuesTotal,
+    clean: violations.length === 0,
+  }
+}
+
 /**
  * `portfolio_validate` (Batch-4 #19): run `validate_graph` across every product
  * in scope in one call — the audit counterpart to `portfolio_digest`. Replaces
@@ -440,7 +606,11 @@ async function registryDriftReport(
  *   per-product `top_violations` list. When the portfolio has a canonical
  *   registry, a `registry_drift` block reports `instance_of` edges that point at
  *   a missing canonical, dangle, mismatch type, or were renamed off-canon
- *   (canonical-registry initiative, Phase 3).
+ *   (canonical-registry initiative, Phase 3). When the portfolio uses the
+ *   foundations tier (a registry specification / primitive or a foundations
+ *   cross-edge), a `portfolio_anti_patterns` block reports the portfolio-scoped
+ *   (`scope: 'portfolio'`) anti-patterns: specification-without-implementer,
+ *   primitive-scattered-without-canonical, product-reimplements-specification (0.9.13).
  * @atomicity atomic (read-only). Never mutates active-product state.
  * @see validate_graph
  * @see portfolio_digest
@@ -560,6 +730,15 @@ export const portfolioValidate: ToolHandler = async (args, ctx): Promise<ToolRes
     if (drift) response.registry_drift = drift
   } catch {
     // registry drift is advisory; never fail the whole validate on its account
+  }
+  // Portfolio-scoped (foundations) anti-patterns: only attached when the portfolio
+  // has foundations usage (a registry specification / primitive or a foundations
+  // cross-edge), so non-foundations portfolios keep their existing output.
+  try {
+    const portfolioAntiPatterns = await portfolioAntiPatternReport(cwd, store, violationLimit)
+    if (portfolioAntiPatterns) response.portfolio_anti_patterns = portfolioAntiPatterns
+  } catch {
+    // advisory; never fail the whole validate on its account
   }
   return text(JSON.stringify(response, null, 2))
 }

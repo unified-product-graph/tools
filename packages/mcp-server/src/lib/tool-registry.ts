@@ -80,6 +80,7 @@ import {
   batchDefineCanonicalEntity,
   batchRegisterInstance,
   promoteToCanonical,
+  createRegistryEdge,
 } from '../tools/registry.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
@@ -1930,6 +1931,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'create_registry_edge',
+    description:
+      'Create a canonical-internal edge between two registry entities: the authoring path for `registry.edges`. Canonical entities relate to one another (a registry specification governed_by a registry organization, a primitive defined_by a specification, a specification that extends another specification). These edges live in the portfolio registry and never touch product graphs. Validates that both endpoints exist in the registry, the type is a real `UPG_EDGE_CATALOG` edge, and the catalog source_type/target_type match the two nodes (the canonical edge for the pair). Idempotent: an identical edge (same source/target/type) already present is returned, not duplicated.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        source_id: { type: 'string', description: 'Source registry entity id (bare or registry/{id}).' },
+        target_id: { type: 'string', description: 'Target registry entity id (bare or registry/{id}).' },
+        type: { type: 'string', description: 'A UPG_EDGE_CATALOG edge type whose endpoint types match the two registry nodes (see resolve_edge_for_pair).' },
+      },
+      required: ['source_id', 'target_id', 'type'],
+    },
+  },
+  {
     name: 'portfolio_query',
     description:
       'Traverse the graph ACROSS products in one call (the multi-product `query`). Runs the same BFS (typed-edge traversal + field projection) against every product in scope and tags each subgraph with its source `product_id`, without `switch_product` (the active product is read live; others are read-only). Use for portfolio-level questions ("every product\'s strategy region", "which products have a persona"). `from_id` only matches in its owning product. Read-only.',
@@ -2249,6 +2264,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   batch_define_canonical_entity: batchDefineCanonicalEntity,
   batch_register_instance: batchRegisterInstance,
   promote_to_canonical: promoteToCanonical,
+  create_registry_edge: createRegistryEdge,
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
   portfolio_validate: portfolioValidate,

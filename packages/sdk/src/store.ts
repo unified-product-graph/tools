@@ -1678,6 +1678,54 @@ export class UPGPortfolioStore {
     return node
   }
 
+  // ── Registry-internal edges ──────────────────────────────────────────────────
+  //
+  // Canonical entities can relate to one another (a registry specification
+  // governed_by a registry organization, a primitive defined_by a specification).
+  // These live in `registry.edges` and never touch product graphs. Like the
+  // registry itself, `edges` is lazy: it stays absent until the first internal
+  // edge is added, so registries without internal structure serialise
+  // byte-identically. Endpoints are bare registry node ids.
+
+  /** All canonical-internal edges in the registry (empty array when none). */
+  listRegistryEdges(type?: string): UPGEdge[] {
+    const edges = this.doc?.registry?.edges ?? []
+    return type ? edges.filter((e) => e.type === type) : edges
+  }
+
+  /** Find a registry-internal edge by id. */
+  getRegistryEdge(id: string): UPGEdge | undefined {
+    return this.doc?.registry?.edges?.find((e) => e.id === id)
+  }
+
+  /**
+   * Add a canonical-internal edge to the registry. Throws if an edge with the
+   * same id already exists. Lazily creates `registry.edges` on first use.
+   */
+  addRegistryEdge(edge: UPGEdge): void {
+    if (!edge.id) throw new Error('Registry edge must have an id')
+    const registry = this.ensureRegistry()
+    if (!registry.edges) registry.edges = []
+    if (registry.edges.some((e) => e.id === edge.id)) {
+      throw new Error(`Registry already has an edge with id "${edge.id}"`)
+    }
+    registry.edges.push(edge)
+    this.scheduleSave()
+  }
+
+  /**
+   * Remove a registry-internal edge from the registry by id.
+   * @returns The removed edge, or null if not found.
+   */
+  removeRegistryEdge(id: string): UPGEdge | null {
+    if (!this.doc?.registry?.edges) return null
+    const idx = this.doc.registry.edges.findIndex((e) => e.id === id)
+    if (idx === -1) return null
+    const [removed] = this.doc.registry.edges.splice(idx, 1)
+    this.scheduleSave()
+    return removed ?? null
+  }
+
   // ── Migration: inline → portfolio ─────────────────────────
   //
   // Scans `sourceDoc` for edges whose type is in UPG_CROSS_EDGE_TYPES, converts

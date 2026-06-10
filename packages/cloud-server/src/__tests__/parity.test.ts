@@ -134,6 +134,7 @@ const CLOUD_NA = new Set([
   'batch_define_canonical_entity',
   'batch_register_instance',
   'promote_to_canonical',
+  'create_registry_edge',
   'link_area_to_audience',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers

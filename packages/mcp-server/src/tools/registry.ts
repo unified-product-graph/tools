@@ -27,10 +27,12 @@ import {
 import { UPGPortfolioStore } from '@unified-product-graph/sdk'
 import {
   UPG_TYPES_SET,
+  UPG_EDGE_CATALOG,
   REGISTRY_PRODUCT_ID,
   generateSlug,
   type UPGBaseNode,
   type UPGCrossEdge,
+  type UPGEdge,
 } from '@unified-product-graph/core'
 
 /** Build a stable, readable, type-prefixed registry node id from a title. */
@@ -730,6 +732,124 @@ export const promoteToCanonical: ToolHandler = async (args, ctx): Promise<ToolRe
         registered_source: registerSource,
         edge,
         portfolio_file: path.relative(cwd, portfolioPath),
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Create a canonical-internal edge between two registry entities: the authoring
+ * path for `registry.edges`. Canonical entities relate to one another (a registry
+ * specification governed_by a registry organization, a primitive defined_by a
+ * specification, a specification extends another specification). These edges live
+ * in the portfolio registry and never touch product graphs.
+ *
+ * Validates what the registry requires and the generic edge tools cannot:
+ *   - both endpoints already exist in the registry,
+ *   - the type is a real UPG_EDGE_CATALOG edge,
+ *   - the catalog source_type/target_type match the two registry nodes' types
+ *     (so the edge is the canonical one for the pair).
+ * Idempotent: an identical edge (same source/target/type) already present is
+ * returned, not duplicated.
+ *
+ * Parameters:
+ * - `source_id` (required): registry node id (bare or `registry/{id}`).
+ * - `target_id` (required): registry node id (bare or `registry/{id}`).
+ * - `type` (required): a catalog edge type whose endpoints match the two nodes.
+ *
+ * @returns JSON: `{ edge, source, target, portfolio_file, already_existed? }`.
+ * @atomicity non-atomic. Registry edge append to the portfolio document.
+ * @see define_canonical_entity
+ * @see list_registry
+ */
+export const createRegistryEdge: ToolHandler = async (args): Promise<ToolResult> => {
+  const sourceArg = args.source_id as string | undefined
+  const targetArg = args.target_id as string | undefined
+  const type = args.type as string | undefined
+  if (!sourceArg) return textError('Missing required parameter: source_id (a registry entity)')
+  if (!targetArg) return textError('Missing required parameter: target_id (a registry entity)')
+  if (!type) return textError('Missing required parameter: type (a catalog edge type)')
+
+  const def = (UPG_EDGE_CATALOG as Record<string, { source_type: string; target_type: string }>)[type]
+  if (!def) {
+    return textError(
+      `Invalid edge type: "${type}". A registry edge must be a UPG_EDGE_CATALOG type ` +
+      `(see list_edge_types or resolve_edge_for_pair).`,
+    )
+  }
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return textError(
+      'No portfolio document found. Define the canonical entities first with `define_canonical_entity`.',
+    )
+  }
+
+  const sourceId = bareCanonicalId(sourceArg)
+  const targetId = bareCanonicalId(targetArg)
+  const source = portfolioStore.getRegistryNode(sourceId)
+  if (!source) {
+    return textError(`Source "${sourceId}" not found in the registry. See \`list_registry\`.`)
+  }
+  const target = portfolioStore.getRegistryNode(targetId)
+  if (!target) {
+    return textError(`Target "${targetId}" not found in the registry. See \`list_registry\`.`)
+  }
+
+  // Endpoint types must match the catalog edge's declared source/target types,
+  // so the registry edge is the canonical relationship for the pair.
+  if (source.type !== def.source_type || target.type !== def.target_type) {
+    return textError(
+      `Type mismatch for "${type}": expects ${def.source_type} -> ${def.target_type}, but got ` +
+      `${source.type} ("${sourceId}") -> ${target.type} ("${targetId}"). ` +
+      `Use \`resolve_edge_for_pair\` to find the edge for this pair.`,
+    )
+  }
+
+  // Idempotent: an identical registry edge already present is returned, not duplicated.
+  const existing = portfolioStore
+    .listRegistryEdges()
+    .find((e) => e.type === type && e.source === sourceId && e.target === targetId)
+  if (existing) {
+    return text(
+      JSON.stringify(
+        {
+          edge: existing,
+          source: { id: sourceId, type: source.type, title: source.title },
+          target: { id: targetId, type: target.type, title: target.title },
+          portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
+          already_existed: true,
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  const edge: UPGEdge = {
+    id: edgeId(),
+    source: sourceId,
+    target: targetId,
+    type: type as UPGEdge['type'],
+  }
+
+  try {
+    portfolioStore.addRegistryEdge(edge)
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to write registry edge: ${(err as Error).message}`)
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        edge,
+        source: { id: sourceId, type: source.type, title: source.title },
+        target: { id: targetId, type: target.type, title: target.title },
+        portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
       },
       null,
       2,

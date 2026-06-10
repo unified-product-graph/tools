@@ -30,6 +30,7 @@ import {
   batchDefineCanonicalEntity,
   batchRegisterInstance,
   promoteToCanonical,
+  createRegistryEdge,
 } from '../tools/registry.js'
 import { createCrossProductEdge, linkAreaToAudience } from '../tools/workspace.js'
 import { getNode, getNodes } from '../tools/nodes.js'
@@ -94,6 +95,23 @@ describe('canonical registry (0.9.6)', () => {
 
   function readPortfolio(): Record<string, unknown> {
     return JSON.parse(readFileSync(join(cwd, '.upg', 'portfolio.upg'), 'utf-8'))
+  }
+
+  /** Write a minimal portfolio.upg with a registry + cross_edges (no bootstrap needed). */
+  function writePortfolioDoc(over: { registry?: unknown; cross_edges?: unknown[] }): void {
+    const pf = {
+      upg_version: '0.2',
+      type: 'portfolio',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      organization: { id: 'org_test', title: 'Test Org' },
+      product_areas: [],
+      portfolios: [],
+      products: [],
+      cross_edges: over.cross_edges ?? [],
+      ...(over.registry ? { registry: over.registry } : {}),
+    }
+    writeFileSync(join(cwd, '.upg', 'portfolio.upg'), JSON.stringify(pf, null, 2))
   }
 
   // ── define_canonical_entity ────────────────────────────────────────────────
@@ -447,5 +465,185 @@ describe('canonical registry (0.9.6)', () => {
       ),
     )
     expect(err).toMatch(/link_area_to_audience/i)
+  })
+
+  // ── create_registry_edge (0.9.13 foundations follow-ups) ─────────────────────
+
+  /** Seed a registry specification + organization and return the ctx. */
+  async function withSpecAndOrg(): Promise<ToolContext> {
+    const ctx = await activeCtx()
+    await batchDefineCanonicalEntity(
+      {
+        entities: [
+          { type: 'specification', title: 'UPG', canonical_id: 'specification_upg' },
+          { type: 'organization', title: 'Arkheiev', canonical_id: 'organization_arkheiev' },
+        ],
+      },
+      ctx,
+    )
+    return ctx
+  }
+
+  it('create_registry_edge writes a canonical-internal edge into registry.edges', async () => {
+    const ctx = await withSpecAndOrg()
+    const body = bodyOf(
+      await createRegistryEdge(
+        { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+        ctx,
+      ),
+    )
+    expect(body.edge.type).toBe('specification_governed_by_organization')
+    expect(body.edge.source).toBe('specification_upg')
+    expect(body.edge.target).toBe('organization_arkheiev')
+    const pf = readPortfolio() as { registry?: { edges?: Array<{ type: string }> } }
+    expect(pf.registry?.edges?.map((e) => e.type)).toContain('specification_governed_by_organization')
+  })
+
+  it('create_registry_edge accepts registry/{id}-qualified endpoints', async () => {
+    const ctx = await withSpecAndOrg()
+    const body = bodyOf(
+      await createRegistryEdge(
+        { source_id: 'registry/specification_upg', target_id: 'registry/organization_arkheiev', type: 'specification_governed_by_organization' },
+        ctx,
+      ),
+    )
+    expect(body.edge.source).toBe('specification_upg')
+    expect(body.edge.target).toBe('organization_arkheiev')
+  })
+
+  it('create_registry_edge is idempotent', async () => {
+    const ctx = await withSpecAndOrg()
+    await createRegistryEdge(
+      { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+      ctx,
+    )
+    const body = bodyOf(
+      await createRegistryEdge(
+        { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+        ctx,
+      ),
+    )
+    expect(body.already_existed).toBe(true)
+    const pf = readPortfolio() as { registry?: { edges?: unknown[] } }
+    expect(pf.registry?.edges).toHaveLength(1)
+  })
+
+  it('create_registry_edge rejects an unknown edge type', async () => {
+    const ctx = await withSpecAndOrg()
+    const err = errOf(
+      await createRegistryEdge(
+        { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'not_a_real_edge' },
+        ctx,
+      ),
+    )
+    expect(err).toMatch(/Invalid edge type/i)
+  })
+
+  it('create_registry_edge rejects an endpoint type mismatch', async () => {
+    const ctx = await withSpecAndOrg()
+    // Endpoints reversed: organization -> specification is not the catalog pair.
+    const err = errOf(
+      await createRegistryEdge(
+        { source_id: 'organization_arkheiev', target_id: 'specification_upg', type: 'specification_governed_by_organization' },
+        ctx,
+      ),
+    )
+    expect(err).toMatch(/Type mismatch/i)
+  })
+
+  it('create_registry_edge rejects a missing endpoint', async () => {
+    const ctx = await withSpecAndOrg()
+    const err = errOf(
+      await createRegistryEdge(
+        { source_id: 'specification_upg', target_id: 'organization_ghost', type: 'specification_governed_by_organization' },
+        ctx,
+      ),
+    )
+    expect(err).toMatch(/not found in the registry/i)
+  })
+
+  // ── portfolio_validate foundations anti-patterns (0.9.13, scope:'portfolio') ──
+
+  it('portfolio_validate fires the three foundations anti-patterns and stays clean when satisfied', async () => {
+    // Two sibling products, each with a product-local "Token" primitive (scatter)
+    // and a node that implements a specification.
+    for (const pid of ['p_a', 'p_b']) {
+      const PROD = doc({
+        product: { id: pid, title: pid.toUpperCase(), stage: 'growth' },
+        nodes: [
+          { id: `${pid}_prod`, type: 'product', title: pid.toUpperCase() },
+          { id: `${pid}_token`, type: 'primitive', title: 'Token' },
+        ],
+      })
+      writeFileSync(join(cwd, '.upg', `${pid}.upg`), JSON.stringify(PROD, null, 2))
+    }
+
+    // Registry: specification_groq has NO implementer; specification_graphql is
+    // implemented by BOTH products (reimplementation). No canonical "Token" primitive.
+    writePortfolioDoc({
+      registry: {
+        nodes: [
+          { id: 'specification_groq', type: 'specification', title: 'GROQ' },
+          { id: 'specification_graphql', type: 'specification', title: 'GraphQL' },
+        ],
+      },
+      cross_edges: [
+        {
+          id: 'ce_a', source: 'p_a/p_a_prod', target: 'registry/specification_graphql',
+          type: 'product_implements_specification', source_product_id: 'p_a', target_product_id: 'registry',
+        },
+        {
+          id: 'ce_b', source: 'p_b/p_b_prod', target: 'registry/specification_graphql',
+          type: 'product_implements_specification', source_product_id: 'p_b', target_product_id: 'registry',
+        },
+      ],
+    })
+
+    const ctx = await activeCtx()
+    const body = bodyOf(await portfolioValidate({}, ctx))
+    const block = body.portfolio_anti_patterns
+    expect(block).toBeDefined()
+    expect(block.clean).toBe(false)
+    const byId = Object.fromEntries(
+      block.violations.map((v: { anti_pattern_id: string }) => [v.anti_pattern_id, v]),
+    )
+    // 1 · GROQ has no implementer (GraphQL does, so it is not flagged).
+    expect(byId['specification-without-implementer'].count).toBe(1)
+    expect(byId['specification-without-implementer'].instances[0].specification).toBe('specification_groq')
+    // 2 · "Token" primitive scattered across p_a + p_b with no registry canonical.
+    expect(byId['primitive-scattered-without-canonical'].count).toBe(1)
+    expect(byId['primitive-scattered-without-canonical'].instances[0].products).toEqual(['p_a', 'p_b'])
+    // 3 · GraphQL implemented by two products.
+    expect(byId['product-reimplements-specification'].count).toBe(1)
+    expect(byId['product-reimplements-specification'].instances[0].products).toEqual(['p_a', 'p_b'])
+  })
+
+  it('portfolio_validate omits the foundations block for a non-foundations portfolio', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Developer' }, ctx)
+    const body = bodyOf(await portfolioValidate({}, ctx))
+    expect(body.portfolio_anti_patterns).toBeUndefined()
+  })
+
+  it('portfolio_validate reports a clean foundations block once the specification has an implementer and the primitive is canonical', async () => {
+    const PROD = doc({
+      product: { id: 'p_a', title: 'A', stage: 'growth' },
+      nodes: [{ id: 'p_a_prod', type: 'product', title: 'A' }],
+    })
+    writeFileSync(join(cwd, '.upg', 'a.upg'), JSON.stringify(PROD, null, 2))
+    writePortfolioDoc({
+      registry: { nodes: [{ id: 'specification_groq', type: 'specification', title: 'GROQ' }] },
+      cross_edges: [
+        {
+          id: 'ce_a', source: 'p_a/p_a_prod', target: 'registry/specification_groq',
+          type: 'product_implements_specification', source_product_id: 'p_a', target_product_id: 'registry',
+        },
+      ],
+    })
+    const ctx = await activeCtx()
+    const body = bodyOf(await portfolioValidate({}, ctx))
+    expect(body.portfolio_anti_patterns).toBeDefined()
+    expect(body.portfolio_anti_patterns.clean).toBe(true)
+    expect(body.portfolio_anti_patterns.violations).toHaveLength(0)
   })
 })

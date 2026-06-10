@@ -160,6 +160,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   batchDefineCanonicalEntity: 'batch_define_canonical_entity',
   batchRegisterInstance: 'batch_register_instance',
   promoteToCanonical: 'promote_to_canonical',
+  createRegistryEdge: 'create_registry_edge',
   migrateCrossEdges: 'migrate_cross_edges',
   // migrations
   migrateStatus: 'migrate_status',

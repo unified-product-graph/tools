@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 119 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 120 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 119 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 27 tools
+- [Workspace & Portfolios](#workspace-portfolios): 28 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 46 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1228,6 +1228,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`clone_structure`](#clone-structure)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_product`](#create-product)
+- [`create_registry_edge`](#create-registry-edge)
 - [`define_canonical_entity`](#define-canonical-entity)
 - [`delete_cross_product_edge`](#delete-cross-product-edge)
 - [`detach_product_from_portfolio`](#detach-product-from-portfolio)
@@ -1432,6 +1433,27 @@ JSON: `{ message, ...result }`. `result` carries `id`, `title`,
 (`InvalidProductNameError`).
 
 **See also:** `init_workspace`
+
+
+### `create_registry_edge`
+
+Create a canonical-internal edge between two registry entities: the authoring path for `registry.edges`. Canonical entities relate to one another (a registry specification governed_by a registry organization, a primitive defined_by a specification, a specification that extends another specification). These edges live in the portfolio registry and never touch product graphs. Validates that both endpoints exist in the registry, the type is a real `UPG_EDGE_CATALOG` edge, and the catalog source_type/target_type match the two nodes (the canonical edge for the pair). Idempotent: an identical edge (same source/target/type) already present is returned, not duplicated.
+
+**Atomicity:** `non-atomic. Registry edge append to the portfolio document.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `source_id` | string | ✓ | Source registry entity id (bare or registry/{id}). |
+| `target_id` | string | ✓ | Target registry entity id (bare or registry/{id}). |
+| `type` | string | ✓ | A UPG_EDGE_CATALOG edge type whose endpoint types match the two registry nodes (see resolve_edge_for_pair). |
+
+**Returns:**
+
+JSON: `{ edge, source, target, portfolio_file, already_existed? }`.
+
+**See also:** `define_canonical_entity`, `list_registry`
 
 
 ### `define_canonical_entity`
@@ -1778,7 +1800,11 @@ anti_pattern_violations, all_valid }, errored_products?, unmatched_scope? }`.
 per-product `top_violations` list. When the portfolio has a canonical
 registry, a `registry_drift` block reports `instance_of` edges that point at
 a missing canonical, dangle, mismatch type, or were renamed off-canon
-(canonical-registry initiative, Phase 3).
+(canonical-registry initiative, Phase 3). When the portfolio uses the
+foundations tier (a registry specification / primitive or a foundations
+cross-edge), a `portfolio_anti_patterns` block reports the portfolio-scoped
+(`scope: 'portfolio'`) anti-patterns: specification-without-implementer,
+primitive-scattered-without-canonical, product-reimplements-specification (0.9.13).
 
 **See also:** `validate_graph`, `portfolio_digest`, `portfolio_query`, `list_registry`
 
