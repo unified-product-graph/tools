@@ -98,6 +98,12 @@ export const createCrossProductEdge: ToolHandler = async (args, { store }) => {
       `Invalid cross-edge type: "${type}". Must be one of: ${UPG_CROSS_EDGE_TYPES.join(', ')}`,
     )
   }
+  if (type === 'instance_of') {
+    return textError(
+      `instance_of links a product entity to a canonical registry entity and is created via the ` +
+      `registry tooling (register_instance) in the local MCP server, not create_cross_product_edge.`,
+    )
+  }
 
   try {
     const edge = await store.addCrossProductEdge(edgeId(), productId, source, target, type)

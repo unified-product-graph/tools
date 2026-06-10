@@ -547,6 +547,13 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
       `Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`,
     )
   }
+  if (edgeTypeArg === 'instance_of') {
+    return textError(
+      `instance_of edges link a product entity to a canonical registry entity and are created via ` +
+      `\`register_instance\` (which enforces the same-type constraint and the registry/ target), ` +
+      `not \`create_cross_product_edge\`.`,
+    )
+  }
 
   // Qualify IDs; accept both bare IDs (with product context) and
   // pre-qualified `{product_id}/{node_id}` strings.
@@ -934,6 +941,9 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
     if (!edgeTypeArg) return textError(`edges[${i}]: missing type`)
     if (!UPG_CROSS_EDGE_TYPES.includes(edgeTypeArg as UPGCrossEdgeType)) {
       return textError(`edges[${i}]: invalid cross-product edge type "${edgeTypeArg}". Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`)
+    }
+    if (edgeTypeArg === 'instance_of') {
+      return textError(`edges[${i}]: instance_of edges are created via \`register_instance\` (registry same-type rules), not batch_create_cross_product_edges.`)
     }
     let qualifiedSource: string
     if (sourceIdArg.includes('/')) qualifiedSource = sourceIdArg

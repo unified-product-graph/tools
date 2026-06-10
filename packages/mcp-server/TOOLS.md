@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 110 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 113 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 110 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 19 tools
+- [Workspace & Portfolios](#workspace-portfolios): 22 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1226,6 +1226,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`clone_structure`](#clone-structure)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_product`](#create-product)
+- [`define_canonical_entity`](#define-canonical-entity)
 - [`delete_cross_product_edge`](#delete-cross-product-edge)
 - [`detach_product_from_portfolio`](#detach-product-from-portfolio)
 - [`get_organization`](#get-organization)
@@ -1234,10 +1235,12 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`list_local_products`](#list-local-products)
 - [`list_portfolio_cross_edges`](#list-portfolio-cross-edges)
 - [`list_portfolios`](#list-portfolios)
+- [`list_registry`](#list-registry)
 - [`migrate_cross_edges`](#migrate-cross-edges)
 - [`portfolio_digest`](#portfolio-digest)
 - [`portfolio_query`](#portfolio-query)
 - [`portfolio_validate`](#portfolio-validate)
+- [`register_instance`](#register-instance)
 - [`switch_product`](#switch-product)
 - [`update_product`](#update-product)
 
@@ -1386,6 +1389,30 @@ JSON: `{ message, ...result }`. `result` carries `id`, `title`,
 (`InvalidProductNameError`).
 
 **See also:** `init_workspace`
+
+
+### `define_canonical_entity`
+
+Define a canonical shared entity in the portfolio registry (the shared-vocabulary tier of `.upg/portfolio.upg`). Use when an archetype is shared across products (a Developer persona, a North-Star metric, a competitor) and should have ONE authoritative definition that product instances link to via `register_instance`. A canonical entity is a normal node (persona, metric, competitor, market_segment, ...) that lives in the registry rather than in a product. Creates the portfolio document if absent. Returns the canonical node and its `registry/{id}` qualified id.
+
+**Atomicity:** `non-atomic. Portfolio file create (if new) + registry append.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `canonical_id` | string |  | Optional explicit registry id; otherwise derived from type + title (e.g. persona_developer). |
+| `description` | string |  | Optional longer description of the canonical entity. |
+| `properties` | object |  | Optional properties (e.g. a persona's audience_role). |
+| `tags` | array |  | Optional tags. |
+| `title` | string | ✓ | Canonical name (e.g. "Developer"). |
+| `type` | string | ✓ | Canonical UPG entity type (e.g. persona, metric, competitor, market_segment). Must be an active type. |
+
+**Returns:**
+
+JSON: `{ canonical, qualified_id, portfolio_file }`.
+
+**See also:** `register_instance`, `list_registry`
 
 
 ### `delete_cross_product_edge`
@@ -1551,6 +1578,28 @@ parent_portfolio_id?, hierarchy_model?, products? }>, total }`.
 **See also:** `create_cross_product_edge`, `get_organization`
 
 
+### `list_registry`
+
+List the canonical shared entities in the portfolio registry. Each row carries id, type, title, optional audience_role, and instance_count. With `include_instances`, attaches the product instances (the `instance_of` edges) pointing at each canonical. Empty when no registry exists yet.
+
+**Atomicity:** `atomic (read-only).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `include_instances` | boolean |  | Attach each canonical's product instances (default false). |
+| `type` | string |  | Filter to one entity type (e.g. persona). |
+
+**Returns:**
+
+JSON: `{ registry: Array<{ id, type, title, description?,
+audience_role?, instance_count?, instances? }>, total, by_type }`. Returns
+an empty registry when none exists yet.
+
+**See also:** `define_canonical_entity`, `register_instance`
+
+
 ### `migrate_cross_edges`
 
 Migrate inline cross-product edges from the current product's `edges[]` into the portfolio document (`.upg/portfolio.upg`) with qualified IDs. `dry_run: true` (default) previews; `dry_run: false` applies. Requires `source_product_id` to qualify source node IDs.
@@ -1661,9 +1710,33 @@ structurally_valid, drift, anti_patterns: { high, medium, low },
 top_violations? }>, rollup: { products, valid, invalid, structurally_valid,
 anti_pattern_violations, all_valid }, errored_products?, unmatched_scope? }`.
 `severity` filters anti-patterns; `include_violations: false` drops the
-per-product `top_violations` list.
+per-product `top_violations` list. When the portfolio has a canonical
+registry, a `registry_drift` block reports `instance_of` edges that point at
+a missing canonical, dangle, mismatch type, or were renamed off-canon
+(canonical-registry initiative, Phase 3).
 
-**See also:** `validate_graph`, `portfolio_digest`, `portfolio_query`
+**See also:** `validate_graph`, `portfolio_digest`, `portfolio_query`, `list_registry`
+
+
+### `register_instance`
+
+Link a product node to a canonical registry entity by creating an `instance_of` cross-edge (product entity → `registry/{id}`). This is the only path that creates `instance_of` edges: it requires the canonical to exist and enforces the same-type constraint (a persona instance_of a persona). Idempotent: re-registering the same instance returns the existing edge. Use after `define_canonical_entity` to attach each product's local copy to the shared definition.
+
+**Atomicity:** `non-atomic. Edge append to the portfolio document.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `canonical_id` | string | ✓ | The registry entity id (bare, or registry/{id}). |
+| `node_id` | string | ✓ | The product instance node. Bare id resolves against the active product (or source_product_id); a qualified {product_id}/{node_id} targets any workspace product. |
+| `source_product_id` | string |  | Product ID owning the instance, when node_id is a bare id not in the active product. |
+
+**Returns:**
+
+JSON: `{ edge, instance, canonical, portfolio_file, already_existed? }`.
+
+**See also:** `define_canonical_entity`, `list_registry`
 
 
 ### `switch_product`
@@ -2295,7 +2368,7 @@ JSON: `{ kind, total, count, benchmarks: ... }`
 
 ### `list_cross_edge_types`
 
-List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.
+List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`, not `create_cross_product_edge`.
 
 **Atomicity:** `atomic (read-only)`
 

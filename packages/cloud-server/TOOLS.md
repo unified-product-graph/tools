@@ -1685,7 +1685,7 @@ JSON: `{ kind, total, count, benchmarks: ... }`
 
 ### `list_cross_edge_types`
 
-List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG.
+List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to, instance_of). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG. instance_of (product entity to a canonical registry entity) is created via the registry tooling in the local MCP server.
 
 **Atomicity:** `atomic (read-only)`
 

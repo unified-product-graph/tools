@@ -71,6 +71,7 @@ import {
 } from '../tools/workspace.js'
 import { portfolioQuery, portfolioDigest, portfolioValidate } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
+import { defineCanonicalEntity, registerInstance, listRegistry } from '../tools/registry.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
 import {
@@ -1145,7 +1146,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_cross_edge_types',
     description:
-      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`.',
+      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`, not `create_cross_product_edge`.',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
@@ -1746,6 +1747,49 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
+    name: 'define_canonical_entity',
+    description:
+      'Define a canonical shared entity in the portfolio registry (the shared-vocabulary tier of `.upg/portfolio.upg`). Use when an archetype is shared across products (a Developer persona, a North-Star metric, a competitor) and should have ONE authoritative definition that product instances link to via `register_instance`. A canonical entity is a normal node (persona, metric, competitor, market_segment, ...) that lives in the registry rather than in a product. Creates the portfolio document if absent. Returns the canonical node and its `registry/{id}` qualified id.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        type: { type: 'string', description: 'Canonical UPG entity type (e.g. persona, metric, competitor, market_segment). Must be an active type.' },
+        title: { type: 'string', description: 'Canonical name (e.g. "Developer").' },
+        description: { type: 'string', description: 'Optional longer description of the canonical entity.' },
+        properties: { type: 'object', description: 'Optional properties (e.g. a persona\'s audience_role).' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Optional tags.' },
+        canonical_id: { type: 'string', description: 'Optional explicit registry id; otherwise derived from type + title (e.g. persona_developer).' },
+      },
+      required: ['type', 'title'],
+    },
+  },
+  {
+    name: 'register_instance',
+    description:
+      'Link a product node to a canonical registry entity by creating an `instance_of` cross-edge (product entity → `registry/{id}`). This is the only path that creates `instance_of` edges: it requires the canonical to exist and enforces the same-type constraint (a persona instance_of a persona). Idempotent: re-registering the same instance returns the existing edge. Use after `define_canonical_entity` to attach each product\'s local copy to the shared definition.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        node_id: { type: 'string', description: 'The product instance node. Bare id resolves against the active product (or source_product_id); a qualified {product_id}/{node_id} targets any workspace product.' },
+        canonical_id: { type: 'string', description: 'The registry entity id (bare, or registry/{id}).' },
+        source_product_id: { type: 'string', description: 'Product ID owning the instance, when node_id is a bare id not in the active product.' },
+      },
+      required: ['node_id', 'canonical_id'],
+    },
+  },
+  {
+    name: 'list_registry',
+    description:
+      'List the canonical shared entities in the portfolio registry. Each row carries id, type, title, optional audience_role, and instance_count. With `include_instances`, attaches the product instances (the `instance_of` edges) pointing at each canonical. Empty when no registry exists yet.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        type: { type: 'string', description: 'Filter to one entity type (e.g. persona).' },
+        include_instances: { type: 'boolean', description: 'Attach each canonical\'s product instances (default false).' },
+      },
+    },
+  },
+  {
     name: 'portfolio_query',
     description:
       'Traverse the graph ACROSS products in one call (the multi-product `query`). Runs the same BFS (typed-edge traversal + field projection) against every product in scope and tags each subgraph with its source `product_id`, without `switch_product` (the active product is read live; others are read-only). Use for portfolio-level questions ("every product\'s strategy region", "which products have a persona"). `from_id` only matches in its owning product. Read-only.',
@@ -2056,6 +2100,9 @@ const HANDLERS: Record<string, ToolHandler> = {
   attach_product_to_portfolio: attachProductToPortfolioTool,
   detach_product_from_portfolio: detachProductFromPortfolioTool,
   list_portfolio_cross_edges: listPortfolioCrossEdges,
+  define_canonical_entity: defineCanonicalEntity,
+  register_instance: registerInstance,
+  list_registry: listRegistry,
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
   portfolio_validate: portfolioValidate,

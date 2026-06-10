@@ -20,7 +20,8 @@ import * as path from 'node:path'
 import * as fs from 'node:fs'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
-import { UPGFileStore, computeGraphDigest } from '@unified-product-graph/sdk'
+import { UPGFileStore, computeGraphDigest, openPortfolioStoreIfExists } from '@unified-product-graph/sdk'
+import { REGISTRY_PRODUCT_ID } from '@unified-product-graph/core'
 import { preflightPayload } from '../lib/payload-guard.js'
 import { traverseGraph, type GraphReader, type TraverseParams } from '../lib/graph-traverse.js'
 import { findWorkspaceUpgFiles } from './workspace.js'
@@ -311,6 +312,109 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
 }
 
 /**
+ * Registry drift report (canonical-registry initiative, Phase 3). Walks every
+ * `instance_of` cross-edge and checks it against the canonical it points at:
+ *   - `missing_canonical`: the target is not in the registry,
+ *   - `dangling_instance`: the source product node no longer exists,
+ *   - `type_mismatch`: instance and canonical disagree on type,
+ *   - `title_divergence`: the instance was renamed off-canon (title differs).
+ *
+ * Returns `undefined` when the portfolio has no registry, so portfolios without
+ * one keep their existing `portfolio_validate` output unchanged.
+ */
+async function registryDriftReport(
+  cwd: string,
+  activeStore: UPGFileStore,
+  issueLimit: number,
+): Promise<Record<string, unknown> | undefined> {
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) return undefined
+  const registryNodes = portfolioStore.listRegistryNodes()
+  const crossEdges = portfolioStore.getAllCrossEdges()
+  const instanceEdges = crossEdges.filter((e) => e.type === 'instance_of')
+  if (registryNodes.length === 0 && instanceEdges.length === 0) return undefined
+
+  const canonicalById = new Map(registryNodes.map((n) => [n.id, n]))
+  const activeId = (() => {
+    try {
+      return activeStore.getDocument()?.product?.id
+    } catch {
+      return undefined
+    }
+  })()
+
+  // Cache read-only product stores by id so each referenced product loads once.
+  const roCache = new Map<string, UPGFileStore | null>()
+  const resolveNode = async (productId: string, nodeId: string) => {
+    if (activeId && productId === activeId) return activeStore.getNode(nodeId)
+    if (!roCache.has(productId)) {
+      let store: UPGFileStore | null = null
+      for (const absPath of findWorkspaceUpgFiles(cwd)) {
+        try {
+          const doc = JSON.parse(fs.readFileSync(absPath, 'utf-8')) as { product?: { id?: string } }
+          if (doc.product?.id === productId) {
+            const s = new UPGFileStore()
+            await s.loadReadOnly(absPath)
+            store = s
+            break
+          }
+        } catch {
+          // skip malformed
+        }
+      }
+      roCache.set(productId, store)
+    }
+    return roCache.get(productId)?.getNode(nodeId)
+  }
+
+  const issues: Array<Record<string, unknown>> = []
+  let okCount = 0
+  for (const edge of instanceEdges) {
+    const prefix = `${REGISTRY_PRODUCT_ID}/`
+    const canonicalId = edge.target.startsWith(prefix) ? edge.target.slice(prefix.length) : edge.target
+    const canonical = canonicalById.get(canonicalId)
+    if (!canonical) {
+      issues.push({ kind: 'missing_canonical', edge_id: edge.id, source: edge.source, canonical: canonicalId })
+      continue
+    }
+    const [productId, ...rest] = edge.source.split('/')
+    const nodeId = rest.join('/')
+    const node = await resolveNode(productId ?? '', nodeId)
+    if (!node) {
+      issues.push({ kind: 'dangling_instance', edge_id: edge.id, source: edge.source, canonical: canonicalId })
+      continue
+    }
+    if (node.type !== canonical.type) {
+      issues.push({
+        kind: 'type_mismatch', edge_id: edge.id, source: edge.source, canonical: canonicalId,
+        instance_type: node.type, canonical_type: canonical.type,
+      })
+      continue
+    }
+    if (node.title !== canonical.title) {
+      issues.push({
+        kind: 'title_divergence', edge_id: edge.id, source: edge.source, canonical: canonicalId,
+        instance_title: node.title, canonical_title: canonical.title,
+      })
+      continue
+    }
+    okCount++
+  }
+
+  const byKind: Record<string, number> = {}
+  for (const i of issues) byKind[i.kind as string] = (byKind[i.kind as string] ?? 0) + 1
+  return {
+    canonical_entities: registryNodes.length,
+    instances: instanceEdges.length,
+    on_canon: okCount,
+    issues_total: issues.length,
+    issues_by_kind: byKind,
+    issues: issues.slice(0, issueLimit),
+    clean: issues.length === 0,
+  }
+}
+
+/**
  * `portfolio_validate` (Batch-4 #19): run `validate_graph` across every product
  * in scope in one call — the audit counterpart to `portfolio_digest`. Replaces
  * the `switch_product` + `validate_graph` round-trip per product. Each product
@@ -323,11 +427,15 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
  *   top_violations? }>, rollup: { products, valid, invalid, structurally_valid,
  *   anti_pattern_violations, all_valid }, errored_products?, unmatched_scope? }`.
  *   `severity` filters anti-patterns; `include_violations: false` drops the
- *   per-product `top_violations` list.
+ *   per-product `top_violations` list. When the portfolio has a canonical
+ *   registry, a `registry_drift` block reports `instance_of` edges that point at
+ *   a missing canonical, dangle, mismatch type, or were renamed off-canon
+ *   (canonical-registry initiative, Phase 3).
  * @atomicity atomic (read-only). Never mutates active-product state.
  * @see validate_graph
  * @see portfolio_digest
  * @see portfolio_query
+ * @see list_registry
  */
 export const portfolioValidate: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
@@ -434,6 +542,14 @@ export const portfolioValidate: ToolHandler = async (args, ctx): Promise<ToolRes
       scope && scope.length > 0
         ? 'No workspace products matched the requested scope.'
         : 'No products found in the workspace. Run from a directory with a .upg/ workspace.'
+  }
+  // Registry drift (Phase 3): only attached when the portfolio has a registry,
+  // so non-registry portfolios keep their existing output.
+  try {
+    const drift = await registryDriftReport(cwd, store, violationLimit)
+    if (drift) response.registry_drift = drift
+  } catch {
+    // registry drift is advisory; never fail the whole validate on its account
   }
   return text(JSON.stringify(response, null, 2))
 }

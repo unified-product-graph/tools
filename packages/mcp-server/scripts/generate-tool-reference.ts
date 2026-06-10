@@ -55,7 +55,7 @@ const DOMAIN_SOURCE_FILES: Record<string, readonly string[]> = {
   spec: ['spec.ts', 'frameworks.ts'],
   // portfolio_query / portfolio_digest (0.9.1 batch-3 #13) — the cross-product
   // read layer — live in their own file but belong to the Workspace section.
-  workspace: ['workspace.ts', 'portfolio-read.ts', 'clone-structure.ts'],
+  workspace: ['workspace.ts', 'portfolio-read.ts', 'clone-structure.ts', 'registry.ts'],
 }
 
 const DOMAIN_LABELS: Record<string, string> = {
@@ -152,6 +152,9 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   portfolioDigest: 'portfolio_digest',
   portfolioValidate: 'portfolio_validate',
   cloneStructure: 'clone_structure',
+  defineCanonicalEntity: 'define_canonical_entity',
+  registerInstance: 'register_instance',
+  listRegistry: 'list_registry',
   migrateCrossEdges: 'migrate_cross_edges',
   // migrations
   migrateStatus: 'migrate_status',

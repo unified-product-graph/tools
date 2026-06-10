@@ -124,6 +124,12 @@ const CLOUD_NA = new Set([
   // multiple .upg files, which the single-product-per-request cloud has no
   // analogue for.
   'clone_structure',
+  // canonical shared-entity registry (0.9.6, registry initiative Phase 2): the
+  // registry lives in the `.upg`-file portfolio document (shared-vocabulary tier
+  // across products), a workspace concept with no single-product cloud analogue.
+  'define_canonical_entity',
+  'register_instance',
+  'list_registry',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).

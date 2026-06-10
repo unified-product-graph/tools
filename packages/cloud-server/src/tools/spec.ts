@@ -818,9 +818,10 @@ export const resolveEdgeForPair: ToolHandler = (args): ToolResult => {
 /**
  * List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`
  * (`shares_persona`, `shares_competitor`, `shares_metric`,
- * `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`). These are portfolio-level
- * relationships between entities in different products, separate from the
- * within-product `UPG_EDGE_CATALOG` and previously invisible to MCP.
+ * `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`,
+ * `instance_of`). These are portfolio-level relationships between entities in
+ * different products, separate from the within-product `UPG_EDGE_CATALOG` and
+ * previously invisible to MCP.
  *
  * @returns JSON: `{ count, types: readonly UPGCrossEdgeType[] }`
  * @atomicity atomic (read-only)

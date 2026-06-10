@@ -113,7 +113,9 @@ describe('Tool registry: completeness', () => {
     //   portfolio_digest. → 108.
     // + portfolio_validate (0.9.3 batch-4 #19): portfolio-wide audit. → 109.
     // + clone_structure (0.9.4 batch-4 #17): cross-product shape clone. → 110.
-    expect(TOOL_DEFINITIONS).toHaveLength(110)
+    // + 3 registry tools (0.9.6 registry initiative Phase 2): define_canonical_entity,
+    //   register_instance, list_registry. → 113.
+    expect(TOOL_DEFINITIONS).toHaveLength(113)
   })
 })
 

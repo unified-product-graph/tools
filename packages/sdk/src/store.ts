@@ -12,6 +12,7 @@ import {
   type UPGValidationError,
   type UPGPortfolioDocument,
   type UPGCrossEdge,
+  type UPGRegistry,
   UPG_CROSS_EDGE_TYPES,
 } from '@unified-product-graph/core'
 import { UPG_TYPES, rotateSlug, migrateEdge, migrateNodeProperties, UPG_VERSION, type UPGPropertyMigrationChange } from '@unified-product-graph/core'
@@ -1577,6 +1578,70 @@ export class UPGPortfolioStore {
   /** Find a cross-product edge by ID. */
   getCrossEdge(id: string): UPGCrossEdge | undefined {
     return this.doc?.cross_edges.find((e) => e.id === id)
+  }
+
+  // ── Registry (shared-vocabulary tier) ────────────────────────────────────────
+  //
+  // Canonical shared entities live in the portfolio document's `registry`
+  // section. A canonical entity is a normal UPGBaseNode; product instances link
+  // to it via an `instance_of` cross-edge whose target is `registry/{node_id}`.
+  // The registry is lazy: it stays undefined until the first canonical node is
+  // added, so portfolios without a registry serialise byte-identically.
+
+  /** Return the registry section, or undefined when none exists yet. */
+  getRegistry(): UPGRegistry | undefined {
+    return this.doc?.registry
+  }
+
+  /**
+   * Return the registry section, creating an empty one if absent. Marks the
+   * document dirty only when it actually creates the section.
+   */
+  ensureRegistry(): UPGRegistry {
+    if (!this.doc) throw new Error('Portfolio document not loaded. Call loadOrInit() first.')
+    if (!this.doc.registry) {
+      this.doc.registry = { nodes: [] }
+      this.scheduleSave()
+    }
+    return this.doc.registry
+  }
+
+  /** All canonical entities in the registry (empty array when none). */
+  listRegistryNodes(type?: string): UPGBaseNode[] {
+    const nodes = this.doc?.registry?.nodes ?? []
+    return type ? nodes.filter((n) => n.type === type) : nodes
+  }
+
+  /** Find a canonical entity by its (registry-local) node id. */
+  getRegistryNode(id: string): UPGBaseNode | undefined {
+    return this.doc?.registry?.nodes.find((n) => n.id === id)
+  }
+
+  /**
+   * Add a canonical entity to the registry. Throws if a node with the same id
+   * already exists (the registry is the authoritative single definition).
+   */
+  addRegistryNode(node: UPGBaseNode): void {
+    if (!node.id) throw new Error('Registry node must have an id')
+    const registry = this.ensureRegistry()
+    if (registry.nodes.some((n) => n.id === node.id)) {
+      throw new Error(`Registry already has a canonical entity with id "${node.id}"`)
+    }
+    registry.nodes.push(node)
+    this.scheduleSave()
+  }
+
+  /**
+   * Remove a canonical entity from the registry by id.
+   * @returns The removed node, or null if not found.
+   */
+  removeRegistryNode(id: string): UPGBaseNode | null {
+    if (!this.doc?.registry) return null
+    const idx = this.doc.registry.nodes.findIndex((n) => n.id === id)
+    if (idx === -1) return null
+    const [removed] = this.doc.registry.nodes.splice(idx, 1)
+    this.scheduleSave()
+    return removed ?? null
   }
 
   // ── Migration: inline → portfolio ─────────────────────────
