@@ -229,10 +229,10 @@ export const CODA_LOOKUP_EDGE_MAP: Record<string, string> = {
   initiatives: 'initiative_drives_outcome',
 
   // key_result → metric
-  'key result': 'key_result_tracked_by_metric',
-  key_result: 'key_result_tracked_by_metric',
-  'key results': 'key_result_tracked_by_metric',
-  key_results: 'key_result_tracked_by_metric',
+  'key result': 'key_result_quantified_by_metric',
+  key_result: 'key_result_quantified_by_metric',
+  'key results': 'key_result_quantified_by_metric',
+  key_results: 'key_result_quantified_by_metric',
 
   // feature_area → feature
   'feature area': 'feature_area_contains_feature',

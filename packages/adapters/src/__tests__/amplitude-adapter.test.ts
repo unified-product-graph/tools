@@ -234,7 +234,7 @@ describe('AmplitudeAdapter: metric value fields', () => {
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
 describe('AmplitudeAdapter: edge emission', () => {
-  it('outcome_tracked_by_metric emitted when metric has outcome parent', async () => {
+  it('outcome_measured_by_metric emitted when metric has outcome parent', async () => {
     const items: SourceItem[] = [
       makeItem('out1', 'Increase Activation', 'outcome'),
       makeItem('c1', 'Activation Rate', 'chart', {
@@ -244,13 +244,13 @@ describe('AmplitudeAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'outcome_tracked_by_metric')
-    const edge = result.edges.find((e) => e.type === 'outcome_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'outcome_measured_by_metric')
+    const edge = result.edges.find((e) => e.type === 'outcome_measured_by_metric')
     expect(edge).toBeDefined()
     expect(edge?.mapping_confidence).toBe('medium')
   })
 
-  it('key_result_tracked_by_metric emitted when metric has key_result parent', async () => {
+  it('key_result_quantified_by_metric emitted when metric has key_result parent', async () => {
     const items: SourceItem[] = [
       makeItem('kr1', 'WAU hits 20k', 'key_result'),
       makeItem('c1', 'WAU Chart', 'chart', {
@@ -260,8 +260,8 @@ describe('AmplitudeAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'key_result_tracked_by_metric')
-    const edge = result.edges.find((e) => e.type === 'key_result_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'key_result_quantified_by_metric')
+    const edge = result.edges.find((e) => e.type === 'key_result_quantified_by_metric')
     expect(edge).toBeDefined()
   })
 

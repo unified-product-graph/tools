@@ -136,6 +136,7 @@ import {
   pushToCloud,
 } from '../tools/sync.js'
 import { skillAudit } from '../tools/skills.js'
+import { UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
 
 // `ToolDefinition` lives in `@unified-product-graph/mcp-tooling`. Re-exported
 // for backwards-compat with internal imports + the parity audit test.
@@ -144,6 +145,23 @@ export type { ToolDefinition }
 export interface ToolEntry extends ToolDefinition {
   handler: ToolHandler
 }
+
+// The cross-edge types creatable through the GENERIC writers
+// (`create_cross_product_edge` + `batch_create_cross_product_edges`). Derived
+// from the spec union so the single and batch tools share ONE source and can
+// never drift again (batch-6 #31: the batch enum had lagged a release behind,
+// missing `rolls_up_to`). The dedicated edges — `instance_of` (via
+// `register_instance`) and `area_serves_persona` / `area_targets_market_segment`
+// (via `link_area_to_audience`) — are excluded; their handlers own creation and
+// the generic writers reject them.
+const DEDICATED_CROSS_EDGE_TYPES = new Set<string>([
+  'instance_of',
+  'area_serves_persona',
+  'area_targets_market_segment',
+])
+const GENERIC_CROSS_EDGE_TYPES: string[] = UPG_CROSS_EDGE_TYPES.filter(
+  (t) => !DEDICATED_CROSS_EDGE_TYPES.has(t),
+)
 
 /** Wire-shape definitions passed to `tools/list`. */
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -223,14 +241,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_nodes',
     description:
-      'Batch-fetch up to 50 entities by ID. Returns each node with its edges. Use instead of looping `get_node`.',
+      'Batch-fetch up to 50 entities by ID. Returns each node with its edges. Use instead of looping `get_node`. A bare id reads the active product; a qualified `{product_id}/{node_id}` (the form list_registry / export_edges / cross-edges return) reads that product cross-portfolio (read-only for non-active products), so a connective pass can fetch node content across graphs without a switch_product sweep. Cross-product results carry a `product_id`.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         ids: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of node IDs to fetch (max 50)',
+          description: 'Node IDs (max 50). Bare (active product) or qualified `{product_id}/{node_id}` for any product in the workspace.',
         },
         compact_edges: { type: 'boolean', description: 'Omit titles from edges' },
       },
@@ -1697,7 +1715,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         target_id: { type: 'string', description: 'Target node ID' },
         type: {
           type: 'string',
-          enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts', 'contributes_to', 'rolls_up_to'],
+          enum: GENERIC_CROSS_EDGE_TYPES,
           description: 'Cross-product relationship type',
         },
         source_product_id: { type: 'string', description: 'Product ID of the source node' },
@@ -1750,8 +1768,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               target_id: { type: 'string', description: 'Target node ID (bare or qualified {product_id}/{node_id})' },
               type: {
                 type: 'string',
-                enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts', 'contributes_to'],
-                description: 'Cross-product relationship type',
+                enum: GENERIC_CROSS_EDGE_TYPES,
+                description: 'Cross-product relationship type (parity with create_cross_product_edge; `rolls_up_to` included). For `instance_of` use `register_instance`; for the area edges use `link_area_to_audience`.',
               },
               source_product_id: { type: 'string', description: 'Product ID of the source node (qualifies a bare source_id)' },
               target_product_id: { type: 'string', description: 'Product ID of the target node (qualifies a bare target_id)' },

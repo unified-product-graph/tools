@@ -188,11 +188,14 @@ describe(': chain walk lands on canonical (Fix A)', () => {
     // The hypothesis-family v0.4.0 reversal applies to ~12 edges. Each was
     // renamed to `*_hypothesis_claim` in v0.2.8 and renamed back to
     // `*_hypothesis` in v0.4.0. Validate the walk pattern for the broader
-    // family (excluding hypothesis_evidence_* which is `drop`, not rename).
+    // family (excluding hypothesis_evidence_* which is `drop`, not rename, and
+    // hypothesis_claim_planned_via_test_plan whose v0.4.0 target
+    // `hypothesis_planned_via_test_plan` was retired in 0.9.9 / when
+    // test_plan re-homed validation → QA — it now chains to `drop`, asserted
+    // separately below).
     const hypothesisClaimDeprecated = [
       'solution_proposes_hypothesis_claim',
       'hypothesis_claim_requires_experiment_plan',
-      'hypothesis_claim_planned_via_test_plan',
       'hypothesis_claim_investigated_via_research_plan',
       'learning_updates_hypothesis_claim',
       'learning_refines_hypothesis_claim',
@@ -213,6 +216,17 @@ describe(': chain walk lands on canonical (Fix A)', () => {
         expect(walk.to in UPG_EDGE_CATALOG).toBe(true)
       }
     }
+
+    // The test_plan-planning alias chains through its v0.4.0 target to the
+    // 0.9.9 / drop (a hypothesis no longer plans via a QA test_plan).
+    const planViaTestPlan = walkMigrationChainToCanonical(
+      'hypothesis_claim_planned_via_test_plan',
+      UPG_EDGE_CATALOG,
+    )
+    expect(
+      planViaTestPlan.kind,
+      'hypothesis_claim_planned_via_test_plan should chain to drop (test_plan re-homed to QA in 0.9.9)',
+    ).toBe('drop')
   })
 })
 

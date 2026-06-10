@@ -32,7 +32,8 @@ import {
   promoteToCanonical,
 } from '../tools/registry.js'
 import { createCrossProductEdge, linkAreaToAudience } from '../tools/workspace.js'
-import { getNode } from '../tools/nodes.js'
+import { getNode, getNodes } from '../tools/nodes.js'
+import { createEdge } from '../tools/edges.js'
 import { portfolioValidate } from '../tools/portfolio-read.js'
 
 function doc(over: Partial<UPGDocument> & { product: UPGDocument['product'] }): UPGDocument {
@@ -126,6 +127,58 @@ describe('canonical registry (0.9.6)', () => {
       await defineCanonicalEntity({ type: 'persona', title: 'Dev again', canonical_id: 'dev' }, ctx),
     )
     expect(err).toMatch(/already has a canonical entity/i)
+  })
+
+  // ── batch-6 #34: cross-product get_nodes ─────────────────────────────────────
+
+  it('get_nodes resolves a qualified {product_id}/{node_id} from another product', async () => {
+    const OTHER = doc({
+      product: { id: 'p_other', title: 'Other', stage: 'growth' },
+      nodes: [{ id: 'o_persona', type: 'persona', title: 'Designer' }],
+    })
+    writeFileSync(join(cwd, '.upg', 'other.upg'), JSON.stringify(OTHER, null, 2))
+    const ctx = await activeCtx() // active product = main
+    const body = bodyOf(await getNodes({ ids: ['m_dev', 'p_other/o_persona'] }, ctx))
+    const dev = body.nodes.find((w: { node: { id: string } }) => w.node.id === 'm_dev')
+    expect(dev).toBeDefined()
+    const designer = body.nodes.find((w: { node: { id: string } }) => w.node.id === 'o_persona')
+    expect(designer).toBeDefined()
+    expect(designer.product_id).toBe('p_other')
+    expect(designer.node.title).toBe('Designer')
+  })
+
+  it('get_nodes reports a cross-product miss with its qualified id', async () => {
+    const ctx = await activeCtx()
+    const body = bodyOf(await getNodes({ ids: ['p_nonexistent/x'] }, ctx))
+    expect(body.not_found).toContain('p_nonexistent/x')
+  })
+
+  // ── batch-6 #37: p_ product-header acceptance on intra-graph edges ───────────
+
+  it('create_edge accepts the p_ product-header and resolves it to the in-graph product node', async () => {
+    // A legacy-shape product: the in-graph product NODE id differs from the
+    // p_ header (new products mint them equal; older ones do not).
+    const LEGACY = doc({
+      product: { id: 'p_legacy', title: 'Legacy', stage: 'growth' },
+      nodes: [
+        { id: 'n_legacy_prod', type: 'product', title: 'Legacy' },
+        { id: 'n_dec', type: 'decision', title: 'Adopt UPG' },
+      ],
+    })
+    writeFileSync(join(cwd, '.upg', 'legacy.upg'), JSON.stringify(LEGACY, null, 2))
+    const store = new UPGFileStore()
+    await store.load(join(cwd, '.upg', 'legacy.upg'))
+    store.stopWatching()
+    const ctx: ToolContext = {
+      store,
+      sessionContext: createSessionContext(),
+      queryCache: createQueryCache(),
+      sync: { readSyncState, writeSyncState, hashFile, syncFilePath },
+    }
+    const body = bodyOf(createEdge({ source_id: 'p_legacy', target_id: 'n_dec' }, ctx))
+    expect(body.error).toBeUndefined()
+    // The p_ header resolved to the in-graph product node, not left as p_legacy.
+    expect(body.edge.source).toBe('n_legacy_prod')
   })
 
   // ── register_instance ───────────────────────────────────────────────────────

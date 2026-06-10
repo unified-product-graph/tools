@@ -605,7 +605,7 @@ export const batchRegisterInstance: ToolHandler = async (args, ctx): Promise<Too
         target_product_id: REGISTRY_PRODUCT_ID,
       }
       if (aliasArg === true) newEdge.alias = true
-      plans.push({ newEdge, row: { ...baseRow, already_existed: false } })
+      plans.push({ newEdge, row: { ...baseRow, already_existed: false, aliased: aliasArg === true } })
     }
   }
 
@@ -622,7 +622,12 @@ export const batchRegisterInstance: ToolHandler = async (args, ctx): Promise<Too
           if (p.aliasArg) p.existingRef.alias = true
           else delete p.existingRef.alias
           portfolioStore.markDirty()
+          // Signal that the idempotent re-register actually mutated the sanction,
+          // so success is visible without a separate portfolio_validate (#32).
+          p.row.alias_updated = true
         }
+        // Always echo the resulting sanction state on an existing instance.
+        p.row.aliased = p.existingRef.alias === true
       }
     }
     await portfolioStore.flush()

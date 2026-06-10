@@ -305,6 +305,28 @@ describe(': resolver UX alternates', () => {
   })
 })
 
+// ── batch-6 #28: did_you_mean for a mistyped edge type ──────────────────────
+describe('batch-6 #28: create_edge did_you_mean for a bad edge type', () => {
+  it('fuzzy-suggests the closest catalogue edge for a typo whose pair has no canonical edge', async () => {
+    const store = await makeStore()
+    const ctx = makeCtx(store)
+    const product = (await parseBody(createNode({ type: 'product', title: 'P' }, ctx))) as { node: { id: string } }
+    const icp = (await parseBody(
+      createNode({ type: 'ideal_customer_profile', title: 'ICP' }, ctx),
+    )) as { node: { id: string } }
+    // product → ideal_customer_profile has no canonical edge, so before #28 a
+    // bad explicit type produced no suggestion. The fuzzy name match now does.
+    const result = createEdge(
+      { source_id: product.node.id, target_id: icp.node.id, type: 'product_decided_via_decisio' },
+      ctx,
+    )
+    expect(await isErrorResult(result)).toBe(true)
+    const text = (result.content[0] as { text: string }).text
+    expect(text).toContain('did_you_mean')
+    expect(text).toContain('product_decided_via_decision')
+  })
+})
+
 // ──: create_node first-use schema hints ─────────────────────────────
 
 describe(': create_node first-use hints', () => {

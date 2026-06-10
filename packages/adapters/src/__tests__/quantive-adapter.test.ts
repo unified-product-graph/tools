@@ -309,7 +309,7 @@ describe('QuantiveAdapter: edge emission', () => {
     expect(edge?.mapping_confidence).toBe('medium')
   })
 
-  it('key_result_tracked_by_metric emitted when metric has key_result parent', async () => {
+  it('key_result_quantified_by_metric emitted when metric has key_result parent', async () => {
     const items: SourceItem[] = [
       makeEntity('kr1', 'Activation Rate ≥ 60%', 'key_result'),
       makeEntity('m1', 'Activation Rate', 'metric', {
@@ -321,12 +321,12 @@ describe('QuantiveAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'key_result_tracked_by_metric')
-    const edge = result.edges.find((e) => e.type === 'key_result_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'key_result_quantified_by_metric')
+    const edge = result.edges.find((e) => e.type === 'key_result_quantified_by_metric')
     expect(edge).toBeDefined()
   })
 
-  it('kpi parent type also resolves key_result_tracked_by_metric edge', async () => {
+  it('kpi parent type also resolves key_result_quantified_by_metric edge', async () => {
     const items: SourceItem[] = [
       makeEntity('kr1', 'Revenue KR', 'key_result'),
       makeEntity('kpi1', 'Revenue', 'kpi', {
@@ -335,8 +335,8 @@ describe('QuantiveAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'key_result_tracked_by_metric via kpi')
-    const edge = result.edges.find((e) => e.type === 'key_result_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'key_result_quantified_by_metric via kpi')
+    const edge = result.edges.find((e) => e.type === 'key_result_quantified_by_metric')
     expect(edge).toBeDefined()
   })
 

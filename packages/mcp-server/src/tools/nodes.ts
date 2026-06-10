@@ -9,13 +9,15 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { preflightPayload, getSoftLimit } from '../lib/payload-guard.js'
 import { degradeProgressively } from '../lib/payload-degrader.js'
-import { edgeId } from '@unified-product-graph/sdk'
+import path from 'node:path'
+import { edgeId, UPGFileStore } from '@unified-product-graph/sdk'
 import {
   isPortfolioScopedType,
   writePortfolioScopedNode,
   PortfolioRoutingError,
   openPortfolioStoreIfExists,
 } from '@unified-product-graph/sdk'
+import { resolveScopedProducts } from './portfolio-read.js'
 import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
 import {
   UPG_MIGRATIONS,
@@ -276,7 +278,7 @@ export const getNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
  * @atomicity atomic (read-only)
  * @see get_node
  */
-export const getNodes: ToolHandler = (args, ctx): ToolResult => {
+export const getNodes: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
   const ids = args.ids as string[] | undefined
   if (!ids || !Array.isArray(ids) || ids.length === 0)
@@ -285,7 +287,57 @@ export const getNodes: ToolHandler = (args, ctx): ToolResult => {
     return textError('Maximum 50 IDs per batch request')
 
   const requestedCompactEdges = (args.compact_edges as boolean) ?? false
-  const result = getNodesLib(store, { ids, compact_edges: requestedCompactEdges })
+
+  // #34: a bare id reads the active store; a qualified `{product_id}/{node_id}`
+  // reads that product's graph (read-only for non-active products) — so the
+  // portfolio-wide refs that list_registry / export_edges / cross-edges return
+  // resolve to real node content instead of `not_found`, with no serial
+  // switch_product sweep.
+  const bareIds: string[] = []
+  const crossByProduct = new Map<string, string[]>()
+  for (const id of ids) {
+    const slash = id.indexOf('/')
+    if (slash > 0) {
+      const productId = id.slice(0, slash)
+      const nodeId = id.slice(slash + 1)
+      const group = crossByProduct.get(productId)
+      if (group) group.push(nodeId)
+      else crossByProduct.set(productId, [nodeId])
+    } else {
+      bareIds.push(id)
+    }
+  }
+
+  const result = getNodesLib(store, { ids: bareIds, compact_edges: requestedCompactEdges })
+  const notFound: string[] = [...(result.not_found ?? [])]
+
+  if (crossByProduct.size > 0) {
+    const cwd = process.cwd()
+    const activePath = store.getFilePath()
+    for (const [productId, nodeIds] of crossByProduct) {
+      const { products } = resolveScopedProducts(cwd, [productId])
+      const prod = products[0]
+      if (!prod) {
+        for (const nid of nodeIds) notFound.push(`${productId}/${nid}`)
+        continue
+      }
+      let crossStore: UPGFileStore
+      if (activePath && path.resolve(activePath) === path.resolve(prod.absPath)) {
+        crossStore = store
+      } else {
+        crossStore = new UPGFileStore()
+        await crossStore.loadReadOnly(prod.absPath)
+      }
+      const sub = getNodesLib(crossStore, { ids: nodeIds, compact_edges: requestedCompactEdges })
+      for (const wrapper of sub.nodes) {
+        ;(wrapper as Record<string, unknown>).product_id = productId
+        result.nodes.push(wrapper)
+      }
+      for (const nf of sub.not_found ?? []) notFound.push(`${productId}/${nf}`)
+    }
+    result.total = result.nodes.length
+  }
+  if (notFound.length > 0) result.not_found = notFound
 
   const countEdges = (nodes: typeof result.nodes) =>
     nodes.reduce((sum, n) => sum + (n.edges_out?.length ?? 0) + (n.edges_in?.length ?? 0), 0)

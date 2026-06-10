@@ -23,7 +23,7 @@
  * Hierarchy edges emitted:
  * - initiative_drives_outcome           (initiative → goal/objective)
  * - objective_achieved_through_key_result (goal → key_result)
- * - key_result_tracked_by_metric        (key_result → metric child)
+ * - key_result_quantified_by_metric        (key_result → metric child)
  * - release_contains_feature            (release → feature)
  * - feature_decomposed_into_epic        (feature → epic)
  * - epic_specified_by_user_story   (epic → requirement/acceptance_criterion)
@@ -428,7 +428,7 @@ function resolveAhaHierarchyEdge(
 
   // key_result → metric (if metric tracked by key result)
   if (parent === 'key_result' && child === 'metric') {
-    return 'key_result_tracked_by_metric'
+    return 'key_result_quantified_by_metric'
   }
 
   void itemTitle

@@ -62,10 +62,10 @@ const node = (id: string, type: string, title = `Node ${id}`): UPGBaseNode => ({
 })
 
 describe('migrate_properties: pure property pass', () => {
- it('lifts pre-canonical product.properties.stage onto top-level status', async () => {
+ it('does NOT lift a product properties.stage (canonical per/661, batch-6 #33)', async () => {
  const dirty = {
  ...node('p1', 'product'),
- properties: { stage: 'idea' },
+ properties: { stage: 'build' },
  }
  const store = await loadStore(makeDoc([dirty], []))
  const ctx = makeCtx(store)
@@ -74,12 +74,13 @@ describe('migrate_properties: pure property pass', () => {
  const body = JSON.parse(result.content[0].text)
 
  expect(body.dry_run).toBe(false)
- expect(body.lifted_properties).toEqual([
- { id: 'p1', from_property: 'stage', to: 'status', value_changed: true },
- ])
+ // The product stage lift was retired in 0.9.10; properties.stage is the
+ // canonical product lifecycle slot, so a freshly-created product is born
+ // valid instead of self-reporting property_drift.
+ expect(body.lifted_properties).toEqual([])
  const migrated = store.getNode('p1')
- expect(migrated?.status).toBe('concept')
- expect((migrated?.properties as Record<string, unknown> | undefined)?.stage).toBeUndefined()
+ expect(migrated?.status).toBeUndefined()
+ expect((migrated?.properties as Record<string, unknown> | undefined)?.stage).toBe('build')
  })
 
  it('renames pre-canonical lifecycle_status onto status with value_map remap', async () => {

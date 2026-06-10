@@ -12,8 +12,8 @@
  *
  *
  * Edges emitted:
- * - key_result_tracked_by_metric  (when parent is a key_result)
- * - outcome_tracked_by_metric     (when parent is an outcome)
+ * - key_result_quantified_by_metric  (when parent is a key_result)
+ * - outcome_measured_by_metric     (when parent is an outcome)
  *
  * Skipped with warnings:
  * - event    : raw telemetry, no UPG entity equivalent
@@ -266,14 +266,14 @@ export class AmplitudeAdapter implements UPGAdapter {
       if (upgEntityType === 'metric') {
         if (parentResolved === 'key_result' || parentEntityType === 'key_result') {
           edgeType = safeEdgeType(
-            'key_result_tracked_by_metric',
-            `Amplitude: key_result_tracked_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
+            'key_result_quantified_by_metric',
+            `Amplitude: key_result_quantified_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
             warnings,
           )
         } else if (parentResolved === 'outcome' || parentEntityType === 'outcome') {
           edgeType = safeEdgeType(
-            'outcome_tracked_by_metric',
-            `Amplitude: outcome_tracked_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
+            'outcome_measured_by_metric',
+            `Amplitude: outcome_measured_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
             warnings,
           )
         }

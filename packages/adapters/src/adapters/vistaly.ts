@@ -10,7 +10,7 @@
  *
  *
  * Hierarchy edges:
- * - outcome ← metric/kpi        → outcome_tracked_by_metric
+ * - outcome ← metric/kpi        → outcome_measured_by_metric
  * - outcome → opportunity        → opportunity_pursues_outcome
  * - opportunity → solution       → opportunity_drives_solution
  * - solution → experiment        → solution_proposes_hypothesis (via hypothesis)
@@ -407,9 +407,9 @@ function resolveVistalyEdge(
   const child = normalizeName(childType)
 
   // outcome ← metric / kpi: edge direction is outcome → metric (source: outcome, target: metric)
-  // But in Vistaly, parent=outcome, child=kpi|metric → emit outcome_tracked_by_metric
+  // But in Vistaly, parent=outcome, child=kpi|metric → emit outcome_measured_by_metric
   if ((parent === 'outcome') && (child === 'kpi' || child === 'metric')) {
-    return 'outcome_tracked_by_metric'
+    return 'outcome_measured_by_metric'
   }
 
   // outcome → opportunity (Vistaly: parent=outcome, child=opportunity)

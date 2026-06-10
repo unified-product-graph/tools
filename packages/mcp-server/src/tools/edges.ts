@@ -8,7 +8,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
-import { UPG_EDGE_CATALOG, resolveContainmentEdge } from '@unified-product-graph/core'
+import { UPG_EDGE_CATALOG, UPG_EDGE_TYPES, resolveContainmentEdge } from '@unified-product-graph/core'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
 import { validateExplicitEdgeType } from '@unified-product-graph/sdk'
 import { preflightPayload } from '../lib/payload-guard.js'
@@ -41,13 +41,79 @@ function portfolioHeaderHint(store: ToolContext['store'], label: string, id: str
 }
 
 /**
- * Batch-5 #28: enrich an unknown explicit edge type with a `did_you_mean`
- * resolved from the endpoint types (the same lookup `resolve_edge_for_pair` uses).
+ * Batch-6 #37: transparently resolve a `p_…` product-header id (passed where an
+ * intra-graph node id is expected) to the in-graph `type:"product"` node. New
+ * products mint that node with id == the p_ header, so `getNode` already finds
+ * it; products created earlier carry a distinct `n_…` product node, and this
+ * lets a product-anchored edge (`product_builds_feature`,
+ * `product_measures_with_metric`, …) accept the `p_` header without a manual
+ * `list_nodes({type:"product"})` lookup. Returns null when `id` isn't a `p_`
+ * header miss, or the graph has no product node (caller then surfaces the #27
+ * hint instead of silently mis-anchoring).
+ */
+function resolveProductHeaderId(store: ToolContext['store'], id: string | undefined): string | null {
+  if (!id || !id.startsWith('p_') || store.getNode(id)) return null
+  return store.getAllNodes().find((n) => n.type === 'product')?.id ?? null
+}
+
+/**
+ * Cheap Levenshtein distance for the did_you_mean fuzzy match. Inputs are edge
+ * type identifiers (tens of chars), so the iterative two-row DP is plenty.
+ */
+function editDistance(a: string, b: string): number {
+  const m = a.length
+  const n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  let prev = Array.from({ length: n + 1 }, (_, j) => j)
+  let curr = new Array<number>(n + 1)
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      curr[j] = Math.min(prev[j]! + 1, curr[j - 1]! + 1, prev[j - 1]! + cost)
+    }
+    ;[prev, curr] = [curr, prev]
+  }
+  return prev[n]!
+}
+
+/**
+ * The catalogue edge key closest to `type` by edit distance, or null when
+ * nothing is within a sane threshold (never suggest something wildly
+ * unrelated). This closes batch-6 #28 for a mistyped edge type whose endpoints
+ * don't resolve to a canonical pair: a name typo still gets a concrete suggestion.
+ */
+function closestEdgeType(type: string): string | null {
+  let best: string | null = null
+  let bestDist = Infinity
+  for (const cand of UPG_EDGE_TYPES) {
+    const d = editDistance(type, cand)
+    if (d < bestDist) {
+      bestDist = d
+      best = cand
+    }
+  }
+  const threshold = Math.max(3, Math.floor(type.length * 0.4))
+  return best && bestDist <= threshold ? best : null
+}
+
+/**
+ * Batch-5/6 #28: enrich an unknown explicit edge type with a `did_you_mean`.
+ * Prefers the canonical edge for the resolved endpoint types (what
+ * `resolve_edge_for_pair` returns); falls back to the closest catalogue key by
+ * name when the endpoints don't resolve or the pair has no canonical edge — so
+ * a typo'd type always gets a concrete suggestion, not just a pointer to
+ * resolve_edge_for_pair.
  */
 function unknownEdgeTypeHint(type: string, sourceType?: string, targetType?: string): string {
-  const suggestion = sourceType && targetType ? resolveContainmentEdge(sourceType, targetType) : null
+  const byPair = sourceType && targetType ? resolveContainmentEdge(sourceType, targetType) : null
+  const suggestion = byPair ?? closestEdgeType(type)
   if (suggestion) {
-    return `Edge type "${type}" is not in UPG_EDGE_CATALOG. did_you_mean: "${suggestion}" (the canonical ${sourceType} → ${targetType} edge).`
+    const why = byPair
+      ? `the canonical ${sourceType} → ${targetType} edge`
+      : 'the closest catalogue edge by name'
+    return `Edge type "${type}" is not in UPG_EDGE_CATALOG. did_you_mean: "${suggestion}" (${why}).`
   }
   if (sourceType && targetType) {
     return `Edge type "${type}" is not in UPG_EDGE_CATALOG. Omit \`type\` to auto-infer, or call resolve_edge_for_pair({source_type:"${sourceType}", target_type:"${targetType}"}).`
@@ -116,10 +182,16 @@ export const createEdge: ToolHandler = (args, ctx): ToolResult => {
   const { store } = ctx
   if (!args.source_id) return textError(`Missing required parameter: source_id`)
 
-  const sourceId = args.source_id as string
-  const targetId = args.target_id as string | undefined
+  let sourceId = args.source_id as string
+  let targetId = args.target_id as string | undefined
 
-  // #27: surface the p_/n_ identity mismatch before the generic "not found".
+  // #37: transparently accept the p_ product-header where the in-graph product
+  // NODE id is expected (older graphs carry a distinct n_ product node).
+  sourceId = resolveProductHeaderId(store, sourceId) ?? sourceId
+  if (targetId) targetId = resolveProductHeaderId(store, targetId) ?? targetId
+
+  // #27: surface the p_/n_ identity mismatch before the generic "not found"
+  // (only reached when there is no in-graph product node to resolve the p_ to).
   const srcHint = portfolioHeaderHint(store, 'source_id', sourceId)
   if (srcHint) return textError(srcHint)
   const tgtHint = portfolioHeaderHint(store, 'target_id', targetId)
@@ -131,12 +203,14 @@ export const createEdge: ToolHandler = (args, ctx): ToolResult => {
   if (explicitType && !UPG_EDGE_CATALOG[explicitType as UPGEdgeType]) {
     const srcType = store.getNode(sourceId)?.type as string | undefined
     const tgtType = targetId ? (store.getNode(targetId)?.type as string | undefined) : undefined
-    if (srcType && tgtType) return textError(unknownEdgeTypeHint(explicitType, srcType, tgtType))
+    // Always return the hint on a bad type — even when an endpoint doesn't
+    // resolve, the fuzzy name match still offers a did_you_mean (#28).
+    return textError(unknownEdgeTypeHint(explicitType, srcType, tgtType))
   }
 
   const result = createEdgeLib(store, {
-    source_id: args.source_id as string,
-    target_id: args.target_id as string | undefined,
+    source_id: sourceId,
+    target_id: targetId,
     target_title: args.target_title as string | undefined,
     target_type: args.target_type as string | undefined,
     type: args.type as string | undefined,
@@ -284,6 +358,10 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
     const e = edges[i]
     if (!e.source_id) { errors.push({ message: `Edge at index ${i}: missing required field "source_id"` }); resolvedEdgeTypes.push(null); continue }
     if (!e.target_id) { errors.push({ message: `Edge at index ${i}: missing required field "target_id"` }); resolvedEdgeTypes.push(null); continue }
+    // #37: accept the p_ product-header in place, so a product-anchored edge in
+    // a batch resolves to the in-graph product node like the single create_edge.
+    e.source_id = resolveProductHeaderId(store, e.source_id as string) ?? e.source_id
+    e.target_id = resolveProductHeaderId(store, e.target_id as string) ?? e.target_id
     const sourceNode = store.getNode(e.source_id as string)
     const targetNode = store.getNode(e.target_id as string)
     if (!sourceNode) {

@@ -287,7 +287,7 @@ describe('VistalyAdapter: edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('outcome_tracked_by_metric emitted when kpi has outcome parent', async () => {
+  it('outcome_measured_by_metric emitted when kpi has outcome parent', async () => {
     const items: SourceItem[] = [
       makeCard('out1', 'Improve activation', 'outcome'),
       makeCard('kpi1', 'Activation Rate', 'kpi', {
@@ -298,8 +298,8 @@ describe('VistalyAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'outcome_tracked_by_metric')
-    const edge = result.edges.find((e) => e.type === 'outcome_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'outcome_measured_by_metric')
+    const edge = result.edges.find((e) => e.type === 'outcome_measured_by_metric')
     expect(edge).toBeDefined()
   })
 

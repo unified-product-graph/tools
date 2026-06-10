@@ -10,8 +10,8 @@
  *
  *
  * Edges emitted:
- * - key_result_tracked_by_metric      (when metric parent is a key_result)
- * - outcome_tracked_by_metric         (when metric parent is an outcome)
+ * - key_result_quantified_by_metric      (when metric parent is a key_result)
+ * - outcome_measured_by_metric         (when metric parent is an outcome)
  * - feature_tests_hypothesis          (experiment → hypothesis_claim node)
  *
  * Skipped with warnings:
@@ -314,14 +314,14 @@ export class PostHogAdapter implements UPGAdapter {
       if (upgEntityType === 'metric') {
         if (parentResolved === 'key_result' || parentEntityType === 'key_result') {
           edgeType = safeEdgeType(
-            'key_result_tracked_by_metric',
-            `PostHog: key_result_tracked_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
+            'key_result_quantified_by_metric',
+            `PostHog: key_result_quantified_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
             warnings,
           )
         } else if (parentResolved === 'outcome' || parentEntityType === 'outcome') {
           edgeType = safeEdgeType(
-            'outcome_tracked_by_metric',
-            `PostHog: outcome_tracked_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
+            'outcome_measured_by_metric',
+            `PostHog: outcome_measured_by_metric not in catalog. Falling back to node_informs_node for "${item.title}".`,
             warnings,
           )
         }

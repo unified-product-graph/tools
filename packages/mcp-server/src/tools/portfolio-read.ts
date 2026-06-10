@@ -44,7 +44,7 @@ interface ScopedProduct {
  * entry. Returns the matched products plus any scope entries that matched
  * nothing (so the caller can report them).
  */
-function resolveScopedProducts(
+export function resolveScopedProducts(
   cwd: string,
   scope: string[] | undefined,
 ): { products: ScopedProduct[]; unmatched: string[] } {

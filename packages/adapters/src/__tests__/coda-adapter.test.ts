@@ -316,7 +316,7 @@ describe('CodaAdapter: lookup column edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('metric with Key Result lookup emits key_result_tracked_by_metric edge', async () => {
+  it('metric with Key Result lookup emits key_result_quantified_by_metric edge', async () => {
     const items: SourceItem[] = [
       makeRow('kr1', 'Activation NPS', 'Key Results'),
       makeRow('m1', 'NPS score', 'Metrics', {
@@ -326,8 +326,8 @@ describe('CodaAdapter: lookup column edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'key_result_tracked_by_metric')
-    const edge = result.edges.find((e) => e.type === 'key_result_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'key_result_quantified_by_metric')
+    const edge = result.edges.find((e) => e.type === 'key_result_quantified_by_metric')
     expect(edge).toBeDefined()
   })
 
@@ -487,7 +487,7 @@ describe('CodaAdapter: full fixture, all emitted edges are catalogued', () => {
     assertAllEdgesCatalogued(result.edges, 'CodaAdapter full fixture')
 
     // Expected edges
-    expect(result.edges.find((e) => e.type === 'key_result_tracked_by_metric')).toBeDefined()
+    expect(result.edges.find((e) => e.type === 'key_result_quantified_by_metric')).toBeDefined()
     expect(result.edges.find((e) => e.type === 'opportunity_drives_solution')).toBeDefined()
     expect(result.edges.find((e) => e.type === 'release_contains_feature')).toBeDefined()
     expect(result.edges.find((e) => e.type === 'epic_specified_by_user_story')).toBeDefined()

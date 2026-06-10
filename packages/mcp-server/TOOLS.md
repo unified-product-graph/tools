@@ -406,7 +406,7 @@ the node does not exist.
 
 ### `get_nodes`
 
-Batch-fetch up to 50 entities by ID. Returns each node with its edges. Use instead of looping `get_node`.
+Batch-fetch up to 50 entities by ID. Returns each node with its edges. Use instead of looping `get_node`. A bare id reads the active product; a qualified `{product_id}/{node_id}` (the form list_registry / export_edges / cross-edges return) reads that product cross-portfolio (read-only for non-active products), so a connective pass can fetch node content across graphs without a switch_product sweep. Cross-product results carry a `product_id`.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -415,7 +415,7 @@ Batch-fetch up to 50 entities by ID. Returns each node with its edges. Use inste
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `compact_edges` | boolean |  | Omit titles from edges |
-| `ids` | array | ✓ | Array of node IDs to fetch (max 50) |
+| `ids` | array | ✓ | Node IDs (max 50). Bare (active product) or qualified `{product_id}/{node_id}` for any product in the workspace. |
 
 **Returns:**
 

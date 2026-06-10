@@ -280,25 +280,25 @@ describe('PostHogAdapter: metric value fields', () => {
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
 describe('PostHogAdapter: edge emission', () => {
-  it('outcome_tracked_by_metric emitted when metric has outcome parent', async () => {
+  it('outcome_measured_by_metric emitted when metric has outcome parent', async () => {
     const items: SourceItem[] = [
       makeItem('out1', 'Improve Activation', 'outcome'),
       makeItem('ins1', 'Activation Rate', 'insight', { parent_id: 'out1' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'outcome_tracked_by_metric')
-    const edge = result.edges.find((e) => e.type === 'outcome_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'outcome_measured_by_metric')
+    const edge = result.edges.find((e) => e.type === 'outcome_measured_by_metric')
     expect(edge).toBeDefined()
   })
 
-  it('key_result_tracked_by_metric emitted when metric has key_result parent', async () => {
+  it('key_result_quantified_by_metric emitted when metric has key_result parent', async () => {
     const items: SourceItem[] = [
       makeItem('kr1', 'WAU 20k', 'key_result'),
       makeItem('ins1', 'WAU Chart', 'insight', { parent_id: 'kr1' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'key_result_tracked_by_metric')
-    const edge = result.edges.find((e) => e.type === 'key_result_tracked_by_metric')
+    assertAllEdgesCatalogued(result.edges, 'key_result_quantified_by_metric')
+    const edge = result.edges.find((e) => e.type === 'key_result_quantified_by_metric')
     expect(edge).toBeDefined()
   })
 

@@ -13,7 +13,7 @@
  *
  * Hierarchy edges (all verified in the UPG edge catalogue):
  * - objective  → key_result     → objective_achieved_through_key_result
- * - key_result → metric         → key_result_tracked_by_metric
+ * - key_result → metric         → key_result_quantified_by_metric
  * - project    → epic           → project_delivers_epic
  * - epic       → story (feature) → epic_specified_by_user_story
  * - story (feature) → task      → task_implements_user_story
@@ -535,7 +535,7 @@ function resolveShortcutEdge(
 
   // key_result → metric
   if ((parent === 'key_result' || parent === 'key-result') && child === 'metric') {
-    return 'key_result_tracked_by_metric'
+    return 'key_result_quantified_by_metric'
   }
 
   // project → epic
