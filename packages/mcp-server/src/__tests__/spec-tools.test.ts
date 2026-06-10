@@ -87,6 +87,7 @@ import {
  listSplitMigrations,
  listLifecycles,
  getLifecycle,
+ listStatusValues,
  listScales,
  getScale,
  listFrameworkCategories,
@@ -566,6 +567,31 @@ describe('list_frameworks / get_framework', () => {
 })
 
 // ── Edges ───────────────────────────────────────────────────────────────────
+
+describe('list_status_values (#35)', () => {
+ it('returns lifecycle phases as status values for a lifecycle type', () => {
+ const { body } = call(listStatusValues, { entity_type: 'key_result' })
+ const b = body as {
+ lifecycle_free: boolean
+ initial_status: string
+ terminal_statuses: string[]
+ values: Array<{ status: string; terminal: boolean }>
+ }
+ expect(b.lifecycle_free).toBe(false)
+ const ids = b.values.map((v) => v.status)
+ expect(ids).toContain('on_track')
+ expect(ids).toContain('achieved')
+ expect(b.initial_status).toBe('on_track')
+ expect(b.terminal_statuses).toContain('achieved')
+ })
+
+ it('flags a lifecycle-free type with empty values', () => {
+ const { body } = call(listStatusValues, { entity_type: 'persona' })
+ const b = body as { lifecycle_free: boolean; values: unknown[] }
+ expect(b.lifecycle_free).toBe(true)
+ expect(b.values).toEqual([])
+ })
+})
 
 describe('list_edge_types / get_edge_type', () => {
  it('list_edge_types returns every catalogue entry by default', () => {

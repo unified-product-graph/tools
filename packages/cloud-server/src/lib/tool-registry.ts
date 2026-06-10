@@ -35,7 +35,7 @@ import {
   listBenchmarks, listProductStages,
   // Spec catalogues (migrations, lifecycles, scales, framework metadata, domain rings)
   listTypeMigrations, listEdgeMigrations, listSplitMigrations,
-  listLifecycles, getLifecycle,
+  listLifecycles, getLifecycle, listStatusValues,
   listScales, getScale,
   listFrameworkCategories, listFrameworkStructurePatterns,
   listDomainRings, getDomainRing,
@@ -1233,6 +1233,18 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'list_status_values',
+    description:
+      'List the valid `status` values an entity type can hold: the pre-flight lookup so you no longer learn the set only from a rejected write. For a lifecycle type, returns each phase as `{ status, label, terminal }` plus `initial_status` and `terminal_statuses`; for a lifecycle-free type, returns `lifecycle_free: true` with empty `values`. The focused, low-token sibling of `get_lifecycle`.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        entity_type: { type: 'string', description: 'Canonical entity type name (e.g. "feature", "key_result", "need").' },
+      },
+      required: ['entity_type'],
+    },
+  },
+  {
     name: 'list_scales',
     description:
       'List every spec-defined assessment scale from UPG_SCALES: the canonical vocabulary for UPGAssessment values. Each scale carries id, label, description, min, max, steps, and per-point labels plus descriptions. Non-paginated. External scale_extensions are graph-instance–scoped and stay out of this surface.',
@@ -1745,6 +1757,7 @@ const HANDLERS: Record<string, ToolBinding<CloudContext>['handler']> = {
   list_split_migrations: listSplitMigrations,
   list_lifecycles: listLifecycles,
   get_lifecycle: getLifecycle,
+  list_status_values: listStatusValues,
   list_scales: listScales,
   get_scale: getScale,
   list_framework_categories: listFrameworkCategories,

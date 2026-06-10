@@ -57,6 +57,26 @@ function resolveProductHeaderId(store: ToolContext['store'], id: string | undefi
 }
 
 /**
+ * Batch-6 #36: pairing a hypothesis with an experiment_plan activates it.
+ * Auto-promote a `drafted` hypothesis to `active` when it gains a
+ * `hypothesis_requires_experiment_plan` edge, so the documented
+ * structural-spine recipe (hypotheses paired with plans) does not self-trip the
+ * `untested-hypothesis-pile-up` anti-pattern. Best-effort: a promotion failure
+ * never fails the already-created edge.
+ */
+function promoteHypothesisOnPlanEdge(store: ToolContext['store'], edge: UPGEdge): void {
+  if (edge.type !== 'hypothesis_requires_experiment_plan') return
+  const hyp = store.getNode(edge.source)
+  if (hyp?.type === 'hypothesis' && hyp.status === 'drafted') {
+    try {
+      store.updateNode(edge.source, { status: 'active' })
+    } catch {
+      /* promotion is a courtesy; the edge stands regardless */
+    }
+  }
+}
+
+/**
  * Cheap Levenshtein distance for the did_you_mean fuzzy match. Inputs are edge
  * type identifiers (tens of chars), so the iterative two-row DP is plenty.
  */
@@ -229,6 +249,8 @@ export const createEdge: ToolHandler = (args, ctx): ToolResult => {
     }
     return textError(result.error)
   }
+
+  promoteHypothesisOnPlanEdge(store, result.edge)
   return text(JSON.stringify(result, null, 2))
 }
 
@@ -467,6 +489,9 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
     store.addEdge(edge)
     createdEdges.push(edge)
   }
+
+  // #36: activate a drafted hypothesis paired with an experiment_plan.
+  for (const edge of createdEdges) promoteHypothesisOnPlanEdge(store, edge)
 
   return text(JSON.stringify({ created: createdEdges, count: createdEdges.length }, null, 2))
 }

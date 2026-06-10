@@ -1,6 +1,6 @@
 # UPG MCP Cloud Server Tool Reference
 
-Reference for the 93 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
+Reference for the 94 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
 
 ## Contents
 
@@ -14,7 +14,7 @@ Reference for the 93 tools exposed by `@unified-product-graph/cloud-server`. Gen
 - [Collaboration](#collaboration): 4 tools
 - [Analytics](#analytics): 1 tool
 - [Webhooks](#webhooks): 3 tools
-- [Spec Introspection](#spec-introspection): 43 tools
+- [Spec Introspection](#spec-introspection): 44 tools
 - [Portfolio](#portfolio): 4 tools
 - [Atomic Batches](#atomic-batches): 6 tools
 - [Validation](#validation): 1 tool
@@ -1220,6 +1220,7 @@ _Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regi
 - [`list_regions`](#list-regions)
 - [`list_scales`](#list-scales)
 - [`list_split_migrations`](#list-split-migrations)
+- [`list_status_values`](#list-status-values)
 - [`list_type_labels`](#list-type-labels)
 - [`list_type_migrations`](#list-type-migrations)
 - [`plan`](#plan)
@@ -1959,6 +1960,25 @@ _No arguments._
 JSON: `{ splits: [...], total: number }`
 
 **See also:** `list_type_migrations`, `list_edge_migrations`, `migrate_type`, `validate_graph`
+
+
+### `list_status_values`
+
+List the valid `status` values an entity type can hold: the pre-flight lookup so you no longer learn the set only from a rejected write. For a lifecycle type, returns each phase as `{ status, label, terminal }` plus `initial_status` and `terminal_statuses`; for a lifecycle-free type, returns `lifecycle_free: true` with empty `values`. The focused, low-token sibling of `get_lifecycle`.
+
+**Atomicity:** `atomic (read-only)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `entity_type` | string | ✓ | Canonical entity type name (e.g. "feature", "key_result", "need"). |
+
+**Returns:**
+
+JSON: `{ entity_type, lifecycle_free, initial_status?, terminal_statuses?, values: [{ status, label, terminal }], note? }`.
+
+**See also:** `get_lifecycle`, `get_entity_schema`
 
 
 ### `list_type_labels`

@@ -327,6 +327,25 @@ describe('batch-6 #28: create_edge did_you_mean for a bad edge type', () => {
   })
 })
 
+// ── batch-6 #36: hypothesis auto-promote on experiment_plan pairing ─────────
+describe('batch-6 #36: hypothesis auto-promote on experiment_plan pairing', () => {
+  it('promotes a drafted hypothesis to active on a hypothesis_requires_experiment_plan edge', async () => {
+    const store = await makeStore()
+    const ctx = makeCtx(store)
+    const hyp = (await parseBody(createNode({ type: 'hypothesis', title: 'H' }, ctx))) as { node: { id: string } }
+    const plan = (await parseBody(
+      createNode({ type: 'experiment_plan', title: 'EP' }, ctx),
+    )) as { node: { id: string } }
+    // A fresh hypothesis starts drafted; pairing it with a plan should activate it.
+    expect(store.getNode(hyp.node.id)?.status).toBe('drafted')
+    createEdge(
+      { source_id: hyp.node.id, target_id: plan.node.id, type: 'hypothesis_requires_experiment_plan' },
+      ctx,
+    )
+    expect(store.getNode(hyp.node.id)?.status).toBe('active')
+  })
+})
+
 // ──: create_node first-use schema hints ─────────────────────────────
 
 describe(': create_node first-use hints', () => {

@@ -210,6 +210,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listSplitMigrations: 'list_split_migrations',
   listLifecycles: 'list_lifecycles',
   getLifecycle: 'get_lifecycle',
+  listStatusValues: 'list_status_values',
   listScales: 'list_scales',
   getScale: 'get_scale',
   listFrameworkCategories: 'list_framework_categories',

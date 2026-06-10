@@ -767,6 +767,19 @@ export const getSpecVersion: ToolHandler = (): ToolResult => {
         edge_count: UPG_EDGE_COUNT,
         domain_count: UPG_DOMAIN_COUNT,
         region_count: UPG_REGION_COUNT,
+        anti_patterns: {
+          total: UPG_ANTI_PATTERNS.length,
+          // Anti-patterns introduced in a tracked version (the `since` field
+          // landed in 0.9.11). Lets a consumer see which validators are newer
+          // than the version a graph was authored under, so a spec upgrade
+          // doesn't silently flip a clean graph invalid with no heads-up
+          // (batch-6 #36). Baseline patterns (no `since`) predate the tracking.
+          versioned: UPG_ANTI_PATTERNS.filter((p) => p.since).map((p) => ({
+            id: p.id,
+            severity: p.severity,
+            since: p.since,
+          })),
+        },
       },
       null,
       2,
@@ -1471,6 +1484,66 @@ export const getLifecycle: ToolHandler = (args): ToolResult => {
     return textError(`No lifecycle defined for entity type: ${entityType}`)
   }
   return text(JSON.stringify(lifecycle, null, 2))
+}
+
+/**
+ * List the valid `status` values a node of `entity_type` can hold — the
+ * pre-flight lookup batch-6 #35 asked for, so an author no longer learns the
+ * set only by submitting a wrong one and reading the reject. For a
+ * lifecycle-bearing type, returns each phase as a status value (with label +
+ * `terminal` flag), the `initial_status`, and the `terminal_statuses`. For an
+ * intentionally lifecycle-free type, returns `lifecycle_free: true` with an
+ * empty `values` (status is not state-machine-validated). Sources
+ * `UPG_LIFECYCLES` — exactly what the write validator checks — so it is the
+ * focused, low-token sibling of `get_lifecycle` / `get_entity_schema`.
+ *
+ * @returns JSON: `{ entity_type, lifecycle_free, initial_status?, terminal_statuses?, values: [{ status, label, terminal }], note? }`.
+ * @atomicity atomic (read-only)
+ * @see get_lifecycle
+ * @see get_entity_schema
+ */
+export const listStatusValues: ToolHandler = (args): ToolResult => {
+  const entityType = args.entity_type as string | undefined
+  if (!entityType) return textError('Missing required parameter: entity_type')
+  const lifecycle = UPG_LIFECYCLES.find((l) => l.entity_type === entityType)
+  if (!lifecycle) {
+    const free = UPG_LIFECYCLE_FREE_TYPES.has(entityType)
+    const planned = UPG_LIFECYCLE_PLANNED_TYPES.has(entityType)
+    return text(
+      JSON.stringify(
+        {
+          entity_type: entityType,
+          lifecycle_free: free,
+          values: [],
+          note: free
+            ? `${entityType} is lifecycle-free: status is not state-machine-validated (a static type with no phase progression).`
+            : planned
+              ? `${entityType} has a lifecycle planned but not yet authored in this spec version.`
+              : `No lifecycle defined for entity type: ${entityType}.`,
+        },
+        null,
+        2,
+      ),
+    )
+  }
+  const terminal = new Set(lifecycle.terminal_phases)
+  return text(
+    JSON.stringify(
+      {
+        entity_type: entityType,
+        lifecycle_free: false,
+        initial_status: lifecycle.initial_phase,
+        terminal_statuses: lifecycle.terminal_phases,
+        values: lifecycle.phases.map((p) => ({
+          status: p.id,
+          label: p.label,
+          terminal: terminal.has(p.id),
+        })),
+      },
+      null,
+      2,
+    ),
+  )
 }
 
 // ── Scales ──────────────────────────────────────────────────────────────────
