@@ -8,7 +8,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
-import { UPG_EDGE_CATALOG } from '@unified-product-graph/core'
+import { UPG_EDGE_CATALOG, resolveContainmentEdge } from '@unified-product-graph/core'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
 import { validateExplicitEdgeType } from '@unified-product-graph/sdk'
 import { preflightPayload } from '../lib/payload-guard.js'
@@ -24,6 +24,36 @@ import type {
   ExportEdgesEdge,
   RenameEdgeTypeResult,
 } from '@unified-product-graph/mcp-tooling'
+
+/**
+ * Batch-5 #27: a `p_…` (portfolio product-header) id passed where an intra-graph
+ * node id (`n_…`) is expected. The two identities aren't interchangeable — the
+ * `p_` id addresses a product in cross-product edges; an intra-graph edge needs
+ * the in-graph `type:"product"` NODE id. Returns a targeted hint, or null.
+ */
+function portfolioHeaderHint(store: ToolContext['store'], label: string, id: string | undefined): string | null {
+  if (!id || !id.startsWith('p_') || store.getNode(id)) return null
+  return (
+    `${label} "${id}" looks like a portfolio product-header id (p_…), which addresses a product only in ` +
+    `cross-product edges. An intra-graph edge needs the in-graph product NODE id (the type:"product" node, an n_… id). ` +
+    `Find it with list_nodes({type:"product"}) or get_product_context.`
+  )
+}
+
+/**
+ * Batch-5 #28: enrich an unknown explicit edge type with a `did_you_mean`
+ * resolved from the endpoint types (the same lookup `resolve_edge_for_pair` uses).
+ */
+function unknownEdgeTypeHint(type: string, sourceType?: string, targetType?: string): string {
+  const suggestion = sourceType && targetType ? resolveContainmentEdge(sourceType, targetType) : null
+  if (suggestion) {
+    return `Edge type "${type}" is not in UPG_EDGE_CATALOG. did_you_mean: "${suggestion}" (the canonical ${sourceType} → ${targetType} edge).`
+  }
+  if (sourceType && targetType) {
+    return `Edge type "${type}" is not in UPG_EDGE_CATALOG. Omit \`type\` to auto-infer, or call resolve_edge_for_pair({source_type:"${sourceType}", target_type:"${targetType}"}).`
+  }
+  return `Edge type "${type}" is not in UPG_EDGE_CATALOG. Omit \`type\` to auto-infer, or see resolve_edge_for_pair.`
+}
 
 /**
  * Build an `isError` result whose text body is a JSON envelope carrying both
@@ -85,6 +115,24 @@ function edgeResolverError(
 export const createEdge: ToolHandler = (args, ctx): ToolResult => {
   const { store } = ctx
   if (!args.source_id) return textError(`Missing required parameter: source_id`)
+
+  const sourceId = args.source_id as string
+  const targetId = args.target_id as string | undefined
+
+  // #27: surface the p_/n_ identity mismatch before the generic "not found".
+  const srcHint = portfolioHeaderHint(store, 'source_id', sourceId)
+  if (srcHint) return textError(srcHint)
+  const tgtHint = portfolioHeaderHint(store, 'target_id', targetId)
+  if (tgtHint) return textError(tgtHint)
+
+  // #28: an explicit edge type that isn't canonical gets a did_you_mean from the
+  // resolved endpoint types, rather than a bare "not in UPG_EDGE_CATALOG".
+  const explicitType = args.type as string | undefined
+  if (explicitType && !UPG_EDGE_CATALOG[explicitType as UPGEdgeType]) {
+    const srcType = store.getNode(sourceId)?.type as string | undefined
+    const tgtType = targetId ? (store.getNode(targetId)?.type as string | undefined) : undefined
+    if (srcType && tgtType) return textError(unknownEdgeTypeHint(explicitType, srcType, tgtType))
+  }
 
   const result = createEdgeLib(store, {
     source_id: args.source_id as string,
@@ -238,8 +286,16 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
     if (!e.target_id) { errors.push({ message: `Edge at index ${i}: missing required field "target_id"` }); resolvedEdgeTypes.push(null); continue }
     const sourceNode = store.getNode(e.source_id as string)
     const targetNode = store.getNode(e.target_id as string)
-    if (!sourceNode) { errors.push({ message: `Edge at index ${i}: source node "${e.source_id}" not found` }); resolvedEdgeTypes.push(null); continue }
-    if (!targetNode) { errors.push({ message: `Edge at index ${i}: target node "${e.target_id}" not found` }); resolvedEdgeTypes.push(null); continue }
+    if (!sourceNode) {
+      const hint = portfolioHeaderHint(store, 'source_id', e.source_id as string)
+      errors.push({ message: hint ? `Edge at index ${i}: ${hint}` : `Edge at index ${i}: source node "${e.source_id}" not found` })
+      resolvedEdgeTypes.push(null); continue
+    }
+    if (!targetNode) {
+      const hint = portfolioHeaderHint(store, 'target_id', e.target_id as string)
+      errors.push({ message: hint ? `Edge at index ${i}: ${hint}` : `Edge at index ${i}: target node "${e.target_id}" not found` })
+      resolvedEdgeTypes.push(null); continue
+    }
 
     // Refuse graph-topology self-loops. No canonical UPG edge type is
     // currently self-referential. F2 (2026-05-20).
@@ -267,7 +323,11 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
         targetNode.type as string,
       )
       if (typeCheck.errors.length > 0) {
-        errors.push({ message: `Edge at index ${i}: ${typeCheck.errors.join(' ')}` })
+        // #28: a non-catalog explicit type gets a did_you_mean from the endpoints.
+        const msg = !UPG_EDGE_CATALOG[e.type as UPGEdgeType]
+          ? unknownEdgeTypeHint(e.type as string, sourceNode.type as string, targetNode.type as string)
+          : typeCheck.errors.join(' ')
+        errors.push({ message: `Edge at index ${i}: ${msg}` })
         resolvedEdgeTypes.push(null)
         continue
       }

@@ -369,6 +369,7 @@ async function registryDriftReport(
 
   const issues: Array<Record<string, unknown>> = []
   let okCount = 0
+  let sanctioned = 0
   for (const edge of instanceEdges) {
     const prefix = `${REGISTRY_PRODUCT_ID}/`
     const canonicalId = edge.target.startsWith(prefix) ? edge.target.slice(prefix.length) : edge.target
@@ -392,6 +393,14 @@ async function registryDriftReport(
       continue
     }
     if (node.title !== canonical.title) {
+      // A divergence marked `alias: true` on the edge is sanctioned (an
+      // intentional product-local name, e.g. "Vercel Platform / SDK" vs canonical
+      // "Vercel"), so it is not drift: exclude it from issues and from `clean`,
+      // counting it as accepted instead. `clean: true` then means "no UNexpected drift".
+      if (edge.alias === true) {
+        sanctioned++
+        continue
+      }
       issues.push({
         kind: 'title_divergence', edge_id: edge.id, source: edge.source, canonical: canonicalId,
         instance_title: node.title, canonical_title: canonical.title,
@@ -407,6 +416,7 @@ async function registryDriftReport(
     canonical_entities: registryNodes.length,
     instances: instanceEdges.length,
     on_canon: okCount,
+    sanctioned,
     issues_total: issues.length,
     issues_by_kind: byKind,
     issues: issues.slice(0, issueLimit),

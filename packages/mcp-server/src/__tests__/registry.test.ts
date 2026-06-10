@@ -22,8 +22,17 @@ import {
   syncFilePath,
   type ToolContext,
 } from '../lib/server-context.js'
-import { defineCanonicalEntity, registerInstance, listRegistry } from '../tools/registry.js'
-import { createCrossProductEdge } from '../tools/workspace.js'
+import {
+  defineCanonicalEntity,
+  registerInstance,
+  listRegistry,
+  updateCanonicalEntity,
+  batchDefineCanonicalEntity,
+  batchRegisterInstance,
+  promoteToCanonical,
+} from '../tools/registry.js'
+import { createCrossProductEdge, linkAreaToAudience } from '../tools/workspace.js'
+import { getNode } from '../tools/nodes.js'
 import { portfolioValidate } from '../tools/portfolio-read.js'
 
 function doc(over: Partial<UPGDocument> & { product: UPGDocument['product'] }): UPGDocument {
@@ -216,5 +225,174 @@ describe('canonical registry (0.9.6)', () => {
     const issue = body.registry_drift.issues.find((i: { kind: string }) => i.kind === 'title_divergence')
     expect(issue.instance_title).toBe('Senior Developer')
     expect(issue.canonical_title).toBe('Developer')
+  })
+
+  // ── update_canonical_entity (#23) ────────────────────────────────────────────
+
+  it('update_canonical_entity edits a canonical without disturbing its instances', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Developer', description: 'PROOF placeholder' }, ctx)
+    await registerInstance({ node_id: 'm_dev', canonical_id: 'persona_developer' }, ctx)
+    const body = bodyOf(
+      await updateCanonicalEntity(
+        { canonical_id: 'persona_developer', description: 'A software developer.', audience_role: 'user' },
+        ctx,
+      ),
+    )
+    expect(body.canonical.description).toBe('A software developer.')
+    expect(body.canonical.properties.audience_role).toBe('user')
+    expect(body.instance_count).toBe(1)
+    const pf = readPortfolio() as { cross_edges?: Array<{ type: string }> }
+    expect(pf.cross_edges?.filter((e) => e.type === 'instance_of')).toHaveLength(1)
+  })
+
+  it('update_canonical_entity rejects a missing canonical', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Developer' }, ctx)
+    const err = errOf(await updateCanonicalEntity({ canonical_id: 'persona_ghost', title: 'X' }, ctx))
+    expect(err).toMatch(/not found in the registry/i)
+  })
+
+  // ── batch_define_canonical_entity / batch_register_instance (#24) ─────────────
+
+  it('batch_define_canonical_entity writes many atomically', async () => {
+    const ctx = await activeCtx()
+    const body = bodyOf(
+      await batchDefineCanonicalEntity(
+        { entities: [{ type: 'persona', title: 'Developer' }, { type: 'metric', title: 'Weekly active developers' }] },
+        ctx,
+      ),
+    )
+    expect(body.count).toBe(2)
+    expect(bodyOf(await listRegistry({}, ctx)).total).toBe(2)
+  })
+
+  it('batch_define_canonical_entity rejects the whole batch on one bad type', async () => {
+    const ctx = await activeCtx()
+    const err = errOf(
+      await batchDefineCanonicalEntity(
+        { entities: [{ type: 'persona', title: 'Developer' }, { type: 'banana', title: 'Nope' }] },
+        ctx,
+      ),
+    )
+    expect(err).toMatch(/entities\[1\].*invalid entity type/i)
+    expect(bodyOf(await listRegistry({}, ctx)).total).toBe(0)
+  })
+
+  it('batch_register_instance links many and is idempotent', async () => {
+    const ctx = await activeCtx()
+    await batchDefineCanonicalEntity(
+      { entities: [{ type: 'persona', title: 'Developer' }, { type: 'metric', title: 'Weekly active developers' }] },
+      ctx,
+    )
+    const body = bodyOf(
+      await batchRegisterInstance(
+        {
+          instances: [
+            { node_id: 'm_dev', canonical_id: 'persona_developer' },
+            { node_id: 'm_kpi', canonical_id: 'metric_weekly_active_developers' },
+          ],
+        },
+        ctx,
+      ),
+    )
+    expect(body.registered).toBe(2)
+    const again = bodyOf(
+      await batchRegisterInstance({ instances: [{ node_id: 'm_dev', canonical_id: 'persona_developer' }] }, ctx),
+    )
+    expect(again.already_existed).toBe(1)
+    expect(again.registered).toBe(0)
+  })
+
+  // ── promote_to_canonical (#26) ───────────────────────────────────────────────
+
+  it('promote_to_canonical lifts an existing node and registers it as first instance', async () => {
+    const ctx = await activeCtx()
+    const body = bodyOf(await promoteToCanonical({ node_id: 'm_dev' }, ctx))
+    expect(body.canonical.type).toBe('persona')
+    expect(body.canonical.title).toBe('Developer')
+    expect(body.registered_source).toBe(true)
+    expect(body.edge.type).toBe('instance_of')
+    expect(body.edge.source).toBe('p_main/m_dev')
+  })
+
+  // ── alias-sanctioned drift (#25) ─────────────────────────────────────────────
+
+  it('register_instance alias sanctions a title divergence so drift stays clean', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Developer' }, ctx)
+    await registerInstance({ node_id: 'm_dev', canonical_id: 'persona_developer', alias: true }, ctx)
+    ctx.store.updateNode('m_dev', { title: 'Senior Developer' })
+    await ctx.store.flush()
+    const body = bodyOf(await portfolioValidate({}, ctx))
+    expect(body.registry_drift.clean).toBe(true)
+    expect(body.registry_drift.sanctioned).toBe(1)
+    expect(body.registry_drift.issues_total).toBe(0)
+  })
+
+  // ── get_node resolves registry/{id} (#23 bonus) ──────────────────────────────
+
+  it('get_node resolves a registry/{id} canonical with its instances', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Developer' }, ctx)
+    await registerInstance({ node_id: 'm_dev', canonical_id: 'persona_developer', alias: true }, ctx)
+    const body = bodyOf(await getNode({ node_id: 'registry/persona_developer' }, ctx))
+    expect(body.registry).toBe(true)
+    expect(body.node.title).toBe('Developer')
+    expect(body.instance_count).toBe(1)
+    expect(body.instances[0].alias).toBe(true)
+  })
+
+  // ── rolls_up_to via create_cross_product_edge (#30) ──────────────────────────
+
+  it('create_cross_product_edge accepts rolls_up_to (metric to metric)', async () => {
+    const ctx = await activeCtx()
+    const body = bodyOf(
+      await createCrossProductEdge(
+        { source_id: 'p_main/m_kpi', target_id: 'p_company/company_nsm', type: 'rolls_up_to', auto_create_portfolio: true },
+        ctx,
+      ),
+    )
+    expect(body.edge.type).toBe('rolls_up_to')
+    expect(body.edge.source).toBe('p_main/m_kpi')
+  })
+
+  // ── link_area_to_audience (#29) ──────────────────────────────────────────────
+
+  it('link_area_to_audience links an area to a registry persona with qualifiers', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Developer' }, ctx)
+    const pf = readPortfolio()
+    pf.product_areas = [{ id: 'area_platform', title: 'Platform' }]
+    writeFileSync(join(cwd, '.upg', 'portfolio.upg'), JSON.stringify(pf, null, 2))
+    const body = bodyOf(
+      await linkAreaToAudience(
+        { area_id: 'area_platform', canonical_id: 'persona_developer', relevance: 'primary', audience_role: 'user' },
+        ctx,
+      ),
+    )
+    expect(body.edge.type).toBe('area_serves_persona')
+    expect(body.edge.source).toBe('area_platform')
+    expect(body.edge.target).toBe('registry/persona_developer')
+    expect(body.edge.relevance).toBe('primary')
+    expect(body.edge.audience_role).toBe('user')
+  })
+
+  it('link_area_to_audience rejects an unknown area', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Developer' }, ctx)
+    const err = errOf(await linkAreaToAudience({ area_id: 'area_ghost', canonical_id: 'persona_developer' }, ctx))
+    expect(err).toMatch(/not found in the portfolio/i)
+  })
+
+  it('create_cross_product_edge refuses area_serves_persona and points at link_area_to_audience', async () => {
+    const ctx = await activeCtx()
+    const err = errOf(
+      await createCrossProductEdge(
+        { source_id: 'area_platform', target_id: 'registry/persona_developer', type: 'area_serves_persona' },
+        ctx,
+      ),
+    )
+    expect(err).toMatch(/link_area_to_audience/i)
   })
 })

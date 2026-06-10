@@ -1531,13 +1531,19 @@ export class UPGPortfolioStore {
   // ── Cross-edge writes ────────────────────────────────────────────────────────
 
   /**
-   * Add a cross-product edge to the portfolio document. Both `source` and
-   * `target` must be qualified IDs (`{product_id}/{node_id}`).
+   * Add a cross-product edge to the portfolio document. `source` and `target`
+   * must be qualified IDs (`{product_id}/{node_id}`), except that the
+   * area-anchored edge types (`area_serves_persona` / `area_targets_market_segment`)
+   * carry a bare portfolio-tier `product_area` id as their source.
    */
   addCrossEdge(edge: UPGCrossEdge): void {
     if (!this.doc) throw new Error('Portfolio document not loaded. Call loadOrInit() first.')
     if (!edge.id) throw new Error('Cross-edge must have an id')
-    if (!edge.source.includes('/')) {
+    // Area-anchored edges source from a portfolio `product_area` id, not a
+    // `{product_id}/{node_id}` pair — so the source qualification check is skipped
+    // for them. The target is still qualified (`registry/{node_id}`).
+    const areaAnchored = edge.type === 'area_serves_persona' || edge.type === 'area_targets_market_segment'
+    if (!areaAnchored && !edge.source.includes('/')) {
       throw new Error(
         `Cross-edge source must be a qualified ID ({product_id}/{node_id}), got: "${edge.source}"`,
       )
@@ -1642,6 +1648,34 @@ export class UPGPortfolioStore {
     const [removed] = this.doc.registry.nodes.splice(idx, 1)
     this.scheduleSave()
     return removed ?? null
+  }
+
+  /**
+   * Patch a canonical entity in place (title / description / tags / properties).
+   * Properties are shallow-merged so a partial patch (e.g. just `audience_role`)
+   * preserves the rest. Does NOT touch any `instance_of` edges that point at this
+   * canonical — editing the canonical leaves every instance linked. Returns the
+   * updated node, or null if no registry node has that id.
+   */
+  updateRegistryNode(
+    id: string,
+    patch: {
+      title?: string
+      description?: string
+      tags?: string[]
+      properties?: Record<string, unknown>
+    },
+  ): UPGBaseNode | null {
+    const node = this.doc?.registry?.nodes.find((n) => n.id === id)
+    if (!node) return null
+    if (patch.title !== undefined) node.title = patch.title
+    if (patch.description !== undefined) node.description = patch.description
+    if (patch.tags !== undefined) node.tags = patch.tags
+    if (patch.properties !== undefined) {
+      node.properties = { ...(node.properties ?? {}), ...patch.properties } as UPGBaseNode['properties']
+    }
+    this.scheduleSave()
+    return node
   }
 
   // ── Migration: inline → portfolio ─────────────────────────

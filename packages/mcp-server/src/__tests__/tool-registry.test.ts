@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 110 tools', () => {
+  it('exposes the expected 118 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -115,7 +115,10 @@ describe('Tool registry: completeness', () => {
     // + clone_structure (0.9.4 batch-4 #17): cross-product shape clone. → 110.
     // + 3 registry tools (0.9.6 registry initiative Phase 2): define_canonical_entity,
     //   register_instance, list_registry. → 113.
-    expect(TOOL_DEFINITIONS).toHaveLength(113)
+    // + 5 batch-5 registry-lifecycle / portfolio-edge tools (0.9.8): update_canonical_entity,
+    //   batch_define_canonical_entity, batch_register_instance, promote_to_canonical,
+    //   link_area_to_audience. → 118.
+    expect(TOOL_DEFINITIONS).toHaveLength(118)
   })
 })
 

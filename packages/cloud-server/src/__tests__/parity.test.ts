@@ -130,6 +130,11 @@ const CLOUD_NA = new Set([
   'define_canonical_entity',
   'register_instance',
   'list_registry',
+  'update_canonical_entity',
+  'batch_define_canonical_entity',
+  'batch_register_instance',
+  'promote_to_canonical',
+  'link_area_to_audience',
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).

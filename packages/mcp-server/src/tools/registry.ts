@@ -146,7 +146,7 @@ async function resolveSourceNode(
   nodeIdArg: string,
   sourceProductIdArg: string | undefined,
 ): Promise<
-  | { ok: true; productId: string; nodeId: string; type: string; title: string }
+  | { ok: true; productId: string; nodeId: string; type: string; title: string; node: UPGBaseNode }
   | { ok: false; error: string }
 > {
   let productId: string
@@ -196,7 +196,7 @@ async function resolveSourceNode(
   if (!node) {
     return { ok: false, error: `Node "${bareNodeId}" not found in product "${productId}".` }
   }
-  return { ok: true, productId, nodeId: bareNodeId, type: node.type, title: node.title }
+  return { ok: true, productId, nodeId: bareNodeId, type: node.type, title: node.title, node }
 }
 
 /**
@@ -269,7 +269,18 @@ export const registerInstance: ToolHandler = async (args, ctx): Promise<ToolResu
     .find(
       (e) => e.type === 'instance_of' && e.source === qualifiedSource && e.target === qualifiedTarget,
     )
+  const aliasArg = args.alias as boolean | undefined
   if (existing) {
+    // Re-registering is a no-op for the edge, but `alias` can be toggled on an
+    // existing instance_of to sanction (or un-sanction) a deliberate title divergence.
+    let aliasUpdated = false
+    if (aliasArg !== undefined && (existing.alias ?? false) !== aliasArg) {
+      if (aliasArg) existing.alias = true
+      else delete existing.alias
+      portfolioStore.markDirty()
+      await portfolioStore.flush()
+      aliasUpdated = true
+    }
     return text(
       JSON.stringify(
         {
@@ -278,6 +289,7 @@ export const registerInstance: ToolHandler = async (args, ctx): Promise<ToolResu
           canonical: { id: canonicalId, type: canonical.type, title: canonical.title },
           portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
           already_existed: true,
+          alias_updated: aliasUpdated,
         },
         null,
         2,
@@ -293,6 +305,8 @@ export const registerInstance: ToolHandler = async (args, ctx): Promise<ToolResu
     source_product_id: source.productId,
     target_product_id: REGISTRY_PRODUCT_ID,
   }
+  // `alias: true` marks a sanctioned title divergence (registry drift ignores it).
+  if (aliasArg === true) edge.alias = true
 
   try {
     portfolioStore.addCrossEdge(edge)
@@ -361,5 +375,359 @@ export const listRegistry: ToolHandler = async (args): Promise<ToolResult> => {
 
   return text(
     JSON.stringify({ registry: rows, total: rows.length, by_type: byType }, null, 2),
+  )
+}
+
+/**
+ * Edit a canonical registry entity in place (title / description / audience_role
+ * / tags / properties). Properties are shallow-merged, so a partial patch keeps
+ * the rest. Crucially, editing the canonical does NOT disturb any `instance_of`
+ * edges pointing at it — every instance stays linked. This is the fix for a
+ * canonical seeded with a typo or placeholder: correct it via the API instead of
+ * hand-editing `portfolio.upg`.
+ *
+ * Parameters:
+ * - `canonical_id` (required): the registry node id (bare or `registry/{id}`).
+ * - `title`, `description`, `tags`, `properties`, `audience_role`: at least one
+ *   required. `audience_role` is merged into `properties`.
+ *
+ * @returns JSON: `{ canonical, qualified_id, instance_count, portfolio_file }`.
+ * @atomicity non-atomic. In-place registry node patch + flush.
+ * @see define_canonical_entity
+ */
+export const updateCanonicalEntity: ToolHandler = async (args): Promise<ToolResult> => {
+  const canonicalArg = args.canonical_id as string | undefined
+  if (!canonicalArg) return textError('Missing required parameter: canonical_id')
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return textError('No portfolio document found. Define a canonical entity first with `define_canonical_entity`.')
+  }
+
+  const canonicalId = bareCanonicalId(canonicalArg)
+  if (!portfolioStore.getRegistryNode(canonicalId)) {
+    return textError(`Canonical entity "${canonicalId}" not found in the registry. See \`list_registry\`.`)
+  }
+
+  const patch: { title?: string; description?: string; tags?: string[]; properties?: Record<string, unknown> } = {}
+  if (args.title !== undefined) patch.title = args.title as string
+  if (args.description !== undefined) patch.description = args.description as string
+  if (Array.isArray(args.tags)) patch.tags = args.tags as string[]
+  const props: Record<string, unknown> = {}
+  if (args.properties && typeof args.properties === 'object') Object.assign(props, args.properties)
+  if (args.audience_role !== undefined) props.audience_role = args.audience_role
+  if (Object.keys(props).length > 0) patch.properties = props
+  if (Object.keys(patch).length === 0) {
+    return textError('Nothing to update: pass at least one of title, description, audience_role, tags, properties.')
+  }
+
+  const updated = portfolioStore.updateRegistryNode(canonicalId, patch)
+  await portfolioStore.flush()
+
+  const target = `${REGISTRY_PRODUCT_ID}/${canonicalId}`
+  const instanceCount = portfolioStore.getAllCrossEdges().filter((e) => e.type === 'instance_of' && e.target === target).length
+
+  return text(
+    JSON.stringify(
+      {
+        canonical: updated,
+        qualified_id: target,
+        instance_count: instanceCount,
+        portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Batch-create canonical registry entities in one atomic call (the migration
+ * counterpart to `define_canonical_entity`). Validates every entity up front
+ * (valid type, unique id within the batch and against the existing registry),
+ * then writes all and flushes once — so a registry stand-up is a handful of
+ * batches, not one call per canonical.
+ *
+ * Parameters:
+ * - `entities` (required): array (max 50) of `{ type, title, canonical_id?,
+ *   description?, tags?, properties? }` — same shape as `define_canonical_entity`.
+ *
+ * @returns JSON: `{ defined: [{ canonical_id, qualified_id, type, title }], count, portfolio_file }`.
+ * @atomicity validate-all-then-write. A single invalid entity rejects the whole batch.
+ * @see define_canonical_entity
+ */
+export const batchDefineCanonicalEntity: ToolHandler = async (args): Promise<ToolResult> => {
+  const entities = args.entities as Array<Record<string, unknown>> | undefined
+  if (!Array.isArray(entities) || entities.length === 0) {
+    return textError('Missing required parameter: entities (a non-empty array)')
+  }
+  if (entities.length > 50) return textError('Batch limit is 50 entities per call.')
+
+  const cwd = process.cwd()
+  const portfolioPath = resolvePortfolioPath(cwd)
+  if (!portfolioPath) return textError('No workspace found. Run `init_workspace` first to host a portfolio registry.')
+
+  const portfolioStore = new UPGPortfolioStore()
+  try {
+    await portfolioStore.loadOrInit(portfolioPath)
+  } catch (err) {
+    return textError(`Failed to load portfolio document: ${(err as Error).message}`)
+  }
+
+  // Validate all up front (atomic): types valid, ids unique vs registry + within batch.
+  const taken = new Set(portfolioStore.listRegistryNodes().map((n) => n.id))
+  const planned: UPGBaseNode[] = []
+  for (let i = 0; i < entities.length; i++) {
+    const e = entities[i]!
+    const type = e.type as string | undefined
+    const title = e.title as string | undefined
+    if (!type) return textError(`entities[${i}]: missing required field: type`)
+    if (!title) return textError(`entities[${i}]: missing required field: title`)
+    if (!UPG_TYPES_SET.has(type)) {
+      return textError(`entities[${i}]: invalid entity type "${type}". See list_entity_types.`)
+    }
+    const explicitId = (e.canonical_id as string | undefined)?.trim()
+    if (explicitId && taken.has(explicitId)) {
+      return textError(`entities[${i}]: registry already has a canonical entity with id "${explicitId}".`)
+    }
+    const id = explicitId || deriveCanonicalId(type, title, taken)
+    taken.add(id)
+    const node: UPGBaseNode = { id, type: type as UPGBaseNode['type'], title }
+    if (e.description) node.description = e.description as string
+    if (Array.isArray(e.tags)) node.tags = e.tags as string[]
+    if (e.properties && typeof e.properties === 'object') node.properties = e.properties as Record<string, unknown>
+    planned.push(node)
+  }
+
+  try {
+    for (const node of planned) portfolioStore.addRegistryNode(node)
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to write canonical entities: ${(err as Error).message}`)
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        defined: planned.map((n) => ({
+          canonical_id: n.id,
+          qualified_id: `${REGISTRY_PRODUCT_ID}/${n.id}`,
+          type: n.type,
+          title: n.title,
+        })),
+        count: planned.length,
+        portfolio_file: path.relative(cwd, portfolioPath),
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Batch-register product instances against canonical entities in one atomic call
+ * (the migration counterpart to `register_instance`). Validates every instance up
+ * front (canonical exists, same-type constraint), then writes all `instance_of`
+ * edges and flushes once. Per-instance idempotent: an already-linked instance is
+ * reported, not duplicated. `alias` is honoured per instance.
+ *
+ * Parameters:
+ * - `instances` (required): array (max 50) of `{ node_id, canonical_id,
+ *   source_product_id?, alias? }`.
+ *
+ * @returns JSON: `{ results: [...], registered, already_existed, count, portfolio_file }`.
+ * @atomicity validate-all-then-write. A single invalid instance rejects the whole batch.
+ * @see register_instance
+ */
+export const batchRegisterInstance: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const instances = args.instances as Array<Record<string, unknown>> | undefined
+  if (!Array.isArray(instances) || instances.length === 0) {
+    return textError('Missing required parameter: instances (a non-empty array)')
+  }
+  if (instances.length > 50) return textError('Batch limit is 50 instances per call.')
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return textError('No portfolio document found. Define a canonical entity first with `define_canonical_entity`.')
+  }
+
+  type Plan = {
+    newEdge?: UPGCrossEdge
+    existingRef?: UPGCrossEdge
+    aliasArg?: boolean
+    row: Record<string, unknown>
+  }
+  const plans: Plan[] = []
+
+  for (let i = 0; i < instances.length; i++) {
+    const inst = instances[i]!
+    const nodeIdArg = inst.node_id as string | undefined
+    const canonicalArg = inst.canonical_id as string | undefined
+    if (!nodeIdArg) return textError(`instances[${i}]: missing required field: node_id`)
+    if (!canonicalArg) return textError(`instances[${i}]: missing required field: canonical_id`)
+
+    const canonicalId = bareCanonicalId(canonicalArg)
+    const canonical = portfolioStore.getRegistryNode(canonicalId)
+    if (!canonical) return textError(`instances[${i}]: canonical "${canonicalId}" not found in the registry.`)
+
+    const source = await resolveSourceNode(cwd, ctx.store, nodeIdArg, inst.source_product_id as string | undefined)
+    if (!source.ok) return textError(`instances[${i}]: ${source.error}`)
+    if (source.type !== canonical.type) {
+      return textError(
+        `instances[${i}]: type mismatch — instance "${source.nodeId}" is a ${source.type}, ` +
+        `canonical "${canonicalId}" is a ${canonical.type}.`,
+      )
+    }
+
+    const qualifiedSource = `${source.productId}/${source.nodeId}`
+    const qualifiedTarget = `${REGISTRY_PRODUCT_ID}/${canonicalId}`
+    const aliasArg = inst.alias as boolean | undefined
+    const existing = portfolioStore
+      .getAllCrossEdges()
+      .find((e) => e.type === 'instance_of' && e.source === qualifiedSource && e.target === qualifiedTarget)
+
+    const baseRow = {
+      source: qualifiedSource,
+      target: qualifiedTarget,
+      canonical_id: canonicalId,
+    }
+    if (existing) {
+      plans.push({ existingRef: existing, aliasArg, row: { ...baseRow, already_existed: true } })
+    } else {
+      const newEdge: UPGCrossEdge = {
+        id: edgeId(),
+        source: qualifiedSource,
+        target: qualifiedTarget,
+        type: 'instance_of',
+        source_product_id: source.productId,
+        target_product_id: REGISTRY_PRODUCT_ID,
+      }
+      if (aliasArg === true) newEdge.alias = true
+      plans.push({ newEdge, row: { ...baseRow, already_existed: false } })
+    }
+  }
+
+  let registered = 0
+  let alreadyExisted = 0
+  try {
+    for (const p of plans) {
+      if (p.newEdge) {
+        portfolioStore.addCrossEdge(p.newEdge)
+        registered++
+      } else if (p.existingRef) {
+        alreadyExisted++
+        if (p.aliasArg !== undefined && (p.existingRef.alias ?? false) !== p.aliasArg) {
+          if (p.aliasArg) p.existingRef.alias = true
+          else delete p.existingRef.alias
+          portfolioStore.markDirty()
+        }
+      }
+    }
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to write instance_of edges: ${(err as Error).message}`)
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        results: plans.map((p) => p.row),
+        registered,
+        already_existed: alreadyExisted,
+        count: plans.length,
+        portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Promote an existing product node into the registry as its canonical — instead
+ * of authoring a fresh, thinner canonical with `define_canonical_entity`. Copies
+ * the source node's description / tags / properties into a new registry node, and
+ * (by default) registers the source as the canonical's first instance via an
+ * `instance_of` edge. Lets a team canonicalise the rich node they already curated.
+ *
+ * Parameters:
+ * - `node_id` (required): the existing node (bare resolves against the active
+ *   product or `source_product_id`; or qualified `{product_id}/{node_id}`).
+ * - `source_product_id`: qualifies a bare `node_id`.
+ * - `canonical_id`: optional explicit registry id (otherwise derived).
+ * - `register_source`: register the source node as the first instance (default true).
+ *
+ * @returns JSON: `{ canonical, qualified_id, registered_source, edge?, portfolio_file }`.
+ * @atomicity non-atomic. Registry node add (+ optional instance_of edge) + flush.
+ * @see define_canonical_entity
+ * @see register_instance
+ */
+export const promoteToCanonical: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const nodeIdArg = args.node_id as string | undefined
+  if (!nodeIdArg) return textError('Missing required parameter: node_id (the existing node to promote)')
+  const registerSource = (args.register_source as boolean | undefined) ?? true
+
+  const cwd = process.cwd()
+  const portfolioPath = resolvePortfolioPath(cwd)
+  if (!portfolioPath) return textError('No workspace found. Run `init_workspace` first to host a portfolio registry.')
+
+  const source = await resolveSourceNode(cwd, ctx.store, nodeIdArg, args.source_product_id as string | undefined)
+  if (!source.ok) return textError(source.error)
+  const srcNode = source.node
+
+  const portfolioStore = new UPGPortfolioStore()
+  try {
+    await portfolioStore.loadOrInit(portfolioPath)
+  } catch (err) {
+    return textError(`Failed to load portfolio document: ${(err as Error).message}`)
+  }
+
+  const taken = new Set(portfolioStore.listRegistryNodes().map((n) => n.id))
+  const explicitId = (args.canonical_id as string | undefined)?.trim()
+  if (explicitId && taken.has(explicitId)) {
+    return textError(`Registry already has a canonical entity with id "${explicitId}".`)
+  }
+  const id = explicitId || deriveCanonicalId(srcNode.type, srcNode.title, taken)
+
+  const canonical: UPGBaseNode = { id, type: srcNode.type, title: srcNode.title }
+  if (srcNode.description) canonical.description = srcNode.description
+  if (Array.isArray(srcNode.tags)) canonical.tags = [...srcNode.tags]
+  if (srcNode.properties && typeof srcNode.properties === 'object') {
+    canonical.properties = { ...(srcNode.properties as Record<string, unknown>) } as UPGBaseNode['properties']
+  }
+
+  let edge: UPGCrossEdge | undefined
+  try {
+    portfolioStore.addRegistryNode(canonical)
+    if (registerSource) {
+      edge = {
+        id: edgeId(),
+        source: `${source.productId}/${source.nodeId}`,
+        target: `${REGISTRY_PRODUCT_ID}/${id}`,
+        type: 'instance_of',
+        source_product_id: source.productId,
+        target_product_id: REGISTRY_PRODUCT_ID,
+      }
+      portfolioStore.addCrossEdge(edge)
+    }
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to promote node to canonical: ${(err as Error).message}`)
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        canonical,
+        qualified_id: `${REGISTRY_PRODUCT_ID}/${id}`,
+        registered_source: registerSource,
+        edge,
+        portfolio_file: path.relative(cwd, portfolioPath),
+      },
+      null,
+      2,
+    ),
   )
 }

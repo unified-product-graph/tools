@@ -11,7 +11,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType } from '@unified-product-graph/core'
-import { UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID } from '@unified-product-graph/core'
 import { UPGPortfolioStore } from '@unified-product-graph/sdk'
 import {
   resolvePortfolioPath,
@@ -554,6 +554,13 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
       `not \`create_cross_product_edge\`.`,
     )
   }
+  if (edgeTypeArg === 'area_serves_persona' || edgeTypeArg === 'area_targets_market_segment') {
+    return textError(
+      `${edgeTypeArg} edges link a product_area to a canonical registry persona/market_segment ` +
+      `(carrying primary/secondary relevance) and are created via \`link_area_to_audience\`, ` +
+      `not \`create_cross_product_edge\`.`,
+    )
+  }
 
   // Qualify IDs; accept both bare IDs (with product context) and
   // pre-qualified `{product_id}/{node_id}` strings.
@@ -661,6 +668,152 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
         ...(registeredProducts.length > 0
           ? { registered_products: registeredProducts }
           : {}),
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Link a product area to a canonical audience (Batch-5 #29): create an
+ * `area_serves_persona` (→ a registry persona) or `area_targets_market_segment`
+ * (→ a registry market_segment) cross-edge, with optional `relevance`
+ * (primary/secondary) and `audience_role` qualifiers. The edge type is inferred
+ * from the canonical's type, so the caller just names the area and the canonical.
+ * Source is the `product_area` id; target is `registry/{canonical_id}`. This is
+ * the only path that creates the area↔audience edges (the generic
+ * `create_cross_product_edge` rejects them). Idempotent: an existing edge is
+ * updated (qualifiers) rather than duplicated.
+ *
+ * Parameters:
+ * - `area_id` (required): the product_area (see `list_product_areas`).
+ * - `canonical_id` (required): a registry persona or market_segment (bare or `registry/{id}`).
+ * - `relevance`: `primary` | `secondary` (the matrix's core distinction).
+ * - `audience_role`: `buyer`/`user`/`champion`/`influencer`/`partner` (persona targets only).
+ *
+ * @returns JSON: `{ edge, area, canonical, portfolio_file, already_existed?, updated? }`.
+ * @atomicity non-atomic. Edge append to the portfolio document.
+ * @see define_canonical_entity
+ * @see list_product_areas
+ */
+export const linkAreaToAudience: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const areaId = args.area_id as string | undefined
+  const canonicalArg = args.canonical_id as string | undefined
+  if (!areaId) return textError('Missing required parameter: area_id')
+  if (!canonicalArg) return textError('Missing required parameter: canonical_id (a registry persona or market_segment)')
+
+  const relevance = args.relevance as string | undefined
+  if (relevance !== undefined && relevance !== 'primary' && relevance !== 'secondary') {
+    return textError(`Invalid relevance "${relevance}". Use "primary" or "secondary".`)
+  }
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return textError(
+      'No portfolio document found. Create an area and a registry first (`create_area`, `define_canonical_entity`).',
+    )
+  }
+
+  const doc = portfolioStore.getDocument()
+  const area = doc?.product_areas?.find((a) => a.id === areaId)
+  if (!area) {
+    return textError(`Product area "${areaId}" not found in the portfolio. See \`list_product_areas\`.`)
+  }
+
+  const prefix = `${REGISTRY_PRODUCT_ID}/`
+  const canonicalId = canonicalArg.startsWith(prefix) ? canonicalArg.slice(prefix.length) : canonicalArg
+  const canonical = portfolioStore.getRegistryNode(canonicalId)
+  if (!canonical) {
+    return textError(
+      `Canonical entity "${canonicalId}" not found in the registry. An area audience edge targets a ` +
+      `registry persona or market_segment — define it first with \`define_canonical_entity\`.`,
+    )
+  }
+
+  let edgeType: UPGCrossEdgeType
+  if (canonical.type === 'persona') edgeType = 'area_serves_persona'
+  else if (canonical.type === 'market_segment') edgeType = 'area_targets_market_segment'
+  else {
+    return textError(
+      `Canonical "${canonicalId}" is a ${canonical.type}. An area audience edge targets a registry ` +
+      `persona (area_serves_persona) or market_segment (area_targets_market_segment).`,
+    )
+  }
+
+  const audienceRole = args.audience_role as string | undefined
+  if (audienceRole !== undefined) {
+    if (edgeType !== 'area_serves_persona') {
+      return textError('audience_role applies only to a persona target (area_serves_persona).')
+    }
+    const validRoles = ['buyer', 'user', 'champion', 'influencer', 'partner']
+    if (!validRoles.includes(audienceRole)) {
+      return textError(`Invalid audience_role "${audienceRole}". Use one of: ${validRoles.join(', ')}.`)
+    }
+  }
+
+  const target = `${REGISTRY_PRODUCT_ID}/${canonicalId}`
+
+  // Idempotent: an existing area→canonical edge of this type is updated (its
+  // qualifiers), not duplicated.
+  const existing = portfolioStore
+    .getAllCrossEdges()
+    .find((e) => e.type === edgeType && e.source === areaId && e.target === target)
+  if (existing) {
+    let updated = false
+    if (relevance !== undefined && existing.relevance !== relevance) {
+      existing.relevance = relevance as 'primary' | 'secondary'
+      updated = true
+    }
+    if (audienceRole !== undefined && existing.audience_role !== audienceRole) {
+      existing.audience_role = audienceRole as UPGCrossEdge['audience_role']
+      updated = true
+    }
+    if (updated) {
+      portfolioStore.markDirty()
+      await portfolioStore.flush()
+    }
+    return text(
+      JSON.stringify(
+        {
+          edge: existing,
+          area: { id: area.id, title: area.title },
+          canonical: { id: canonicalId, type: canonical.type, title: canonical.title },
+          already_existed: true,
+          updated,
+          portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  const edge: UPGCrossEdge = {
+    id: edgeId(),
+    source: areaId,
+    target,
+    type: edgeType,
+    target_product_id: REGISTRY_PRODUCT_ID,
+  }
+  if (relevance !== undefined) edge.relevance = relevance as 'primary' | 'secondary'
+  if (audienceRole !== undefined) edge.audience_role = audienceRole as UPGCrossEdge['audience_role']
+
+  try {
+    portfolioStore.addCrossEdge(edge)
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to write area audience edge: ${(err as Error).message}`)
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        edge,
+        area: { id: area.id, title: area.title },
+        canonical: { id: canonicalId, type: canonical.type, title: canonical.title },
+        portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
       },
       null,
       2,
@@ -944,6 +1097,9 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
     }
     if (edgeTypeArg === 'instance_of') {
       return textError(`edges[${i}]: instance_of edges are created via \`register_instance\` (registry same-type rules), not batch_create_cross_product_edges.`)
+    }
+    if (edgeTypeArg === 'area_serves_persona' || edgeTypeArg === 'area_targets_market_segment') {
+      return textError(`edges[${i}]: ${edgeTypeArg} edges are created via \`link_area_to_audience\`, not batch_create_cross_product_edges.`)
     }
     let qualifiedSource: string
     if (sourceIdArg.includes('/')) qualifiedSource = sourceIdArg

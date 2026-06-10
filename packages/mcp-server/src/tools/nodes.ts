@@ -14,12 +14,14 @@ import {
   isPortfolioScopedType,
   writePortfolioScopedNode,
   PortfolioRoutingError,
+  openPortfolioStoreIfExists,
 } from '@unified-product-graph/sdk'
 import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
 import {
   UPG_MIGRATIONS,
   UPG_EDGE_CATALOG,
   UPG_VERSION,
+  REGISTRY_PRODUCT_ID,
   migrateEdge,
   migrateNodeProperties,
   getPropertySchema,
@@ -206,13 +208,33 @@ export const listNodes: ToolHandler = (args, ctx): ToolResult => {
  * @atomicity atomic (read-only)
  * @see get_nodes
  */
-export const getNode: ToolHandler = (args, ctx): ToolResult => {
+export const getNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
   // N2 (UPG QA 0.8.7): accept bare `id` as an alias for `node_id`. `node_id` is
   // the canonical key (matches update_node / delete_node / batch ops); `id` is a
   // common first guess. Accept both; `node_id` wins if both are passed.
   const nodeId = (args.node_id ?? args.id) as string | undefined
   if (!nodeId) return textError(`Missing required parameter: node_id (alias: id)`)
+
+  // Registry resolution (Batch-5 #23): a `registry/{id}` reference resolves the
+  // canonical node from the portfolio registry — registry entities are first-class
+  // for reads, not just for `list_registry`. The instances pointing at it (and
+  // whether each is an `alias`) are attached so callers can see the canonical's reach.
+  if (nodeId.startsWith(`${REGISTRY_PRODUCT_ID}/`)) {
+    const bareId = nodeId.slice(REGISTRY_PRODUCT_ID.length + 1)
+    const portfolioStore = await openPortfolioStoreIfExists(process.cwd())
+    const canonical = portfolioStore?.getRegistryNode(bareId)
+    if (!canonical) return textError(`Registry node not found: ${nodeId}`)
+    const target = `${REGISTRY_PRODUCT_ID}/${bareId}`
+    const instances = portfolioStore!
+      .getAllCrossEdges()
+      .filter((e) => e.type === 'instance_of' && e.target === target)
+      .map((e) => ({ source: e.source, product_id: e.source_product_id, alias: e.alias ?? false }))
+    return text(
+      JSON.stringify({ node: canonical, registry: true, instance_count: instances.length, instances }, null, 2),
+    )
+  }
+
   const result = getNodeLib(store, {
     node_id: nodeId,
     compact_edges: (args.compact_edges as boolean) ?? false,

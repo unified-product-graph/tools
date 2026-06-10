@@ -143,6 +143,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listPortfolios: 'list_portfolios',
   getOrganization: 'get_organization',
   createCrossProductEdge: 'create_cross_product_edge',
+  linkAreaToAudience: 'link_area_to_audience',
   deleteCrossProductEdgeTool: 'delete_cross_product_edge',
   batchCreateCrossProductEdges: 'batch_create_cross_product_edges',
   attachProductToPortfolioTool: 'attach_product_to_portfolio',
@@ -155,6 +156,10 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   defineCanonicalEntity: 'define_canonical_entity',
   registerInstance: 'register_instance',
   listRegistry: 'list_registry',
+  updateCanonicalEntity: 'update_canonical_entity',
+  batchDefineCanonicalEntity: 'batch_define_canonical_entity',
+  batchRegisterInstance: 'batch_register_instance',
+  promoteToCanonical: 'promote_to_canonical',
   migrateCrossEdges: 'migrate_cross_edges',
   // migrations
   migrateStatus: 'migrate_status',

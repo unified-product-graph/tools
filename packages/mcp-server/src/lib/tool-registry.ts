@@ -62,6 +62,7 @@ import {
   listPortfolios,
   getOrganization,
   createCrossProductEdge,
+  linkAreaToAudience,
   batchCreateCrossProductEdges,
   deleteCrossProductEdgeTool,
   attachProductToPortfolioTool,
@@ -71,7 +72,15 @@ import {
 } from '../tools/workspace.js'
 import { portfolioQuery, portfolioDigest, portfolioValidate } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
-import { defineCanonicalEntity, registerInstance, listRegistry } from '../tools/registry.js'
+import {
+  defineCanonicalEntity,
+  registerInstance,
+  listRegistry,
+  updateCanonicalEntity,
+  batchDefineCanonicalEntity,
+  batchRegisterInstance,
+  promoteToCanonical,
+} from '../tools/registry.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
 import {
@@ -1146,7 +1155,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_cross_edge_types',
     description:
-      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`, not `create_cross_product_edge`.',
+      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`, `area_serves_persona`, `area_targets_market_segment`, `rolls_up_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`; `area_serves_persona` / `area_targets_market_segment` (a product_area to a registry persona/segment, with primary/secondary relevance) via `link_area_to_audience`; `rolls_up_to` (a product metric feeding a company metric) via `create_cross_product_edge`. None of the area edges go through the generic `create_cross_product_edge`.',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
@@ -1680,7 +1689,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'create_cross_product_edge',
     description:
-      'Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted), `contributes_to` (a product strategy entity rolls up to a higher-level one, e.g. product objective → company objective, product key_result → company key_result; directed subordinate to superior).',
+      'Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted), `contributes_to` (a product strategy entity rolls up to a higher-level one, e.g. product objective → company objective; directed subordinate to superior), `rolls_up_to` (a product metric feeds a company/portfolio metric, e.g. a product KPI → a company north-star; directed feeder to feed, same-type metric → metric). For `instance_of` use `register_instance`; for `area_serves_persona` / `area_targets_market_segment` use `link_area_to_audience`.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -1688,13 +1697,28 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         target_id: { type: 'string', description: 'Target node ID' },
         type: {
           type: 'string',
-          enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts', 'contributes_to'],
+          enum: ['shares_persona', 'shares_competitor', 'shares_metric', 'depends_on_product', 'cannibalises', 'succeeds', 'hosts', 'contributes_to', 'rolls_up_to'],
           description: 'Cross-product relationship type',
         },
         source_product_id: { type: 'string', description: 'Product ID of the source node' },
         target_product_id: { type: 'string', description: 'Product ID of the target node' },
       },
       required: ['source_id', 'target_id', 'type'],
+    },
+  },
+  {
+    name: 'link_area_to_audience',
+    description:
+      'Link a product area to a canonical audience: create an `area_serves_persona` (target is a registry persona) or `area_targets_market_segment` (target is a registry market_segment) cross-edge, with optional `relevance` (primary/secondary) and `audience_role` qualifiers. The edge type is inferred from the canonical entity\'s type. Source is the product_area id; target is `registry/{canonical_id}`. This is the only path that creates the area↔audience edges. Idempotent: an existing edge is updated (qualifiers), not duplicated.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        area_id: { type: 'string', description: 'The product_area id (see list_product_areas).' },
+        canonical_id: { type: 'string', description: 'A registry persona or market_segment (bare or registry/{id}).' },
+        relevance: { type: 'string', enum: ['primary', 'secondary'], description: 'Whether this audience is a primary or secondary focus of the area.' },
+        audience_role: { type: 'string', enum: ['buyer', 'user', 'champion', 'influencer', 'partner'], description: 'The audience role in this area\'s context (persona targets only).' },
+      },
+      required: ['area_id', 'canonical_id'],
     },
   },
   {
@@ -1766,13 +1790,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'register_instance',
     description:
-      'Link a product node to a canonical registry entity by creating an `instance_of` cross-edge (product entity → `registry/{id}`). This is the only path that creates `instance_of` edges: it requires the canonical to exist and enforces the same-type constraint (a persona instance_of a persona). Idempotent: re-registering the same instance returns the existing edge. Use after `define_canonical_entity` to attach each product\'s local copy to the shared definition.',
+      'Link a product node to a canonical registry entity by creating an `instance_of` cross-edge (product entity → `registry/{id}`). This is the only path that creates `instance_of` edges: it requires the canonical to exist and enforces the same-type constraint (a persona instance_of a persona). Idempotent: re-registering the same instance returns the existing edge. Set `alias: true` to sanction a deliberate title divergence (an informative product-local name) so registry drift detection ignores it. Use after `define_canonical_entity` to attach each product\'s local copy to the shared definition.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         node_id: { type: 'string', description: 'The product instance node. Bare id resolves against the active product (or source_product_id); a qualified {product_id}/{node_id} targets any workspace product.' },
         canonical_id: { type: 'string', description: 'The registry entity id (bare, or registry/{id}).' },
         source_product_id: { type: 'string', description: 'Product ID owning the instance, when node_id is a bare id not in the active product.' },
+        alias: { type: 'boolean', description: 'Mark a deliberate title divergence from the canonical as sanctioned, excluding it from registry drift. Can be toggled on an existing instance_of edge.' },
       },
       required: ['node_id', 'canonical_id'],
     },
@@ -1787,6 +1812,90 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         type: { type: 'string', description: 'Filter to one entity type (e.g. persona).' },
         include_instances: { type: 'boolean', description: 'Attach each canonical\'s product instances (default false).' },
       },
+    },
+  },
+  {
+    name: 'update_canonical_entity',
+    description:
+      'Edit a canonical registry entity in place (title, description, audience_role, tags, properties) WITHOUT disturbing the `instance_of` edges that point at it. The fix for a canonical seeded with a typo or placeholder: correct it via the API instead of hand-editing portfolio.upg. Properties are shallow-merged. At least one editable field is required.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        canonical_id: { type: 'string', description: 'The registry entity id (bare, or registry/{id}).' },
+        title: { type: 'string', description: 'New canonical name.' },
+        description: { type: 'string', description: 'New description.' },
+        audience_role: { type: 'string', description: 'Persona audience role (buyer/user/champion/influencer/partner); merged into properties.' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Replacement tags.' },
+        properties: { type: 'object', description: 'Properties to shallow-merge into the canonical.' },
+      },
+      required: ['canonical_id'],
+    },
+  },
+  {
+    name: 'batch_define_canonical_entity',
+    description:
+      'Batch-create canonical registry entities in one atomic call (the migration counterpart to `define_canonical_entity`). Validates every entity up front (valid type, unique id) then writes all and flushes once, so a registry stand-up is a handful of batches, not one call per canonical.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        entities: {
+          type: 'array',
+          description: 'Up to 50 canonical entities.',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', description: 'Canonical UPG entity type.' },
+              title: { type: 'string', description: 'Canonical name.' },
+              canonical_id: { type: 'string', description: 'Optional explicit registry id.' },
+              description: { type: 'string' },
+              tags: { type: 'array', items: { type: 'string' } },
+              properties: { type: 'object' },
+            },
+            required: ['type', 'title'],
+          },
+        },
+      },
+      required: ['entities'],
+    },
+  },
+  {
+    name: 'batch_register_instance',
+    description:
+      'Batch-register product instances against canonical entities in one atomic call (the migration counterpart to `register_instance`). Validates every instance up front (canonical exists, same-type) then writes all `instance_of` edges and flushes once. Per-instance idempotent; `alias` honoured per instance.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        instances: {
+          type: 'array',
+          description: 'Up to 50 instances.',
+          items: {
+            type: 'object',
+            properties: {
+              node_id: { type: 'string', description: 'The product instance node (bare or qualified).' },
+              canonical_id: { type: 'string', description: 'The registry entity id (bare or registry/{id}).' },
+              source_product_id: { type: 'string', description: 'Product ID owning a bare node_id.' },
+              alias: { type: 'boolean', description: 'Sanction a deliberate title divergence.' },
+            },
+            required: ['node_id', 'canonical_id'],
+          },
+        },
+      },
+      required: ['instances'],
+    },
+  },
+  {
+    name: 'promote_to_canonical',
+    description:
+      'Promote an existing product node into the registry as its canonical, instead of authoring a fresh thinner one with `define_canonical_entity`. Copies the source node\'s description/tags/properties into a new registry node and (by default) registers the source as the canonical\'s first instance. Lets a team canonicalise the rich node they already curated.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        node_id: { type: 'string', description: 'The existing node (bare resolves against active product or source_product_id; or qualified {product_id}/{node_id}).' },
+        source_product_id: { type: 'string', description: 'Product ID owning a bare node_id.' },
+        canonical_id: { type: 'string', description: 'Optional explicit registry id; otherwise derived from type + title.' },
+        register_source: { type: 'boolean', description: 'Register the source node as the first instance (default true).' },
+      },
+      required: ['node_id'],
     },
   },
   {
@@ -2095,6 +2204,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   list_portfolios: listPortfolios,
   get_organization: getOrganization,
   create_cross_product_edge: createCrossProductEdge,
+  link_area_to_audience: linkAreaToAudience,
   delete_cross_product_edge: deleteCrossProductEdgeTool,
   batch_create_cross_product_edges: batchCreateCrossProductEdges,
   attach_product_to_portfolio: attachProductToPortfolioTool,
@@ -2103,6 +2213,10 @@ const HANDLERS: Record<string, ToolHandler> = {
   define_canonical_entity: defineCanonicalEntity,
   register_instance: registerInstance,
   list_registry: listRegistry,
+  update_canonical_entity: updateCanonicalEntity,
+  batch_define_canonical_entity: batchDefineCanonicalEntity,
+  batch_register_instance: batchRegisterInstance,
+  promote_to_canonical: promoteToCanonical,
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
   portfolio_validate: portfolioValidate,

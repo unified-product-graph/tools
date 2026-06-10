@@ -999,7 +999,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_cross_edge_types',
     description:
-      'List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to, instance_of). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG. instance_of (product entity to a canonical registry entity) is created via the registry tooling in the local MCP server.',
+      'List the canonical cross-product edge types from UPG_CROSS_EDGE_TYPES (shares_persona, shares_competitor, shares_metric, depends_on_product, cannibalises, succeeds, hosts, contributes_to, instance_of, area_serves_persona, area_targets_market_segment, rolls_up_to). Portfolio-level relationships between entities in different products, separate from the within-product UPG_EDGE_CATALOG. instance_of and the area edges (area_serves_persona / area_targets_market_segment) are created via the registry/portfolio tooling in the local MCP server; rolls_up_to (a product metric feeding a company metric) via create_cross_product_edge.',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {

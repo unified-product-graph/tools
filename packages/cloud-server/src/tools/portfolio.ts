@@ -104,6 +104,12 @@ export const createCrossProductEdge: ToolHandler = async (args, { store }) => {
       `registry tooling (register_instance) in the local MCP server, not create_cross_product_edge.`,
     )
   }
+  if (type === 'area_serves_persona' || type === 'area_targets_market_segment') {
+    return textError(
+      `${type} links a product_area to a canonical registry persona/market_segment and is created via ` +
+      `the portfolio tooling (link_area_to_audience) in the local MCP server, not create_cross_product_edge.`,
+    )
+  }
 
   try {
     const edge = await store.addCrossProductEdge(edgeId(), productId, source, target, type)

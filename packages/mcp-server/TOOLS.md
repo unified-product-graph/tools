@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 113 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 118 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 113 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 15 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 22 tools
+- [Workspace & Portfolios](#workspace-portfolios): 27 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 45 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1223,6 +1223,8 @@ _Multi-product discovery, switching, init, cross-product edges._
 
 - [`attach_product_to_portfolio`](#attach-product-to-portfolio)
 - [`batch_create_cross_product_edges`](#batch-create-cross-product-edges)
+- [`batch_define_canonical_entity`](#batch-define-canonical-entity)
+- [`batch_register_instance`](#batch-register-instance)
 - [`clone_structure`](#clone-structure)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_product`](#create-product)
@@ -1232,6 +1234,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`get_organization`](#get-organization)
 - [`get_workspace_info`](#get-workspace-info)
 - [`init_workspace`](#init-workspace)
+- [`link_area_to_audience`](#link-area-to-audience)
 - [`list_local_products`](#list-local-products)
 - [`list_portfolio_cross_edges`](#list-portfolio-cross-edges)
 - [`list_portfolios`](#list-portfolios)
@@ -1240,8 +1243,10 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`portfolio_digest`](#portfolio-digest)
 - [`portfolio_query`](#portfolio-query)
 - [`portfolio_validate`](#portfolio-validate)
+- [`promote_to_canonical`](#promote-to-canonical)
 - [`register_instance`](#register-instance)
 - [`switch_product`](#switch-product)
+- [`update_canonical_entity`](#update-canonical-entity)
 - [`update_product`](#update-product)
 
 ### `attach_product_to_portfolio`
@@ -1296,6 +1301,44 @@ or when no portfolio document exists (pass `auto_create_portfolio: true` to mint
 **See also:** `create_cross_product_edge`, `list_cross_edge_types`
 
 
+### `batch_define_canonical_entity`
+
+Batch-create canonical registry entities in one atomic call (the migration counterpart to `define_canonical_entity`). Validates every entity up front (valid type, unique id) then writes all and flushes once, so a registry stand-up is a handful of batches, not one call per canonical.
+
+**Atomicity:** `validate-all-then-write. A single invalid entity rejects the whole batch.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `entities` | array | ✓ | Up to 50 canonical entities. |
+
+**Returns:**
+
+JSON: `{ defined: [{ canonical_id, qualified_id, type, title }], count, portfolio_file }`.
+
+**See also:** `define_canonical_entity`
+
+
+### `batch_register_instance`
+
+Batch-register product instances against canonical entities in one atomic call (the migration counterpart to `register_instance`). Validates every instance up front (canonical exists, same-type) then writes all `instance_of` edges and flushes once. Per-instance idempotent; `alias` honoured per instance.
+
+**Atomicity:** `validate-all-then-write. A single invalid instance rejects the whole batch.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `instances` | array | ✓ | Up to 50 instances. |
+
+**Returns:**
+
+JSON: `{ results: [...], registered, already_existed, count, portfolio_file }`.
+
+**See also:** `register_instance`
+
+
 ### `clone_structure`
 
 Stamp the SHAPE of one product (typed nodes + canonical edges + hierarchy, with `TODO:` placeholder titles) into another, without re-authoring the skeleton. Content (descriptions, properties, real titles, statuses) never crosses; only the structure does. The lever for multi-product structural parity: one stamp plus a content pass replaces a multi-batch rebuild. `from_product` is the read-only exemplar; `into` is the write target and DEFAULTS to the active product (name a non-active product to write there with no `switch_product`). `regions` scopes the clone to entity types in those super-domains. `dry_run: true` previews the plan without writing. Local-only.
@@ -1332,7 +1375,7 @@ the source has no clonable shape under the given scope.
 
 ### `create_cross_product_edge`
 
-Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted), `contributes_to` (a product strategy entity rolls up to a higher-level one, e.g. product objective → company objective, product key_result → company key_result; directed subordinate to superior).
+Create a cross-product relationship between two entities in different products within a portfolio graph. Types: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts` (host product runs the hosted product inside itself, directed host to hosted), `contributes_to` (a product strategy entity rolls up to a higher-level one, e.g. product objective → company objective; directed subordinate to superior), `rolls_up_to` (a product metric feeds a company/portfolio metric, e.g. a product KPI → a company north-star; directed feeder to feed, same-type metric → metric). For `instance_of` use `register_instance`; for `area_serves_persona` / `area_targets_market_segment` use `link_area_to_audience`.
 
 **Atomicity:** `non-atomic. Portfolio file create (if new) + edge append are
 separate filesystem operations.`
@@ -1345,7 +1388,7 @@ separate filesystem operations.`
 | `source_product_id` | string |  | Product ID of the source node |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -1527,6 +1570,28 @@ workspace already exists, raises `WorkspaceAlreadyExistsError`. Pair
 with `get_workspace_info` to check state before re-running.
 
 **See also:** `create_product`, `switch_product`, `get_workspace_info`
+
+
+### `link_area_to_audience`
+
+Link a product area to a canonical audience: create an `area_serves_persona` (target is a registry persona) or `area_targets_market_segment` (target is a registry market_segment) cross-edge, with optional `relevance` (primary/secondary) and `audience_role` qualifiers. The edge type is inferred from the canonical entity's type. Source is the product_area id; target is `registry/{canonical_id}`. This is the only path that creates the area↔audience edges. Idempotent: an existing edge is updated (qualifiers), not duplicated.
+
+**Atomicity:** `non-atomic. Edge append to the portfolio document.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `area_id` | string | ✓ | The product_area id (see list_product_areas). |
+| `audience_role` | `buyer` \| `user` \| `champion` \| `influencer` \| `partner` |  | The audience role in this area's context (persona targets only). |
+| `canonical_id` | string | ✓ | A registry persona or market_segment (bare or registry/{id}). |
+| `relevance` | `primary` \| `secondary` |  | Whether this audience is a primary or secondary focus of the area. |
+
+**Returns:**
+
+JSON: `{ edge, area, canonical, portfolio_file, already_existed?, updated? }`.
+
+**See also:** `define_canonical_entity`, `list_product_areas`
 
 
 ### `list_local_products`
@@ -1718,9 +1783,31 @@ a missing canonical, dangle, mismatch type, or were renamed off-canon
 **See also:** `validate_graph`, `portfolio_digest`, `portfolio_query`, `list_registry`
 
 
+### `promote_to_canonical`
+
+Promote an existing product node into the registry as its canonical, instead of authoring a fresh thinner one with `define_canonical_entity`. Copies the source node's description/tags/properties into a new registry node and (by default) registers the source as the canonical's first instance. Lets a team canonicalise the rich node they already curated.
+
+**Atomicity:** `non-atomic. Registry node add (+ optional instance_of edge) + flush.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `canonical_id` | string |  | Optional explicit registry id; otherwise derived from type + title. |
+| `node_id` | string | ✓ | The existing node (bare resolves against active product or source_product_id; or qualified {product_id}/{node_id}). |
+| `register_source` | boolean |  | Register the source node as the first instance (default true). |
+| `source_product_id` | string |  | Product ID owning a bare node_id. |
+
+**Returns:**
+
+JSON: `{ canonical, qualified_id, registered_source, edge?, portfolio_file }`.
+
+**See also:** `define_canonical_entity`, `register_instance`
+
+
 ### `register_instance`
 
-Link a product node to a canonical registry entity by creating an `instance_of` cross-edge (product entity → `registry/{id}`). This is the only path that creates `instance_of` edges: it requires the canonical to exist and enforces the same-type constraint (a persona instance_of a persona). Idempotent: re-registering the same instance returns the existing edge. Use after `define_canonical_entity` to attach each product's local copy to the shared definition.
+Link a product node to a canonical registry entity by creating an `instance_of` cross-edge (product entity → `registry/{id}`). This is the only path that creates `instance_of` edges: it requires the canonical to exist and enforces the same-type constraint (a persona instance_of a persona). Idempotent: re-registering the same instance returns the existing edge. Set `alias: true` to sanction a deliberate title divergence (an informative product-local name) so registry drift detection ignores it. Use after `define_canonical_entity` to attach each product's local copy to the shared definition.
 
 **Atomicity:** `non-atomic. Edge append to the portfolio document.`
 
@@ -1728,6 +1815,7 @@ Link a product node to a canonical registry entity by creating an `instance_of` 
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `alias` | boolean |  | Mark a deliberate title divergence from the canonical as sanctioned, excluding it from registry drift. Can be toggled on an existing instance_of edge. |
 | `canonical_id` | string | ✓ | The registry entity id (bare, or registry/{id}). |
 | `node_id` | string | ✓ | The product instance node. Bare id resolves against the active product (or source_product_id); a qualified {product_id}/{node_id} targets any workspace product. |
 | `source_product_id` | string |  | Product ID owning the instance, when node_id is a bare id not in the active product. |
@@ -1769,6 +1857,30 @@ server reverts to the workspace default. Call `get_workspace_info`
 before any read/mutation to confirm the active product.
 
 **See also:** `get_workspace_info`, `list_local_products`, `init_workspace`
+
+
+### `update_canonical_entity`
+
+Edit a canonical registry entity in place (title, description, audience_role, tags, properties) WITHOUT disturbing the `instance_of` edges that point at it. The fix for a canonical seeded with a typo or placeholder: correct it via the API instead of hand-editing portfolio.upg. Properties are shallow-merged. At least one editable field is required.
+
+**Atomicity:** `non-atomic. In-place registry node patch + flush.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `audience_role` | string |  | Persona audience role (buyer/user/champion/influencer/partner); merged into properties. |
+| `canonical_id` | string | ✓ | The registry entity id (bare, or registry/{id}). |
+| `description` | string |  | New description. |
+| `properties` | object |  | Properties to shallow-merge into the canonical. |
+| `tags` | array |  | Replacement tags. |
+| `title` | string |  | New canonical name. |
+
+**Returns:**
+
+JSON: `{ canonical, qualified_id, instance_count, portfolio_file }`.
+
+**See also:** `define_canonical_entity`
 
 
 ### `update_product`
@@ -2368,7 +2480,7 @@ JSON: `{ kind, total, count, benchmarks: ... }`
 
 ### `list_cross_edge_types`
 
-List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`, not `create_cross_product_edge`.
+List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`, `area_serves_persona`, `area_targets_market_segment`, `rolls_up_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`; `area_serves_persona` / `area_targets_market_segment` (a product_area to a registry persona/segment, with primary/secondary relevance) via `link_area_to_audience`; `rolls_up_to` (a product metric feeding a company metric) via `create_cross_product_edge`. None of the area edges go through the generic `create_cross_product_edge`.
 
 **Atomicity:** `atomic (read-only)`
 
