@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/sdk",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "description": "Unified Product Graph: programmatic SDK for reading and writing .upg product knowledge graphs",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
@@ -36,7 +36,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@unified-product-graph/core": "0.9.8",
+    "@unified-product-graph/core": "0.9.9",
     "chokidar": "^4.0.0",
     "nanoid": "^5.1.0",
     "proper-lockfile": "^4.1.2"
