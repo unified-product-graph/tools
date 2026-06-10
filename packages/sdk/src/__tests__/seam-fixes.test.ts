@@ -215,18 +215,18 @@ describe(' prioritise type guard', () => {
 // ──: plan scope ──────────────────────────────────────────────────────
 
 describe(' plan scope', () => {
-  it('defaults to active regions, not the whole 313-type universe', async () => {
+  it('defaults to active regions, not the whole 315-type universe', async () => {
     const store = await freshStore()
     const r = executePlan(store)
     expect(r.scope).toBe('active_regions')
     expect(r.expected_count).toBeGreaterThan(0)
-    expect(r.expected_count).toBeLessThan(313)
+    expect(r.expected_count).toBeLessThan(315)
     expect(r.scoped_regions.length).toBeGreaterThan(0)
   })
 
   it('exhaustive opt-in scores the full universe', async () => {
     const store = await freshStore()
-    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(313)
+    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(315)
   })
 
   it('accepts a canonical region id AND an atomic-domain id', async () => {

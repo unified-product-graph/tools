@@ -1388,7 +1388,7 @@ separate filesystem operations.`
 | `source_product_id` | string |  | Product ID of the source node |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` | ✓ | Cross-product relationship type |
 
 **Returns:**
 

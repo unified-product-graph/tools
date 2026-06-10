@@ -169,10 +169,10 @@ describe('list_playbooks / get_playbook', () => {
  expect(b.playbooks).toHaveLength(UPG_PLAYBOOKS.length)
  })
 
- it('list_playbooks ships 12 playbooks at v0.3.0', () => {
+ it('list_playbooks ships 13 playbooks at v0.3.0', () => {
  const { body } = call(listPlaybooks, {})
  const b = body as { count: number }
- expect(b.count).toBe(12)
+ expect(b.count).toBe(13)
  })
 
  it('list_playbooks filters by region', () => {
@@ -184,11 +184,11 @@ describe('list_playbooks / get_playbook', () => {
  expect(b.playbooks).toHaveLength(3)
  })
 
- it('list_playbooks filters by canonical_only (W1 invariant: exactly 10)', () => {
+ it('list_playbooks filters by canonical_only (W1 invariant: exactly 11)', () => {
  const { body } = call(listPlaybooks, { canonical_only: true })
  const b = body as { count: number; playbooks: Array<{ is_canonical?: boolean }> }
  expect(b.count).toBe(UPG_REGIONS.length)
- expect(b.count).toBe(10)
+ expect(b.count).toBe(11)
  expect(b.playbooks.every((p) => p.is_canonical === true)).toBe(true)
  })
 
