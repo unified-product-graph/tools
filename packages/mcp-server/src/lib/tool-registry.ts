@@ -103,6 +103,8 @@ import {
   listRegions,
   getRegion,
   getRegionForEntity,
+  listTreePatterns,
+  getTreePattern,
   getSpecVersion,
   resolveEdgeForPair,
   listCrossEdgeTypes,
@@ -1171,6 +1173,27 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'list_tree_patterns',
+    description:
+      'List the canonical get_tree patterns as summary rows: id, label, the region each is the tree view of, anchor_type, fallback_anchors, natural_depth, gap_policy, and slot_count. The introspectable index of what get_tree can assemble. Pair with list_regions to see which tree-shaped regions have a pattern. Fixed list, non-paginated.',
+    inputSchema: { type: 'object' as const, properties: {} },
+  },
+  {
+    name: 'get_tree_pattern',
+    description:
+      'Return the full declarative record for one get_tree pattern: its region, anchor_type, fallback_anchors, gap_policy, natural_depth, and its child map resolved to concrete edges. Each parent-to-child slot carries the canonical `via` edge and its `kind`, resolved live from the edge catalogue, so a client reads the real wiring instead of reverse-engineering it and the pattern cannot cite an edge the grammar lacks.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system.',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'get_spec_version',
     description:
       'Spec-level metadata for compatibility checks: `upg_version`, `markdown_format_version`, and canonical counts (entity types, edge types, atomic domains, super-domain regions). Pin against the version pair; counts are informational.',
@@ -2228,6 +2251,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   list_regions: listRegions,
   get_region: getRegion,
   get_region_for_entity_type: getRegionForEntity,
+  list_tree_patterns: listTreePatterns,
+  get_tree_pattern: getTreePattern,
   get_spec_version: getSpecVersion,
   resolve_edge_for_pair: resolveEdgeForPair,
   list_cross_edge_types: listCrossEdgeTypes,

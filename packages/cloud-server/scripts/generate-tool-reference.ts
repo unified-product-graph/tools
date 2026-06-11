@@ -151,6 +151,8 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listRegions: 'list_regions',
   getRegion: 'get_region',
   getRegionForEntity: 'get_region_for_entity_type',
+  listTreePatterns: 'list_tree_patterns',
+  getTreePattern: 'get_tree_pattern',
   getSpecVersion: 'get_spec_version',
   resolveEdgeForPair: 'resolve_edge_for_pair',
   listCrossEdgeTypes: 'list_cross_edge_types',

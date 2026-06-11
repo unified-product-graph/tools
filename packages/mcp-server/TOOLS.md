@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 121 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 123 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -10,7 +10,7 @@ Reference for the 121 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Areas & Change Log](#areas-change-log): 10 tools
 - [Workspace & Portfolios](#workspace-portfolios): 28 tools
 - [Schema](#schema): 1 tool
-- [Spec Introspection](#spec-introspection): 46 tools
+- [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
 - [Validation](#validation): 3 tools
 
@@ -2012,6 +2012,7 @@ _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, reg
 - [`get_region_for_entity_type`](#get-region-for-entity-type)
 - [`get_scale`](#get-scale)
 - [`get_spec_version`](#get-spec-version)
+- [`get_tree_pattern`](#get-tree-pattern)
 - [`get_type_label`](#get-type-label)
 - [`get_valid_children`](#get-valid-children)
 - [`inspect`](#inspect)
@@ -2035,6 +2036,7 @@ _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, reg
 - [`list_scales`](#list-scales)
 - [`list_split_migrations`](#list-split-migrations)
 - [`list_status_values`](#list-status-values)
+- [`list_tree_patterns`](#list-tree-patterns)
 - [`list_type_labels`](#list-type-labels)
 - [`list_type_migrations`](#list-type-migrations)
 - [`plan`](#plan)
@@ -2394,6 +2396,29 @@ _No arguments._
 JSON: `{ upg_version, markdown_format_version, entity_count, edge_count, domain_count, region_count }`
 
 **See also:** `get_workspace_info`, `list_entity_types`, `list_edge_types`, `list_regions`
+
+
+### `get_tree_pattern`
+
+Return the full declarative record for one get_tree pattern: its region, anchor_type, fallback_anchors, gap_policy, natural_depth, and its child map resolved to concrete edges. Each parent-to-child slot carries the canonical `via` edge and its `kind`, resolved live from the edge catalogue, so a client reads the real wiring instead of reverse-engineering it and the pattern cannot cite an edge the grammar lacks.
+
+**Atomicity:** `atomic (read-only)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `id` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system. |
+
+**Returns:**
+
+JSON: the `UPGTreePatternDetail` record.
+
+**Throws:**
+
+- textError when `id` is missing or unknown.
+
+**See also:** `list_tree_patterns`, `get_tree`, `resolve_edge_for_pair`
 
 
 ### `get_type_label`
@@ -2847,6 +2872,21 @@ List the valid `status` values an entity type can hold: the pre-flight lookup so
 JSON: `{ entity_type, lifecycle_free, initial_status?, terminal_statuses?, values: [{ status, label, terminal }], note? }`.
 
 **See also:** `get_lifecycle`, `get_entity_schema`
+
+
+### `list_tree_patterns`
+
+List the canonical get_tree patterns as summary rows: id, label, the region each is the tree view of, anchor_type, fallback_anchors, natural_depth, gap_policy, and slot_count. The introspectable index of what get_tree can assemble. Pair with list_regions to see which tree-shaped regions have a pattern. Fixed list, non-paginated.
+
+**Atomicity:** `atomic (read-only)`
+
+_No arguments._
+
+**Returns:**
+
+JSON: `{ count, patterns: UPGTreePatternSummary[] }`
+
+**See also:** `get_tree_pattern`, `get_tree`, `list_regions`
 
 
 ### `list_type_labels`

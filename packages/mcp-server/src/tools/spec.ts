@@ -83,6 +83,8 @@ import {
   resolveContainmentEdge,
   resolveLabel,
   getRegionForEntityType,
+  listTreePatternSummaries,
+  describeTreePattern,
   getLens,
   getVisibleTypes,
   getValidChildren,
@@ -1025,6 +1027,48 @@ export const getRegionForEntity: ToolHandler = (args): ToolResult => {
   const region = getRegionForEntityType(entityType)
   if (!region) return textError(`No region contains entity_type: ${entityType}`)
   return text(JSON.stringify(region, null, 2))
+}
+
+// ── Tree patterns ─────────────────────────────────────────────────
+
+/**
+ * List the canonical `get_tree` patterns as summary rows: id, label, the region
+ * each is the tree view of, anchor + fallback anchors, natural depth, gap
+ * policy, and slot count. The introspectable index of what `get_tree` can
+ * assemble (one pattern per tree-shaped region; a region may afford several).
+ *
+ * @returns JSON: `{ count, patterns: UPGTreePatternSummary[] }`
+ * @atomicity atomic (read-only)
+ * @see get_tree_pattern
+ * @see get_tree
+ * @see list_regions
+ */
+export const listTreePatterns: ToolHandler = (): ToolResult => {
+  const patterns = listTreePatternSummaries()
+  return text(JSON.stringify({ count: patterns.length, patterns }, null, 2))
+}
+
+/**
+ * Return the full declarative record for one `get_tree` pattern: its region,
+ * anchor + fallbacks, gap policy, natural depth, and its child map resolved to
+ * concrete edges. Each (parent -> child) slot carries the canonical `via` edge
+ * and its `kind`, resolved LIVE from the edge catalogue so a reader gets the
+ * real wiring without reverse-engineering it, and the pattern cannot cite an
+ * edge the grammar lacks.
+ *
+ * @returns JSON: the `UPGTreePatternDetail` record.
+ * @throws textError when `id` is missing or unknown.
+ * @atomicity atomic (read-only)
+ * @see list_tree_patterns
+ * @see get_tree
+ * @see resolve_edge_for_pair
+ */
+export const getTreePattern: ToolHandler = (args): ToolResult => {
+  const id = args.id as string | undefined
+  if (!id) return textError('Missing required parameter: id')
+  const detail = describeTreePattern(id)
+  if (!detail) return textError(`Unknown tree pattern: ${id}`)
+  return text(JSON.stringify(detail, null, 2))
 }
 
 // ── Spec version ──────────────────────────────────────────────────

@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 121 tools', () => {
+  it('exposes the expected 123 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -122,7 +122,9 @@ describe('Tool registry: completeness', () => {
     // + create_registry_edge (0.9.13 foundations follow-ups): author registry-internal
     //   edges (registry.edges), e.g. specification governed_by organization. → 120.
     // + get_tree (0.9.15): server-side canonical tree assembly (local-only). → 121.
-    expect(TOOL_DEFINITIONS).toHaveLength(121)
+    // + 2 tree-pattern introspection tools (0.9.20): list_tree_patterns,
+    //   get_tree_pattern (the catalogue behind get_tree, made queryable). → 123.
+    expect(TOOL_DEFINITIONS).toHaveLength(123)
   })
 })
 
