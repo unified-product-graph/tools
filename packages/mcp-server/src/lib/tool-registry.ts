@@ -130,6 +130,7 @@ import {
   listDomainRings,
   getDomainRing,
 } from '../tools/spec.js'
+import { getTree } from '../tools/tree.js'
 import { validateGraph, getAntiPatternViolationsFor } from '../tools/validation.js'
 import { migrateStatus } from '../tools/migrations.js'
 import {
@@ -309,6 +310,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         diff_from: { type: 'string', description: 'Result ID from a previous query. Returns only added/removed nodes since that result.' },
       },
+    },
+  },
+  {
+    name: 'get_tree',
+    description:
+      'Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        pattern: { type: 'string', description: 'Tree pattern id: ost, okr, user, product, validation, strategy, or feature_areas.' },
+        from_id: { type: 'string', description: 'Explicit root node id; otherwise the pattern canonical anchor.' },
+        depth: { type: 'number', description: 'Max levels (default = the pattern natural depth; max 12).' },
+        include_properties: { type: 'array', items: { type: 'string' }, description: 'Node property keys to inline on each tree node.' },
+        max_nodes: { type: 'number', description: 'Cap on nodes; the tree is summarised (stats.truncated) rather than silently cut (default 400, max 2000).' },
+      },
+      required: ['pattern'],
     },
   },
   {
@@ -2161,6 +2178,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_nodes: getNodes,
   search_nodes: searchNodes,
   query: query,
+  get_tree: getTree,
   create_node: createNode,
   update_node: updateNode,
   delete_node: deleteNode,

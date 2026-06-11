@@ -48,7 +48,7 @@ const DOMAINS = [
 // `migrate_properties`), `skill_audit` under Validation (it is an integrity
 // check). The handlers stay in `migrations.ts` / `skills.ts`.
 const DOMAIN_SOURCE_FILES: Record<string, readonly string[]> = {
-  nodes: ['nodes.ts', 'migrations.ts'],
+  nodes: ['nodes.ts', 'migrations.ts', 'tree.ts'],
   validation: ['validation.ts', 'skills.ts'],
   // apply_framework / score_entity (0.8.4) live in their own file but belong to
   // the Spec domain section (frameworks), alongside prioritise/get_framework.
@@ -103,6 +103,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getNodes: 'get_nodes',
   searchNodes: 'search_nodes',
   query: 'query',
+  getTree: 'get_tree',
   createNode: 'create_node',
   updateNode: 'update_node',
   deleteNode: 'delete_node',

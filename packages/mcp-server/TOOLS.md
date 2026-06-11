@@ -1,11 +1,11 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 120 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 121 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
 - [Context & Session](#context-session): 5 tools
-- [Nodes](#nodes): 15 tools
+- [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
 - [Workspace & Portfolios](#workspace-portfolios): 28 tools
@@ -186,6 +186,7 @@ _Read, search, traverse, mutate, batch, migrate type/properties/status, dedupe._
 - [`delete_node`](#delete-node)
 - [`get_node`](#get-node)
 - [`get_nodes`](#get-nodes)
+- [`get_tree`](#get-tree)
 - [`list_nodes`](#list-nodes)
 - [`migrate_properties`](#migrate-properties)
 - [`migrate_status`](#migrate-status)
@@ -438,6 +439,31 @@ may drop edge titles, optional node fields, or truncate the result list.
 Surfaced as `degraded.applied[]` on the response.
 
 **See also:** `get_node`
+
+
+### `get_tree`
+
+Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.
+
+**Atomicity:** `atomic (read-only). Reads the active product only.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `depth` | number |  | Max levels (default = the pattern natural depth; max 12). |
+| `from_id` | string |  | Explicit root node id; otherwise the pattern canonical anchor. |
+| `include_properties` | array |  | Node property keys to inline on each tree node. |
+| `max_nodes` | number |  | Cap on nodes; the tree is summarised (stats.truncated) rather than silently cut (default 400, max 2000). |
+| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, or feature_areas. |
+
+**Returns:**
+
+JSON: `{ pattern, framework_id?, anchor_type, anchor_used,
+anchor_resolved_from?, roots: TreeNode[], stats: { nodes, levels, truncated },
+gaps: [{ node_id, type, title, missing }] }`. Structured data, never rendered text.
+
+**See also:** `query`, `list_playbooks`
 
 
 ### `list_nodes`
