@@ -1,6 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import * as path from 'node:path'
 import {
@@ -123,6 +124,34 @@ export const ACTIVE_PRODUCT_WRITE_TOOLS = new Set<string>([
   'deduplicate_nodes', 'rename_edge_type', 'repair_dangling_edges',
 ])
 
+/**
+ * Portfolio / registry / cross-product writers. These do NOT target the active
+ * product's graph (so they are excluded from ACTIVE_PRODUCT_WRITE_TOOLS and the
+ * expect_product guard), but they DO mint ids / append to a portfolio document,
+ * so a re-delivery duplicates them just the same. They are folded into
+ * MUTATING_TOOLS so content-level dedup covers them too.
+ */
+export const PORTFOLIO_WRITE_TOOLS = new Set<string>([
+  'create_product', 'create_area', 'apply_framework', 'migrate_cross_edges',
+  'create_cross_product_edge', 'batch_create_cross_product_edges', 'delete_cross_product_edge',
+  'define_canonical_entity', 'batch_define_canonical_entity',
+  'register_instance', 'batch_register_instance',
+  'promote_to_canonical', 'update_canonical_entity', 'link_area_to_audience',
+])
+
+/**
+ * Every tool that mutates persisted state (active graph OR portfolio document).
+ * Content-level idempotency (the fresh-id duplicate-delivery defence) is scoped
+ * to this set. Reads are deliberately NEVER deduped: a deduped read could return
+ * stale state. Over-covering a write is harmless (a real second call with an
+ * identical payload is the rare case the allow_duplicate escape hatch exists
+ * for); deduping a read would be a NEW bug, so when in doubt a tool is left out.
+ */
+export const MUTATING_TOOLS = new Set<string>([
+  ...ACTIVE_PRODUCT_WRITE_TOOLS,
+  ...PORTFOLIO_WRITE_TOOLS,
+])
+
 export interface ActiveProductIdentity {
   id: string | null
   title: string | null
@@ -203,6 +232,157 @@ export function createIdempotentDispatch<T>(max = 256) {
   }
 }
 
+/** The tools/call result shape the dispatcher returns (a ToolResult variant). */
+export type CallResult = { content: ToolResult['content']; isError?: true }
+
+/** Count window for the content-dedup ledger (most recent N distinct payloads). */
+export const CONTENT_DEDUP_MAX = 64
+
+/**
+ * Content-keyed dedup ledger: the second layer of the duplicate-delivery
+ * defence. The request-id ledger (createIdempotentDispatch) only catches a
+ * resend that REUSES the JSON-RPC request id. A client/transport that re-issues
+ * a mutating call with a FRESH request id slips past it and writes a second copy
+ * with new ids (the 0.9.22 gap). This ledger closes it: it remembers the RESULT
+ * of each recent successful mutating call keyed by its payload, so an identical
+ * mutating payload seen again within the window replays the original result
+ * instead of executing a second time.
+ *
+ * Bounded by COUNT (the most recent `max` distinct payloads), not wall-clock:
+ * the observed replay lands on the next mutating call, so a sliding count window
+ * catches it without the "what timeout?" guesswork a time window needs. Only
+ * SUCCESSFUL results are recorded (a transient error must stay retryable), and
+ * `record` refreshes recency so a repeated payload is not evicted early.
+ */
+export function createContentDedup<T>(max = CONTENT_DEDUP_MAX) {
+  const ledger = new Map<string, T>()
+  return {
+    has(key: string): boolean {
+      return ledger.has(key)
+    },
+    get(key: string): T | undefined {
+      return ledger.get(key)
+    },
+    record(key: string, value: T): void {
+      if (ledger.has(key)) ledger.delete(key)
+      ledger.set(key, value)
+      if (ledger.size > max) {
+        const oldest = ledger.keys().next().value
+        if (oldest !== undefined) ledger.delete(oldest)
+      }
+    },
+    get size(): number {
+      return ledger.size
+    },
+  }
+}
+
+/** Stable JSON stringify (object keys sorted recursively) so arg key ORDER never changes the dedup identity. */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
+  if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']'
+  const obj = value as Record<string, unknown>
+  return '{' + Object.keys(obj).sort().map((k) => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}'
+}
+
+/**
+ * The content-dedup key for a mutating call: (tool, active-product, payload).
+ * `allow_duplicate` is stripped before hashing so toggling the escape hatch
+ * never changes the identity of the underlying mutation.
+ */
+export function contentDedupKey(name: string, store: UPGFileStore, args: Record<string, unknown>): string {
+  const rest: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(args)) {
+    if (k !== 'allow_duplicate') rest[k] = v
+  }
+  const productId = activeProductIdentity(store).id ?? ''
+  return createHash('sha256')
+    .update(name + ' ' + productId + ' ' + stableStringify(rest))
+    .digest('hex')
+    .slice(0, 32)
+}
+
+/**
+ * Build the tools/call dispatcher: resolve the handler, run the active-product
+ * guard, apply BOTH idempotency layers (request-id ledger for same-id resends,
+ * content-dedup for fresh-id re-delivery), and log. Exported so tests drive a
+ * real handler + store through the exact dispatch path the stdio server uses,
+ * with no transport. Returns the dispatch fn plus the ledgers (for assertions).
+ */
+export function createDispatcher(ctx: ToolContext, opts: { logFile?: string } = {}) {
+  const requestLedger = createIdempotentDispatch<CallResult>()
+  const contentLedger = createContentDedup<CallResult>()
+  const logFile = opts.logFile
+
+  async function dispatch(
+    name: string,
+    args: Record<string, unknown>,
+    reqKey: string | undefined,
+  ): Promise<CallResult> {
+    if (reqKey !== undefined && requestLedger.has(reqKey) && logFile) {
+      fs.appendFileSync(
+        logFile,
+        JSON.stringify({ ts: Date.now(), tool: name, requestId: reqKey, replay: true }) + '\n',
+      )
+    }
+
+    return requestLedger.run(reqKey, async (): Promise<CallResult> => {
+      const t0 = logFile ? Date.now() : 0
+
+      // Batch-4 #20: expect_product guard on active-product writes.
+      const isActiveWrite = ACTIVE_PRODUCT_WRITE_TOOLS.has(name)
+      if (isActiveWrite && typeof args.expect_product === 'string' && args.expect_product.length > 0) {
+        const ident = activeProductIdentity(ctx.store)
+        if (!matchesActiveProduct(args.expect_product, ident)) {
+          const guard = textError(
+            `expect_product guard: active product is "${ident.title ?? ident.id ?? '(unknown)'}"` +
+            `${ident.id ? ` (id: ${ident.id})` : ''}, but this call expected "${args.expect_product}". ` +
+            `Refusing to write. Run switch_product to the intended product first, or drop expect_product.`,
+          )
+          if (logFile) {
+            fs.appendFileSync(logFile, JSON.stringify({ ts: t0, tool: name, params: args, result: guard, durationMs: 0 }) + '\n')
+          }
+          return guard as CallResult
+        }
+      }
+
+      // The handler execution (+ active-product echo + log). Shared by the
+      // direct path and the content-dedup path so both run identical logic.
+      const exec = async (): Promise<CallResult> => {
+        const handler = getToolHandler(name)
+        let result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
+        if (isActiveWrite && !result.isError) result = withActiveProductEcho(result, ctx.store)
+        if (logFile) {
+          fs.appendFileSync(logFile, JSON.stringify({ ts: t0, tool: name, params: args, result, durationMs: Date.now() - t0 }) + '\n')
+        }
+        return result as CallResult
+      }
+
+      // Content-level idempotency: a re-delivered mutating call carrying a FRESH
+      // request id (invisible to the request-id ledger above) replays the
+      // original result instead of writing a duplicate. `allow_duplicate: true`
+      // opts out for a deliberate identical re-create.
+      if (MUTATING_TOOLS.has(name) && args.allow_duplicate !== true) {
+        const ckey = contentDedupKey(name, ctx.store, args)
+        const cached = contentLedger.get(ckey)
+        if (cached) {
+          if (logFile) {
+            fs.appendFileSync(logFile, JSON.stringify({ ts: Date.now(), tool: name, contentDedup: true }) + '\n')
+          }
+          return cached
+        }
+        const result = await exec()
+        if (!result.isError) contentLedger.record(ckey, result)
+        return result
+      }
+
+      return exec()
+    })
+  }
+
+  return { dispatch, requestLedger, contentLedger }
+}
+
 export function createServer(store: UPGFileStore) {
   const server = new Server(
     { name: 'unified-product-graph', version: SERVER_VERSION },
@@ -238,68 +418,19 @@ export function createServer(store: UPGFileStore) {
     return { tools: TOOL_DEFINITIONS }
   })
 
-  // ── Idempotency ledger (batch-write duplicate-delivery fix) ─────────────────
-  // A mutating tool call (e.g. batch_create_nodes) can be DELIVERED MORE THAN
-  // ONCE: a transport-level resend re-runs the handler, which mints fresh ids
-  // and writes a second copy. The duplicate often lands a few calls later, so a
-  // post-write recount can't catch it. `idempotency.run` memoises the result per
-  // JSON-RPC request id and replays it, so a re-delivery is a no-op.
-  type CallResult = { content: ToolResult['content']; isError?: true }
-  const idempotency = createIdempotentDispatch<CallResult>()
-
   // ── tools/call ────────────────────────────────────────────────────────────
-  const logFile = process.env.UPG_MCP_LOG
+  // Two-layer duplicate-delivery defence (see createDispatcher): the request-id
+  // ledger no-ops a same-id resend; content-dedup no-ops a fresh-id re-delivery
+  // (the 0.9.22 gap). All dispatch logic lives in createDispatcher so tests can
+  // exercise the exact path without a transport.
+  const { dispatch } = createDispatcher(ctx, { logFile: process.env.UPG_MCP_LOG })
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const reqKey =
       extra && extra.requestId !== undefined && extra.requestId !== null
         ? String(extra.requestId)
         : undefined
-
-    if (reqKey !== undefined && idempotency.has(reqKey) && logFile) {
-      fs.appendFileSync(
-        logFile,
-        JSON.stringify({ ts: Date.now(), tool: request.params.name, requestId: reqKey, replay: true }) + '\n',
-      )
-    }
-
-    return idempotency.run(reqKey, async (): Promise<CallResult> => {
-      const { name, arguments: args = {} } = request.params
-      const handler = getToolHandler(name)
-      const t0 = logFile ? Date.now() : 0
-
-      // Batch-4 #20: expect_product guard on active-product writes — abort before
-      // the handler runs if the active product isn't the one the caller expected.
-      const isActiveWrite = ACTIVE_PRODUCT_WRITE_TOOLS.has(name)
-      if (isActiveWrite && typeof args.expect_product === 'string' && args.expect_product.length > 0) {
-        const ident = activeProductIdentity(ctx.store)
-        if (!matchesActiveProduct(args.expect_product, ident)) {
-          const guard = textError(
-            `expect_product guard: active product is "${ident.title ?? ident.id ?? '(unknown)'}"` +
-            `${ident.id ? ` (id: ${ident.id})` : ''}, but this call expected "${args.expect_product}". ` +
-            `Refusing to write. Run switch_product to the intended product first, or drop expect_product.`,
-          )
-          if (logFile) {
-            fs.appendFileSync(logFile, JSON.stringify({ ts: t0, tool: name, params: args, result: guard, durationMs: 0 }) + '\n')
-          }
-          return guard as CallResult
-        }
-      }
-
-      let result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
-
-      // Batch-4 #20: echo the active product on successful active-product writes.
-      if (isActiveWrite && !result.isError) {
-        result = withActiveProductEcho(result, ctx.store)
-      }
-      if (logFile) {
-        const entry = JSON.stringify({ ts: t0, tool: name, params: args, result, durationMs: Date.now() - t0 })
-        fs.appendFileSync(logFile, entry + '\n')
-      }
-      // ToolResult is structurally identical to the SDK's CallToolResult variant
-      // of ServerResult, but the SDK's union has an index signature my narrower
-      // type doesn't satisfy. Cast at the boundary so handlers can stay typed.
-      return result as CallResult
-    })
+    const { name, arguments: args = {} } = request.params
+    return dispatch(name, (args ?? {}) as Record<string, unknown>, reqKey)
   })
 
   return {

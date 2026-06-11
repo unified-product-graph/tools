@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import lockfile from 'proper-lockfile'
 import type { FSWatcher } from 'chokidar'
 import {
@@ -1524,9 +1524,21 @@ export class UPGPortfolioStore {
     // Canonical serialisation — handles both single-product and
     // portfolio documents via the shared core serialiser.
     const output = serializeCanonical(this.doc)
-    const tmpPath = this.filePath + '.tmp'
-    await fs.writeFile(tmpPath, output, 'utf-8')
-    await fs.rename(tmpPath, this.filePath)
+    // Per-write UNIQUE tmp path. A shared `${filePath}.tmp` let a debounced
+    // save race an explicit flush(): both wrote the same tmp, the first rename
+    // consumed it, and the second rename then threw
+    // `ENOENT ...portfolio.upg.tmp -> ...portfolio.upg` even though the data had
+    // already persisted — a false-negative error that made a naive cross-edge
+    // retry duplicate. A random suffix removes the shared-tmp collision; the tmp
+    // is cleaned up on any failure so a crashed write leaves no orphan.
+    const tmpPath = `${this.filePath}.${randomUUID()}.tmp`
+    try {
+      await fs.writeFile(tmpPath, output, 'utf-8')
+      await fs.rename(tmpPath, this.filePath)
+    } catch (err) {
+      await fs.rm(tmpPath, { force: true }).catch(() => {})
+      throw err
+    }
     this.dirty = false
   }
 
@@ -1561,6 +1573,15 @@ export class UPGPortfolioStore {
         `Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`,
       )
     }
+    // (portfolio mirror): collapse an identical (source, target, type)
+    // re-create onto the existing edge. A cross-product write that surfaced a
+    // false-negative FS error (the shared-tmp rename race, fixed in writeToDisk)
+    // but actually persisted would otherwise duplicate on a naive retry; the
+    // dedup makes that retry a safe no-op.
+    const existing = this.doc.cross_edges.find(
+      (e) => e.source === edge.source && e.target === edge.target && e.type === edge.type,
+    )
+    if (existing) return
     this.doc.cross_edges.push(edge)
     this.scheduleSave()
   }
