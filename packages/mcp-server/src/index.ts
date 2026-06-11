@@ -221,9 +221,8 @@ export async function runMcpServer() {
 }
 
 // Auto-invoke when this module is the entrypoint (e.g. `node dist/index.js`).
-// When imported as a library (e.g. by `@unified-product-graph/mcp` for the
-// `upg mcp run` subcommand), the importer calls runMcpServer() directly and
-// this branch is skipped.
+// When imported as a library (e.g. by the CLI for the `upg mcp run` subcommand),
+// the importer calls runMcpServer() directly and this branch must be skipped.
 //
 // We compare *realpaths*, not the raw strings. `process.argv[1]` is the literal
 // invocation path, while `import.meta.url` is symlink-resolved by the ESM
@@ -232,16 +231,42 @@ export async function runMcpServer() {
 // A raw-string compare would then evaluate false, the server would never start,
 // and `node dist/index.js` / `npx @unified-product-graph/mcp-server` would
 // silently exit 0, which surfaces to MCP clients as "Failed to connect".
+//
+// BUNDLING GUARD (critical): the CLI bundles this module into its single-file
+// `cli.cjs` (tsup `noExternal`). A bundler rewrites `import.meta.url` to the
+// BUNDLE's path, so the realpath compare below would wrongly MATCH argv[1] when
+// the CLI runs — and the inlined branch would auto-start a SECOND server in
+// addition to the CLI's own runMcpServer() call for `mcp run`. Two servers then
+// share one stdin and every request is handled twice (every write duplicated).
+// Our own build output is named `index.js`; a bundle never is, so we additionally
+// require our own filename before auto-invoking. This keeps `node dist/index.js`
+// and `npx @unified-product-graph/mcp-server` (bin → dist/index.js) auto-starting
+// while making the bundled-into-the-CLI case a no-op.
 import { fileURLToPath } from 'node:url'
 import { realpathSync } from 'node:fs'
 
-function isEntrypoint(): boolean {
-  if (!process.argv[1]) return false
+/**
+ * Whether this module should auto-start a server. Extracted + exported so the
+ * bundling guard is unit-testable. `argv1` = process.argv[1]; `selfUrl` =
+ * import.meta.url. Auto-start ONLY when our own entry file (`index.js`) is the
+ * thing being executed — never when inlined into another tool's single-file
+ * bundle (where a bundler rewrites `selfUrl` to the bundle path, which would
+ * otherwise match argv[1] and start a second server).
+ */
+export function shouldAutoStart(argv1: string | undefined, selfUrl: string): boolean {
+  if (!argv1) return false
   try {
-    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+    const self = fileURLToPath(selfUrl)
+    const base = self.replace(/\\/g, '/').split('/').pop()
+    if (base !== 'index.js') return false // inlined in another tool's bundle
+    return realpathSync(argv1) === realpathSync(self)
   } catch {
     return false
   }
+}
+
+function isEntrypoint(): boolean {
+  return shouldAutoStart(process.argv[1], import.meta.url)
 }
 
 if (isEntrypoint()) {
