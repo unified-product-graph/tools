@@ -81,6 +81,7 @@ Optional arguments: `from_id` (root at a specific node), `depth` (override the p
   anchor_type,            // the pattern's canonical root type
   anchor_used,            // the type actually rooted on
   anchor_resolved_from?,  // set ONLY when a fallback fired
+  anchor_present,         // does anchor_type have >=1 node (absent vs present-but-nested)
   roots: [ { id, type, title, status?, properties?, children: [ ... ] } ],
   stats: { nodes, levels, truncated },
   gaps:  [ { node_id, type, title, missing: [childType, ...] } ]
@@ -182,7 +183,9 @@ Example rendering (User tree):
 `get_tree` reports structure the graph is missing. Surface both:
 
 - **Gaps** — each entry in `gaps[]` is a node the pattern expected to have children under, but the graph has none (an opportunity with no solution, an objective with no key result). Mark it inline on the node (`(gap: no <missing-type>)`) or list gaps in the footer. They are the natural next thing to create.
-- **Anchor fallback** — when `anchor_resolved_from` is set, the canonical anchor type had no usable nodes, so the tree rooted on `anchor_used` instead. Note it: *"No `<anchor_type>` found; rooted on `<anchor_used>`."* (e.g. a strategy tree with no vision roots on the product.)
+- **Anchor fallback** — when `anchor_resolved_from` is set, the tree rooted on `anchor_used` instead of the canonical `anchor_type`. Use `anchor_present` to word it correctly, so the note never contradicts the nodes shown below it:
+  - `anchor_present: false` — the anchor type is absent: *"No `<anchor_type>` found; rooted on `<anchor_used>`."* (e.g. a strategy tree with no vision roots on the product.)
+  - `anchor_present: true` — the anchor type EXISTS but nests under a richer root: *"`<anchor_type>` present, but `<anchor_used>` surfaces more of the tree; rooted there."* (e.g. an architecture tree where the services nest under a bounded_context.)
 
 ### Step 5: Show Tree Metadata
 

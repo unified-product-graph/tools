@@ -240,8 +240,42 @@ describe('get_tree (0.9.15)', () => {
     expect(body.anchor_type).toBe('service')
     expect(body.anchor_used).toBe('bounded_context')
     expect(body.anchor_resolved_from).toBe('service')
+    // The anchor type (service) is genuinely ABSENT here.
+    expect(body.anchor_present).toBe(false)
     const root = body.roots.find((r: { id: string }) => r.id === 'bc')
     expect(root.children.map((c: { id: string }) => c.id).sort()).toEqual(['api', 'repo'])
+  })
+
+  it('reports anchor_present=true when the anchor exists but nests under the fallback root', async () => {
+    // The Content Lake case: services EXIST but every one nests under a
+    // bounded_context, so the most-nodes rule roots on bounded_context. The
+    // fallback fired, but "No service found" would contradict the services
+    // rendered below; anchor_present distinguishes present-but-nested from absent.
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'bc', type: 'bounded_context', title: 'Content layer' },
+        { id: 'svc1', type: 'service', title: 'Asset Service' },
+        { id: 'svc2', type: 'service', title: 'Query Service' },
+        { id: 'sch', type: 'database_schema', title: 'assets' },
+      ],
+      edges: [
+        e('e1', 'bc', 'svc1', 'bounded_context_deploys_service'),
+        e('e2', 'bc', 'svc2', 'bounded_context_deploys_service'),
+        e('e3', 'svc1', 'sch', 'service_persisted_in_database_schema'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'architecture' }, makeCtx(store)))
+    expect(body.anchor_used).toBe('bounded_context')
+    expect(body.anchor_resolved_from).toBe('service')
+    // The fix: services ARE present (2 of them), just nested.
+    expect(body.anchor_present).toBe(true)
+    const root = body.roots.find((r: { id: string }) => r.id === 'bc')
+    expect(root.children.map((c: { id: string }) => c.id).sort()).toEqual(['svc1', 'svc2'])
   })
 
   it('honours from_id and include_properties', async () => {

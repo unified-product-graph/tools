@@ -79,6 +79,16 @@ export interface AssembleResult {
   anchor_used: string
   /** Set only when a fallback fired (anchor_used !== anchor_type). */
   anchor_resolved_from?: string
+  /**
+   * Whether the canonical `anchor_type` has at least one node in the graph.
+   * A fallback can fire for two reasons, and this disambiguates them: the anchor
+   * type is ABSENT (anchor_present=false), or it is PRESENT but a fallback root
+   * surfaces more of the pattern (anchor_present=true; e.g. services that nest
+   * under a bounded_context). Without this, a consumer cannot tell "no service
+   * found" from "services exist but nest under the root", and a message that
+   * says the former while rendering the latter contradicts itself.
+   */
+  anchor_present: boolean
   roots: TreeNode[]
   stats: { nodes: number; levels: number; truncated: boolean; shared_refs: number }
   gaps: TreeGap[]
@@ -217,6 +227,7 @@ export function assembleTree(
       framework_id: pattern.framework_id,
       anchor_type: pattern.anchor_type,
       anchor_used: anchorType,
+      anchor_present: reader.getAllNodes().some((n) => n.type === pattern.anchor_type),
       roots: b.roots,
       stats: { nodes: b.nodes, levels: b.levels, truncated: b.truncated, shared_refs: b.sharedRefs },
       gaps: b.gaps,

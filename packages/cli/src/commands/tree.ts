@@ -46,7 +46,14 @@ export const treeCommand = new Command('tree')
         }
         process.stderr.write(upgHeader(`Tree - ${pattern.label}`) + '\n')
         if (result.anchor_resolved_from) {
-          process.stderr.write(`  ${label(`No ${result.anchor_type} found; rooted on ${result.anchor_used}.`)}\n`)
+          // Two reasons a fallback fires: the anchor type is ABSENT, or it is
+          // PRESENT but a fallback root surfaces more of the pattern (e.g.
+          // services that nest under a bounded_context). Say which, so the note
+          // never contradicts the nodes rendered right below it.
+          const note = result.anchor_present
+            ? `${result.anchor_type} present, but ${result.anchor_used} surfaces more of the tree; rooted there.`
+            : `No ${result.anchor_type} found; rooted on ${result.anchor_used}.`
+          process.stderr.write(`  ${label(note)}\n`)
         }
         if (result.roots.length === 0) {
           process.stderr.write(`  ${label(`No ${result.anchor_type} (or fallback) to root the ${pattern.id} tree.`)}\n`)
