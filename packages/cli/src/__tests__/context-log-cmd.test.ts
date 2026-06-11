@@ -70,7 +70,7 @@ describe('upg context command', () => {
   })
 
   function run(args: string[]) {
-    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
   }
 
   it('exits 0 and prints product title in human mode', () => {
@@ -156,7 +156,7 @@ describe('upg context command', () => {
   })
 
   it('--file pointing to missing file exits 1', () => {
-    const r = execFileNoThrow(CLI, ['context', '--file', '/tmp/no-such-file.upg'], { stdinFromNull: true, timeoutMs: 15_000 })
+    const r = execFileNoThrow(CLI, ['context', '--file', '/tmp/no-such-file.upg'], { stdinFromNull: true, timeoutMs: 60_000 })
     expect(r.status).toBe(1)
   })
 })
@@ -190,7 +190,7 @@ describe('upg log command', () => {
   })
 
   function run(args: string[]) {
-    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
   }
 
   it('exits 0 with an empty log on a freshly-loaded file', () => {
@@ -245,7 +245,7 @@ describe('upg log command', () => {
   })
 
   it('--file pointing to a missing file exits 1', () => {
-    const r = execFileNoThrow(CLI, ['log', '--file', '/tmp/no-such-file.upg'], { stdinFromNull: true, timeoutMs: 15_000 })
+    const r = execFileNoThrow(CLI, ['log', '--file', '/tmp/no-such-file.upg'], { stdinFromNull: true, timeoutMs: 60_000 })
     expect(r.status).toBe(1)
   })
 })

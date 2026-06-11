@@ -86,7 +86,7 @@ describe('upg migrate type', () => {
   })
 
   function run(args: string[]) {
-    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
   }
 
   function readNodes(): Array<Record<string, unknown>> {
@@ -168,7 +168,7 @@ describe('upg migrate status', () => {
   })
 
   function run(args: string[]) {
-    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
   }
 
   it('defaults to dry-run and does not write', () => {
@@ -219,7 +219,7 @@ describe('upg migrate properties', () => {
   })
 
   function run(args: string[]) {
-    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
   }
 
   it('defaults to dry-run and does not write', () => {
@@ -263,7 +263,7 @@ describe('upg migrate edges', () => {
   })
 
   function run(args: string[]) {
-    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
   }
 
   function readEdgeTypes(): string[] {

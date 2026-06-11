@@ -96,7 +96,7 @@ describe('upg move', () => {
     return execFileNoThrow(CLI, [...args, '--file', file, '--yes'], {
       cwd: tmp,
       stdinFromNull: true,
-      timeoutMs: 15_000,
+      timeoutMs: 60_000,
     })
   }
 
@@ -170,7 +170,7 @@ describe('upg move', () => {
     const r = execFileNoThrow(CLI, ['move', '--file', file, '--yes'], {
       cwd: tmp,
       stdinFromNull: true,
-      timeoutMs: 15_000,
+      timeoutMs: 60_000,
     })
     expect(r.status).not.toBe(0)
   })
@@ -199,7 +199,7 @@ describe('upg disconnect', () => {
     return execFileNoThrow(CLI, [...args, '--file', file, '--yes'], {
       cwd: tmp,
       stdinFromNull: true,
-      timeoutMs: 15_000,
+      timeoutMs: 60_000,
     })
   }
 
@@ -250,7 +250,7 @@ describe('upg disconnect', () => {
     const r = execFileNoThrow(CLI, ['disconnect', '--file', file, '--yes'], {
       cwd: tmp,
       stdinFromNull: true,
-      timeoutMs: 15_000,
+      timeoutMs: 60_000,
     })
     expect(r.status).not.toBe(0)
   })

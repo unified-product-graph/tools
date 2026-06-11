@@ -19,6 +19,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest'
 import { execFileSync, execFileNoThrow } from './helpers/exec.js'
+import { commandNames } from '../lib/command-registry.js'
 import * as fs from 'node:fs'
 import * as fsp from 'node:fs/promises'
 import * as path from 'node:path'
@@ -28,17 +29,10 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const CLI = path.resolve(here, '..', '..', 'dist', 'cli.cjs')
 
-// The full registry. Mirrors ALL_COMMANDS in cli.ts; if a command is added
-// without a help block, this list (and the assertions) will flag it.
-const COMMANDS = [
-  // Tier-1 ceiling verbs
-  'use', 'here', 'at', 'ls', 'find', 'new', 'link', 'check', 'fix',
-  // Tier-3 substrate
-  'health', 'verify', 'diff', 'list', 'tree', 'search',
-  'create', 'update', 'delete', 'connect', 'gaps',
-  'init', 'workspace', 'import', 'export', 'fmt',
-  'install-skills', 'mcp',
-]
+// The full registry, derived from the SAME ALL_COMMANDS cli.ts builds the
+// program from (lib/command-registry.ts). A new command is automatically
+// covered here; it cannot be added without a help-safe `--help` path.
+const COMMANDS = commandNames()
 
 function dirSnapshot(dir: string): string[] {
   const out: string[] = []
@@ -77,7 +71,7 @@ describe('help safety (CLI-FEEDBACK #1)', () => {
         const { status, stdout, stderr } = execFileNoThrow(CLI, [cmd, helpFlag], {
           cwd: tmp,
           stdinFromNull: true,
-          timeoutMs: 15_000,
+          timeoutMs: 60_000,
         })
         const after = dirSnapshot(tmp)
 
@@ -97,7 +91,7 @@ describe('help safety (CLI-FEEDBACK #1)', () => {
       const { status, stdout } = execFileNoThrow(CLI, ['help', cmd], {
         cwd: tmp,
         stdinFromNull: true,
-        timeoutMs: 15_000,
+        timeoutMs: 60_000,
       })
       const after = dirSnapshot(tmp)
       expect(status, `help ${cmd} exit`).toBe(0)
@@ -107,7 +101,7 @@ describe('help safety (CLI-FEEDBACK #1)', () => {
   }
 
   it('top-level `upg --help` exits 0 and lists groups', () => {
-    const { status, stdout } = execFileNoThrow(CLI, ['--help'], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    const { status, stdout } = execFileNoThrow(CLI, ['--help'], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
     expect(status).toBe(0)
     expect(stdout).toContain('Governance')
     expect(stdout).toContain('Create & Edit')

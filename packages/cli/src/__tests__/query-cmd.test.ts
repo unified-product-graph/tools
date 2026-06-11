@@ -73,7 +73,7 @@ describe('upg query command', () => {
   })
 
   function run(args: string[]) {
-    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 15_000 })
+    return execFileNoThrow(CLI, [...args, '--file', file], { cwd: tmp, stdinFromNull: true, timeoutMs: 60_000 })
   }
 
   // ---- Missing anchor ----

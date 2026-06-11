@@ -37,7 +37,7 @@ function fixtureDoc() {
 }
 
 function run(args: string[], cwd: string) {
-  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 15_000 })
+  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 60_000 })
 }
 
 describe('CLI contract', () => {

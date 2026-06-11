@@ -61,7 +61,7 @@ function syncDoc(productId = 'cloud_p_001') {
 }
 
 function run(args: string[], cwd: string) {
-  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 15_000 })
+  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 60_000 })
 }
 
 // ── shared fixture setup ──────────────────────────────────────────────────

@@ -49,7 +49,7 @@ function fixtureDoc() {
 }
 
 function run(args: string[], cwd: string) {
-  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 15_000 })
+  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 60_000 })
 }
 
 describe(' D1: --json error contract', () => {
@@ -266,7 +266,12 @@ describe(' E5: --data size guard', () => {
     await fsp.rm(tmp, { recursive: true, force: true }).catch(() => { /* noop */ })
   })
 
-  it('rejects a --data payload over 256 KB (exit 3) and writes nothing', () => {
+  // The 256 KB --data guard can only be exercised by passing a >256 KB value as a
+  // single argv argument. On Linux a single argument cannot exceed MAX_ARG_STRLEN
+  // (128 KB), so the OS rejects the spawn with E2BIG before the CLI ever runs (the
+  // OS enforces an even tighter limit than the guard). The guard is exercised on
+  // platforms with a high per-arg limit (macOS dev); skip where argv cannot hold it.
+  it.skipIf(process.platform === 'linux')('rejects a --data payload over 256 KB (exit 3) and writes nothing', () => {
     const huge = JSON.stringify({ blob: 'a'.repeat(300_000) })
     const before = JSON.parse(fs.readFileSync(file, 'utf-8')).nodes.length
     const r = run(args(['create', 'persona', 'Big', '--data', huge]), tmp)

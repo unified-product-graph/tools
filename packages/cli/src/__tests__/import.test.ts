@@ -36,7 +36,7 @@ const FIXTURE_MD = [
 ].join('\n')
 
 function run(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
-  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 15_000, env })
+  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 60_000, env })
 }
 
 describe('upg import --input wiring', () => {

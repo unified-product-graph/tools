@@ -176,6 +176,7 @@ export const helpTopics: Record<string, HelpEntry> = {
       FILE_OPT, JSON_OPT,
       { flag: '--no-orphans', desc: 'Fail when orphan entities exist' },
       { flag: '--no-broken-chains', desc: 'Fail when any chain is incomplete' },
+      { flag: '--no-content-depth', desc: 'Skip property-type, enum, and self-loop checks' },
       { flag: '--max-orphan-rate <n>', desc: 'Maximum orphan rate, 0.0-1.0' },
       { flag: '--require-domains <list>', desc: 'Comma-separated domains that must hold entities' },
     ],
@@ -193,6 +194,7 @@ export const helpTopics: Record<string, HelpEntry> = {
       FILE_OPT, JSON_OPT,
       { flag: '--since <ref>', desc: 'Git ref to compare against. Defaults to HEAD~1' },
       { flag: '--summary', desc: 'One line per change' },
+      { flag: '--stat', desc: 'Counts only, like git diff --stat' },
     ],
     examples: [
       { cmd: 'upg diff', comment: 'vs HEAD~1' },
@@ -221,18 +223,21 @@ export const helpTopics: Record<string, HelpEntry> = {
   },
   tree: {
     usage: 'upg tree [filter] [options]',
-    summary: 'Tree view of the graph. Filter by entity type or domain. --json emits the nested structure.',
+    summary: 'Tree view of the graph: filter by entity type or domain, or assemble a named framework pattern. --json emits the nested structure.',
     options: [
       FILE_OPT, JSON_OPT,
+      { flag: '--pattern <id>', desc: 'Assemble a framework pattern: ost, okr, user, product, validation, strategy, feature_areas, delivery' },
       { flag: '--id <id>', desc: 'Subtree rooted at a specific node' },
       { flag: '--depth <n>', desc: 'Maximum depth. Defaults to 10' },
     ],
     examples: [
       { cmd: 'upg tree' },
       { cmd: 'upg tree persona --depth 3' },
+      { cmd: 'upg tree --pattern okr', comment: 'objective to key_result to metric' },
+      { cmd: 'upg tree --pattern strategy', comment: 'the bets cascade, with gaps' },
       { cmd: 'upg tree --json' },
     ],
-    seeAlso: 'upg list',
+    seeAlso: 'upg list, upg spec',
   },
   search: {
     usage: 'upg search <query> [options]',
@@ -335,6 +340,7 @@ export const helpTopics: Record<string, HelpEntry> = {
       FILE_OPT, JSON_OPT,
       { flag: '--data <json>', desc: 'Required. Result as JSON, e.g. \'{"moscow":"must"}\' or \'{"reach":4,"impact":3,"confidence":4,"effort":2}\'' },
       { flag: '--replace', desc: 'Replace the edge properties instead of merging into them' },
+      { flag: '--slot-role <role>', desc: 'Framework slot role this entity plays (e.g. pain_reliever); rides the same edge as the result' },
     ],
     examples: [
       { cmd: 'upg score n_fx_q3 feat_sso --data \'{"moscow":"must"}\'' },
@@ -356,9 +362,13 @@ export const helpTopics: Record<string, HelpEntry> = {
   gaps: {
     usage: 'upg gaps [options]',
     summary: 'Surface empty domains, broken chains, and sparse areas.',
-    options: [FILE_OPT, JSON_OPT],
+    options: [
+      FILE_OPT, JSON_OPT,
+      { flag: '--domain <domain>', desc: 'Focus on a specific domain' },
+    ],
     examples: [
       { cmd: 'upg gaps' },
+      { cmd: 'upg gaps --domain ux_design' },
       { cmd: 'upg gaps --json' },
     ],
     seeAlso: 'upg health, upg verify',
@@ -371,11 +381,14 @@ export const helpTopics: Record<string, HelpEntry> = {
       { flag: '--template <name>', desc: 'blank | saas | marketplace | mobile | oss' },
       { flag: '--workspace', desc: 'Create .upg/<name>.upg + workspace.json' },
       { flag: '--single', desc: 'Create product.upg in the current directory' },
+      { flag: '--file <path>', desc: 'Explicit output path (overrides the single/workspace default; honours $UPG_FILE)' },
       { flag: '--force', desc: 'Overwrite an existing file' },
+      { flag: '--yes', desc: 'Non-interactive: defaults for anything not set by a flag (template blank, mode single)' },
     ],
     examples: [
       { cmd: 'upg init' },
       { cmd: 'upg init --title "My App" --template saas --single' },
+      { cmd: 'upg init --yes', comment: 'scriptable: accept all defaults' },
     ],
     seeAlso: 'upg workspace, upg mcp setup',
   },
@@ -396,7 +409,9 @@ export const helpTopics: Record<string, HelpEntry> = {
       FILE_OPT,
       { flag: '--from <tool>', desc: 'markdown | notion | linear | vistaly | dovetail | github' },
       { flag: '--input <path>', desc: 'Source file or directory' },
+      { flag: '--output <path>', desc: 'Output .upg path. Defaults to auto-discover or ./product.upg' },
       { flag: '--dry-run', desc: 'Preview without writing' },
+      { flag: '--yes', desc: 'Skip confirmation prompts' },
     ],
     examples: [
       { cmd: 'upg import --from markdown --input ./docs' },
@@ -438,10 +453,14 @@ export const helpTopics: Record<string, HelpEntry> = {
     options: [
       { flag: '--scope <scope>', desc: 'project | user. Defaults to project' },
       { flag: '--force', desc: 'Overwrite existing skill links' },
+      { flag: '--mode <mode>', desc: 'auto (default), symlink, or copy. auto falls back to copy on Windows' },
+      { flag: '--list', desc: 'Print skill names; skip the install' },
+      { flag: '--remove', desc: 'Remove UPG skills recorded in the manifest' },
     ],
     examples: [
       { cmd: 'upg install-skills' },
       { cmd: 'upg install-skills --scope user' },
+      { cmd: 'upg install-skills --list' },
     ],
     seeAlso: 'upg mcp setup',
   },
@@ -462,7 +481,14 @@ export const helpTopics: Record<string, HelpEntry> = {
   // ── Tool parity (CLI-next): the 0.9.x MCP surface as commands ──────────────
   spec: {
     usage: 'upg spec <noun> [id] [options]',
-    summary: 'Browse the UPG spec catalogue offline: entity types, edges, regions, lenses, frameworks, playbooks, lifecycles, status values, and more. No graph needed.',
+    summary:
+      'Browse the UPG spec catalogue offline. No graph needed. Nouns: ' +
+      'types, type, children, edges, edge, cross-edges, resolve-edge; ' +
+      'regions, region, region-for, domains, domain, rings, ring; ' +
+      'lenses, lens, frameworks, framework, framework-categories, framework-patterns; ' +
+      'playbooks, playbook, approaches, approach; ' +
+      'lifecycles, lifecycle, status-values, scales, scale; ' +
+      'anti-patterns, anti-pattern, benchmarks, stages, migrations, schema, version.',
     options: [
       JSON_OPT,
     ],
@@ -472,6 +498,7 @@ export const helpTopics: Record<string, HelpEntry> = {
       { cmd: 'upg spec status-values release' },
       { cmd: 'upg spec resolve-edge persona job', comment: 'the canonical edge for a pair' },
       { cmd: 'upg spec children opportunity' },
+      { cmd: 'upg spec anti-patterns', comment: 'every catalogued anti-pattern' },
     ],
     seeAlso: 'upg list, upg health',
   },
@@ -485,6 +512,8 @@ export const helpTopics: Record<string, HelpEntry> = {
       { flag: '--traverse <edges>', desc: 'Comma list of edge types to follow per level (prefix ! to exclude)' },
       { flag: '--depth <n>', desc: 'Max depth (default 3, max 10)' },
       { flag: '--include <fields>', desc: 'Node fields to project' },
+      { flag: '--edge-include <fields>', desc: 'Edge fields to project: id,type,source,target. Pass "" to omit edges' },
+      { flag: '--limit <n>', desc: 'Max nodes to collect (default 200)' },
     ],
     examples: [
       { cmd: 'upg query --from persona --traverse persona_pursues_job --depth 1' },
@@ -550,7 +579,7 @@ export const helpTopics: Record<string, HelpEntry> = {
   move: {
     usage: 'upg move <id> <new-parent> [options]',
     summary: 'Re-parent a node under a new parent, re-typing its containment edge.',
-    options: [FILE_OPT, JSON_OPT, { flag: '--type <edge>', desc: 'Override the inferred containment edge type' }, { flag: '-y, --yes', desc: 'Skip confirmation' }],
+    options: [FILE_OPT, JSON_OPT, { flag: '--type <edge>', desc: 'Override the inferred containment edge type' }, { flag: '--old-edge <edge-id>', desc: 'Disambiguate when the node has multiple hierarchy edges' }, { flag: '-y, --yes', desc: 'Skip confirmation' }],
     examples: [{ cmd: 'upg move n_story n_epic' }],
     seeAlso: 'upg connect, upg tree',
   },
@@ -564,8 +593,8 @@ export const helpTopics: Record<string, HelpEntry> = {
   dedupe: {
     usage: 'upg dedupe [options]',
     summary: 'Find and merge duplicate nodes (same type + title). Dry-run by default; --apply to commit.',
-    options: [FILE_OPT, JSON_OPT, { flag: '--apply', desc: 'Commit the merge (else preview)' }, { flag: '--keep <s>', desc: 'newest | oldest (default newest)' }, { flag: '-y, --yes', desc: 'Skip confirmation' }],
-    examples: [{ cmd: 'upg dedupe', comment: 'preview' }, { cmd: 'upg dedupe --apply -y' }],
+    options: [FILE_OPT, JSON_OPT, { flag: '--type <type>', desc: 'Scope to one entity type' }, { flag: '--dry-run', desc: 'Preview only; do not write (default: on)' }, { flag: '--apply', desc: 'Commit the merge (else preview)' }, { flag: '--keep <s>', desc: 'newest | oldest (default newest)' }, { flag: '-y, --yes', desc: 'Skip confirmation' }],
+    examples: [{ cmd: 'upg dedupe', comment: 'preview' }, { cmd: 'upg dedupe --type persona --apply -y' }],
     seeAlso: 'upg check, upg fix',
   },
   clone: {
@@ -578,8 +607,8 @@ export const helpTopics: Record<string, HelpEntry> = {
   context: {
     usage: 'upg context [options]',
     summary: 'A lens-aware product summary: counts, key entities, and domain guidance.',
-    options: [FILE_OPT, JSON_OPT, { flag: '--lens <id>', desc: 'View through a role lens' }, { flag: '--domains <list>', desc: 'Filter to domains' }],
-    examples: [{ cmd: 'upg context' }, { cmd: 'upg context --lens ux_design' }],
+    options: [FILE_OPT, JSON_OPT, { flag: '--lens <id>', desc: 'View through a role lens' }, { flag: '--domains <list>', desc: 'Filter to domains' }, { flag: '--summary', desc: 'Include edge counts by type and orphan count' }],
+    examples: [{ cmd: 'upg context' }, { cmd: 'upg context --lens ux_design' }, { cmd: 'upg context --summary' }],
     seeAlso: 'upg health, upg here',
   },
   log: {
@@ -590,11 +619,17 @@ export const helpTopics: Record<string, HelpEntry> = {
     seeAlso: 'upg diff',
   },
   prioritise: {
-    usage: 'upg prioritise [ids...] [options]',
-    summary: 'Rank a set of nodes (RICE / value-effort style). Read-only.',
-    options: [FILE_OPT, JSON_OPT],
-    examples: [{ cmd: 'upg prioritise', comment: 'rank everything rankable' }],
-    seeAlso: 'upg score, upg apply',
+    usage: 'upg prioritise <ids...> --framework <id> [options]',
+    summary: 'Rank entities by a scoring framework (RICE, ICE, WSJF, value-vs-effort). Read-only. --framework and at least one id are required.',
+    options: [
+      FILE_OPT, JSON_OPT,
+      { flag: '--framework <id>', desc: 'Required. Framework id, e.g. rice-scoring, ice-scoring, wsjf' },
+    ],
+    examples: [
+      { cmd: 'upg prioritise n_a n_b --framework rice-scoring' },
+      { cmd: 'upg prioritise n_a n_b --framework value-vs-effort --json' },
+    ],
+    seeAlso: 'upg score, upg apply, upg spec frameworks',
   },
   sync: {
     usage: 'upg sync status [options]',

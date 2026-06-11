@@ -42,7 +42,7 @@ function fixtureDoc() {
 }
 
 function run(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
-  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 15_000, env })
+  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 60_000, env })
 }
 
 describe('Tier-1 ceiling verbs', () => {

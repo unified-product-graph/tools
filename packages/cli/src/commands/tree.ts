@@ -3,7 +3,7 @@ import { discoverUPGFile, loadStore, sortByType } from '../lib/graph.js'
 import { renderTree, renderAssembledTree, upgHeader, label, heading } from '../lib/formatter.js'
 import { die, runtimeError, usageError } from '../lib/errors.js'
 import type { UPGBaseNode } from '@unified-product-graph/core'
-import { getTreePattern, UPG_TREE_PATTERNS } from '@unified-product-graph/core'
+import { getTreePattern, UPG_TREE_PATTERNS, UPG_TYPES_SET, UPG_DOMAINS, getDomainForType } from '@unified-product-graph/core'
 import { assembleTree } from '@unified-product-graph/sdk'
 
 interface TreeJsonNode {
@@ -92,8 +92,41 @@ export const treeCommand = new Command('tree')
         if (!node) { store.stopWatching(); die(runtimeError(`Node not found: ${opts.id}`)) }
         roots = [node]
       } else if (filter) {
+        // A filter is an entity type or a domain id. An unknown token must NOT
+        // silently fall back to the full tree mislabeled as "<filter>" (field
+        // report §10.7) — it errors so a typo is caught, not hidden.
         const typeMatch = allNodes.filter((n) => n.type === filter)
-        roots = typeMatch.length > 0 ? typeMatch : allNodes.filter((n) => !hasParent.has(n.id))
+        if (typeMatch.length > 0) {
+          roots = typeMatch
+        } else if (UPG_TYPES_SET.has(filter)) {
+          // Valid entity type, just none present. Clean, not the whole graph.
+          store.stopWatching()
+          process.stderr.write(`No "${filter}" entities in this graph.\n`)
+          return
+        } else if (UPG_DOMAINS.some((d) => d.id === filter)) {
+          // Domain filter: every node whose type belongs to this domain, rooted
+          // at the domain's natural entry points (nodes with no in-domain parent).
+          const inDomain = allNodes.filter((n) => getDomainForType(n.type)?.id === filter)
+          if (inDomain.length === 0) {
+            store.stopWatching()
+            process.stderr.write(`No entities in the "${filter}" domain in this graph.\n`)
+            return
+          }
+          const inDomainIds = new Set(inDomain.map((n) => n.id))
+          const childOfDomainPeer = new Set<string>()
+          for (const e of allEdges) {
+            if (inDomainIds.has(e.source) && inDomainIds.has(e.target)) childOfDomainPeer.add(e.target)
+          }
+          const domainRoots = inDomain.filter((n) => !childOfDomainPeer.has(n.id))
+          roots = domainRoots.length > 0 ? domainRoots : inDomain
+        } else {
+          store.stopWatching()
+          die(usageError(
+            `Unknown tree filter: "${filter}". Expected an entity type (\`upg spec types\`) ` +
+            `or a domain (\`upg spec domains\`). For one node use --id; for the whole graph run \`upg tree\` with no filter.`,
+          ))
+          return
+        }
       } else {
         roots = allNodes.filter((n) => !hasParent.has(n.id))
       }

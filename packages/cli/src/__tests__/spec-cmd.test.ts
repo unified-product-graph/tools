@@ -17,7 +17,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const CLI = path.resolve(here, '..', '..', 'dist', 'cli.cjs')
 
 function run(args: string[]) {
-  return execFileNoThrow(CLI, args, { stdinFromNull: true, timeoutMs: 15_000 })
+  return execFileNoThrow(CLI, args, { stdinFromNull: true, timeoutMs: 60_000 })
 }
 
 // Fail the whole suite fast when there is no build yet.

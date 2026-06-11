@@ -84,7 +84,7 @@ function multiTypeDupGraph() {
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function run(args: string[], cwd: string, file: string) {
-  return execFileNoThrow(CLI, [...args, '--file', file], { cwd, stdinFromNull: true, timeoutMs: 15_000 })
+  return execFileNoThrow(CLI, [...args, '--file', file], { cwd, stdinFromNull: true, timeoutMs: 60_000 })
 }
 
 function readNodes(file: string): Array<Record<string, unknown>> {

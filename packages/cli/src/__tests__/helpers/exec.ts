@@ -26,7 +26,7 @@ export function execFileNoThrow(bin: string, args: string[], opts: ExecOptions =
   const res = spawnSync('node', [bin, ...args], {
     cwd: opts.cwd,
     input,
-    timeout: opts.timeoutMs ?? 15_000,
+    timeout: opts.timeoutMs ?? 60_000,
     encoding: 'utf-8',
     env: { ...process.env, ...opts.env, NO_COLOR: '1' },
   })

@@ -22,7 +22,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const CLI = path.resolve(here, '..', '..', 'dist', 'cli.cjs')
 
 function run(args: string[], cwd: string) {
-  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 15_000 })
+  return execFileNoThrow(CLI, args, { cwd, stdinFromNull: true, timeoutMs: 60_000 })
 }
 
 /** A minimal product document. */

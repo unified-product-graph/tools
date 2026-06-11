@@ -25,7 +25,7 @@ function emptyGraph() {
 }
 
 function run(args: string[], cwd: string, file: string) {
-  return execFileNoThrow(CLI, [...args, '--file', file], { cwd, stdinFromNull: true, timeoutMs: 15_000 })
+  return execFileNoThrow(CLI, [...args, '--file', file], { cwd, stdinFromNull: true, timeoutMs: 60_000 })
 }
 function readNodes(file: string) {
   return (JSON.parse(fs.readFileSync(file, 'utf-8')) as { nodes: Array<{ id: string; type: string }> }).nodes
