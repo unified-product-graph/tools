@@ -5,8 +5,6 @@
  *   - Catalog contracts: `ToolDefinition`, `ToolHandler<TContext>`,
  *     `ToolBinding<TContext>`.
  *   - Transport interface: `MCPTransport`, `ToolRequest`, `ToolResponse`.
- *   - Tree assembly: `assembleTree`, `GraphReader` (shared by the local and
- *     cloud `get_tree` handlers).
  *   - Catalog helpers: `resolveEntityType`, `UnknownEntityTypeError`,
  *     `buildEntitySchema`, `buildEntityFields`.
  *   - Atomicity contracts: `MigrateTypeResult`, `RenameEdgeTypeResult`,
@@ -34,15 +32,6 @@ export {
   type ToolResponse,
   type MCPTransport,
 } from './transport.js'
-
-export {
-  type GraphReader,
-  type TreeNode,
-  type TreeGap,
-  type AssembleOptions,
-  type AssembleResult,
-  assembleTree,
-} from './tree-assemble.js'
 
 export {
   type EntityTypeResolution,

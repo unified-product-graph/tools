@@ -1,0 +1,888 @@
+/**
+ * `upg portfolio` command group: cross-product / portfolio operations.
+ *
+ * Default portfolio document: `.upg/portfolio.upg` (resolved from cwd).
+ * All subcommands accept `--file <path>` to override the portfolio document.
+ *
+ * Subcommands:
+ *   list                          list portfolios (list_portfolios)
+ *   attach <product> <portfolio>  add product to portfolio (attach_product_to_portfolio)
+ *   detach <product> <portfolio>  remove product from portfolio (detach_product_from_portfolio)
+ *   health                        multi-product digest (portfolio_digest)
+ *   query --from <type>           BFS across products (portfolio_query)
+ *   check                         validate + anti-pattern report (portfolio_validate)
+ *   edges                         list cross-product edges (list_portfolio_cross_edges)
+ *   connect <src> <tgt> --type    create cross-product edge (create_cross_product_edge)
+ *   disconnect <id>               delete cross-product edge (delete_cross_product_edge)
+ *   migrate                       migrate inline edges to portfolio doc (migrate_cross_edges)
+ */
+
+import * as path from 'node:path'
+import * as fs from 'node:fs'
+import { Command } from 'commander'
+import chalk from 'chalk'
+import {
+  UPGPortfolioStore,
+  UPGFileStore,
+  openPortfolioStoreIfExists,
+  resolvePortfolioPath,
+  attachProductToPortfolio,
+  detachProductFromPortfolio,
+  deleteCrossProductEdge,
+  computeGraphDigest,
+  edgeId,
+} from '@unified-product-graph/sdk'
+import { UPG_CROSS_EDGE_TYPES, type UPGCrossEdgeType } from '@unified-product-graph/core'
+import { discoverUPGFile, loadStore } from '../lib/graph.js'
+import { upgHeader, success, fail, label } from '../lib/formatter.js'
+import { die, runtimeError, usageError } from '../lib/errors.js'
+import { sanitizeForTerminal } from '../lib/sanitize.js'
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Resolve the portfolio document path, optionally overriding with --file. */
+function resolvePortfolioFile(explicitFile?: string): string | null {
+  if (explicitFile) return path.resolve(explicitFile)
+  return resolvePortfolioPath(process.cwd())
+}
+
+/** Enumerate workspace products: files with a product header. */
+interface ScopedProduct {
+  id: string | null
+  title: string
+  file: string
+  absPath: string
+}
+
+function listWorkspaceProducts(cwd: string): ScopedProduct[] {
+  const upgDir = path.join(cwd, '.upg')
+  const all: ScopedProduct[] = []
+  const scanDir = (dir: string) => {
+    let entries: string[] = []
+    try { entries = fs.readdirSync(dir) } catch { return }
+    for (const f of entries) {
+      if (!f.endsWith('.upg') || f === 'portfolio.upg') continue
+      const absPath = path.join(dir, f)
+      try {
+        const doc = JSON.parse(fs.readFileSync(absPath, 'utf-8')) as {
+          product?: { id?: string; title?: string }
+        }
+        if (!doc.product) continue
+        all.push({
+          id: doc.product.id ?? null,
+          title: doc.product.title ?? '(untitled)',
+          file: path.relative(cwd, absPath),
+          absPath,
+        })
+      } catch { /* skip malformed */ }
+    }
+  }
+  scanDir(cwd)
+  if (fs.existsSync(upgDir)) scanDir(upgDir)
+  return all
+}
+
+/** Filter products by scope (id / file / basename). */
+function applyScope(
+  all: ScopedProduct[],
+  scope: string[] | undefined,
+): { products: ScopedProduct[]; unmatched: string[] } {
+  if (!scope || scope.length === 0) return { products: all, unmatched: [] }
+  const matches = (p: ScopedProduct, want: string) =>
+    p.id === want ||
+    p.file === want ||
+    path.basename(p.file) === want ||
+    path.basename(p.file, '.upg') === want
+  const products = all.filter((p) => scope.some((w) => matches(p, w)))
+  const unmatched = scope.filter((w) => !all.some((p) => matches(p, w)))
+  return { products, unmatched }
+}
+
+// ── portfolio list ────────────────────────────────────────────────────────────
+
+const listSub = new Command('list')
+  .description('List portfolios in the portfolio document.')
+  .option('--file <path>', 'Path to portfolio.upg (default: .upg/portfolio.upg)')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (opts) => {
+    try {
+      const portfolioStore = await openPortfolioStoreIfExists(process.cwd())
+      const doc = portfolioStore?.getDocument()
+      const portfolios = doc?.portfolios ?? []
+      const result = portfolios.map((pf) => {
+        const row: Record<string, unknown> = { id: pf.id, title: pf.title }
+        if (pf.description) row.description = pf.description
+        if (pf.parent_portfolio_id !== undefined) row.parent_portfolio_id = pf.parent_portfolio_id
+        if (pf.hierarchy_model) row.hierarchy_model = pf.hierarchy_model
+        if (pf.products) row.products = pf.products
+        return row
+      })
+
+      if (opts.json) {
+        console.log(JSON.stringify({ portfolios: result, total: result.length }, null, 2))
+        return
+      }
+
+      console.log(upgHeader('Portfolio'))
+      if (result.length === 0) {
+        console.log('  No portfolios. Create one with `upg create portfolio "<title>"`.\n')
+        return
+      }
+      for (const pf of result) {
+        const pcount = Array.isArray(pf.products)
+          ? ` ${chalk.dim(`(${(pf.products as string[]).length} products)`)}`
+          : ''
+        console.log(`  ${chalk.bold.white(sanitizeForTerminal(pf.title as string))}${pcount}`)
+        console.log(`  ${chalk.dim('id:')} ${sanitizeForTerminal(pf.id as string)}`)
+        if (pf.description) {
+          console.log(`  ${chalk.dim(sanitizeForTerminal(pf.description as string))}`)
+        }
+        console.log()
+      }
+      console.log(`  ${label(`${result.length} portfolio(s)`)}\n`)
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio attach ──────────────────────────────────────────────────────────
+
+const attachSub = new Command('attach')
+  .description('Add a product to a portfolio (attach_product_to_portfolio).')
+  .arguments('<product> <portfolio>')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (product: string, portfolio: string, opts) => {
+    try {
+      const result = await attachProductToPortfolio(process.cwd(), {
+        product_id: product,
+        portfolio_id: portfolio,
+      })
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: true, ...result }, null, 2))
+        return
+      }
+      const containerTitle = sanitizeForTerminal(result.container_title ?? portfolio)
+      const productLabel = sanitizeForTerminal(product)
+      if (result.already_member) {
+        console.log(`\n  ${chalk.dim(`Product "${productLabel}" is already a member of "${containerTitle}"`)}\n`)
+      } else {
+        console.log(`\n  ${success(`Attached "${productLabel}" to portfolio "${containerTitle}"`)}\n`)
+      }
+    } catch (err) {
+      die(runtimeError((err as Error).message))
+    }
+  })
+
+// ── portfolio detach ──────────────────────────────────────────────────────────
+
+const detachSub = new Command('detach')
+  .description('Remove a product from a portfolio (detach_product_from_portfolio).')
+  .arguments('<product> <portfolio>')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (product: string, portfolio: string, opts) => {
+    try {
+      const result = await detachProductFromPortfolio(process.cwd(), {
+        product_id: product,
+        portfolio_id: portfolio,
+      })
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: true, ...result }, null, 2))
+        return
+      }
+      const containerTitle = sanitizeForTerminal(result.container_title ?? portfolio)
+      const productLabel = sanitizeForTerminal(product)
+      if (!result.removed) {
+        console.log(`\n  ${chalk.dim(`Product "${productLabel}" was not a member of "${containerTitle}"`)}\n`)
+      } else {
+        console.log(`\n  ${success(`Detached "${productLabel}" from portfolio "${containerTitle}"`)}\n`)
+      }
+    } catch (err) {
+      die(runtimeError((err as Error).message))
+    }
+  })
+
+// ── portfolio health ──────────────────────────────────────────────────────────
+
+const healthSub = new Command('health')
+  .description('Multi-product digest: counts and health per product (portfolio_digest).')
+  .option('--scope <ids...>', 'Restrict to specific product ids, files, or basenames')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (opts) => {
+    try {
+      const cwd = process.cwd()
+      const { products, unmatched } = applyScope(listWorkspaceProducts(cwd), opts.scope as string[] | undefined)
+
+      if (products.length === 0) {
+        const note = opts.scope ? 'No workspace products matched the requested scope.' : 'No products found in the workspace.'
+        if (opts.json) {
+          console.log(JSON.stringify({
+            products: [],
+            rollup: { products: 0, total_nodes: 0, total_edges: 0, by_stage: {} },
+            note,
+          }, null, 2))
+          return
+        }
+        console.log(upgHeader('Portfolio Health'))
+        console.log(`  ${note}\n`)
+        return
+      }
+
+      const summaries: Array<Record<string, unknown>> = []
+      const byStage: Record<string, number> = {}
+      let totalNodes = 0
+      let totalEdges = 0
+
+      for (const product of products) {
+        try {
+          const s = new UPGFileStore()
+          await s.loadReadOnly(product.absPath)
+          const digest = computeGraphDigest(s)
+          const stage = digest.product.stage || 'unset'
+          byStage[stage] = (byStage[stage] ?? 0) + 1
+          totalNodes += digest.counts.total_nodes
+          totalEdges += digest.counts.total_edges
+          const topTypes = Object.entries(digest.counts.by_type)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([type, count]) => ({ type, count }))
+          const covSummary = (digest.coverage as Record<string, { overall_pct?: number } | unknown>)
+          const overallPct = (covSummary['stage_summary'] as { overall_pct?: number } | undefined)?.overall_pct ?? null
+          summaries.push({
+            product_id: product.id,
+            file: product.file,
+            title: digest.product.title,
+            stage: digest.product.stage || null,
+            total_nodes: digest.counts.total_nodes,
+            total_edges: digest.counts.total_edges,
+            health: digest.health,
+            coverage_pct: overallPct,
+            top_types: topTypes,
+          })
+        } catch (err) {
+          summaries.push({
+            product_id: product.id,
+            file: product.file,
+            title: product.title,
+            error: (err as Error).message,
+          })
+        }
+      }
+
+      const rollup = {
+        products: summaries.length,
+        total_nodes: totalNodes,
+        total_edges: totalEdges,
+        by_stage: byStage,
+      }
+
+      if (opts.json) {
+        const out: Record<string, unknown> = { products: summaries, rollup }
+        if (unmatched.length > 0) out.unmatched_scope = unmatched
+        console.log(JSON.stringify(out, null, 2))
+        return
+      }
+
+      console.log(upgHeader('Portfolio Health'))
+      for (const s of summaries) {
+        const title = sanitizeForTerminal(String(s.title ?? s.product_id ?? s.file))
+        const stage = s.stage ? chalk.dim(` [${sanitizeForTerminal(String(s.stage))}]`) : ''
+        if (s.error) {
+          console.log(`  ${fail(title)}${stage}  ${chalk.dim(String(s.error))}`)
+          continue
+        }
+        const h = s.health as { orphan_rate?: number; validation_rate?: number } | undefined
+        const coverage = typeof s.coverage_pct === 'number' ? Math.round(s.coverage_pct) : null
+        const orphanRate = typeof h?.orphan_rate === 'number' ? Math.round(h.orphan_rate * 100) : null
+        console.log(`  ${chalk.bold.white(title)}${stage}`)
+        console.log(
+          `    ${label('nodes')} ${chalk.bold(String(s.total_nodes))}` +
+          `  ${label('edges')} ${chalk.bold(String(s.total_edges))}` +
+          `  ${label('coverage')} ${coverage !== null ? `${coverage}%` : chalk.dim('n/a')}` +
+          `  ${label('orphans')} ${orphanRate !== null ? `${orphanRate}%` : chalk.dim('n/a')}`,
+        )
+        console.log()
+      }
+      const stageEntries = Object.entries(byStage).map(([s, n]) => `${s}:${n}`).join('  ')
+      console.log(`  ${label('Rollup')}  ${summaries.length} products  ${totalNodes} nodes  ${totalEdges} edges`)
+      if (stageEntries) console.log(`  ${label('By stage')}  ${stageEntries}`)
+      if (unmatched.length > 0) {
+        console.log(`\n  ${fail(`Unmatched scope: ${unmatched.join(', ')}`)}\n`)
+      } else {
+        console.log()
+      }
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio query ───────────────────────────────────────────────────────────
+
+const querySub = new Command('query')
+  .description('BFS traversal across all workspace products (portfolio_query).')
+  .requiredOption('--from <type>', 'Starting entity type (BFS anchor)')
+  .option('--traverse <edges...>', 'Edge types to traverse')
+  .option('--depth <n>', 'BFS depth (default 2)', parseInt)
+  .option('--limit <n>', 'Max nodes per product (default 100)', parseInt)
+  .option('--scope <ids...>', 'Restrict to specific product ids, files, or basenames')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (opts) => {
+    try {
+      const cwd = process.cwd()
+      const from: string = opts.from
+      const traverse = opts.traverse as string[] | undefined
+      const depth = typeof opts.depth === 'number' ? opts.depth : 2
+      const perProductLimit = typeof opts.limit === 'number' ? Math.min(Math.max(opts.limit, 1), 1000) : 100
+
+      const { products, unmatched } = applyScope(listWorkspaceProducts(cwd), opts.scope as string[] | undefined)
+
+      if (products.length === 0) {
+        const note = opts.scope ? 'No workspace products matched the requested scope.' : 'No products found in the workspace.'
+        if (opts.json) {
+          console.log(JSON.stringify({
+            products: [],
+            products_searched: 0,
+            products_with_matches: 0,
+            empty_products: [],
+            note,
+          }, null, 2))
+          return
+        }
+        console.log(upgHeader('Portfolio Query'))
+        console.log(`  ${note}\n`)
+        return
+      }
+
+      const matched: Array<Record<string, unknown>> = []
+      const emptyProducts: string[] = []
+      let totalNodes = 0
+      let totalEdges = 0
+
+      for (const product of products) {
+        try {
+          const s = new UPGFileStore()
+          await s.loadReadOnly(product.absPath)
+          const allNodes = s.getDocument().nodes ?? []
+          const allEdges = s.getDocument().edges ?? []
+          const roots = allNodes.filter((n) => n.type === from)
+          if (roots.length === 0) {
+            emptyProducts.push(product.id ?? product.file)
+            continue
+          }
+
+          // Build adjacency map for BFS
+          const edgesBySource = new Map<string, typeof allEdges>()
+          for (const e of allEdges) {
+            if (traverse && traverse.length > 0 && !traverse.includes(e.type)) continue
+            const arr = edgesBySource.get(e.source) ?? []
+            arr.push(e)
+            edgesBySource.set(e.source, arr)
+          }
+
+          const visited = new Set<string>()
+          const queue: Array<{ id: string; d: number }> = roots.map((r) => ({ id: r.id, d: 0 }))
+          const resultNodes: Array<{ id: string; type: string; title: string; status?: string }> = []
+          const resultEdges: Array<{ id: string; source: string; target: string; type: string }> = []
+
+          while (queue.length > 0 && resultNodes.length < perProductLimit) {
+            const item = queue.shift()!
+            if (visited.has(item.id)) continue
+            visited.add(item.id)
+            const node = allNodes.find((n) => n.id === item.id)
+            if (!node) continue
+            resultNodes.push({
+              id: node.id,
+              type: node.type,
+              title: node.title,
+              ...(node.status ? { status: node.status } : {}),
+            })
+            if (item.d < depth) {
+              for (const e of edgesBySource.get(item.id) ?? []) {
+                resultEdges.push({ id: e.id, source: e.source, target: e.target, type: e.type })
+                if (!visited.has(e.target)) queue.push({ id: e.target, d: item.d + 1 })
+              }
+            }
+          }
+
+          totalNodes += resultNodes.length
+          totalEdges += resultEdges.length
+          matched.push({
+            product_id: product.id,
+            file: product.file,
+            title: product.title,
+            total_nodes: resultNodes.length,
+            total_edges: resultEdges.length,
+            nodes: resultNodes,
+            edges: resultEdges,
+          })
+        } catch {
+          emptyProducts.push(product.id ?? product.file)
+        }
+      }
+
+      const response: Record<string, unknown> = {
+        products: matched,
+        products_searched: products.length,
+        products_with_matches: matched.length,
+        total_nodes: totalNodes,
+        total_edges: totalEdges,
+        empty_products: emptyProducts,
+      }
+      if (unmatched.length > 0) response.unmatched_scope = unmatched
+
+      if (opts.json) {
+        console.log(JSON.stringify(response, null, 2))
+        return
+      }
+
+      console.log(upgHeader('Portfolio Query'))
+      console.log(
+        `  ${label('from')} ${chalk.bold(sanitizeForTerminal(from))}` +
+        `  ${label('depth')} ${depth}` +
+        `  ${label('products')} ${products.length}`,
+      )
+      console.log()
+
+      if (matched.length === 0) {
+        console.log(`  No matches for type "${sanitizeForTerminal(from)}" across ${products.length} product(s).\n`)
+        return
+      }
+
+      for (const m of matched) {
+        const title = sanitizeForTerminal(String(m.title ?? m.product_id ?? m.file))
+        console.log(`  ${chalk.bold.white(title)}  ${chalk.dim(sanitizeForTerminal(String(m.file)))}`)
+        const nodes = m.nodes as Array<{ type: string; title: string }>
+        for (const n of nodes) {
+          console.log(`    ${chalk.gray(sanitizeForTerminal(n.type))}  ${chalk.white(sanitizeForTerminal(n.title))}`)
+        }
+        console.log()
+      }
+      console.log(`  ${label(`${matched.length}/${products.length} products matched, ${totalNodes} nodes total`)}\n`)
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio check ───────────────────────────────────────────────────────────
+
+const checkSub = new Command('check')
+  .description('Validate all workspace products + portfolio anti-patterns (portfolio_validate).')
+  .option('--scope <ids...>', 'Restrict to specific product ids, files, or basenames')
+  .option('--severity <sev>', 'Filter anti-patterns: high, medium, or low')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (opts) => {
+    try {
+      const cwd = process.cwd()
+      const { products, unmatched } = applyScope(listWorkspaceProducts(cwd), opts.scope as string[] | undefined)
+
+      if (products.length === 0) {
+        const note = opts.scope ? 'No workspace products matched the requested scope.' : 'No products found in the workspace.'
+        const out = {
+          products: [],
+          rollup: {
+            products: 0, valid: 0, invalid: 0, structurally_valid: 0,
+            anti_pattern_violations: { high: 0, medium: 0, low: 0 },
+            all_valid: false,
+          },
+          note,
+        }
+        if (opts.json) { console.log(JSON.stringify(out, null, 2)); return }
+        console.log(upgHeader('Portfolio Check'))
+        console.log(`  ${note}\n`)
+        return
+      }
+
+      const summaries: Array<Record<string, unknown>> = []
+      let validCount = 0
+      let structurallyValidCount = 0
+      let totalHigh = 0
+      let totalMedium = 0
+      let totalLow = 0
+
+      for (const product of products) {
+        try {
+          const s = new UPGFileStore()
+          await s.loadReadOnly(product.absPath)
+          const digest = computeGraphDigest(s)
+
+          // Anti-pattern violations are surfaced via the digest when the SDK includes them.
+          // Cast defensively; MCP server computes them via validateGraph handler separately.
+          type DigestWithAP = typeof digest & {
+            anti_pattern_violations?: Array<{ anti_pattern_id: string; severity: string; name: string }>
+          }
+          const apAll = (digest as DigestWithAP).anti_pattern_violations ?? []
+          const apFiltered = opts.severity
+            ? apAll.filter((v) => v.severity === opts.severity)
+            : apAll
+
+          const high = apFiltered.filter((v) => v.severity === 'high').length
+          const medium = apFiltered.filter((v) => v.severity === 'medium').length
+          const low = apFiltered.filter((v) => v.severity === 'low').length
+          totalHigh += high
+          totalMedium += medium
+          totalLow += low
+          const valid = high === 0
+          if (valid) validCount++
+          structurallyValidCount++
+
+          const entry: Record<string, unknown> = {
+            product_id: product.id,
+            file: product.file,
+            title: digest.product.title,
+            valid,
+            structurally_valid: true,
+            anti_patterns: { high, medium, low },
+          }
+          if (apFiltered.length > 0) {
+            entry.top_violations = apFiltered.slice(0, 5).map((v) => ({
+              anti_pattern_id: v.anti_pattern_id,
+              severity: v.severity,
+              name: v.name,
+            }))
+          }
+          summaries.push(entry)
+        } catch (err) {
+          summaries.push({
+            product_id: product.id,
+            file: product.file,
+            title: product.title,
+            error: (err as Error).message,
+          })
+        }
+      }
+
+      const rollup = {
+        products: summaries.length,
+        valid: validCount,
+        invalid: summaries.length - validCount,
+        structurally_valid: structurallyValidCount,
+        anti_pattern_violations: { high: totalHigh, medium: totalMedium, low: totalLow },
+        all_valid: summaries.length > 0 && validCount === summaries.length,
+      }
+
+      if (opts.json) {
+        const out: Record<string, unknown> = { products: summaries, rollup }
+        if (unmatched.length > 0) out.unmatched_scope = unmatched
+        console.log(JSON.stringify(out, null, 2))
+        return
+      }
+
+      console.log(upgHeader('Portfolio Check'))
+      for (const s of summaries) {
+        const title = sanitizeForTerminal(String(s.title ?? s.product_id ?? s.file))
+        if (s.error) {
+          console.log(`  ${fail(title)}  ${chalk.dim(String(s.error))}`)
+          continue
+        }
+        const ap = s.anti_patterns as { high: number; medium: number; low: number } | undefined
+        const indicator = s.valid ? success(title) : fail(title)
+        const apSummary = ap ? chalk.dim(` h:${ap.high} m:${ap.medium} l:${ap.low}`) : ''
+        console.log(`  ${indicator}${apSummary}`)
+        const violations = s.top_violations as Array<{ anti_pattern_id: string; severity: string }> | undefined
+        if (violations && violations.length > 0) {
+          for (const v of violations) {
+            const sev =
+              v.severity === 'high' ? chalk.red(v.severity) :
+              v.severity === 'medium' ? chalk.yellow(v.severity) :
+              chalk.dim(v.severity)
+            console.log(`    ${sev}  ${chalk.dim(sanitizeForTerminal(v.anti_pattern_id))}`)
+          }
+        }
+      }
+      console.log()
+      const verdict = rollup.all_valid
+        ? success(`All ${rollup.products} products valid`)
+        : fail(`${rollup.invalid}/${rollup.products} products have issues`)
+      console.log(
+        `  ${verdict}  ` +
+        `${chalk.dim(`high:${totalHigh} medium:${totalMedium} low:${totalLow}`)}`,
+      )
+      if (unmatched.length > 0) {
+        console.log(`\n  ${fail(`Unmatched scope: ${unmatched.join(', ')}`)}\n`)
+      } else {
+        console.log()
+      }
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio edges ───────────────────────────────────────────────────────────
+
+const edgesSub = new Command('edges')
+  .description('List cross-product edges in the portfolio document (list_portfolio_cross_edges).')
+  .option('--file <path>', 'Path to portfolio.upg (default: .upg/portfolio.upg)')
+  .option('--type <type>', 'Filter by edge type')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (opts) => {
+    try {
+      const cwd = process.cwd()
+      const portfolioPath = resolvePortfolioFile(opts.file)
+      if (!portfolioPath) {
+        if (opts.json) {
+          console.log(JSON.stringify({ cross_edges: [], total: 0, note: 'No workspace found.' }, null, 2))
+          return
+        }
+        console.log(upgHeader('Portfolio Edges'))
+        console.log('  No workspace found. Run `upg init --workspace` to create one.\n')
+        return
+      }
+      const portfolioStore = await openPortfolioStoreIfExists(cwd)
+      const edges = portfolioStore?.getAllCrossEdges() ?? []
+      const filtered = opts.type ? edges.filter((e) => e.type === opts.type) : edges
+
+      if (opts.json) {
+        console.log(JSON.stringify({ cross_edges: filtered, total: filtered.length }, null, 2))
+        return
+      }
+
+      console.log(upgHeader('Portfolio Edges'))
+      if (filtered.length === 0) {
+        console.log('  No cross-product edges. Use `upg portfolio connect` to add one.\n')
+        return
+      }
+      for (const e of filtered) {
+        console.log(`  ${chalk.dim(sanitizeForTerminal(e.type))}`)
+        console.log(`    ${chalk.dim('src')} ${chalk.white(sanitizeForTerminal(e.source))}`)
+        console.log(`    ${chalk.dim('tgt')} ${chalk.white(sanitizeForTerminal(e.target))}`)
+        console.log(`    ${chalk.dim('id')}  ${chalk.dim(sanitizeForTerminal(e.id))}`)
+        console.log()
+      }
+      console.log(`  ${label(`${filtered.length} cross-product edge(s)`)}\n`)
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio connect ─────────────────────────────────────────────────────────
+
+const connectSub = new Command('connect')
+  .description('Create a cross-product edge in the portfolio document (create_cross_product_edge).')
+  .arguments('<src> <tgt>')
+  .requiredOption('--type <type>', 'Cross-product edge type')
+  .option('--file <path>', 'Path to portfolio.upg (default: .upg/portfolio.upg)')
+  .option('--source-product <id>', 'Source product id (when src is a bare node id)')
+  .option('--target-product <id>', 'Target product id (when tgt is a bare node id)')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (src: string, tgt: string, opts) => {
+    try {
+      const edgeType = opts.type as string
+
+      if (!(UPG_CROSS_EDGE_TYPES as readonly string[]).includes(edgeType)) {
+        die(usageError(
+          `Invalid cross-product edge type: "${sanitizeForTerminal(edgeType)}". ` +
+          `Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`,
+        ))
+      }
+      if (edgeType === 'instance_of') {
+        die(usageError(
+          'instance_of edges are created via `register_instance` (MCP), not `upg portfolio connect`.',
+        ))
+      }
+      if (edgeType === 'area_serves_persona' || edgeType === 'area_targets_market_segment') {
+        die(usageError(
+          `${edgeType} edges are created via \`link_area_to_audience\` (MCP), not \`upg portfolio connect\`.`,
+        ))
+      }
+
+      const cwd = process.cwd()
+      const portfolioPath = resolvePortfolioFile(opts.file)
+      if (!portfolioPath) {
+        die(runtimeError('No workspace found. Run `upg init --workspace` first.'))
+      }
+
+      // Qualify IDs
+      let qualifiedSource: string
+      if (src.includes('/')) {
+        qualifiedSource = src
+      } else if (opts.sourceProduct) {
+        qualifiedSource = `${opts.sourceProduct}/${src}`
+      } else {
+        die(usageError(
+          `source "${sanitizeForTerminal(src)}" is a bare node id. ` +
+          `Use --source-product <id> to qualify it, or pass {product_id}/{node_id}.`,
+        ))
+      }
+
+      let qualifiedTarget: string
+      if (tgt.includes('/')) {
+        qualifiedTarget = tgt
+      } else if (opts.targetProduct) {
+        qualifiedTarget = `${opts.targetProduct}/${tgt}`
+      } else {
+        die(usageError(
+          `target "${sanitizeForTerminal(tgt)}" is a bare node id. ` +
+          `Use --target-product <id> to qualify it, or pass {product_id}/{node_id}.`,
+        ))
+      }
+
+      const portfolioStore = new UPGPortfolioStore()
+      await portfolioStore.loadOrInit(portfolioPath)
+
+      const derivedSourceProduct = opts.sourceProduct ?? qualifiedSource.split('/')[0]
+      const derivedTargetProduct = opts.targetProduct ?? qualifiedTarget.split('/')[0]
+
+      const newEdge = {
+        id: edgeId(),
+        source: qualifiedSource,
+        target: qualifiedTarget,
+        type: edgeType as UPGCrossEdgeType,
+        source_product_id: derivedSourceProduct,
+        target_product_id: derivedTargetProduct,
+      }
+
+      portfolioStore.addCrossEdge(newEdge)
+      await portfolioStore.flush()
+
+      if (opts.json) {
+        console.log(JSON.stringify({
+          ok: true,
+          edge: newEdge,
+          portfolio_file: path.relative(cwd, portfolioPath),
+        }, null, 2))
+        return
+      }
+      console.log(`\n  ${success(`Created "${sanitizeForTerminal(edgeType)}" edge`)}`)
+      console.log(`  ${chalk.dim('src')} ${chalk.white(sanitizeForTerminal(qualifiedSource))}`)
+      console.log(`  ${chalk.dim('tgt')} ${chalk.white(sanitizeForTerminal(qualifiedTarget))}`)
+      console.log(`  ${chalk.dim('id')}  ${chalk.dim(sanitizeForTerminal(newEdge.id))}\n`)
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio disconnect ──────────────────────────────────────────────────────
+
+const disconnectSub = new Command('disconnect')
+  .description('Delete a cross-product edge by id (delete_cross_product_edge).')
+  .arguments('<id>')
+  .option('--file <path>', 'Path to portfolio.upg (default: .upg/portfolio.upg)')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (edgeIdArg: string, opts) => {
+    try {
+      const cwd = process.cwd()
+      const portfolioPath = resolvePortfolioFile(opts.file)
+      if (!portfolioPath || !fs.existsSync(portfolioPath)) {
+        die(runtimeError('No portfolio document found. Run `upg init --workspace` first.'))
+      }
+      const result = await deleteCrossProductEdge(cwd, edgeIdArg)
+
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: true, ...result }, null, 2))
+        return
+      }
+      if (!result.deleted) {
+        console.log(`\n  ${chalk.dim(`No cross-product edge found with id "${sanitizeForTerminal(edgeIdArg)}"`)}\n`)
+      } else {
+        console.log(`\n  ${success(`Deleted cross-product edge "${sanitizeForTerminal(edgeIdArg)}"`)}\n`)
+      }
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio migrate ─────────────────────────────────────────────────────────
+
+const migrateSub = new Command('migrate')
+  .description('Migrate inline cross-product edges from the active product into portfolio.upg (migrate_cross_edges).')
+  .option('--file <path>', 'Path to the product .upg file (default: auto-discovered)')
+  .option('--source-product <id>', '(required) Product id owning the source nodes')
+  .option('--target-product <id>', 'Product id owning the target nodes')
+  .option('--commit', 'Actually migrate; default is dry run')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (opts) => {
+    try {
+      const sourceProductId = opts.sourceProduct as string | undefined
+      if (!sourceProductId) {
+        die(usageError('--source-product <id> is required for migrate'))
+      }
+
+      const filePath = await discoverUPGFile(opts.file)
+      const store = await loadStore(filePath)
+      const dryRun = !opts.commit
+      const cwd = process.cwd()
+      const portfolioPath = resolvePortfolioFile(undefined)
+
+      if (!portfolioPath && !dryRun) {
+        store.stopWatching()
+        die(runtimeError('No workspace found. Run `upg init --workspace` first.'))
+      }
+
+      const portfolioStore = new UPGPortfolioStore()
+      if (portfolioPath) {
+        try {
+          await portfolioStore.loadOrInit(portfolioPath)
+        } catch (err) {
+          store.stopWatching()
+          die(runtimeError(`Failed to load portfolio document: ${(err as Error).message}`))
+        }
+      }
+
+      const doc = store.getDocument()
+      const targetProductId = (opts.targetProduct as string | undefined) ?? null
+      const result = portfolioStore.migrateCrossEdgesFromDoc(doc, sourceProductId, targetProductId, dryRun)
+
+      if (!dryRun && result.migrated.length > 0) {
+        store.markDirty()
+        if (portfolioPath) await portfolioStore.flush()
+        await store.flush()
+      }
+      store.stopWatching()
+
+      if (opts.json) {
+        console.log(JSON.stringify({
+          ...result,
+          portfolio_file: portfolioPath ? path.relative(cwd, portfolioPath) : null,
+        }, null, 2))
+        return
+      }
+
+      console.log(upgHeader('Portfolio Migrate'))
+      if (dryRun) console.log(chalk.dim('  Dry run (pass --commit to migrate)\n'))
+
+      if (result.migrated.length === 0 && result.skipped.length === 0) {
+        console.log('  No inline cross-product edges found.\n')
+        return
+      }
+      if (result.migrated.length > 0) {
+        console.log(`  ${success(`${result.migrated.length} edge(s) to migrate:`)}\n`)
+        for (const e of result.migrated) {
+          console.log(
+            `    ${chalk.dim(sanitizeForTerminal(e.type))}` +
+            `  ${chalk.white(sanitizeForTerminal(e.source))}` +
+            ` ${chalk.dim('->')}` +
+            ` ${chalk.white(sanitizeForTerminal(e.target))}`,
+          )
+        }
+        console.log()
+      }
+      if (result.skipped.length > 0) {
+        console.log(`  ${chalk.yellow(`${result.skipped.length} edge(s) skipped:`)}\n`)
+        for (const s of result.skipped) {
+          console.log(`    ${chalk.dim(sanitizeForTerminal(s.id))}  ${chalk.dim(sanitizeForTerminal(s.reason))}`)
+        }
+        console.log()
+      }
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── Root command ──────────────────────────────────────────────────────────────
+
+export const portfolioCommand = new Command('portfolio')
+  .description('Cross-product and portfolio operations (portfolio.upg).')
+  .addCommand(listSub)
+  .addCommand(attachSub)
+  .addCommand(detachSub)
+  .addCommand(healthSub)
+  .addCommand(querySub)
+  .addCommand(checkSub)
+  .addCommand(edgesSub)
+  .addCommand(connectSub)
+  .addCommand(disconnectSub)
+  .addCommand(migrateSub)
+
+// Bare `upg portfolio` with no subcommand shows help.
+portfolioCommand.action(() => {
+  portfolioCommand.help()
+})

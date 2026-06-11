@@ -46,6 +46,22 @@ import { fixCommand } from './commands/fix.js'
 import { applyCommand } from './commands/apply.js'
 import { scoreCommand } from './commands/score.js'
 import { showCommand } from './commands/show.js'
+import { specCommand } from './commands/spec.js'
+import { queryCommand } from './commands/query.js'
+import { registryCommand } from './commands/registry.js'
+import { portfolioCommand } from './commands/portfolio.js'
+import { areaCommand } from './commands/area.js'
+import { migrateCommand } from './commands/migrate.js'
+import { moveCommand } from './commands/move.js'
+import { disconnectCommand } from './commands/disconnect.js'
+import { dedupeCommand } from './commands/dedupe.js'
+import { cloneCommand } from './commands/clone.js'
+import { contextCommand } from './commands/context.js'
+import { logCommand } from './commands/log.js'
+import { prioritiseCommand } from './commands/prioritise.js'
+import { syncCommand } from './commands/sync.js'
+import { productCommand } from './commands/product.js'
+import { batchCommand } from './commands/batch.js'
 import chalk from 'chalk'
 import { upgLogo } from './lib/formatter.js'
 import { applyColorPreference } from './lib/output.js'
@@ -71,6 +87,11 @@ const ALL_COMMANDS: Command[] = [
   initCommand, workspaceCommand, importCommand, exportCommand, fmtCommand,
   // Frameworks (exercises)
   applyCommand, scoreCommand, showCommand,
+  // Tool parity (CLI-next): spec browser, traversal, registry, portfolio, areas, migrations
+  specCommand, queryCommand, registryCommand, portfolioCommand, areaCommand, migrateCommand,
+  // Tool parity singletons
+  moveCommand, disconnectCommand, dedupeCommand, cloneCommand, contextCommand,
+  logCommand, prioritiseCommand, syncCommand, productCommand, batchCommand,
   // Setup
   installSkillsCommand, mcpCommand,
 ]
@@ -110,6 +131,9 @@ function printHelp() {
   console.log(cmd('import', '--from <tool>', 'Import from Markdown, Notion, Linear, Vistaly, Dovetail, GitHub'))
   console.log(cmd('export', '[options]', 'Export as JSON, Markdown, or CSV'))
   console.log(cmd('fmt', '[files...]', 'Rewrite .upg to canonical form. --check for CI'))
+  console.log(cmd('clone', '<from>', 'Scaffold a structure from a template product'))
+  console.log(cmd('product', 'update', 'Edit product-level fields (title, stage)'))
+  console.log(cmd('sync', 'status', 'Report local sync state vs the remote'))
   console.log()
 
   console.log(chalk.bold('  Governance'))
@@ -123,6 +147,11 @@ function printHelp() {
   console.log(cmd('list', '[options]', 'Query entities by type, status, domain'))
   console.log(cmd('tree', '[filter]', 'Tree view of the graph'))
   console.log(cmd('search', '<query>', 'Fuzzy search across titles and descriptions'))
+  console.log(cmd('query', '[options]', 'BFS traversal with projection from a start set'))
+  console.log(cmd('spec', '<noun> [id]', 'Browse the spec catalogue offline (types, edges, regions...)'))
+  console.log(cmd('context', '[options]', 'Lens-aware product summary'))
+  console.log(cmd('log', '[options]', 'Recent mutation feed (create / update / delete)'))
+  console.log(cmd('prioritise', '[ids...]', 'Rank nodes (RICE / value-effort)'))
   console.log()
 
   console.log(chalk.bold('  Create & Edit'))
@@ -130,6 +159,17 @@ function printHelp() {
   console.log(cmd('update', '<id>', 'Update an entity. Unspecified fields preserved'))
   console.log(cmd('delete', '<id>', 'Delete an entity and its edges'))
   console.log(cmd('connect', '<src> <tgt>', 'Create an edge. Type auto-inferred'))
+  console.log(cmd('disconnect', '<edge-id>', 'Remove a single edge by id'))
+  console.log(cmd('move', '<id> <parent>', 'Re-parent a node, re-typing its containment edge'))
+  console.log(cmd('dedupe', '[options]', 'Find and merge duplicate nodes (dry-run by default)'))
+  console.log(cmd('migrate', '<sub>', 'Catalogue-aware retype / status / property / edge migrations'))
+  console.log(cmd('batch', '<sub>', 'Atomic batch create / update / delete'))
+  console.log()
+
+  console.log(chalk.bold('  Portfolio & registry'))
+  console.log(cmd('registry', '<sub>', 'Canonical shared entities: define, register, promote, list'))
+  console.log(cmd('portfolio', '<sub>', 'Cross-product edges, digest, validation, membership'))
+  console.log(cmd('area', '<sub>', 'Product areas: hierarchy, subgraphs, membership'))
   console.log()
 
   console.log(chalk.bold('  Frameworks'))

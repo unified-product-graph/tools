@@ -297,12 +297,98 @@ export function typeSortPriority(type: string): number {
   return idx >= 0 ? idx : 999
 }
 
-/** Sort nodes by type priority, then alphabetically by title within same type */
+// ── Meaning-aware ordering ──────────────────────────────────────────────────
+//
+// The intra-type tiebreaker. A plain `title.localeCompare` orders a release
+// series as `v5.1.0, v5.10.0, … v5.2.0` (lexical, not sequential). This ladder
+// orders by MEANING, trying each rung in turn and returning the first that
+// separates the pair:
+//   1. an explicit order field (`<type>_order`, or order/sequence/position/...)
+//   2. a semantic version detected in the title or a `version` property
+//   3. the status's position in the type's lifecycle (state-machine order)
+//   4. a provenance timestamp (`created_at` / `created`)
+//   5. a numeric-aware locale compare of the title (so `v5.2.0` precedes
+//      `v5.10.0` even with no other signal)
+// Lives in the SDK so every surface that renders a node list (the CLI `list` /
+// `tree`, get_tree child ordering, the cloud) shares one notion of order.
+
+const ORDER_KEYS = ['order', 'sequence', 'position', 'rank', 'index', 'sort_order'] as const
+
+/** An explicit numeric order from `<type>_order` or a generic order property. */
+function orderValue(n: UPGBaseNode): number | undefined {
+  const props = (n.properties ?? {}) as Record<string, unknown>
+  const keys = [`${n.type}_order`, ...ORDER_KEYS]
+  for (const k of keys) {
+    const v = props[k]
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return Number(v)
+  }
+  return undefined
+}
+
+/** A semver [major, minor, patch] from the title or a `version` property. */
+function semverKey(n: UPGBaseNode): [number, number, number] | undefined {
+  const version = (n.properties as Record<string, unknown> | undefined)?.version
+  const src = `${n.title} ${typeof version === 'string' ? version : ''}`
+  const m = src.match(/(\d+)\.(\d+)(?:\.(\d+))?/)
+  if (!m) return undefined
+  return [Number(m[1]), Number(m[2]), Number(m[3] ?? 0)]
+}
+
+/** A millisecond timestamp from a provenance property. */
+function timeValue(n: UPGBaseNode): number | undefined {
+  const props = (n.properties ?? {}) as Record<string, unknown>
+  const raw = props.created_at ?? props.created ?? (n as { created_at?: unknown }).created_at
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw === 'string') {
+    const t = Date.parse(raw)
+    return Number.isNaN(t) ? undefined : t
+  }
+  return undefined
+}
+
+/**
+ * Compare two nodes by meaning (the ladder above). Intended for nodes of the
+ * same entity type, but safe across types: rungs that do not apply fall through.
+ */
+export function compareNodesWithinType(a: UPGBaseNode, b: UPGBaseNode): number {
+  // 1. explicit order field
+  const oa = orderValue(a)
+  const ob = orderValue(b)
+  if (oa !== undefined && ob !== undefined && oa !== ob) return oa - ob
+
+  // 2. semantic version
+  const va = semverKey(a)
+  const vb = semverKey(b)
+  if (va && vb) {
+    for (let i = 0; i < 3; i++) if (va[i] !== vb[i]) return va[i] - vb[i]
+  }
+
+  // 3. lifecycle/status sequence
+  if (a.status && b.status) {
+    const lc = getLifecycleForType(a.type)
+    if (lc) {
+      const ia = lc.phases.findIndex((p) => p.id === a.status)
+      const ib = lc.phases.findIndex((p) => p.id === b.status)
+      if (ia >= 0 && ib >= 0 && ia !== ib) return ia - ib
+    }
+  }
+
+  // 4. provenance time
+  const ta = timeValue(a)
+  const tb = timeValue(b)
+  if (ta !== undefined && tb !== undefined && ta !== tb) return ta - tb
+
+  // 5. numeric-aware locale fallback
+  return a.title.localeCompare(b.title, undefined, { numeric: true })
+}
+
+/** Sort nodes by type priority, then by meaning (see compareNodesWithinType) within a type. */
 export function sortByType(nodes: UPGBaseNode[]): UPGBaseNode[] {
   return [...nodes].sort((a, b) => {
     const priorityDiff = typeSortPriority(a.type) - typeSortPriority(b.type)
     if (priorityDiff !== 0) return priorityDiff
-    return a.title.localeCompare(b.title)
+    return compareNodesWithinType(a, b)
   })
 }
 
@@ -782,6 +868,11 @@ export function listNodes(
     )
     nodes = nodes.filter((n) => childIds.has(n.id))
   }
+
+  // Meaning-aware order (type priority, then the within-type ladder: order
+  // field / semver / lifecycle / time / numeric-locale) before paginating, so a
+  // release series reads sequentially instead of `v5.1.0, v5.10.0, … v5.2.0`.
+  nodes = sortByType(nodes)
 
   const total = nodes.length
   const offset = options?.offset ?? 0

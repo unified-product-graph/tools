@@ -1,9 +1,9 @@
 /**
- * Tree assembly for `get_tree`. The implementation moved to the shared tooling
- * package in 0.9.16 so the cloud server assembles identical trees from the same
- * code; this module re-exports it to keep the local import path stable.
+ * Tree assembly for `get_tree`. The implementation lives in the SDK (the
+ * graph-data layer, shared by both servers and the CLI); this module re-exports
+ * it to keep the local import path stable.
  *
- * @see @unified-product-graph/mcp-tooling tree-assemble.ts
+ * @see @unified-product-graph/sdk lib/tree-assemble.ts
  */
 export {
   type GraphReader,
@@ -12,4 +12,4 @@ export {
   type AssembleOptions,
   type AssembleResult,
   assembleTree,
-} from '@unified-product-graph/mcp-tooling'
+} from '@unified-product-graph/sdk'

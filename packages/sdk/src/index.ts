@@ -65,6 +65,7 @@ export * from './lib/schema-drift.js'
 export * from './lib/anti-pattern-inputs.js'
 export * from './lib/property-type-validator.js'
 export * from './lib/length-caps.js'
+export * from './lib/tree-assemble.js'
 
 // ── Expression + resolver hints ─────────────────────────────────────────────
 export * from './lib/expression.js'

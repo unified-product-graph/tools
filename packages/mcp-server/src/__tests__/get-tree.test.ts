@@ -80,10 +80,51 @@ describe('get_tree (0.9.15)', () => {
     expect(childIds).toEqual(['do1', 'j1'])
     const job = dev.children.find((c: { id: string }) => c.id === 'j1')
     expect(job.children.map((c: { id: string }) => c.id)).toEqual(['n1'])
-    // p2 has no children -> a gap
+    // p2 has no children -> a gap on the REQUIRED child only (job); need /
+    // desired_outcome are optional and do not produce gap noise.
     const gap = body.gaps.find((g: { node_id: string }) => g.node_id === 'p2')
     expect(gap).toBeDefined()
-    expect(gap.missing).toEqual(['job', 'need', 'desired_outcome'])
+    expect(gap.missing).toEqual(['job'])
+  })
+
+  it('renders a shared (multi-parent) node under every parent as a reference, never dropped', async () => {
+    // DAG: two personas pursue the SAME job; the job carries a need. The job must
+    // appear under BOTH personas (the second as a shared reference, not dropped),
+    // and its subtree (the need) expands exactly once.
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'p1', type: 'persona', title: 'Developer' },
+        { id: 'p2', type: 'persona', title: 'Designer' },
+        { id: 'j1', type: 'job', title: 'Model content as code' },
+        { id: 'n1', type: 'need', title: 'Reuse without forking' },
+      ],
+      edges: [
+        e('e1', 'p1', 'j1', 'persona_pursues_job'),
+        e('e2', 'p2', 'j1', 'persona_pursues_job'),
+        e('e3', 'j1', 'n1', 'job_surfaces_need'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'user' }, makeCtx(store)))
+    const p1 = body.roots.find((r: { id: string }) => r.id === 'p1')
+    const p2 = body.roots.find((r: { id: string }) => r.id === 'p2')
+    const j1UnderP1 = p1.children.find((c: { id: string }) => c.id === 'j1')
+    const j1UnderP2 = p2.children.find((c: { id: string }) => c.id === 'j1')
+    // Appears under both parents (never silently dropped).
+    expect(j1UnderP1).toBeDefined()
+    expect(j1UnderP2).toBeDefined()
+    // Expanded once (the need is under the first occurrence), referenced second.
+    expect(j1UnderP1.children.map((c: { id: string }) => c.id)).toEqual(['n1'])
+    expect(j1UnderP1.shared).toBeUndefined()
+    expect(j1UnderP2.shared).toBe(true)
+    expect(j1UnderP2.children).toEqual([])
+    expect(body.stats.shared_refs).toBe(1)
+    // Neither persona is gap-flagged for job (both have one).
+    expect(body.gaps.find((g: { node_id: string }) => g.node_id === 'p2')).toBeUndefined()
   })
 
   it('falls back to the product anchor for strategy when there is no vision, and reports it', async () => {

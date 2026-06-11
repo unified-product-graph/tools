@@ -5,13 +5,13 @@
  * (emoji, score dots, ASCII) stays in the client.
  *
  * Shares the exact assembler the local server uses (`assembleTree` in
- * `@unified-product-graph/mcp-tooling`); the only cloud-specific work is loading
+ * `@unified-product-graph/sdk`); the only cloud-specific work is loading
  * the product's nodes + edges once and wrapping them in a synchronous in-memory
  * `GraphReader`, the way the cloud `query` handler loads `allNodes`/`allEdges`.
  */
 import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
 import { getTreePattern, UPG_TREE_PATTERNS } from '@unified-product-graph/core'
-import { type GraphReader, assembleTree } from '@unified-product-graph/mcp-tooling'
+import { type GraphReader, assembleTree } from '@unified-product-graph/sdk'
 import { type ToolHandler, text, textError } from '../lib/server-context.js'
 
 /**

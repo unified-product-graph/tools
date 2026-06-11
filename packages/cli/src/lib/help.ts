@@ -458,6 +458,165 @@ export const helpTopics: Record<string, HelpEntry> = {
     ],
     seeAlso: 'upg install-skills',
   },
+
+  // ── Tool parity (CLI-next): the 0.9.x MCP surface as commands ──────────────
+  spec: {
+    usage: 'upg spec <noun> [id] [options]',
+    summary: 'Browse the UPG spec catalogue offline: entity types, edges, regions, lenses, frameworks, playbooks, lifecycles, status values, and more. No graph needed.',
+    options: [
+      JSON_OPT,
+    ],
+    examples: [
+      { cmd: 'upg spec regions', comment: 'the 11 canonical regions' },
+      { cmd: 'upg spec lifecycle feature', comment: 'a type\'s status journey' },
+      { cmd: 'upg spec status-values release' },
+      { cmd: 'upg spec resolve-edge persona job', comment: 'the canonical edge for a pair' },
+      { cmd: 'upg spec children opportunity' },
+    ],
+    seeAlso: 'upg list, upg health',
+  },
+  query: {
+    usage: 'upg query --from <type>|--from-id <id> [options]',
+    summary: 'Traverse the graph following typed edges, with field projection and truncation. The BFS primitive behind tree views.',
+    options: [
+      FILE_OPT, JSON_OPT,
+      { flag: '--from <type>', desc: 'Start from all nodes of this type' },
+      { flag: '--from-id <id>', desc: 'Start from a specific node' },
+      { flag: '--traverse <edges>', desc: 'Comma list of edge types to follow per level (prefix ! to exclude)' },
+      { flag: '--depth <n>', desc: 'Max depth (default 3, max 10)' },
+      { flag: '--include <fields>', desc: 'Node fields to project' },
+    ],
+    examples: [
+      { cmd: 'upg query --from persona --traverse persona_pursues_job --depth 1' },
+      { cmd: 'upg query --from-id n_abc --depth 2 --json' },
+    ],
+    seeAlso: 'upg tree, upg list',
+  },
+  registry: {
+    usage: 'upg registry <define|update|register|promote|list|connect|org> [options]',
+    summary: 'The canonical-entity registry: shared entities many products instance. Operates on a portfolio graph (default portfolio.upg).',
+    options: [
+      FILE_OPT, JSON_OPT,
+    ],
+    examples: [
+      { cmd: 'upg registry list', comment: 'all canonical entities' },
+      { cmd: 'upg registry define persona "Developer"' },
+      { cmd: 'upg registry register my-product n_xyz --canonical persona_developer' },
+    ],
+    seeAlso: 'upg portfolio, upg spec',
+  },
+  portfolio: {
+    usage: 'upg portfolio <list|attach|detach|health|query|check|edges|connect|disconnect|migrate> [options]',
+    summary: 'Cross-product and portfolio operations: portfolio membership, cross-product edges, a portfolio digest, and validation including portfolio anti-patterns.',
+    options: [
+      FILE_OPT, JSON_OPT,
+    ],
+    examples: [
+      { cmd: 'upg portfolio list' },
+      { cmd: 'upg portfolio check', comment: 'portfolio validation + anti-patterns' },
+      { cmd: 'upg portfolio health' },
+    ],
+    seeAlso: 'upg registry, upg health',
+  },
+  area: {
+    usage: 'upg area <list|create|update|delete|show|tree|assign|move|remove|link-audience> [options]',
+    summary: 'Product areas within a portfolio: the area hierarchy, area-scoped subgraphs, product membership, and audience links.',
+    options: [
+      FILE_OPT, JSON_OPT,
+    ],
+    examples: [
+      { cmd: 'upg area list' },
+      { cmd: 'upg area create "Schema & Forms"' },
+      { cmd: 'upg area tree area_schema_forms', comment: 'the area subgraph' },
+    ],
+    seeAlso: 'upg portfolio, upg tree',
+  },
+  migrate: {
+    usage: 'upg migrate <type|status|properties|edges> [options]',
+    summary: 'Catalogue-aware migrations: retype a node (applies spec defaults), migrate statuses/properties to current, or rename an edge type. Pairs with fmt and fix.',
+    options: [
+      FILE_OPT, JSON_OPT,
+      { flag: '--dry-run / --no-dry-run', desc: 'Preview without writing (defaults vary per subcommand)' },
+    ],
+    examples: [
+      { cmd: 'upg migrate type n_abc need', comment: 'retype + apply defaults' },
+      { cmd: 'upg migrate status', comment: 'preview status migrations (dry-run default)' },
+      { cmd: 'upg migrate edges --from old_edge --to new_edge --flip' },
+    ],
+    seeAlso: 'upg fmt, upg fix',
+  },
+
+  // ── Tool parity singletons ─────────────────────────────────────────────────
+  move: {
+    usage: 'upg move <id> <new-parent> [options]',
+    summary: 'Re-parent a node under a new parent, re-typing its containment edge.',
+    options: [FILE_OPT, JSON_OPT, { flag: '--type <edge>', desc: 'Override the inferred containment edge type' }, { flag: '-y, --yes', desc: 'Skip confirmation' }],
+    examples: [{ cmd: 'upg move n_story n_epic' }],
+    seeAlso: 'upg connect, upg tree',
+  },
+  disconnect: {
+    usage: 'upg disconnect <edge-id> [options]',
+    summary: 'Remove a single edge by id (the inverse of connect).',
+    options: [FILE_OPT, JSON_OPT, { flag: '-y, --yes', desc: 'Skip confirmation' }],
+    examples: [{ cmd: 'upg disconnect e_abc123' }],
+    seeAlso: 'upg connect, upg delete',
+  },
+  dedupe: {
+    usage: 'upg dedupe [options]',
+    summary: 'Find and merge duplicate nodes (same type + title). Dry-run by default; --apply to commit.',
+    options: [FILE_OPT, JSON_OPT, { flag: '--apply', desc: 'Commit the merge (else preview)' }, { flag: '--keep <s>', desc: 'newest | oldest (default newest)' }, { flag: '-y, --yes', desc: 'Skip confirmation' }],
+    examples: [{ cmd: 'upg dedupe', comment: 'preview' }, { cmd: 'upg dedupe --apply -y' }],
+    seeAlso: 'upg check, upg fix',
+  },
+  clone: {
+    usage: 'upg clone <from-product> [options]',
+    summary: 'Scaffold a structure from a template product, optionally scoped to a region.',
+    options: [FILE_OPT, JSON_OPT, { flag: '--into <product>', desc: 'Target product (else active)' }, { flag: '--region <id>', desc: 'Only clone a region' }, { flag: '--dry-run', desc: 'Preview' }, { flag: '-y, --yes', desc: 'Skip confirmation' }],
+    examples: [{ cmd: 'upg clone template --into my-product --dry-run' }],
+    seeAlso: 'upg workspace, upg create',
+  },
+  context: {
+    usage: 'upg context [options]',
+    summary: 'A lens-aware product summary: counts, key entities, and domain guidance.',
+    options: [FILE_OPT, JSON_OPT, { flag: '--lens <id>', desc: 'View through a role lens' }, { flag: '--domains <list>', desc: 'Filter to domains' }],
+    examples: [{ cmd: 'upg context' }, { cmd: 'upg context --lens ux_design' }],
+    seeAlso: 'upg health, upg here',
+  },
+  log: {
+    usage: 'upg log [options]',
+    summary: 'The recent mutation feed for the graph (create / update / delete).',
+    options: [FILE_OPT, JSON_OPT, { flag: '--since <iso>', desc: 'Only changes after this timestamp' }, { flag: '--limit <n>', desc: 'Most recent N' }],
+    examples: [{ cmd: 'upg log --limit 20' }],
+    seeAlso: 'upg diff',
+  },
+  prioritise: {
+    usage: 'upg prioritise [ids...] [options]',
+    summary: 'Rank a set of nodes (RICE / value-effort style). Read-only.',
+    options: [FILE_OPT, JSON_OPT],
+    examples: [{ cmd: 'upg prioritise', comment: 'rank everything rankable' }],
+    seeAlso: 'upg score, upg apply',
+  },
+  sync: {
+    usage: 'upg sync status [options]',
+    summary: 'Report local sync state vs the cloud (read-only; push/pull stay agent-only).',
+    options: [FILE_OPT, JSON_OPT],
+    examples: [{ cmd: 'upg sync status' }],
+    seeAlso: 'upg workspace',
+  },
+  product: {
+    usage: 'upg product update [options]',
+    summary: 'Edit product-level fields (title, description, stage).',
+    options: [FILE_OPT, JSON_OPT, { flag: '--title <t>', desc: 'New title' }, { flag: '--stage <s>', desc: 'Product stage' }],
+    examples: [{ cmd: 'upg product update --stage growth' }],
+    seeAlso: 'upg workspace, upg init',
+  },
+  batch: {
+    usage: 'upg batch <create|update|delete> [options]',
+    summary: 'Atomic batch operations: create, update, or delete many entities in one call.',
+    options: [FILE_OPT, JSON_OPT, { flag: '--data <json>', desc: 'create/update: JSON array (or { nodes, edges })' }, { flag: '--ids <list>', desc: 'delete: comma-separated ids' }, { flag: '--dry-run', desc: 'create: validate without writing' }],
+    examples: [{ cmd: 'upg batch create --data \'[{"type":"need","title":"X"}]\'' }, { cmd: 'upg batch delete --ids n_a,n_b -y' }],
+    seeAlso: 'upg create, upg import',
+  },
 }
 
 /** Resolve a command name (or alias) to its help entry, if any. */
