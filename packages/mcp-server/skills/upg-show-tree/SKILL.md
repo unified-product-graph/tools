@@ -30,6 +30,10 @@ Use `mcp__unified-product-graph__get_tree` to fetch a tree in **one call**, and 
 /upg-show-tree validation: Hypothesis → Experiment → Learning
 /upg-show-tree strategy: Vision → Strategic Theme → Initiative → Outcome
 /upg-show-tree feature_areas: Feature Areas → Features
+/upg-show-tree delivery: Roadmap → Themes / Items / Releases → Features
+/upg-show-tree architecture: Bounded Context → Service → API / Schema / Deployment
+/upg-show-tree journey: User Journey → Phase / Step → Action / Screen
+/upg-show-tree design_system: Design System → Component → Token
 ```
 
 ## Named Tree Patterns
@@ -45,6 +49,10 @@ Each `pattern` id maps to a server-owned shape. Use the attribution below for th
 | `validation` | Hypothesis → Experiment Plan → Experiment → Run → Learning | Eric Ries, *The Lean Startup*, 2011 |
 | `strategy` | Vision / Mission → Strategic Theme → Initiative → Outcome | Roger Martin, *Playing to Win*, 2013 |
 | `feature_areas` | Feature Area → Feature | Standard agile product management |
+| `delivery` | Roadmap → Theme / Item / Release → Feature | Standard agile release management |
+| `architecture` | Bounded Context → Service → API / Schema / Deployment | Eric Evans, *Domain-Driven Design*, 2003 |
+| `journey` | User Journey → Phase / Step → Action / Screen | Standard UX journey mapping |
+| `design_system` | Design System → Component → Token | Brad Frost, *Atomic Design*, 2016 |
 
 ## Rendering
 
@@ -93,6 +101,10 @@ If none was specified, auto-detect from `get_graph_digest`:
 - persona + job → `user`
 - feature_area + feature → `product`
 - hypothesis + experiment → `validation`
+- roadmap + release → `delivery`
+- service or bounded_context → `architecture`
+- user_journey → `journey`
+- design_system or design_component → `design_system`
 - Otherwise → `strategy`, or render the product-rooted `product` tree
 
 ### Step 3: Render the tree

@@ -153,6 +153,97 @@ describe('get_tree (0.9.15)', () => {
     expect(root.children[0].children[0].id).toBe('i1')
   })
 
+  it('roots the delivery pattern at the roadmap even when a product is wired above it', async () => {
+    // Regression: the shipped delivery child_map listed product -> roadmap, which
+    // made the product a SUPERSET of the roadmap, so the most-nodes anchor rule
+    // rooted delivery at the product even when a roadmap existed. The product ->
+    // roadmap slot is dropped; the roadmap must win when present. A product ->
+    // roadmap EDGE is present here to prove the pattern no longer follows it.
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'prod', type: 'product', title: 'Studio' },
+        { id: 'rm', type: 'roadmap', title: 'Studio Roadmap' },
+        { id: 'th', type: 'roadmap_theme', title: 'AI theme' },
+        { id: 'rel', type: 'release', title: 'v6.0.0' },
+        { id: 'feat', type: 'feature', title: 'Vite 8' },
+        { id: 'cl', type: 'changelog', title: 'v6.0.0 notes' },
+      ],
+      edges: [
+        e('e0', 'prod', 'rm', 'product_plans_via_roadmap'),
+        e('e1', 'rm', 'th', 'roadmap_categorised_by_roadmap_theme'),
+        e('e2', 'rm', 'rel', 'roadmap_schedules_release'),
+        e('e3', 'rel', 'feat', 'release_contains_feature'),
+        e('e4', 'rel', 'cl', 'release_documented_in_changelog'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'delivery' }, makeCtx(store)))
+    expect(body.anchor_used).toBe('roadmap')
+    expect(body.anchor_resolved_from).toBeUndefined()
+    const root = body.roots.find((r: { id: string }) => r.id === 'rm')
+    expect(root, 'roots at the roadmap, not the product').toBeDefined()
+    const childIds = root.children.map((c: { id: string }) => c.id).sort()
+    expect(childIds).toEqual(['rel', 'th'])
+    const rel = root.children.find((c: { id: string }) => c.id === 'rel')
+    // release reaches both its feature and its changelog (new optional slots).
+    expect(rel.children.map((c: { id: string }) => c.id).sort()).toEqual(['cl', 'feat'])
+    // All-optional pattern: no gap noise.
+    expect(body.gaps).toEqual([])
+  })
+
+  it('falls back to the product for delivery when there is no roadmap', async () => {
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'prod', type: 'product', title: 'Studio' },
+        { id: 'rel', type: 'release', title: 'v6.0.0' },
+        { id: 'feat', type: 'feature', title: 'Vite 8' },
+      ],
+      edges: [
+        e('e1', 'prod', 'rel', 'product_ships_release'),
+        e('e2', 'rel', 'feat', 'release_contains_feature'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'delivery' }, makeCtx(store)))
+    expect(body.anchor_used).toBe('product')
+    expect(body.anchor_resolved_from).toBe('roadmap')
+    const root = body.roots.find((r: { id: string }) => r.id === 'prod')
+    expect(root.children[0].id).toBe('rel')
+  })
+
+  it('falls back from service to bounded_context for the architecture pattern', async () => {
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'bc', type: 'bounded_context', title: 'AI layer' },
+        { id: 'repo', type: 'code_repository', title: 'studio-ai' },
+        { id: 'api', type: 'external_api', title: 'Anthropic API' },
+      ],
+      edges: [
+        e('e1', 'bc', 'repo', 'bounded_context_includes_code_repository'),
+        e('e2', 'bc', 'api', 'bounded_context_integrates_external_api'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'architecture' }, makeCtx(store)))
+    expect(body.anchor_type).toBe('service')
+    expect(body.anchor_used).toBe('bounded_context')
+    expect(body.anchor_resolved_from).toBe('service')
+    const root = body.roots.find((r: { id: string }) => r.id === 'bc')
+    expect(root.children.map((c: { id: string }) => c.id).sort()).toEqual(['api', 'repo'])
+  })
+
   it('honours from_id and include_properties', async () => {
     const doc: UPGDocument = {
       upg_version: '0.2',

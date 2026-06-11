@@ -1,8 +1,9 @@
 /**
  * get_tree: server-side tree assembly (0.9.15). Assembles a canonical tree
- * pattern (OST, OKR, user, product, validation, strategy, feature_areas) from
- * the active product graph and returns NESTED data plus structural gaps.
- * Rendering (emoji, score dots, ASCII) stays in the client.
+ * pattern (OST, OKR, user, product, validation, strategy, feature_areas,
+ * delivery, architecture, journey, design_system) from the active product graph
+ * and returns NESTED data plus structural gaps. Rendering (emoji, score dots,
+ * ASCII) stays in the client.
  */
 import type { ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
@@ -25,7 +26,8 @@ import { assembleTree } from '../lib/tree-assemble.js'
  *
  * Parameters:
  * - `pattern` (required): one of `ost`, `okr`, `user`, `product`, `validation`,
- *   `strategy`, `feature_areas` (see `UPG_TREE_PATTERNS`).
+ *   `strategy`, `feature_areas`, `delivery`, `architecture`, `journey`,
+ *   `design_system` (see `UPG_TREE_PATTERNS`).
  * - `from_id`: explicit root node id; else the pattern's canonical anchor.
  * - `depth`: max levels (default = the pattern's natural depth).
  * - `include_properties`: node property keys to inline on each tree node.

@@ -226,7 +226,7 @@ export const helpTopics: Record<string, HelpEntry> = {
     summary: 'Tree view of the graph: filter by entity type or domain, or assemble a named framework pattern. --json emits the nested structure.',
     options: [
       FILE_OPT, JSON_OPT,
-      { flag: '--pattern <id>', desc: 'Assemble a framework pattern: ost, okr, user, product, validation, strategy, feature_areas, delivery' },
+      { flag: '--pattern <id>', desc: 'Assemble a named tree pattern: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system' },
       { flag: '--id <id>', desc: 'Subtree rooted at a specific node' },
       { flag: '--depth <n>', desc: 'Maximum depth. Defaults to 10' },
     ],

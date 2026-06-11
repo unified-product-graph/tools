@@ -443,7 +443,7 @@ Surfaced as `degraded.applied[]` on the response.
 
 ### `get_tree`
 
-Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.
+Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.
 
 **Atomicity:** `atomic (read-only). Reads the active product only.`
 
@@ -455,7 +455,7 @@ Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy
 | `from_id` | string |  | Explicit root node id; otherwise the pattern canonical anchor. |
 | `include_properties` | array |  | Node property keys to inline on each tree node. |
 | `max_nodes` | number |  | Cap on nodes; the tree is summarised (stats.truncated) rather than silently cut (default 400, max 2000). |
-| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, or feature_areas. |
+| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, or design_system. |
 
 **Returns:**
 
