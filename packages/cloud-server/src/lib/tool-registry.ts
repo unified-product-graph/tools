@@ -7,6 +7,7 @@ import type { ToolBinding, ToolDefinition } from '@unified-product-graph/mcp-too
 import type { CloudContext } from './server-context.js'
 import { listProducts, createProduct, getAuditLog } from '../tools/products.js'
 import { getProductContext, getGraphDigest, query, getChanges } from '../tools/context.js'
+import { getTree } from '../tools/tree.js'
 import {
   listNodes, getNode, getNodes, searchNodes,
   createNode, updateNode, deleteNode, getProductGraph, moveNode,
@@ -665,6 +666,46 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       "required": [
         "product_id"
+      ]
+    }
+  },
+  {
+    "name": "get_tree",
+    "description": "Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas) from the product graph. Walks the pattern's type-driven child map over the live graph (drift-proof, follows whatever edge wired each parent to a child of the expected type), roots at the pattern anchor with fallback, and reports structural gaps. Returns nested data, not rendered text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "The product ID"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas"
+        },
+        "from_id": {
+          "type": "string",
+          "description": "Explicit root node id. Defaults to the pattern's canonical anchor type."
+        },
+        "depth": {
+          "type": "number",
+          "description": "Max levels. Defaults to the pattern's natural depth."
+        },
+        "include_properties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Node property keys to inline on each tree node."
+        },
+        "max_nodes": {
+          "type": "number",
+          "description": "Cap on assembled nodes. The tree is summarised (stats.truncated) rather than silently cut."
+        }
+      },
+      "required": [
+        "product_id",
+        "pattern"
       ]
     }
   },
@@ -1687,6 +1728,7 @@ const HANDLERS: Record<string, ToolBinding<CloudContext>['handler']> = {
   get_product_context: getProductContext,
   get_graph_digest: getGraphDigest,
   query,
+  get_tree: getTree,
   get_changes: getChanges,
   list_nodes: listNodes,
   export_upg_document: exportUpgDocument,

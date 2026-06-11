@@ -2330,7 +2330,7 @@ Return the full `UPGRegion` record by id: anchor entity (with rationale and inbo
 
 **Returns:**
 
-JSON: the full `UPGRegion` record.
+JSON: the full `UPGRegion` record plus `coverage_keys` and `business_areas`.
 
 **Throws:**
 
@@ -2795,7 +2795,7 @@ _No arguments._
 
 **Returns:**
 
-JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count }> }`
+JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count, coverage_keys, business_areas }>, area_taxonomy }`
 
 **See also:** `get_region`, `get_region_for_entity_type`, `list_domains`, `list_playbooks`
 

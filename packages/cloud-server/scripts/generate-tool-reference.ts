@@ -91,6 +91,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getProductContext: 'get_product_context',
   getGraphDigest: 'get_graph_digest',
   query: 'query',
+  getTree: 'get_tree',
   getChanges: 'get_changes',
   // nodes
   listNodes: 'list_nodes',
@@ -220,6 +221,9 @@ async function main(): Promise<void> {
     domains: DOMAINS,
     domainLabels: DOMAIN_LABELS,
     domainBlurbs: DOMAIN_BLURBS,
+    // get_tree's handler lives in its own tree.ts; fold it into the context
+    // (Context & Traversal) domain, where query sits.
+    domainSourceFiles: { context: ['context.ts', 'tree.ts'] },
     symbolToToolName: SYMBOL_TO_TOOL_NAME,
     toolDefinitions: TOOL_DEFINITIONS,
     outputs: {

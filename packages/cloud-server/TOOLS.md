@@ -1,11 +1,11 @@
 # UPG MCP Cloud Server Tool Reference
 
-Reference for the 94 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
+Reference for the 95 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
 
 ## Contents
 
 - [Products & Audit](#products-audit): 3 tools
-- [Context & Traversal](#context-traversal): 4 tools
+- [Context & Traversal](#context-traversal): 5 tools
 - [Nodes](#nodes): 11 tools
 - [Edges](#edges): 4 tools
 - [Framework Exercises](#framework-exercises): 2 tools
@@ -114,6 +114,7 @@ _Product summary, digest, BFS traversal, change feed._
 - [`get_changes`](#get-changes)
 - [`get_graph_digest`](#get-graph-digest)
 - [`get_product_context`](#get-product-context)
+- [`get_tree`](#get-tree)
 - [`query`](#query)
 
 ### `get_changes`
@@ -206,6 +207,36 @@ per type. Errors with `Product not found: <id>` for unknown products.
 is not visible to the caller.
 
 **See also:** `get_graph_digest`, `get_graph_analytics`, `get_entity_schema`, `list_nodes`
+
+
+### `get_tree`
+
+Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas) from the product graph. Walks the pattern's type-driven child map over the live graph (drift-proof, follows whatever edge wired each parent to a child of the expected type), roots at the pattern anchor with fallback, and reports structural gaps. Returns nested data, not rendered text.
+
+**Atomicity:** `atomic (read-only). Reads the named product only.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `depth` | number |  | Max levels. Defaults to the pattern's natural depth. |
+| `from_id` | string |  | Explicit root node id. Defaults to the pattern's canonical anchor type. |
+| `include_properties` | array |  | Node property keys to inline on each tree node. |
+| `max_nodes` | number |  | Cap on assembled nodes. The tree is summarised (stats.truncated) rather than silently cut. |
+| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas |
+| `product_id` | string | ✓ | The product ID |
+
+**Returns:**
+
+JSON: `{ pattern, framework_id?, anchor_type, anchor_used,
+anchor_resolved_from?, roots: TreeNode[], stats: { nodes, levels, truncated },
+gaps: [{ node_id, type, title, missing }] }`. Structured data, never rendered text.
+
+**Throws:**
+
+- textError when `product_id` or `pattern` is missing or `pattern` is unknown.
+
+**See also:** `query`, `list_playbooks`
 
 
 ### `query`
@@ -1474,7 +1505,7 @@ Return the full UPGRegion record by id: anchor entity (with rationale and inboun
 
 **Returns:**
 
-JSON: the full `UPGRegion` record.
+JSON: the full `UPGRegion` record plus `coverage_keys` and `business_areas`.
 
 **Throws:**
 
@@ -1927,7 +1958,7 @@ _No arguments._
 
 **Returns:**
 
-JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count }> }`
+JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count, coverage_keys, business_areas }>, area_taxonomy }`
 
 **See also:** `get_region`, `get_region_for_entity_type`, `list_domains`, `list_playbooks`
 

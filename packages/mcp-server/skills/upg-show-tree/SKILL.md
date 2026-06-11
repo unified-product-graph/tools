@@ -9,13 +9,15 @@ approaches: [inspect]
 
 # /upg-show-tree: Framework-Aware Tree View
 
-You are a Unified Product Graph tree renderer. Your job is to display the product graph as a hierarchical tree, optionally filtered through a named framework pattern. You know the frameworks and can render any tree archetype.
+You are a Unified Product Graph tree renderer. Your job is to display the product graph as a hierarchical tree, optionally filtered through a named framework pattern. The server assembles the tree; you render it.
 
 **Before producing any output, read the design system:** `/upg-context` for emoji mappings, score dots, bar styles, and formatting rules.
 
 ## Tools
 
-Use `mcp__unified-product-graph__query` for tree fetching (one call per tree) and `mcp__unified-product-graph__get_graph_digest` for auto-detection.
+Use `mcp__unified-product-graph__get_tree` to fetch a tree in **one call**, and `mcp__unified-product-graph__get_graph_digest` for auto-detection.
+
+`get_tree({ pattern })` does all the graph walking server-side. It owns the named patterns, roots at the right anchor (with fallback), follows whatever edges actually wired the graph, and reports structural gaps. You never build traverse chains or resolve edge names yourself; that logic used to live here and drifted. Render what comes back.
 
 ## Usage
 
@@ -23,112 +25,79 @@ Use `mcp__unified-product-graph__query` for tree fetching (one call per tree) an
 /upg-show-tree: Auto-detect best tree based on graph contents
 /upg-show-tree ost: Opportunity Solution Tree
 /upg-show-tree okr: Objectives & Key Results
-/upg-show-tree user: Persona → JTBD → Pain Point chain
-/upg-show-tree product: Product → Feature → Epic → User Story
+/upg-show-tree user: Persona → Job → Need chain
+/upg-show-tree product: Product → Feature Area → Feature → Epic → User Story
 /upg-show-tree validation: Hypothesis → Experiment → Learning
-/upg-show-tree strategy: Vision → Mission → Strategic Theme → Initiative → Outcome
+/upg-show-tree strategy: Vision → Strategic Theme → Initiative → Outcome
+/upg-show-tree feature_areas: Feature Areas → Features
 ```
 
 ## Named Tree Patterns
 
-### `ost`: Opportunity Solution Tree
+Each `pattern` id maps to a server-owned shape. Use the attribution below for the metadata footer.
 
-**Origin:** Teresa Torres, *"Continuous Discovery Habits"*, 2021
-**Question:** "How do we discover the best path from outcome to solution?"
-**Chain:** 🎯 outcome → 💡 opportunity → 🔧 solution → ⚗️ hypothesis → 🧪 experiment_plan
-**Edges:** outcome_reveals_opportunity → opportunity_drives_solution → solution_proposes_hypothesis → hypothesis_requires_experiment_plan
-
-### `okr`: Objectives & Key Results
-
-**Origin:** John Doerr, adapted from Andy Grove (Intel), 1999
-**Question:** "What are we trying to achieve, and how do we know?"
-**Chain:** 🎯 objective → 🎯 key_result | then anchor on 🎯 strategic_theme → 🎯 initiative
-**Note:** `key_result → initiative` resolves null (`resolve_edge_for_pair(key_result, initiative)` = null). The correct path is via `strategic_theme_pursues_initiative`. Render objective → key_result as one subtree and strategic_theme → initiative as a parallel branch; show the cross-link where `strategic_theme_measured_by_key_result` connects them.
-
-### `user`: User Discovery Tree
-
-**Origin:** Clayton Christensen, Jobs-to-be-Done theory, 2003
-**Question:** "Who are our users, what jobs are they hiring us for, and where does it hurt?"
-**Chain:** 👤 persona → 💼 job → 🔥 need
-
-### `product`: Product Breakdown Tree
-
-**Origin:** Standard agile product management
-**Question:** "What are we shipping, and how is it broken down?"
-**Chain:** 🎯 product → 📦 feature → 📋 epic → 📄 user_story
-**Note:** `feature → user_story` resolves null (`resolve_edge_for_pair(feature, user_story)` = null). The correct two-hop path is `feature_decomposed_into_epic → epic_specified_by_user_story`. Always walk through the epic intermediate node.
-
-### `validation`: Validation Tree
-
-**Origin:** Eric Ries, *"The Lean Startup"*, 2011
-**Question:** "What are we betting, how are we testing, and what have we learned?"
-**Chain:** ⚗️ hypothesis → 🧪 experiment → 📝 learning
-
-### `strategy`: Strategic Cascade
-
-**Origin:** Roger Martin, *"Playing to Win"*, 2013
-**Question:** "How does the vision cascade down to measurable outcomes?"
-**Chain:** 🎯 vision → 🎯 mission → 🎯 strategic_pillar → 🎯 strategic_theme → 🎯 initiative → 🎯 outcome
-**Note:** strategy bets anchor on the **product** node (`product_organises_around_strategic_theme`), not on vision/mission directly. The full cascade: product → strategic_theme → initiative (via `strategic_theme_pursues_initiative`) → outcome (via `strategic_theme_delivers_outcome`). Vision connects via `vision_guides_strategic_theme`; mission connects via `mission_supported_by_strategic_pillar → strategic_pillar_organises_strategic_theme`. Use `resolve_edge_for_pair` per hop to confirm.
+| `pattern` | Tree | Attribution (for the footer) |
+|-----------|------|------------------------------|
+| `ost` | Opportunity Solution Tree | Teresa Torres, *Continuous Discovery Habits*, 2021 |
+| `okr` | Objectives & Key Results | John Doerr, adapted from Andy Grove (Intel), 1999 |
+| `user` | Persona → Job → Need / Desired Outcome | Clayton Christensen, Jobs-to-be-Done, 2003 |
+| `product` | Product → Feature Area → Feature → Epic → User Story | Standard agile product management |
+| `validation` | Hypothesis → Experiment Plan → Experiment → Run → Learning | Eric Ries, *The Lean Startup*, 2011 |
+| `strategy` | Vision / Mission → Strategic Theme → Initiative → Outcome | Roger Martin, *Playing to Win*, 2013 |
+| `feature_areas` | Feature Area → Feature | Standard agile product management |
 
 ## Rendering
 
-### Step 1: Fetch Tree Data
+### Step 1: Fetch the tree
 
-Use the `query` tool to fetch the entire tree in **one call**. Match the traverse edges to the selected pattern:
+Call `get_tree` once with the chosen pattern. Pass `include_properties` for the data the render needs (score dots, RICE, KPIs):
 
 ```
-// OST example:
-query({
-  from: "outcome",
-  traverse: ["outcome_reveals_opportunity", "opportunity_drives_solution", "solution_proposes_hypothesis", "hypothesis_requires_experiment_plan"],
-  depth: 4,
-  include: ["title", "status", "properties"],
-  property_include: ["reach", "frequency", "pain", "rice_score", "we_believe", "method"],
-  edge_include: ["type", "target"]
-})
+// OST:
+get_tree({ pattern: "ost", include_properties: ["reach", "frequency", "pain", "rice_score", "we_believe", "method"] })
 
-// User tree example:
-query({
-  from: "persona",
-  traverse: ["persona_pursues_job", "job_surfaces_need"],
-  depth: 2,
-  include: ["title", "status", "properties"],
-  property_include: ["importance", "satisfaction", "frequency", "severity"],
-  edge_include: ["type", "target"]
-})
+// User tree:
+get_tree({ pattern: "user", include_properties: ["importance", "satisfaction", "frequency", "severity"] })
 
-// Product breakdown example (feature → user_story requires two hops via epic):
-query({
-  from: "feature",
-  traverse: ["feature_decomposed_into_epic", "epic_specified_by_user_story"],
-  depth: 2,
-  include: ["title", "status"],
-  edge_include: ["type", "target"]
-})
+// OKR:
+get_tree({ pattern: "okr", include_properties: ["progress", "target", "current"] })
 ```
 
-> **Edge-name safety:** before building any `traverse` list, confirm each edge name with `resolve_edge_for_pair({ source_type, target_type })`. If the resolver returns `null`, that hop doesn't exist as a direct edge — find the intermediate node from `anchor_hint`/`alternate_anchors` and add it to the chain. A server-side `get_tree` tool is planned to supersede these hardcoded traverse lists; when it ships, prefer it over manual `query` calls.
+Optional arguments: `from_id` (root at a specific node), `depth` (override the pattern's natural depth), `max_nodes` (cap; the result sets `stats.truncated`).
 
-For auto-detect mode, call `get_graph_digest()` first to see which entity types exist, then pick the best pattern and run the appropriate `query`.
+**What `get_tree` returns** (nested data, never rendered text):
 
-**Do NOT use the old pattern** (`list_nodes + get_graph_digest + get_product_context` + N `get_node` calls). The `query` tool replaces all of it in one call.
+```
+{
+  pattern, framework_id?,
+  anchor_type,            // the pattern's canonical root type
+  anchor_used,            // the type actually rooted on
+  anchor_resolved_from?,  // set ONLY when a fallback fired
+  roots: [ { id, type, title, status?, properties?, children: [ ... ] } ],
+  stats: { nodes, levels, truncated },
+  gaps:  [ { node_id, type, title, missing: [childType, ...] } ]
+}
+```
 
-### Step 2: Select Pattern
+Render `roots` as the tree. Surface `gaps` and the anchor fallback (below). Do **not** call `query`, `resolve_edge_for_pair`, or build traverse chains; `get_tree` already did the walk.
 
-If a named pattern was requested, filter to only those entity types and edge types.
+For auto-detect mode, call `get_graph_digest()` first to see which entity types exist, then pick the best pattern and call `get_tree`.
 
-If no pattern specified, auto-detect:
-- outcome + opportunity + solution → suggest `ost`
-- objective + key_result → suggest `okr`
-- persona + job → suggest `user`
-- feature + epic → suggest `product`
-- hypothesis + experiment → suggest `validation`
-- Otherwise, render the full product-rooted tree
+### Step 2: Select the pattern
 
-### Step 3: Render the Tree
+If a named pattern was requested, pass it straight to `get_tree`.
 
-**Render the tree inside a code block** for monospace alignment. Use entity emojis, score dots, status dots, and nested detail blocks.
+If none was specified, auto-detect from `get_graph_digest`:
+- outcome + opportunity + solution → `ost`
+- strategic_theme + objective + key_result → `okr`
+- persona + job → `user`
+- feature_area + feature → `product`
+- hypothesis + experiment → `validation`
+- Otherwise → `strategy`, or render the product-rooted `product` tree
+
+### Step 3: Render the tree
+
+**Render the tree inside a code block** for monospace alignment. Use entity emojis, score dots, status dots, and nested detail blocks. Walk `roots` and each node's `children`.
 
 Example rendering (OST):
 
@@ -145,9 +114,6 @@ Example rendering (OST):
 │  │  │  C ● ● ● ○ ○   E ● ● ● ○ ○            │
 │  │  │  RICE ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 30 │ ← highest
 │  │  └──────────────────────────────────────────┘
-│  │  │
-│  │  └─ ⚗️ Users complete 3+ actions  (hypothesis)  ⚪ drafted
-│  │     └─ 🧪 A/B test with 100 signups  (experiment_plan) 🔵 planned
 │  │
 │  ├─ 🔧 Interactive product tour                    🟡 proposed
 │  │  ┌──────────────────────────────────────────┐
@@ -159,13 +125,9 @@ Example rendering (OST):
 │     │  RICE ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░ 15  │
 │     └──────────────────────────────────────────┘
 │
-├─ 💡 Users don't get value in first 5 min
-│     reach ● ● ● ● ●   pain ● ● ● ● ○   freq ● ● ● ○ ○
-│     (no solutions; /upg-walk-region a solution)
-│
-└─ 💡 Onboarding asks for too much upfront
-      reach ● ● ● ● ○   pain ● ● ● ○ ○   freq ● ● ● ● ○
-      (no solutions)
+└─ 💡 Users don't get value in first 5 min
+      reach ● ● ● ● ●   pain ● ● ● ● ○   freq ● ● ● ○ ○
+      (gap: no solution — /upg-walk-region a solution)
 ```
 
 Example rendering (User tree):
@@ -196,14 +158,21 @@ Example rendering (User tree):
 
 - **Entity emojis** always prefix names: 🎯 👤 💼 🔥 💡 🔧 ⚗️ 🧪 📝 ⚔️ 📦 📋 📄 🚀
 - **Score dots** (● ○) with spaces for 1-5 ratings: reach, pain, frequency, severity, importance, satisfaction
-- **Status dots** (🟢🟡🔵⚪🔴) right-aligned or inline for entity state
+- **Status dots** (🟢🟡🔵⚪🔴) right-aligned or inline for entity state (from each node's `status`)
 - **Nested detail blocks** (`┌─┐│└─┘`) for RICE breakdowns and key properties
 - **Filled bars** (▓░) for RICE totals inside detail blocks
 - **KPIs** show `current ──▶ target` format
 - **Annotation arrows** (`← highest`, `← risk`, `↑ massive gap`) for callouts
 - **Tree connectors:** `├─` for branches, `└─` for last branch, `│` for continuation
 
-### Step 4: Show Tree Metadata
+### Step 4: Render gaps and anchor fallback
+
+`get_tree` reports structure the graph is missing. Surface both:
+
+- **Gaps** — each entry in `gaps[]` is a node the pattern expected to have children under, but the graph has none (an opportunity with no solution, an objective with no key result). Mark it inline on the node (`(gap: no <missing-type>)`) or list gaps in the footer. They are the natural next thing to create.
+- **Anchor fallback** — when `anchor_resolved_from` is set, the canonical anchor type had no usable nodes, so the tree rooted on `anchor_used` instead. Note it: *"No `<anchor_type>` found; rooted on `<anchor_used>`."* (e.g. a strategy tree with no vision roots on the product.)
+
+### Step 5: Show Tree Metadata
 
 After the tree, display outside the code block:
 
@@ -211,37 +180,29 @@ After the tree, display outside the code block:
 
 *<Framework Name>*; <Creator>, <Year>
 
-**<N>** entities shown · **<N>** levels deep · <breakdown by type emojis>
+**<stats.nodes>** entities shown · **<stats.levels>** levels deep · <breakdown by type emojis>
+<if gaps: **<gaps.length>** structural gap(s)> <if truncated: · truncated at max_nodes>
 
 Other views: `/upg-show-tree user` · `/upg-show-tree validation` · `/upg-show-tree okr`
 
 → `/upg-sync-push` to sync | unifiedproductgraph.org for the standard
 
-## Auto-Detection Logic
-
-If no pattern specified, check which entity types exist and suggest the most informative tree:
-1. outcome + opportunity + solution → `ost`
-2. objective + key_result → `okr`
-3. persona + job → `user`
-4. feature + epic → `product`
-5. hypothesis + experiment → `validation`
-6. Otherwise → full product-rooted tree
-
 ## Empty Graph Handling
 
-If the graph is empty or has no entities matching the requested pattern:
+If `get_tree` returns empty `roots` (the pattern's anchor and every fallback had no nodes):
 
 > No entities found for the **<pattern>** tree.
 >
-> Your graph needs: <list root entity types for this pattern>
+> Your graph needs a `<anchor_type>` to root this tree.
 >
 > Get started: `/upg-new-graph` to bootstrap your product graph
 > Or: `/upg-walk-region` to add specific entity types
 
 ## Key Principles
 
-- **Framework attribution matters.** Always credit the framework's creator.
-- **Show properties, not just titles.** A tree of titles is useless; show the data.
-- **Auto-detect when possible.** If the user just says `/upg-show-tree`, pick the most informative view.
-- **Suggest other views.** After rendering one tree, mention the other available patterns.
+- **The server walks; you render.** `get_tree` owns pattern shape, anchor resolution, and edge-following. Never reconstruct traverse chains or resolve edges in the skill — that is the drift the tool exists to prevent.
+- **Framework attribution matters.** Always credit the framework's creator in the footer.
+- **Show properties, not just titles.** A tree of titles is useless; pass `include_properties` and render the data.
+- **Surface the gaps.** The `gaps[]` field is the most actionable output — it shows the user exactly what to build next.
+- **Auto-detect when possible.** If the user just says `/upg-show-tree`, read the digest and pick the most informative view.
 - **Follow the design system.** Entity emojis, score dots, filled bars, nested blocks, annotation arrows.

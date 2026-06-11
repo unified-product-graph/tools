@@ -51,6 +51,9 @@ import {
   UPG_REGIONS,
   UPG_REGION_MAP,
   UPG_REGION_COUNT,
+  UPG_AREA_TAXONOMY,
+  getCoverageKeysForRegion,
+  getBusinessAreasForRegion,
   UPG_LENSES,
   UPG_TYPE_LABELS,
   UPG_TYPE_LABELS_MAP,
@@ -933,14 +936,20 @@ export const getEdgeType: ToolHandler = (args): ToolResult => {
 /**
  * List every canonical UPGRegion shipped with `@unified-product-graph/core`.
  * Returns a compact summary per region (id, label, order, shape, mental_model,
- * anchor entity type, atomic-domain composition, entity / edge counts): the
- * minimum surface needed to decide whether to drill into `get_region`. The
- * region count is fixed (10) so this endpoint is intentionally non-paginated.
+ * anchor entity type, atomic-domain composition, entity / edge counts, plus the
+ * `digest.coverage` keys and "business areas" that map to it): the minimum
+ * surface needed to decide whether to drill into `get_region`. The region count
+ * is fixed (11) so this endpoint is intentionally non-paginated.
  *
- * Order matches the canonical 1..10 ring sequence from `UPG_REGIONS`
- * (Strategy & Outcomes → Operations & Quality).
+ * Also returns `area_taxonomy`: the documented cross-walk between the three
+ * overlapping area groupings (the 10 `get_graph_digest.coverage` keys, the 11
+ * regions, and the 8 "business areas"), so a skill can translate any direction
+ * instead of computing coverage against a stale denominator.
  *
- * @returns JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count }> }`
+ * Order matches the canonical 1..11 ring sequence from `UPG_REGIONS`
+ * (Strategy & Outcomes through Foundations).
+ *
+ * @returns JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count, coverage_keys, business_areas }>, area_taxonomy }`
  * @atomicity atomic (read-only)
  * @see get_region
  * @see get_region_for_entity_type
@@ -959,9 +968,11 @@ export const listRegions: ToolHandler = (): ToolResult => {
     entity_count: r.entities.length,
     intra_edge_count: r.intra_edges.length,
     boundary_edge_count: r.boundary_edges.length,
+    coverage_keys: getCoverageKeysForRegion(r.id),
+    business_areas: getBusinessAreasForRegion(r.id),
   }))
   return text(
-    JSON.stringify({ count: UPG_REGION_COUNT, regions }, null, 2),
+    JSON.stringify({ count: UPG_REGION_COUNT, regions, area_taxonomy: UPG_AREA_TAXONOMY }, null, 2),
   )
 }
 
@@ -969,9 +980,12 @@ export const listRegions: ToolHandler = (): ToolResult => {
  * Return the full UPGRegion record by id: anchor entity (with rationale and
  * inbound/outbound cross-edge counts), entity memberships with structural
  * roles, intra-domain edge keys, boundary edges to other regions, shape
- * archetype, and the atomic-domain composition.
+ * archetype, and the atomic-domain composition. Also carries `coverage_keys`
+ * and `business_areas`: the `digest.coverage` keys and "8 business areas" that
+ * map to this region (the area-taxonomy cross-walk), so coverage math resolves
+ * against the right denominator.
  *
- * @returns JSON: the full `UPGRegion` record.
+ * @returns JSON: the full `UPGRegion` record plus `coverage_keys` and `business_areas`.
  * @throws textError when `id` is missing or unknown.
  * @atomicity atomic (read-only)
  * @see list_regions
@@ -984,7 +998,11 @@ export const getRegion: ToolHandler = (args): ToolResult => {
   if (!id) return textError('Missing required parameter: id')
   const region: UPGRegion | undefined = UPG_REGION_MAP[id]
   if (!region) return textError(`Unknown region id: ${id}`)
-  return text(JSON.stringify(region, null, 2))
+  return text(JSON.stringify({
+    ...region,
+    coverage_keys: getCoverageKeysForRegion(id),
+    business_areas: getBusinessAreasForRegion(id),
+  }, null, 2))
 }
 
 /**

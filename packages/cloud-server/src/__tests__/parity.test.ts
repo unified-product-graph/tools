@@ -136,9 +136,9 @@ const CLOUD_NA = new Set([
   'promote_to_canonical',
   'create_registry_edge',
   'link_area_to_audience',
-  // get_tree (0.9.15): server-side tree assembly over the local GraphReader. The
-  // cloud's Postgres store needs its own traversal to host it; local-only for v1.
-  'get_tree',
+  // get_tree reached cloud parity in 0.9.16: the assembler moved to the shared
+  // @unified-product-graph/mcp-tooling package, and the cloud handler builds an
+  // in-memory GraphReader from a one-shot product load. REQUIRED on cloud now.
   // framework exercises (apply_framework / score_entity) reached cloud parity in
   // 0.8.6: migration 005 added edge `properties` JSONB, and the cloud handlers
   // mirror the local SDK logic. They are now REQUIRED on cloud (removed here).
