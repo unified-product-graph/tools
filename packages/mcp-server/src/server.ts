@@ -271,6 +271,9 @@ export function createContentDedup<T>(max = CONTENT_DEDUP_MAX) {
         if (oldest !== undefined) ledger.delete(oldest)
       }
     },
+    delete(key: string): void {
+      ledger.delete(key)
+    },
     get size(): number {
       return ledger.size
     },
@@ -311,7 +314,10 @@ export function contentDedupKey(name: string, store: UPGFileStore, args: Record<
  */
 export function createDispatcher(ctx: ToolContext, opts: { logFile?: string } = {}) {
   const requestLedger = createIdempotentDispatch<CallResult>()
-  const contentLedger = createContentDedup<CallResult>()
+  // Promise-memoised so CONCURRENT identical mutating calls share one execution
+  // (a re-delivery overlapping the original would otherwise both miss a
+  // record-after-exec cache and both write — the 0.9.23 race).
+  const contentLedger = createContentDedup<Promise<CallResult>>()
   const logFile = opts.logFile
 
   async function dispatch(
@@ -319,10 +325,23 @@ export function createDispatcher(ctx: ToolContext, opts: { logFile?: string } = 
     args: Record<string, unknown>,
     reqKey: string | undefined,
   ): Promise<CallResult> {
+    // Diagnostic: log EVERY incoming tools/call at the dispatch boundary, before
+    // any dedup, so a re-delivery is visible even when a ledger swallows it.
+    // `argsHash` correlates two deliveries of the same mutation.
+    if (logFile) {
+      fs.appendFileSync(
+        logFile,
+        JSON.stringify({
+          ev: 'recv', ts: Date.now(), pid: process.pid, tool: name,
+          reqKey: reqKey ?? null,
+          argsHash: MUTATING_TOOLS.has(name) ? contentDedupKey(name, ctx.store, args) : null,
+        }) + '\n',
+      )
+    }
     if (reqKey !== undefined && requestLedger.has(reqKey) && logFile) {
       fs.appendFileSync(
         logFile,
-        JSON.stringify({ ts: Date.now(), tool: name, requestId: reqKey, replay: true }) + '\n',
+        JSON.stringify({ ev: 'replay', ts: Date.now(), tool: name, requestId: reqKey }) + '\n',
       )
     }
 
@@ -364,16 +383,27 @@ export function createDispatcher(ctx: ToolContext, opts: { logFile?: string } = 
       // opts out for a deliberate identical re-create.
       if (MUTATING_TOOLS.has(name) && args.allow_duplicate !== true) {
         const ckey = contentDedupKey(name, ctx.store, args)
-        const cached = contentLedger.get(ckey)
-        if (cached) {
+        const inflight = contentLedger.get(ckey)
+        if (inflight) {
           if (logFile) {
-            fs.appendFileSync(logFile, JSON.stringify({ ts: Date.now(), tool: name, contentDedup: true }) + '\n')
+            fs.appendFileSync(logFile, JSON.stringify({ ev: 'content-dedup', ts: Date.now(), tool: name, ckey }) + '\n')
           }
-          return cached
+          return inflight
         }
-        const result = await exec()
-        if (!result.isError) contentLedger.record(ckey, result)
-        return result
+        // Memoise the in-flight PROMISE before awaiting, so a concurrent
+        // identical re-delivery shares this execution instead of starting a
+        // second. Evict on error so a transient failure stays retryable; keep a
+        // success so a later (sequential) re-delivery replays the original.
+        const p = exec()
+        contentLedger.record(ckey, p)
+        try {
+          const result = await p
+          if (result.isError) contentLedger.delete(ckey)
+          return result
+        } catch (err) {
+          contentLedger.delete(ckey)
+          throw err
+        }
       }
 
       return exec()

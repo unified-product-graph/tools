@@ -110,6 +110,20 @@ describe('content-level dedup (fresh-id duplicate-delivery defence)', () => {
     expect(store.getAllNodes()).toHaveLength(5)
   })
 
+  it('two CONCURRENT identical calls (different req ids) share one execution', async () => {
+    // The 0.9.23 gap: record-after-exec let two overlapping identical calls both
+    // miss the cache and both write (8). Promise-memoisation makes the second
+    // share the first's in-flight execution.
+    const store = await makeStore()
+    const { dispatch } = createDispatcher(makeCtx(store))
+
+    await Promise.all([
+      dispatch('batch_create_nodes', clone(FOUR), 'req-1'),
+      dispatch('batch_create_nodes', clone(FOUR), 'req-2'), // identical, concurrent, fresh id
+    ])
+    expect(store.getAllNodes()).toHaveLength(4) // not 8
+  })
+
   it("the report's interleaved sequence (W1=create k, W2=create 1, W1 replayed) stays correct", async () => {
     const store = await makeStore()
     const { dispatch } = createDispatcher(makeCtx(store))
@@ -171,5 +185,14 @@ describe('createContentDedup', () => {
     expect(d.get('a')).toBe(1)
     expect(d.get('b')).toBeUndefined()
     expect(d.get('c')).toBe(3)
+  })
+
+  it('delete removes a key (used to evict a failed in-flight promise)', () => {
+    const d = createContentDedup<number>()
+    d.record('k', 1)
+    expect(d.has('k')).toBe(true)
+    d.delete('k')
+    expect(d.has('k')).toBe(false)
+    expect(d.get('k')).toBeUndefined()
   })
 })
