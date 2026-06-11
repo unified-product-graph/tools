@@ -336,6 +336,8 @@ create_node({
 })
 ```
 
+The first lifecycle phase id from `get_lifecycle({ entity_type: "hypothesis" })` is the initial `drafted` phase — use whatever the live call returns as the `status` value. Do not hard-code `"draft"` or `"untested"`.
+
 Then ask: **"Got another bet, or are we good for now?"**
 
 If they have another, create it. If not, move to the closing.
@@ -353,8 +355,8 @@ Display what was created as an indented tree with entity type emojis:
 │  └─ ⚡ <need>
 ├─ 🎯 <outcome>
 │  └─ 📊 <metric> (<current> → <target>)
-├─ ⚗️ <h1>                                    ⚪ <draft phase>
-└─ ⚗️ <h2>                                    ⚪ <draft phase>
+├─ ⚗️ <h1>                                    ⚪ drafted
+└─ ⚗️ <h2>                                    ⚪ drafted
 ```
 
 ## Close with Smart Ending

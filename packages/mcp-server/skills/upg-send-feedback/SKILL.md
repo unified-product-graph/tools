@@ -56,7 +56,7 @@ Wait for answer.
 
 Collect metadata automatically. **Never read or send node titles, descriptions, or graph content.**
 
-- **UPG version**: read from `get_product_context` if available, otherwise `"0.2.0"`
+- **UPG version**: call `get_spec_version().upg_version` (falls back silently if unavailable)
 - **Product stage**: read from `get_product_context` if available
 - **Entity count**: read from `get_graph_digest` if available
 - **Recent skill**: scan conversation history for the most recent `/upg-*` invocation
@@ -103,7 +103,7 @@ The file format:
 Saved to upg-feedback-YYYY-MM-DD.md; thank you!
 
 To get it to the team, send the file however suits you:
-- open an issue at github.com/unified-product-graph/spec and paste it in, or
+- open an issue at unifiedproductgraph.org (follow the feedback link) and paste it in, or
 - email it / attach the file.
 
 Your input directly shapes the Unified Product Graph.

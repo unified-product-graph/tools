@@ -55,12 +55,15 @@ If auditing multiple graphs, repeat for each `.upg` file via `list_local_product
 
 ### 1b. Load the Schema
 
-Read the schema definition:
+Load the schema via MCP introspection (never read spec source files directly — paths don't exist in deployed environments):
 ```
-Read packages/upg-spec/src/domains.ts     → all domains and their types
-Read packages/upg-spec/src/entity-meta.ts → all registered types with maturity
-Read packages/upg-spec/src/index.ts       → all edge types
+list_entity_types()          → all registered entity types (replaces entity-meta.ts)
+list_domains()               → all domains and their types (replaces domains.ts)
+list_edge_types()            → all edge catalog entries (replaces index.ts)
+get_spec_version()           → current version, entity count, edge count, domain count
 ```
+
+Derive counts live from these calls — never hardcode numbers from an earlier version.
 
 ## Phase 2: Type Usage Analysis
 
@@ -72,9 +75,9 @@ Compare types present in the graph against types defined in the schema:
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 TYPE USAGE ANALYSIS
 
-Schema defines: 310 entity types (across 36 atomic domains, 10 canonical regions)
+Schema defines: <N entity types from list_entity_types()> (across <M domains from list_domains()>, <R regions from list_regions()>)
 Graph uses:     47 entity types
-Coverage:       21%
+Coverage:       <graph_used / schema_total>%
 
 BY DOMAIN:
 | Domain | Defined | Used | Coverage | Status |
@@ -166,9 +169,9 @@ These are candidates for adding to the property interfaces; the user is already 
 ```
 EDGE USAGE
 
-Schema defines: 800+ edge types
+Schema defines: <N edges from list_edge_types() or get_spec_version().edge_count>
 Graph uses:     23 edge types
-Coverage:       3%
+Coverage:       <graph_used / schema_total>%
 
 MOST USED EDGES:
 | Edge Type | Count | Between |
@@ -193,7 +196,7 @@ IMPLICIT RELATIONSHIPS (nodes likely related but unconnected)
 
 | Node A | Node B | Why related | Missing edge? |
 |--------|--------|-------------|--------------|
-| "Auth redesign" (feature) | "OAuth migration" (tech_debt) | Same domain keywords | debt_blocks_feature? |
+| "Auth redesign" (feature) | "OAuth migration" (technical_debt_item) | Same domain keywords | technical_debt_item_blocks_feature? |
 | "Mobile persona" (persona) | "App Store channel" (acquisition_channel) | channel_targets_persona? |
 ```
 

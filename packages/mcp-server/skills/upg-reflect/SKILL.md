@@ -75,11 +75,12 @@ get_approach({ id: "reflect" })
 ```
 
 The returned `framework_id_examples` carries the canonical reflection
-framework ids (currently: `five-whys`, `pre-mortem`, `red-team`,
-`devils-advocate`, `second-order-thinking`, plus the reflective ceremonies
-`retrospective` and `four-forces-of-progress`). When the spec gains a new
+framework ids (currently including: `five-whys`, `pre-mortem`, `red-team`,
+`devils-advocate`, `second-order-thinking`, `build-measure-learn`,
+`hypothesis-board`, and `retrospective`). When the spec gains a new
 reflection framework, it surfaces here automatically; no skill edit
-required.
+required. Never use a framework id that the live `framework_id_examples`
+does not return.
 
 Recommend one based on what you just saw:
 

@@ -34,7 +34,7 @@ The source of truth. All changes start here.
 | File | What to update | How to find the insertion point |
 |------|---------------|-------------------------------|
 | `catalog/entity-catalog.ts` | Add to `UPGEntityType` union | Find the domain comment (e.g., `// Engineering`) and add after the last type in that section |
-| `registry/entity-meta.ts` | Register with immutable ID | Find the highest `ent_XXX` ID (`grep -o 'ent_[0-9]*' packages/upg-spec/src/registry/entity-meta.ts \| sort -t_ -k2 -n \| tail -1`), increment by 1. Set `maturity: 'stable'`, `since: '0.2.0'` |
+| `registry/entity-meta.ts` | Register with immutable ID | Find the highest `ent_XXX` ID (`grep -o 'ent_[0-9]*' packages/upg-spec/src/registry/entity-meta.ts \| sort -t_ -k2 -n \| tail -1`), increment by 1. Set `maturity: 'stable'`, `since: '<current upg_version from get_spec_version()>'` |
 | `registry/domains.ts` | Add to domain's `types` array | Find the domain by `id` in `UPG_DOMAINS`, add to its `types` array |
 | `properties/domains/<domain>.ts` | Add property interface | Create `export interface XxxProperties { ... }` with typed fields. Use existing interfaces as templates. |
 | `catalog/edge-catalog.ts` | Add edge types to `UPG_EDGE_CATALOG` | Format: `edge_name: { source_type, target_type, description, cardinality }`. The `UPG_EDGE_PAIR_MAP` is derived automatically. |

@@ -1,5 +1,5 @@
 ---
-name: upg-explore-detail
+name: upg-walk-region-detail
 description: "Full property schemas and edge type reference for /upg-walk-region"
 ---
 
@@ -12,7 +12,7 @@ This file is an **illustrative reference**, not the spec. It is loaded on demand
 When creating an entity, actively prompt for the key properties. Do not just set title and description.
 
 > **Two conventions these schemas follow (and you must too):**
-> 1. **Lifecycle `status` is a TOP-LEVEL field on the node, not a property.** Where a block below shows `status (top-level ...)`, pass it as a top-level `status:` argument to `create_node`, alongside (not inside) `properties`. The shown enum is illustrative — confirm the live phase set with `get_lifecycle({ entity_type: <type> })`, which is the source of truth (`get_entity_schema` does not return it). Note: a `*_status` PROPERTY (e.g. `objective_status`, `kr_status`) is a SEPARATE enum field that lives inside `properties` and is distinct from the top-level lifecycle `status` — never copy one into the other.
+> 1. **Lifecycle `status` is a TOP-LEVEL field on the node, not a property.** Where a block below shows `status (top-level ...)`, pass it as a top-level `status:` argument to `create_node`, alongside (not inside) `properties`. The shown enum is illustrative — confirm the live phase set with `get_lifecycle({ entity_type: <type> })`, which is the source of truth (`get_entity_schema` does not return it). Note: a `*_status` PROPERTY (e.g. `objective_status`) is a SEPARATE enum field that lives inside `properties` and is distinct from the top-level lifecycle `status` — never copy one into the other.
 > 2. **Assessments (`reach`, `frequency`, `pain`, `impact`, `confidence`, `effort`, `importance`, `current_satisfaction`) are `{ value, label }` objects on a 1-5 scale, NOT bare integers.** Where a block shows `1-5`, write `{ value: <1-5>, label: "<word>" }`.
 
 ### outcome
@@ -51,7 +51,6 @@ Ask: "What's the current value? What's the target? What unit?" (KPIs are `metric
   "current_value": 0,
   "target_value": 100,
   "unit": "metric unit",
-  "kr_status": "on_track | at_risk | behind | achieved",
   "status (top-level lifecycle)": "on_track | at_risk | behind | achieved"
 }
 ```

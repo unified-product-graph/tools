@@ -25,9 +25,9 @@ For `kind: 'domain_guide'` steps, the runtime expands them via `DomainUsageGuide
 
 The user invokes this skill with a playbook id, e.g. `/upg-walk-playbook playbook:business-gtm-growth`.
 
-If no argument is given, list the canonical ids and ask the user to pick one. Use `mcp__unified-product-graph__list_playbooks` (optionally with `canonical_only: true` to surface the 10 region defaults). v0.3.0 ships 12 playbooks across 10 regions:
+If no argument is given, list the canonical ids and ask the user to pick one. Call `mcp__unified-product-graph__list_playbooks` (optionally with `canonical_only: true`) to get the live list — **do not hardcode counts or ids**. The live server currently ships 13 playbooks across 11 regions (illustrative list; verify with `list_playbooks` at runtime):
 
-- **Canonical** (one per region): `playbook:strategy-outcomes`, `playbook:users-needs`, `playbook:discovery-research-validation`, `playbook:market-competitive`, `playbook:experience-design-brand`, `playbook:product-delivery`, `playbook:engineering-platform`, `playbook:business-gtm-growth`, `playbook:analytics-data`, `playbook:operations-quality`.
+- **Canonical** (one per region): `playbook:strategy-outcomes`, `playbook:users-needs`, `playbook:discovery-research-validation`, `playbook:market-competitive`, `playbook:experience-design-brand`, `playbook:product-delivery`, `playbook:engineering-platform`, `playbook:business-gtm-growth`, `playbook:analytics-data`, `playbook:operations-quality`, `playbook:foundations`.
 - **Specialised** (alternative entry paths): `playbook:business-growth-metric-driven`, `playbook:business-marketing-audience-first`.
 
 ## Session flow

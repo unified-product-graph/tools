@@ -39,7 +39,12 @@ You are a schema analyst. Your job is to evaluate whether two or more entity typ
 
 ### Step 1: Property Overlap Analysis
 
-Read the property interfaces from `packages/upg-spec/src/properties/`. Compare field by field:
+Load property interfaces via MCP (never read spec files directly — paths don't exist in deployed environments):
+```
+get_entity_schema({ type: "type_a" })   → expected_properties for type_a
+get_entity_schema({ type: "type_b" })   → expected_properties for type_b
+```
+Compare field by field:
 
 ```
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -62,33 +67,30 @@ This is the critical test. Check 4 structural dimensions:
 
 **2a. Parent types**: Do they have the same canonical parent?
 ```
-Read UPG_VALID_CHILDREN in grammar/hierarchy.ts
-- type_a parent: bounded_context
-- type_b parent: design_system
+get_valid_children({ parent_type: "bounded_context" })   → check if type_a is listed
+get_valid_children({ parent_type: "design_system" })      → check if type_b is listed
+get_entity_schema({ type: "type_a" })                     → shows canonical parent
 → DIFFERENT parents = structural divergence
 ```
 
 **2b. Child types**: Do they have the same children?
 ```
-Search UPG_VALID_CHILDREN for entries where value = type_a or type_b
-- type_a children: technical_debt_item
-- type_b children: (none)
+get_valid_children({ parent_type: "type_a" })   → children of type_a
+get_valid_children({ parent_type: "type_b" })   → children of type_b
 → DIFFERENT children = structural divergence
 ```
 
 **2c. Edge types**: Do they participate in the same relationships?
 ```
-Search UPG_EDGE_CATALOG in catalog/edge-catalog.ts for both types
-- type_a edges: context_has_decision, decision_has_technical_debt_item
-- type_b edges: decision_informs_decision, decision_affects_component
+list_edge_types()   → filter by source_type or target_type matching type_a or type_b
+resolve_edge_for_pair({ source_type: "type_a", target_type: X })  → check common pair edges
 → DIFFERENT edges = semantic divergence
 ```
 
 **2d. Domain membership**: Are they in the same domain?
 ```
-Check registry/domains.ts
-- type_a: engineering
-- type_b: design
+get_entity_schema({ type: "type_a" }).domain   → type_a's domain
+get_entity_schema({ type: "type_b" }).domain   → type_b's domain
 → DIFFERENT domains = role divergence
 ```
 
@@ -103,9 +105,7 @@ Check registry/domains.ts
 Check how each type is used in practice:
 
 **3a. Skill references**: Which skills create/reference each type?
-```
-grep -r "type_a\|type_b" packages/upg-mcp-server/skills/
-```
+Review the skills directory for references to `type_a` and `type_b`; the search tools or a workspace grep can locate these. Alternatively, call `get_type_label({ entity_type: "type_a" })` to see the alt_labels and designations — any skill that surfaces this type will reference those labels.
 
 **3b. Lens relevance**: Do they appear in different lenses?
 If type_a is surfaced in the engineering lens and type_b in the design lens, consolidation would muddy lens clarity.
@@ -189,7 +189,7 @@ Save to a decisions log in your project (wherever your team keeps ADRs) for futu
 
 When called with a domain name instead of specific types:
 
-1. List all types in the domain (from `domains.ts`)
+1. List all types in the domain via `list_entity_types()` filtered by domain, or `get_domain_guide({ domain_id })`
 2. For each pair, compute property overlap percentage
 3. Flag pairs with >60% overlap as candidates
 4. Present a summary table:
@@ -212,7 +212,7 @@ These consolidations have already happened in UPG and can be referenced as patte
 
 | Old Types | Unified As | Discriminator | Version |
 |-----------|-----------|---------------|---------|
-| `pain_point`, `user_need` | `need` | `valence: 'pain' \| 'gap' \| 'desire' \| 'constraint'` | 0.1.0 |
+| `pain_point`, `user_need` | `need` | `valence: 'pain' \| 'gap' \| 'constraint'` (live enum — verify via `get_entity_schema({ type: "need" })`) | 0.1.0 |
 | `north_star_metric`, `input_metric`, `kpi`, `metric_definition` | `metric` | `designation` property | 0.1.0 |
 | `research_insight`, `finding`, `ux_insight` | `insight` | `source_domain` / `insight_level` | 0.1.0 |
 | `ab_test`, `growth_experiment`, `pricing_experiment` | `experiment` | `experiment_type` | 0.1.0 |

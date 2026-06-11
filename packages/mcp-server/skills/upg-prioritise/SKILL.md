@@ -33,9 +33,13 @@ Use the `mcp__unified-product-graph__*` MCP tools:
 | 4 | **ICE** | `ice-scoring` | Quick, gut-level scoring when time is short | Ranked list with scores: Impact × Confidence × Ease |
 | 5 | **Value vs Effort** | `value-vs-effort` | Visual 2×2 prioritisation, great for stakeholder alignment | Quadrant placement: Quick wins / Big bets / Fill-ins / Time sinks |
 | 6 | **WSJF** | `wsjf` | Execution sequencing; what to start first given cost of delay | Ranked list: (User Value + Time Criticality + Risk Reduction) ÷ Job Size |
-| 7 | **Opportunity Scoring** | `opportunity-scoring` | Finding the highest-value underserved needs | Ranked by gap: Importance − min(Satisfaction, Importance) |
+| 7 | **Cost of Delay** | `cost-of-delay` | Quantifying the economic impact of not delivering something now | Ranked by delay cost: (User Value + Time Criticality + Risk Reduction) over time |
+| 8 | **Opportunity Sizing** | `opportunity-sizing` | Finding the highest-value underserved needs | Ranked by gap: Importance − min(Satisfaction, Importance) |
+| 9 | **Eisenhower Matrix** | `eisenhower-matrix` | Triage tasks by urgency vs importance | Four quadrants: Do Now / Schedule / Delegate / Eliminate |
 
 These are the named frameworks inside the Prioritise approach. The LLM is the facilitator; you walk the user through the framework's scoring dimensions, take their inputs, compute the ranking, and present results.
+
+> **Note:** this table is illustrative. The canonical list is always fetched live from `get_approach({ approach_id: "prioritise" }).framework_id_examples` at Step 2 so it stays current as the spec evolves. Never hardcode a framework id that the live call cannot confirm.
 
 ## Flow
 
@@ -80,7 +84,8 @@ Recommend one framework based on context:
 | User wants to understand which features users can't live without vs which delight them | `kano-model` |
 | User wants a 2×2 for a stakeholder meeting | `value-vs-effort` |
 | User is sequencing a development backlog with cost-of-delay thinking | `wsjf` (Note: WSJF is in the `planning` framework category; use `get_approach({ approach_id: 'prioritise' })` to look it up, not `list_frameworks({ category: 'prioritization' })`) |
-| User is looking for the most underserved user needs from JTBD research | `opportunity-scoring` |
+| User wants to quantify the economic cost of not delivering something now | `cost-of-delay` |
+| User is looking for the most underserved user needs from JTBD research | `opportunity-sizing` |
 | User wants to triage tasks by urgency vs importance | `eisenhower-matrix` |
 
 If unclear, present the full table as numbered options and let the user pick. Always allow override.
@@ -124,7 +129,7 @@ The returned `UPGFramework` record carries everything you need:
 
 Present results in a clear table:
 
-**For numeric frameworks (RICE, ICE, WSJF, Opportunity Scoring):**
+**For numeric frameworks (RICE, ICE, WSJF, Cost of Delay, Opportunity Sizing):**
 
 ```
 Rank  Candidate                   Score   Notes

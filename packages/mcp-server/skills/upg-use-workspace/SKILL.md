@@ -55,11 +55,12 @@ If multiple loose files, number them and suggest `init`. If zero files, point to
 1. Ask: **"What's the name of the new product?"**: one question, STOP, wait.
 2. Create blank .upg file via Bash. Path: `.upg/<kebab-slug>.upg` if workspace mode, else `<kebab-slug>.upg` in cwd. Generate id: `node -e "import('nanoid').then(m => console.log(m.nanoid(16)))"`. File structure:
    ```json
-   { "upg_version": "0.5.0", "exported_at": "<now>",
-     "source": { "tool": "upg-mcp-local", "tool_version": "0.5.0" },
+   { "upg_version": "<get_spec_version().upg_version>", "exported_at": "<now>",
+     "source": { "tool": "upg-mcp-local", "tool_version": "<get_spec_version().upg_version>" },
      "product": { "id": "<nanoid>", "title": "<title>", "stage": "idea" },
      "nodes": [], "edges": [] }
    ```
+   (Call `get_spec_version()` first to get the current `upg_version` string; never hardcode it.)
 3. If workspace mode, update workspace.json; add to `products` array.
 4. Confirm: `✓ Created **Client Project** (.upg/client-project.upg)`, then ask "Switch to it now? [Y/n]". If yes, run switch logic.
 

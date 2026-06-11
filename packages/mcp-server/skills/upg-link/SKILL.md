@@ -63,8 +63,13 @@ Do not decide validity from memory or from a `{source}_{verb}_{target}` guess �
 | job -> feature | Jobs don't directly map to features | job -> need -> (opportunity) -> solution -> feature |
 | persona -> outcome | Personas don't directly drive outcomes | The product drives outcomes; personas pursue jobs |
 | hypothesis -> metric | Hypotheses don't directly measure metrics | hypothesis -> experiment_plan -> experiment_run -> learning; outcome -> metric |
-| outcome -> feature | Outcomes don't directly require features | outcome -> opportunity -> solution -> feature |
 | job -> solution | Jobs don't directly have solutions | job -> need; opportunity -> solution |
+
+**Valid paths that are commonly underused (resolver returns an edge type):**
+
+| Pair | Edge | Notes |
+|---|---|---|
+| outcome -> feature | `outcome_delivered_by_feature` | Direct cross-domain edge; `get_valid_children(outcome)` includes feature |
 
 When the user requests an invalid direct connection, explain the gap and offer to create the intermediate entities:
 
@@ -108,6 +113,7 @@ After creating an edge, look at the target node and suggest what should come nex
 | 👤 persona → 💼 job | "This 💼 job should have needs. What friction does Sarah face when trying to do this job?" |
 | 💼 job → 🔥 need | "🔥 Needs surface 💡 opportunities. Is there an opportunity worth exploring here?" |
 | 🎯 outcome → 💡 opportunity | "💡 Opportunities need 🔧 solutions. What approaches could address this?" |
+| 🎯 outcome → 📦 feature | "That outcome is now directly linked to a feature (`outcome_delivered_by_feature`). Want to trace further back to the opportunity that produced it?" |
 | 🔧 solution → ⚗️ hypothesis | "This ⚗️ hypothesis needs a 🧪 experiment plan. How would you test this?" |
 | ⚗️ hypothesis → 🧪 experiment_plan | "Run the plan as an experiment_run, then capture the 📝 learning. What do you expect to find?" |
 

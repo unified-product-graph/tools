@@ -13,7 +13,7 @@ This is the shared brain for all `/upg-*` skills. When you load this, you unders
 
 ## What Is the Unified Product Graph?
 
-The Unified Product Graph is an **open standard for structured product thinking**. It defines how product knowledge connects: a catalogue of entity types organised into canonical regions (Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations), with typed properties and semantic relationships. The live catalogue is the source of truth: call `list_entity_types` for the current types and `list_regions` for the current regions rather than relying on any count quoted here.
+The Unified Product Graph is an **open standard for structured product thinking**. It defines how product knowledge connects: a catalogue of entity types organised into canonical regions (Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations, Foundations), with typed properties and semantic relationships. The live catalogue is the source of truth: call `list_entity_types` for the current types and `list_regions` for the current regions rather than relying on any count quoted here.
 
 It's not a tool. It's a vocabulary. A shared language for product decisions.
 
@@ -31,7 +31,7 @@ The spec evolves: entity types, status/phase enums, property keys, valid childre
 
 - **Before creating or updating any entity:** call `get_entity_schema({ type: <type> })` and drive the form from its `expected_properties` and valid parent→child hierarchy. (`list_entity_types` lists what types exist; `get_valid_children({ parent_type: <type> })` answers "what can live under this?")
 - **For a node's top-level lifecycle `status`:** read the phases from `get_lifecycle({ entity_type: <type> })`. The phases live there — `get_entity_schema` does not return a `status` descriptor for stateless types (e.g. persona), so don't try to derive top-level `status` from it. Set top-level `status` to one of the phase ids `get_lifecycle` returns (e.g. objective → `draft`/`active`/`achieved`/`missed`/`deferred`). Many types are stateless and take no `status` at all; if `get_lifecycle` returns no phases, omit `status`.
-- **`*_status` PROPERTIES are NOT the node's lifecycle `status`.** Some types carry a property such as `objective_status` or `kr_status` (an enum inside `expected_properties`). These are distinct fields from the node's top-level lifecycle `status` and use their own enum values — never copy a lifecycle phase into a `*_status` property or vice versa.
+- **`*_status` PROPERTIES are NOT the node's lifecycle `status`.** Some types carry a property such as `objective_status` (an enum inside `expected_properties`). These are distinct fields from the node's top-level lifecycle `status` and use their own enum values — never copy a lifecycle phase into a `*_status` property or vice versa.
 - **Before creating any edge:** call `resolve_edge_for_pair({ source_type, target_type })` to get the canonical edge for that pair, then let the server infer `type` (omit an explicit `type:` where you can).
 - **Before quoting a number** (how many types, frameworks, regions, lenses, playbooks, anti-patterns): derive it from the relevant `list_*` call or `get_spec_version`, or don't quote it. Counts written into a skill drift the moment the spec moves.
 
@@ -145,7 +145,7 @@ Map gaps to skills:
 
 Only show this line when:
 1. At least one entity was created or updated during the session
-2. The cloud MCP tools exist (i.e. `mcp__upg-cloud__*` tools are available)
+2. The cloud sync tool is available (i.e. `mcp__unified-product-graph__push_to_cloud` resolves without error)
 3. The user did NOT just run `/upg-sync-pull` (they just synced FROM cloud; pushing back immediately makes no sense)
 
 Do NOT show the sync line when:

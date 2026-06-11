@@ -804,6 +804,7 @@ function buildOrphanWarning(canonicalType: string): string | undefined {
  * @see batch_create_nodes
  * @see update_node
  */
+
 export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
   if (!args.type) return textError(`Missing required parameter: type`)
@@ -907,6 +908,11 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
       const orphanWarning = buildOrphanWarning((result.node as { type: string }).type)
       if (orphanWarning) aggregatedWarnings.push(orphanWarning)
     }
+    // A3 (0.9.14): a parent_id whose (parent_type -> child_type) pair has no
+    // canonical containment edge still resolves a lateral edge and writes it
+    // silently. Surface it so the author can decide link-vs-nest (never a refusal).
+    const a3LateralWarning = lateralParentWarning(store, args.parent_id as string | undefined, result)
+    if (a3LateralWarning) aggregatedWarnings.push(a3LateralWarning)
     const libWarning = (result as { warning?: string }).warning
     const combinedWarning = libWarning
       ? aggregatedWarnings.length > 0
@@ -1126,6 +1132,16 @@ export const batchCreateNodes: ToolHandler = (args, ctx): ToolResult => {
   }
   const { ok: _ok, ...payload } = result
   void _ok
+  // A3 (0.9.14): surface silent lateral-parent nestings (validate_only + commit).
+  const a3 = batchLateralParentWarnings(store, nodes)
+  if (a3.length > 0) {
+    const existing = (payload as { warnings?: unknown }).warnings
+    ;(payload as { warnings?: unknown }).warnings = Array.isArray(existing)
+      ? [...existing, ...a3]
+      : typeof existing === 'string'
+        ? [existing, ...a3]
+        : a3
+  }
   return text(JSON.stringify(payload, null, 2))
 }
 
@@ -1565,3 +1581,64 @@ export const deduplicateNodes: ToolHandler = (args, ctx): ToolResult => {
 }
 
 export type { ToolContext }
+
+/**
+ * A3 (0.9.14): when a `parent_id` is supplied but the (parent_type -> child_type)
+ * pair has no canonical containment edge, the create path still resolves a lateral
+ * edge via the pair map and writes it silently. Return a warning (never a refusal)
+ * so the author can decide nest-vs-link. Returns undefined when the parent IS a
+ * valid containment parent or when no parent edge was created.
+ */
+function lateralParentWarning(
+  store: { getNode: (id: string) => { type?: string } | undefined },
+  parentId: string | undefined,
+  result: unknown,
+): string | undefined {
+  if (!parentId) return undefined
+  const childType = (result as { node?: { type?: string } }).node?.type
+  const parentType = store.getNode(parentId)?.type
+  if (!parentType || !childType) return undefined
+  if (resolveContainmentEdge(parentType, childType)) return undefined // genuine containment nesting
+  // Non-containment parent: either a silent lateral edge resolved, OR the node
+  // orphaned (no edge) while parent_id suppressed the orphan hint. Both are
+  // "parent_id did not nest as expected" and were silent before; warn either way.
+  const edge = (result as { edge?: { type?: string } }).edge
+  const outcome = edge?.type ? `a lateral edge ("${edge.type}")` : 'no parent edge (the node is orphaned)'
+  return (
+    `parent_id "${parentId}" (${parentType}) is not a containment parent of ${childType}: ` +
+    `it produced ${outcome}, not nesting. Use create_edge to link laterally, or pass a valid containment parent to nest.`
+  )
+}
+
+/**
+ * A3 (0.9.14), batch form: scan each batch node's `parent_id` / `parent_ref` and
+ * warn when the parent type is not a containment parent of the child type (the
+ * parent would resolve to a lateral edge, not nesting). Computed from inputs +
+ * types, so it fires on `validate_only` too. `parent_ref` "$N" resolves against
+ * the same batch's node N; a bare id resolves against the live store.
+ */
+function batchLateralParentWarnings(
+  store: { getNode: (id: string) => { type?: string } | undefined },
+  nodes: Array<Record<string, unknown>>,
+): string[] {
+  const typeOfRef = (ref: string): string | undefined => {
+    const m = /^\$(\d+)$/.exec(ref)
+    if (m) return nodes[Number(m[1])]?.type as string | undefined
+    return store.getNode(ref)?.type
+  }
+  const warnings: string[] = []
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i]!
+    const childType = n.type as string | undefined
+    const parentRef = (n.parent_id ?? n.parent_ref) as string | undefined
+    if (!childType || !parentRef) continue
+    const parentType = typeOfRef(parentRef)
+    if (!parentType || resolveContainmentEdge(parentType, childType)) continue
+    warnings.push(
+      `nodes[${i}] (${childType}): parent "${parentRef}" (${parentType}) is not a containment parent of ${childType}; ` +
+        `parent_id will not nest it (it resolves to a lateral edge, or no edge at all). ` +
+        `Use an explicit edge to link, or a valid containment parent to nest.`,
+    )
+  }
+  return warnings
+}

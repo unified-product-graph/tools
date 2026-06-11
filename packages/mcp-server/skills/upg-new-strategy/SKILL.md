@@ -181,7 +181,7 @@ STOP. Wait for the answer.
 
 **Vibe check:** Show the user a summary of what you've captured and ask: "Anything you'd change before I save this?"
 
-For each theme the user provides, create a node:
+For each theme the user provides, create a node. **`strategic_theme` is not a containment child of `mission`** — first confirm with `get_valid_children({ parent_type: "mission" })`. If `strategic_theme` is NOT a valid child, create it at root and wire the lateral relationship with `resolve_edge_for_pair({ source_type: "mission", target_type: "strategic_theme" })`:
 
 ```
 // Read get_entity_schema("strategic_theme") first, then:
@@ -189,9 +189,12 @@ create_node({
   type: "strategic_theme",
   title: "<theme name>",
   description: "<why this is a bet worth making>",
-  status: "<active phase from the schema>",
-  parent_id: "<mission_id>"
+  status: "<active phase from the schema>"
+  // Do NOT set parent_id to mission_id unless get_valid_children confirms containment.
+  // Instead, wire the relationship via resolve_edge_for_pair after creation:
 })
+// Then: edge = resolve_edge_for_pair({ source_type: "mission", target_type: "strategic_theme" })
+// create_edge({ source_id: "<mission_id>", target_id: "<strategic_theme_id>" })  // server infers type
 ```
 
 Show the growing tree after creating themes:
@@ -260,15 +263,20 @@ You already have outcomes in your graph:
 
 If creating a new outcome:
 
+> **`outcome` is not a containment child of `initiative`** — verify with `get_valid_children({ parent_type: "initiative" })`. Create the outcome at root (no `parent_id`) and then wire the lateral relationship between initiative and outcome using the resolved edge (typically `initiative_drives_outcome`).
+
 ```
 // Read get_entity_schema("outcome") first, then:
 create_node({
   type: "outcome",
   title: "<measurable outcome>",
   description: "<what success looks like>",
-  status: "<identified phase from the schema>",
-  parent_id: "<initiative_id>"
+  status: "<identified phase from the schema>"
+  // No parent_id — outcome is not a containment child of initiative
 })
+// Wire the lateral relationship:
+// edge = resolve_edge_for_pair({ source_type: "initiative", target_type: "outcome" })
+// create_edge({ source_id: "<initiative_id>", target_id: "<new_outcome_id>" })  // server infers type
 ```
 
 If linking to an existing outcome, resolve the edge first:
@@ -290,16 +298,16 @@ Display the complete strategy tree:
 🎯 <Vision>
 └─ 🎯 <Mission>
    ├─ 🎯 <Theme 1>                                 🟡 active
-   │  ├─ 🎯 <Initiative 1a>                        🔵 planned
+   │  ├─ 🎯 <Initiative 1a>                        🔵 proposed
    │  │  └─ 🎯 <Outcome>
-   │  └─ 🎯 <Initiative 1b>                        🔵 planned
+   │  └─ 🎯 <Initiative 1b>                        🔵 proposed
    │     └─ 🎯 <Outcome>
    ├─ 🎯 <Theme 2>                                 🟡 active
-   │  └─ 🎯 <Initiative 2a>                        🔵 planned
+   │  └─ 🎯 <Initiative 2a>                        🔵 proposed
    │     └─ 🎯 <Outcome>
    └─ 🎯 <Theme 3>                                 🟡 active
-      ├─ 🎯 <Initiative 3a>                        🔵 planned
-      └─ 🎯 <Initiative 3b>                        🔵 planned
+      ├─ 🎯 <Initiative 3a>                        🔵 proposed
+      └─ 🎯 <Initiative 3b>                        🔵 proposed
          └─ 🎯 <Outcome>
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄

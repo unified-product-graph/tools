@@ -199,11 +199,13 @@ Create the experiment chain. Read `get_entity_schema({ type: "hypothesis" })` an
 // is a signal you have not articulated the *approach* yet.
 // Read get_entity_schema({ type: "hypothesis" }) for properties and
 // get_lifecycle({ entity_type: "hypothesis" }) for its status phases.
+// get_lifecycle({ entity_type: "hypothesis" }) returns phases: drafted | active | validated | invalidated | archived
+// Use the first phase ("drafted") as the initial status — derive via list_status_values({ entity_type: "hypothesis" })
 create_node({
   type: "hypothesis",
   title: "<riskiest assumption>",
   properties: { /* keys from the schema: we-believe / will-result-in / we-know-when */ },
-  status: "<a phase id from get_lifecycle({ entity_type: 'hypothesis' })>",
+  status: "<first phase from get_lifecycle({ entity_type: 'hypothesis' }) — currently 'drafted'>",
   parent_id: "<solution_id>"  // parent_ref auto-chains the canonical solution→hypothesis edge
 })
 
@@ -233,8 +235,8 @@ Display the full OST:
 │     reach ● ● ● ● ●   pain ● ● ● ● ●
 │  ├─ 🔧 Personalized action checklist           🟡 proposed
 │  │  RICE ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 30
-│  │  └─ ⚗️ Users complete 3+ actions with checklist   ⚪ untested
-│  │     └─ 🧪 Fake door test with 100 new signups     🔵 planned
+│  │  └─ ⚗️ Users complete 3+ actions with checklist   ⚪ drafted
+│  │     └─ 🧪 Fake door test with 100 new signups     🔵 proposed
 │  ├─ 🔧 Interactive product tour                🟡 proposed
 │  │  RICE ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░ 20
 │  └─ 🔧 Welcome email sequence                  🟡 proposed

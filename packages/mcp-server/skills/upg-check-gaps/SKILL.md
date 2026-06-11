@@ -106,7 +106,7 @@ Structural gaps tell you *what's missing right now*. This step interprets the gr
 
 | Signal | Condition | Level |
 |--------|-----------|-------|
-| Untested bets | ⚗️ hypotheses with status `untested` (or no status), created >14 days ago | 🔴 High |
+| Untested bets | ⚗️ hypotheses with status `drafted` (or no status), created >14 days ago — derive valid statuses via `list_status_values({ entity_type: "hypothesis" })` | 🔴 High |
 | Assumption-based personas | 👤 personas with no connected 🔬 research_study or 💎 insight | 🟡 Medium |
 | Orphan features | 📦 features not connected to any 👤 persona (directly or via job chain) | 🔴 High |
 | Missing business model | Product at `build`, `launch`, or `growth` stage, zero 💰 business_model entities | 🔴 High |

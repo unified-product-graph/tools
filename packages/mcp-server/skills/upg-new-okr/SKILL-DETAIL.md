@@ -5,7 +5,7 @@ description: "Detailed OKR builder discovery flow"
 
 # /upg-new-okr: Discovery Flow Detail
 
-> **MCP-first (applies to every create below).** Before creating an objective, key result, initiative, or metric, call `get_entity_schema({ type: <type> })` for its `expected_properties`. Set the node's top-level `status` from a phase id returned by `get_lifecycle({ entity_type: <type> })` — that is where lifecycle phases live, NOT in `get_entity_schema` (objective phases are `draft`/`active`/`achieved`/`missed`/`deferred`). Note that a `*_status` PROPERTY (e.g. `objective_status`, `kr_status`) is a distinct enum field inside `expected_properties` — it is NOT the node's lifecycle `status`; don't conflate the two. Pass any assessment property as `{ value, label }`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. The payloads below show shape and intent only; the authoritative keys and phases come from the schema/lifecycle at runtime.
+> **MCP-first (applies to every create below).** Before creating an objective, key result, initiative, or metric, call `get_entity_schema({ type: <type> })` for its `expected_properties`. Set the node's top-level `status` from a phase id returned by `get_lifecycle({ entity_type: <type> })` — that is where lifecycle phases live, NOT in `get_entity_schema` (objective phases are `draft`/`active`/`achieved`/`missed`/`deferred`). Note that a `*_status` PROPERTY (e.g. `objective_status`) is a distinct enum field inside `expected_properties` — it is NOT the node's lifecycle `status`; don't conflate the two. Pass any assessment property as `{ value, label }`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. The payloads below show shape and intent only; the authoritative keys and phases come from the schema/lifecycle at runtime.
 
 ## Discovery Flow
 
@@ -142,7 +142,7 @@ create_node({
   title: "<metric>: <current> → <target>",
   description: "<why this metric matters for the objective>",
   status: "<a phase id from get_lifecycle({ entity_type: 'key_result' })>",
-  properties: { /* keys from the schema: current_value, target_value, unit, etc. (kr_status, if present, is a PROPERTY, not this lifecycle status) */ },
+  properties: { /* keys from the schema: current_value, target_value, unit, etc. Delivery health lives on the top-level lifecycle `status`, not a property. */ },
   parent_id: "<objective_id>"
 })
 ```
@@ -194,6 +194,8 @@ You have initiatives and features in your graph that might drive this:
 
 If creating a new initiative:
 
+> **`initiative` is not a containment child of `key_result`** — verify with `get_valid_children({ parent_type: "key_result" })`. Create the initiative at root (no `parent_id`) and wire the lateral relationship using `resolve_edge_for_pair({ source_type: "initiative", target_type: "key_result" })`.
+
 ```
 // Read get_entity_schema({ type: "initiative" }) for properties and
 // get_lifecycle({ entity_type: "initiative" }) for its status phases, then:
@@ -201,9 +203,12 @@ create_node({
   type: "initiative",
   title: "<initiative name>",
   description: "<how this drives the key result>",
-  status: "<a phase id from get_lifecycle({ entity_type: 'initiative' })>",
-  parent_id: "<key_result_id>"
+  status: "<a phase id from get_lifecycle({ entity_type: 'initiative' })>"
+  // No parent_id — initiative is not a containment child of key_result
 })
+// Wire the lateral relationship:
+// edge = resolve_edge_for_pair({ source_type: "initiative", target_type: "key_result" })
+// create_edge({ source_id: "<initiative_id>", target_id: "<key_result_id>" })  // server infers type
 ```
 
 If linking to an existing entity, resolve the canonical edge for the pair and let the server infer the type:
@@ -250,7 +255,7 @@ create_node({
   type: "metric",
   title: "<metric name>",
   description: "<what this metric measures and why it matters>",
-  properties: { /* keys from the schema: designation, category, current value, unit, direction */ },
+  properties: { /* keys from the schema: designation, metric_category, current_value, unit, indicator_direction */ },
   parent_id: "<objective_id>"
 })
 ```
@@ -287,12 +292,12 @@ Display the complete OKR set with grade-ability assessment:
 🎯 <Objective 1>
 ├─ 🎯 <KR 1.1>: <current> → <target>               ⚪ 0%
 │     ▓░░░░░░░░░░░░░░░░░░░  0%
-│  └─ 🎯 <Initiative>                               🔵 planned
+│  └─ 🎯 <Initiative>                               🔵 proposed
 ├─ 🎯 <KR 1.2>: <current> → <target>               ⚪ 0%
 │     ▓░░░░░░░░░░░░░░░░░░░  0%
 ├─ 🎯 <KR 1.3>: <current> → <target>               ⚪ 0%
 │     ▓░░░░░░░░░░░░░░░░░░░  0%
-│  └─ 🎯 <Initiative>                               🔵 planned
+│  └─ 🎯 <Initiative>                               🔵 proposed
 │
 └─ 📊 Tracked Metrics                                (if created)
    ├─ 📊 <input metric>; <direction> <unit>         (input)

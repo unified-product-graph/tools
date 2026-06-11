@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/markdown",
-  "version": "0.9.13",
+  "version": "0.9.14",
   "description": "Parser and utilities for UPG Markdown (.upg.md): graph-aware documents with typed entity references",
   "type": "module",
   "license": "MIT",

@@ -70,16 +70,16 @@ BY BUSINESS AREA *(are you covering all parts of a business?)*
 The bar is 20 chars wide. Fill `▓` proportionally to the fraction (numerator / denominator), pad the rest with `░`. Append `✓` if fully covered, `← gap` if partially covered, `← empty` if 0.
 
 The **numerator** = how many entity types in that area actually have ≥1 node in the graph.
-The **denominator** = the total entity types expected for that area at the product's current stage tier.
+The **denominator** = drive from `get_graph_digest().coverage` (server-computed, stage-aware) — **do not hardcode tier denominators**. The "40/55/70" figures from earlier versions are drift-prone; use the live digest's coverage section and report whatever the server returns.
 
-**Stage → Tier mapping** (stage is a canonical `UPGProductStage`):
-- `concept`, `validation`, `build`, `beta` → **Solo Builder** (40 entities across 8 areas)
-- `launch`, `growth` → **Small Team** (55 entities)
-- `mature`, `maintenance`, `sunset` → **Scale-Up** (70 entities)
+**Stage → Tier mapping** (editorial grouping; stage is a canonical `UPGProductStage`):
+- `concept`, `validation`, `build`, `beta` → **Solo Builder**
+- `launch`, `growth` → **Small Team**
+- `mature`, `maintenance`, `sunset` → **Scale-Up**
 
 **Business Completeness Score**: render immediately after the table:
 
-Business Completeness: **<covered>/<total>** (<percent>%) for <Tier Name> stage
+Business Completeness: **<covered>/<total from get_graph_digest().coverage>** (<percent>%) for <Tier Name> stage
 
 <N> of 8 areas covered. Gaps:
 → <emoji> <Area>; `<suggested /upg command>` to fill it
@@ -123,7 +123,7 @@ METRICS
 | 🔗 Connectivity | **85%** | `▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░` |
 | ⚗️ Validation | **25%** | `▓▓▓▓▓░░░░░░░░░░░░░░░` ← risk |
 | 👤 User coverage | **100%** | `▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓` |
-| 🗺️ Domains | **7/36** | `▓▓▓▓▓▓▓░░░░░░░░░░░░░` |
+| 🗺️ Domains | **7/<N from list_domains()>** | `▓▓▓▓▓▓▓░░░░░░░░░░░░░` |
 
 Connectivity = % entities with ≥1 edge. Validation = experiments / hypotheses. User coverage = personas with jobs / total personas.
 
@@ -210,7 +210,7 @@ Check `get_session_context()` for the current lens. Adapt the dashboard:
 | 🔵 Planned | N | [feature names] |
 | ✅ Shipped | N | [feature names] |
 
-A feature counts as **Blocked** when it has an inbound blocking edge (e.g. `bug_blocks_feature`, `dependency_blocks_*`, `technical_debt_item_slows_*`), NOT when it carries a `blocker` type; there is no `blocker` entity type. Map feature `status` (`proposed | in_progress | shipped | archived`) to In Progress / Planned / Shipped.
+A feature counts as **Blocked** when it has an inbound blocking edge (e.g. `bug_affects_feature`, `technical_debt_item_blocks_feature`). Use `resolve_edge_for_pair({ source_type: "bug", target_type: "feature" })` and `resolve_edge_for_pair({ source_type: "technical_debt_item", target_type: "feature" })` to confirm the canonical edge names at runtime. There is no `blocker` entity type. Map feature `status` (`proposed | in_progress | shipped | archived`) to In Progress / Planned / Shipped.
 
 Show: `BLOCKED: N features · BUGS: N open (M critical) · DEBT: N items` (blocking signal comes from `bug` / `technical_debt_item` / `dependency` / `root_cause` entities, not a `blocker` type)
 
@@ -248,7 +248,7 @@ Recommend: `/upg-walk-region growth` (funnel + experiments), `/upg-walk-region m
 
 ## Business Area Entity Mapping
 
-### Solo Builder tier (`concept`–`beta` stage: 40 entities)
+### Solo Builder tier (`concept`–`beta` stage)
 
 | Area | Entity Types |
 |---|---|
@@ -261,7 +261,7 @@ Recommend: `/upg-walk-region growth` (funnel + experiments), `/upg-walk-region m
 | 🏦 Sustaining | business_model, revenue_stream, cost_structure, unit_economics, pricing_strategy |
 | 📊 Learning | outcome, metric, objective, key_result, retrospective |
 
-### Small Team tier (`launch`–`growth` stage: 55 entities)
+### Small Team tier (`launch`–`growth` stage)
 
 All Solo Builder entities plus:
 
@@ -273,9 +273,9 @@ All Solo Builder entities plus:
 | 📦 Building | + team, role, dependency, prototype, wireframe, design_component, user_flow (flow_type: onboarding), roadmap, screen |
 | 📊 Learning | + milestone, feature_request, feedback_theme |
 
-### Scale-Up tier (`mature`–`sunset` stage: 70 entities)
+### Scale-Up tier (`mature`–`sunset` stage)
 
-All Small Team entities plus additional entities per area to reach 70 total. Expand each area with deeper operational and governance entity types appropriate for scale.
+All Small Team entities plus additional entities per area. Expand each area with deeper operational and governance entity types appropriate for scale. Derive actual counts from `get_graph_digest().coverage` rather than a fixed number.
 
 ## Quick Pulse Mode (`--quick`)
 

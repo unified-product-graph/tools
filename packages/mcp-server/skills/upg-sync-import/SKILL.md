@@ -58,13 +58,13 @@ Parses headings and content. Infers entity types from keywords:
 - "persona/user/audience" → `persona`
 - "feature/capability" → `feature`
 - "pain point/problem/frustration" → `need`
-- "hypothesis/assumption" → `hypothesis_claim`
+- "hypothesis/assumption" → `hypothesis`
 - "metric/KPI/measure" → `metric`
 - "objective/OKR/goal" → `objective`
 - "opportunity/gap" → `opportunity`
 - "competitor/alternative" → `competitor`
 - "solution/approach" → `solution`
-- "epic/story" → `epic` / `story_statement`
+- "epic/story" → `epic` / `user_story`
 - "experiment/validation" → `experiment`
 - "insight/learning" → `insight`
 

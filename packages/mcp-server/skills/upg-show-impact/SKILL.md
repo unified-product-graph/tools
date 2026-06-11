@@ -32,7 +32,7 @@ Before running the impact analysis, call `get_graph_digest()` and check the foll
 - **Fewer than 3 features total**: if `by_type.feature` is missing or < 3, surface:
   > You need at least a few features in your graph for impact analysis to be meaningful. Run `/upg-walk-region feature` to add some.
 
-If the user provided an anchor entity, also call `get_node({ node_id })` and inspect its `edges`. If the anchor has zero outgoing edges of types `bug_affects_feature` / `debt_blocks_feature` / `root_cause_affects_feature` / `causes` / `blocks`, surface (do not silently return an empty blast radius):
+If the user provided an anchor entity, also call `get_node({ node_id })` and inspect its `edges`. If the anchor has zero outgoing edges of types `bug_affects_feature` / `technical_debt_item_blocks_feature` / `root_cause_affects_feature` / `root_cause_causes_bug` / `root_cause_shares_cause_with_root_cause`, surface (do not silently return an empty blast radius):
 > `<anchor title>` has no outgoing impact edges in the graph, so its blast radius is empty by definition. Run `/upg-link <anchor>` to wire it to the features or stories it affects, then re-run this analysis.
 
 If the user is in the engineering lens, you may also consult `lens_digest.blockers` and `lens_digest.blocked_features` for a richer signal.
@@ -47,7 +47,9 @@ Use `mcp__unified-product-graph__*` MCP tools.
 get_session_context()
 search_nodes({ query: "<user's search term>" })   // if they gave a title, not an ID
 get_node({ node_id: "<id>" })                      // get the target entity + edges
-query({ from_id: "<id>", traverse: ["causes", "debt_blocks_feature", "bug_affects_feature", "root_cause_affects_feature", "blocks", "service_powers_feature"], depth: 5 })
+query({ from_id: "<id>", traverse: ["root_cause_causes_bug", "technical_debt_item_blocks_feature", "bug_affects_feature", "root_cause_affects_feature", "root_cause_shares_cause_with_root_cause", "service_powers_feature"], depth: 5 })
+// Use resolve_edge_for_pair({ source_type, target_type }) per hop to confirm edge names before
+// traversing; treat a null result as a signal to re-anchor rather than a dead end.
 ```
 
 For `--upstream` mode, traverse the same edge types in reverse (use `to_id` as the anchor or `query` with appropriate direction). For graph-wide upstream scans:
@@ -75,12 +77,14 @@ If the user provided:
 ### Step 2: Traverse Forward
 
 Use the `query` tool to traverse downstream from the entity. Follow these edge types:
-- `debt_blocks_feature`: this debt blocks features
-- `causes` / `root_cause_causes_bug`: this root cause produces bugs
+- `technical_debt_item_blocks_feature`: this debt item blocks a feature
+- `root_cause_causes_bug`: this root cause produces bugs
 - `bug_affects_feature` / `root_cause_affects_feature`: issue affects features
-- `feature_has_epic` / `epic_has_user_story` / `story_has_task`; feature breakdown
+- `root_cause_shares_cause_with_root_cause`: related root causes sharing the same underlying cause
+- `feature_decomposed_into_epic` / `epic_specified_by_user_story`; feature breakdown
 - `service_powers_feature`: service enables feature
-- Any edge containing `blocks` or `enables`
+
+> **Edge name safety:** call `resolve_edge_for_pair({ source_type, target_type })` for each hop before traversing. If it returns `null`, treat that as a re-anchor signal (check the returned `anchor_hint`/`alternate_anchors`), not a dead end. Do not use bare `causes`, `blocks`, `debt_blocks_feature`, or `same_root_cause` — these are not valid catalog edge names.
 
 ### Step 3: Compute Blast Radius
 
@@ -159,7 +163,7 @@ Switch direction. Instead of "what does fixing this enable?" the question become
 ### Flow (single entity)
 
 1. Find the entity (`search_nodes` or `get_node`).
-2. Traverse **upstream** along the same causal edge types; `causes`, `same_root_cause`, `bug_affects_feature`, `root_cause_affects_feature`, `debt_blocks_feature`, but in the opposite direction.
+2. Traverse **upstream** along the same causal edge types; `root_cause_causes_bug`, `root_cause_shares_cause_with_root_cause`, `bug_affects_feature`, `root_cause_affects_feature`, `technical_debt_item_blocks_feature`, but in the opposite direction.
 3. Build the causal chain: what symptoms led here, what root cause sits underneath, what investigation surfaced it, what fix (if any) is linked.
 4. Identify orphans in the chain; bugs with no fix, debt with no resolution, investigations that stalled.
 

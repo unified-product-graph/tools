@@ -40,7 +40,9 @@ These go between logical sections (header, lifecycle, metrics, actions, footer).
 
 ## Entity Type Emojis
 
-Always prefix entity names with their type emoji:
+Always prefix entity names with their type emoji.
+
+*This table is the canonical display reference for the types listed. It is also mirrored by the live `get_type_label({ entity_type }).emoji` field — use the live field for any type not in this table, or when you need to verify a specific emoji against the current spec.*
 
 | Type | Emoji | Domain |
 |---|---|---|
@@ -120,12 +122,14 @@ Use colored emoji dots for entity state. One dot, inline or right-aligned:
 |---|---|
 | shipped / validated / achieved | 🟢 |
 | in_progress / active / testing | 🟡 |
-| planned / proposed | 🔵 |
+| planned / proposed / drafted | 🔵 |
 | untested / backlog | ⚪ |
 | blocked / invalidated | 🔴 |
-| deferred / deprecated | ⚫ |
+| deferred / deprecated / archived | ⚫ |
 
-Display: `🟡 proposed` or right-aligned at end of a tree line.
+Display: `🟡 active` or right-aligned at end of a tree line.
+
+> Hypothesis phases are `drafted` → `active` → `validated` / `invalidated` / `archived`. Derive valid phases live via `list_status_values({ entity_type })` or `get_lifecycle({ entity_type })`; never hard-code phase names.
 
 ## Nested Detail Blocks
 

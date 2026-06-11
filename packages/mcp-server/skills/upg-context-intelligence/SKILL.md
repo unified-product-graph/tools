@@ -115,8 +115,8 @@ Skills: `/upg-walk-region pricing`, `/upg-walk-region content`, `/upg-walk-regio
 Phase 1: Identity        /upg-new-graph, /upg-new-strategy
 Phase 2: Understanding   /upg-new-persona, /upg-new-research, /upg-walk-region ux_design
 Phase 3: Discovery       /upg-new-discovery, /upg-new-hypothesis
-Phase 4: Business        /upg-walk-region business_model, /upg-walk-region market_intelligence, /upg-new-okr, /upg-walk-region pricing
-Phase 5: Reaching        /upg-new-launch, /upg-walk-region market_intelligence, /upg-walk-region content, /upg-walk-region marketing, /upg-walk-region growth
+Phase 4: Business        /upg-walk-region business_model, /upg-walk-region market_competitive, /upg-new-okr, /upg-walk-region pricing
+Phase 5: Reaching        /upg-new-launch, /upg-walk-region market_competitive, /upg-walk-region content, /upg-walk-region marketing, /upg-walk-region growth
 Phase 6: Building        /upg-walk-region product_spec, /upg-walk-region engineering, /upg-walk-region ux_design
 Phase 7: Learning        /upg-walk-region team_org, /upg-check-gaps, /upg-walk-region engineering (debt + deps)
 ```
@@ -127,7 +127,7 @@ Phase 7: Learning        /upg-walk-region team_org, /upg-check-gaps, /upg-walk-r
 
 ## Level 2: Benchmark Intelligence
 
-When the graph has 10+ entities, compare against product management benchmarks from `@unified-product-graph/core` (`benchmarks.ts`; 42 count benchmarks, 18 relationship benchmarks, 10 ratio benchmarks, 24 domain activation rules). These encode wisdom from Ries, Christensen, Torres, Osterwalder, Cagan, Moore, and others.
+When the graph has 10+ entities, compare against product management benchmarks from `@unified-product-graph/core`. Derive the current benchmark set live via `list_benchmarks()` rather than relying on counts quoted here; the set grows with the spec. These encode wisdom from Ries, Christensen, Torres, Osterwalder, Cagan, Moore, and others.
 
 **The rule: never state a number without explaining what you're trying to achieve.**
 
@@ -191,7 +191,7 @@ A benchmark is not "you have 1 persona, expected 2-4." A benchmark is a conversa
 **The voice:** A coach who's been through this before. Not a linter flagging errors. Not a dashboard showing red/green. A thinking partner who says "here's what I've seen work" and lets you decide.
 
 **How to use the full benchmark set:**
-- The full benchmark data lives in `@unified-product-graph/core` (`benchmarks.ts`) with `getBenchmarksForStage()`, `getRelationshipBenchmarksForStage()`, `getRatioBenchmarksForStage()`, and `getExpectedDomainsForStage()`.
+- Derive the live benchmark set via `list_benchmarks()` (MCP introspection); this covers count, relationship, and ratio benchmarks without hardcoding any numbers.
 - `/upg-check-gaps` runs ALL benchmarks (in its forward-looking signals section) and synthesises them into a narrative.
 - Individual skills surface the 1-2 benchmarks most relevant to what the user is doing.
 - Never show the raw benchmark table. Always narrate.
@@ -203,17 +203,17 @@ A benchmark is not "you have 1 persona, expected 2-4." A benchmark is a conversa
 At the start of any graph-modifying skill session, detect the user's graph state with two quick checks:
 
 1. **Local graph:** call `mcp__unified-product-graph__get_graph_digest()`; this tells you if a `.upg` file exists and how many entities it has.
-2. **Cloud graph:** call `mcp__unified-product-graph__list_local_products()`; if this tool exists and returns products, the local MCP is available; for cloud check, try `push_to_cloud` availability.
+2. **Cloud sync:** call `mcp__unified-product-graph__get_sync_state()`; if it succeeds, the cloud connection is available. Compare entity counts; if they differ materially, surface the discrepancy.
 
 ### What to do with the results
 
 | Local | Cloud | Action |
 |-------|-------|--------|
-| Exists | Available, same product | Note both are connected. Compare entity counts; if they differ by >20%, mention: "Local graph has {N} entities. Cloud has {M}. They may be out of sync; consider `/upg-sync-push` or `/upg-sync-pull`." |
-| Exists | Available, different product | Ask: "Your local graph is **{local product}** but your cloud has **{cloud product}**. Which one are we working on?" |
-| Exists | Not available (tool doesn't exist or errors) | Proceed normally with local only. No sync suggestions at end. |
-| Doesn't exist | Available | Suggest: "You have a cloud graph but no local `.upg` file. Run `/upg-sync-pull` to bring it down, or `/upg-new-graph` to start fresh." |
-| Doesn't exist | Not available | Suggest `/upg-new-graph` to get started. |
+| Exists | `get_sync_state` succeeds, same product | Note both are connected. Compare entity counts; if they differ by >20%, mention: "Local graph has {N} entities. Cloud has {M}. They may be out of sync; consider `/upg-sync-push` or `/upg-sync-pull`." |
+| Exists | `get_sync_state` succeeds, different product | Ask: "Your local graph is **{local product}** but your cloud has **{cloud product}**. Which one are we working on?" |
+| Exists | `get_sync_state` errors or tool not available | Proceed normally with local only. No sync suggestions at end. |
+| Doesn't exist | `get_sync_state` succeeds | Suggest: "You have a cloud graph but no local `.upg` file. Run `/upg-sync-pull` to bring it down, or `/upg-new-graph` to start fresh." |
+| Doesn't exist | `get_sync_state` errors or not available | Suggest `/upg-new-graph` to get started. |
 
 ### Rules
 

@@ -19,7 +19,7 @@ You are an edge design advisor. Your job is to help decide whether a relationshi
 
 - Before adding a new edge to `UPG_EDGE_CATALOG`
 - When two entity types are clearly related but the right connection type is unclear
-- When the edge catalog feels bloated (700+ and counting)
+- When the edge catalog feels bloated (check live count via `get_spec_version().edge_count`)
 - When someone asks "should X be a child of Y, or connected by an edge?"
 - When a relationship needs properties (confidence, weight, note)
 
@@ -64,9 +64,9 @@ Every relationship between entities in UPG can be expressed as one of three thin
 
 **Examples:**
 ```
-✅ Edge: debt_blocks_feature (debt and feature are independent, relationship is discovered)
+✅ Edge: technical_debt_item_blocks_feature (debt and feature are independent, relationship is discovered)
 ✅ Edge: screen_implements_feature (screen and feature live in different domains)
-✅ Edge: causes (root_cause and bug are independently created, link discovered during investigation)
+✅ Edge: root_cause_causes_bug (root_cause and bug are independently created, link discovered during investigation)
 ```
 
 ### Option C: Relationship Entity
@@ -127,7 +127,7 @@ The key in `UPG_EDGE_CATALOG` is the edge name (e.g. `'service_powers_feature'`)
 **Rule 2: Source acts on target**
 The source entity is the actor, the target is the receiver:
 ```
-✅ debt_blocks_feature  (debt is blocking the feature)
+✅ technical_debt_item_blocks_feature  (debt is blocking the feature)
 ✅ fix_resolved_bug     (fix resolved the bug)
 ❌ feature_blocked_by_debt  (inverted; make debt the source)
 ```
@@ -153,7 +153,7 @@ If a source type appears in multiple edge pairs with the same verb, prefix with 
 |------|-----------|---------|
 | `has` | Containment/ownership | product_has_outcome, service_has_endpoint |
 | `causes` | Causal production | root_cause_causes_bug |
-| `blocks` | Prevents progress | debt_blocks_feature |
+| `blocks` | Prevents progress | technical_debt_item_blocks_feature |
 | `enables` | Makes possible | fix_enables_feature |
 | `implements` | Realises a spec | screen_implements_feature, component_implements_feature |
 | `informs` | Provides input to | decision_informs_decision (across layers) |
@@ -175,7 +175,7 @@ If a source type appears in multiple edge pairs with the same verb, prefix with 
 When direction is ambiguous, ask: "Which entity would you navigate FROM to find the other?"
 
 ```
-"Show me what this debt blocks"  → debt (source) → feature (target)
+"Show me what this debt blocks"  → technical_debt_item (source) → feature (target)
 "Show me what caused this bug"   → root_cause (source) → bug (target)
 "Show me what this screen shows" → screen (source) → feature (target)
 ```
@@ -188,17 +188,19 @@ service_has_endpoint: service (source) → api_endpoint (target)
 
 ## Duplicate Detection
 
-Before adding any edge, check if it already exists:
+Before adding any edge, check if it already exists using MCP introspection (never grep spec files directly — paths don't exist in deployed environments):
 
-```bash
-# Check exact pair (search the edge catalog)
-grep "source_type: 'SOURCE'" packages/upg-spec/src/catalog/edge-catalog.ts
+```
+# Check if a canonical edge already exists for the pair:
+resolve_edge_for_pair({ source_type: "SOURCE", target_type: "TARGET" })
+→ returns the edge key if one exists, null if not
 
-# Check if a similar verb already exists for this source
-grep "SOURCE_.*_TARGET" packages/upg-spec/src/catalog/edge-catalog.ts
+# Browse all edges from a source type:
+list_edge_types()   → filter by source_type or target_type
+get_edge_type({ edge_type: "<edge_key>" })  → full edge definition with cardinality
 
-# Or inspect the runtime pair map at build time:
-#   UPG_EDGE_PAIR_MAP['source_type:target_type'] -> edge key
+# Check edge count vs what live spec has:
+get_spec_version()  → reports total edge_count
 ```
 
 **If a pair already has an edge**, consider whether you need a second edge or if the existing one covers your semantics. Two edges between the same pair should represent genuinely different relationships:
@@ -239,7 +241,7 @@ Important edges that only go one direction but should be queryable both ways. No
 ONE-WAY EDGES (consider if reverse queries are needed)
 | Edge | Direction | Reverse query use case |
 |------|-----------|----------------------|
-| debt_blocks_feature | debt → feature | "What debt blocks THIS feature?" (reverse lookup needed) |
+| technical_debt_item_blocks_feature | technical_debt_item → feature | "What debt blocks THIS feature?" (reverse lookup needed) |
 ```
 
 ### Check 4: Coverage by Domain Pair
@@ -279,7 +281,7 @@ Value: { source_type: '[source_type]', target_type: '[target_type]', description
 
 - **Hierarchy is structural, edges are semantic.** Parent-child says "X contains Y." Edges say "X relates to Y in this specific way."
 - **When in doubt, prefer an edge.** Hierarchy is harder to change later. Edges can be added and removed without restructuring the graph.
-- **800+ edges is fine if each is distinct.** The problem isn't quantity; it's duplicates, orphans, and vague naming.
+- **Many edges is fine if each is distinct.** Check the live count via `get_spec_version().edge_count`. The problem isn't quantity; it's duplicates, orphans, and vague naming.
 - **Direction matters for queries.** Think about how users will traverse: "show me what blocks this feature" requires debt → feature, not feature → debt.
 - **Edges are cheap, relationship entities are expensive.** Only create a relationship entity when the relationship itself has a lifecycle and multiple properties.
 

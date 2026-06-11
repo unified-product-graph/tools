@@ -23,7 +23,7 @@ Use the `mcp__unified-product-graph__*` MCP tools:
 
 ## The Cartographic Frame
 
-UPG is a chart of your product knowledge. The chart is organised into **10 regions** (Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations). The chart is read through one of **5 approaches**: five paths of arrival to five different questions:
+UPG is a chart of your product knowledge. The chart is organised into regions (call `list_regions` for the live set; the spec currently has 11: Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations, Foundations). The chart is read through one of **5 approaches**: five paths of arrival to five different questions:
 
 | Approach | Question | Cartographic sense |
 |---|---|---|
@@ -131,7 +131,7 @@ Render (real markdown, NOT a code block):
 
 Your graph lives in a `.upg` file: a JSON format you own and track with git, with no cloud required.
 
-UPG is a chart of your product knowledge across **10 regions**: Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations.
+UPG is a chart of your product knowledge across regions (call `list_regions` for the live set; currently 11 canonical regions including Foundations).
 
 You read the chart through **5 approaches**: Plan, Inspect, Prioritise, Trace, Reflect.
 
@@ -239,7 +239,7 @@ After routing the user to the next skill, call:
 If a returning user asks "what's new?":
 
 - **5 approaches** (Plan / Inspect / Prioritise / Trace / Reflect) replace the old "14 canonical workflows" framing; cognitive operations, not menus.
-- **23 region-anchored playbooks** organised under 10 canonical regions.
-- **89 MCP tools** (was 40) across 6 buckets; primitives, approaches, catalog readers, spec metadata, mutations, workspace ops.
+- **Region-anchored playbooks** organised under canonical regions (call `list_playbooks` for the live count; currently 13 across 11 regions).
+- **MCP tools** across 6 buckets: primitives, approaches, catalog readers, spec metadata, mutations, workspace ops (call `get_spec_version()` for the live tool count).
 - **Reflect** is now first-class; `/upg-reflect` walks Five Whys, Pre-mortem, Red Team, Devil's Advocate, or Second-order Thinking against any entity, region, or the whole graph.
 - **Skill frontmatter** declares `category` (cognitive / tooling / schema / meta) and `approaches`; agents and the aggregator can route by these instead of grepping descriptions.

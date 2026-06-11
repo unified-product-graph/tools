@@ -65,10 +65,23 @@ If the user provided an argument (e.g. `/upg-new-from-template saas`), skip this
 
 Show: **Phase 2 of 4: Choose a template**
 
-List the templates for the selected industry. For each template show:
+There are no pre-shipped template files in this skill directory. Instead, **synthesize the template live** by calling:
+
+```
+list_entity_types()          // get the full catalog of entity types
+get_valid_children({ parent_type: "<anchor type for this industry>" })  // e.g. "persona" or "product"
+```
+
+For the selected industry, propose 2-3 template patterns built from canonical entity types. Each template is a **graph pattern**: a set of entity types + the parent→child hierarchy and cross-domain edges that wire them together. Derive the structure from the spec, not from memory. A good template for SaaS, for example:
+
+- **Persona-first (users & needs):** persona → job → need → opportunity. Anchor type: `persona`. Enriched with desired_outcome nodes.
+- **OKR foundation:** objective → key_result, linked to strategic_theme → initiative → outcome. Anchor type: `objective`.
+- **Product hypothesis loop:** feature → hypothesis → experiment_plan. Anchor type: `feature`.
+
+For each proposed template show:
 - **Name** in bold
-- Description (one line)
-- Entity count and types (e.g. "Creates: 1 persona, 2 JTBDs, 2 pain points; 5 entities, 4 connections")
+- Description (one line, derived from the entity types it creates)
+- Entity count and types synthesized from the pattern (e.g. "Creates: 1 persona, 2 jobs, 2 needs; 5 entities, 4 connections")
 
 Ask: **Which template speaks to where you are right now?** Offer numbered options.
 
@@ -76,10 +89,17 @@ Ask: **Which template speaks to where you are right now?** Offer numbered option
 
 Show: **Phase 3 of 4: Fill in the details**
 
-Work through the template's `prompts` one at a time. For each prompt:
-- Ask the question from the prompt value
-- If the user gives a short answer, that is fine; use it
-- If the user says "skip" or "not sure", use a sensible default and note it
+**Synthesize the prompts live** from the entity types in the chosen template pattern:
+
+1. Call `get_entity_schema({ type: "<anchor type>" })` to learn what properties that entity expects.
+2. For each entity type in the pattern, derive a natural-language question from its `expected_properties`:
+   - `title` → "What would you name this [type]?"
+   - `description` → "Describe it in one or two sentences."
+   - Assessment properties (the schema flags these) → "On a scale of 1-5, how would you rate [property label]?"
+   - Enum properties → "Which of these values fits: [enum values]?"
+3. Walk the user through the entity types in hierarchy order (parent first), one question at a time.
+
+If the user gives a short answer, that is fine; use it. If they say "skip" or "not sure", use a sensible default and note it.
 
 After collecting all answers, show a **preview** of what will be created:
 
@@ -100,10 +120,13 @@ Anything you'd change before I save these?
 
 Show: **Phase 4 of 4: Creating entities**
 
-1. Call `get_product_context()` to find the product node
-2. **MCP-first:** for each entity type in the template, call `get_entity_schema(<type>)` before creating it — build `properties` from its `expected_properties`, set `status` top-level from its lifecycle phases, and pass assessments as `{ value, label }`. Use `get_valid_children(<parent type>)` to confirm the parent→child hierarchy (job under persona, need under job, funnel_step under funnel, etc.) rather than assuming it. Create each entity with `create_node` using the resolved `parent_id`.
-3. For each connection, call `resolve_edge_for_pair({ source_type, target_type })` and create the edge letting the server infer the type (omit explicit `type:`). Treat the template's `edges` array as intent; the canonical edge for each pair is whatever the resolver returns.
-4. Show confirmation for each entity created
+1. Call `get_product_context()` to check graph state and find any existing product node.
+2. **MCP-first — resolve before creating:** for each entity type in the synthesized template:
+   - Call `get_entity_schema({ type: "<type>" })` to build `properties` from `expected_properties`, set `status` from valid lifecycle phases, and pass assessments as `{ value, label }`.
+   - Call `get_valid_children({ parent_type: "<parent type>" })` to confirm the parent→child hierarchy (job under persona, need under job, etc.) before passing `parent_id`.
+   - Create each entity with `create_node`.
+3. For each connection, call `resolve_edge_for_pair({ source_type, target_type })` and create the edge letting the server infer the type (omit explicit `type:`). The canonical edge for each pair is whatever the resolver returns — never assume or hardcode an edge name.
+4. Show confirmation for each entity created.
 
 After all entities are created, show the batch confirmation:
 

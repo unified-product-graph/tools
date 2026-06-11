@@ -44,11 +44,21 @@ You are a schema evolution advisor. Your job is to help the UPG schema grow thou
 
 ### 1a. Inventory Current State
 
-Read the domain from `packages/upg-spec/src/domains.ts` and list all entity types. For each, check:
-- Does it have a property interface? (`properties/*.ts`)
-- What edges connect it to other types? (`index.ts`)
-- Is it used in any skills? (`skills/`)
-- Is it registered in `apps/graph`? (`entity-metadata.ts`)
+Load the domain via MCP introspection (never read spec source files directly — paths don't exist in deployed environments):
+```
+list_domains()                        → find the domain record by name/id
+get_domain_guide({ domain_id })       → anchor entity, creation sequence, anti-patterns
+list_entity_types({ domain_id? })     → all entity types in the domain
+get_entity_schema({ type })           → property interface for each type
+list_edge_types()                     → edges involving each type
+get_valid_children({ parent_type })   → what nests under each parent type
+```
+
+For each type in the domain, check:
+- Does it have expected properties? (`get_entity_schema({ type })`)
+- What edges connect it to other types? (`list_edge_types()` filtered by source/target)
+- Is it referenced in any skills? (skills directory)
+- Does it appear in real graphs? (`list_nodes({ type })` on the active product)
 
 Present as a domain health table:
 
@@ -280,7 +290,7 @@ Once analysis is complete and the user agrees on what to add/change:
 
 1. **New types** → hand off to `/upg-new-schema-type` for the cascade
 2. **Consolidations** → hand off to `/upg-check-schema-merge` for migration design
-3. **New edges only** → add directly to `UPG_EDGE_CATALOG` in `catalog/edge-catalog.ts`
+3. **New edges only** → add to `UPG_EDGE_CATALOG` in the spec source (see `/upg-new-schema-type` for the cascade)
 4. **Defer** → document the decision in your project's decisions log for future reference
 
 ## Output Format

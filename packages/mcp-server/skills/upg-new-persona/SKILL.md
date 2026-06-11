@@ -107,8 +107,7 @@ Use this as the persona's `description`; the narrative that brings them to life.
 
 ```
 // 1. Schema-driven create. The persona is a top-level entity: create it at ROOT
-//    (no parent_id). The product is a top-level .upg field, NOT a node, so there is
-//    no product node to parent under or link to by default. Read
+//    (no parent_id) unless a product node exists (see below). Read
 //    get_entity_schema({ type: "persona" }) first, then:
 create_node({
   type: "persona",
@@ -117,6 +116,14 @@ create_node({
   properties: { /* keys from get_entity_schema persona.expected_properties; tech_comfort is an enum */ }
 })
 // → persona_id = result.node.id
+
+// 1b. Link to the product node if one exists:
+//    product_nodes = list_nodes({ type: "product" })
+//    if (product_nodes.length > 0) {
+//      edge = resolve_edge_for_pair({ source_type: "product", target_type: "persona" })
+//      // → "product_targets_persona"
+//      create_edge({ source_id: product_nodes[0].id, target_id: persona_id })
+//    }
 
 // 2. For each desired outcome from Step 3 — child type + edge resolved live:
 //    childType = the outcome/aspiration type from get_valid_children({ parent_type: "persona" })
@@ -194,5 +201,5 @@ For JTBD importance and satisfaction: ask the user ("On a scale of 1-5, how impo
 - **One question at a time.** Don't dump all 6 questions at once. React to each answer.
 - **Push for specificity.** "Wants to be more productive" is too vague. "Wants to ship features 2x faster without burning out the team" is useful.
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
-- **Connect the persona to its jobs and needs, not to a phantom product.** The product is a top-level `.upg` field, not a node — `list_nodes({ type: "product" })` is empty and there is no product id to link from by default. Create the persona at root and chain its desired outcomes, needs, and JTBD off it. (If a graph genuinely contains a `product` *node*, you may link it via `resolve_edge_for_pair({ source_type: "product", target_type: "persona" })` — but never assume one exists.)
+- **Check for a product node and link to it.** Call `list_nodes({ type: "product" })` before creating the persona. If a product node exists, link to it via `product_targets_persona` (`resolve_edge_for_pair({ source_type: "product", target_type: "persona" })`). If none exists, create the persona at root. Never skip this check — the persona domain guide flags missing `product_targets_persona` as an anti-pattern when a product node is present.
 - **Bridge to JTBD.** A 👤 persona without a 💼 job is incomplete. Always offer to create the first JTBD.

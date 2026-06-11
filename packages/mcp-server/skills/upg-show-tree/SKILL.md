@@ -42,7 +42,8 @@ Use `mcp__unified-product-graph__query` for tree fetching (one call per tree) an
 
 **Origin:** John Doerr, adapted from Andy Grove (Intel), 1999
 **Question:** "What are we trying to achieve, and how do we know?"
-**Chain:** 🎯 objective → 🎯 key_result → 🎯 initiative
+**Chain:** 🎯 objective → 🎯 key_result | then anchor on 🎯 strategic_theme → 🎯 initiative
+**Note:** `key_result → initiative` resolves null (`resolve_edge_for_pair(key_result, initiative)` = null). The correct path is via `strategic_theme_pursues_initiative`. Render objective → key_result as one subtree and strategic_theme → initiative as a parallel branch; show the cross-link where `strategic_theme_measured_by_key_result` connects them.
 
 ### `user`: User Discovery Tree
 
@@ -55,6 +56,7 @@ Use `mcp__unified-product-graph__query` for tree fetching (one call per tree) an
 **Origin:** Standard agile product management
 **Question:** "What are we shipping, and how is it broken down?"
 **Chain:** 🎯 product → 📦 feature → 📋 epic → 📄 user_story
+**Note:** `feature → user_story` resolves null (`resolve_edge_for_pair(feature, user_story)` = null). The correct two-hop path is `feature_decomposed_into_epic → epic_specified_by_user_story`. Always walk through the epic intermediate node.
 
 ### `validation`: Validation Tree
 
@@ -66,7 +68,8 @@ Use `mcp__unified-product-graph__query` for tree fetching (one call per tree) an
 
 **Origin:** Roger Martin, *"Playing to Win"*, 2013
 **Question:** "How does the vision cascade down to measurable outcomes?"
-**Chain:** 🎯 vision → 🎯 mission → 🎯 strategic_theme → 🎯 initiative → 🎯 outcome
+**Chain:** 🎯 vision → 🎯 mission → 🎯 strategic_pillar → 🎯 strategic_theme → 🎯 initiative → 🎯 outcome
+**Note:** strategy bets anchor on the **product** node (`product_organises_around_strategic_theme`), not on vision/mission directly. The full cascade: product → strategic_theme → initiative (via `strategic_theme_pursues_initiative`) → outcome (via `strategic_theme_delivers_outcome`). Vision connects via `vision_guides_strategic_theme`; mission connects via `mission_supported_by_strategic_pillar → strategic_pillar_organises_strategic_theme`. Use `resolve_edge_for_pair` per hop to confirm.
 
 ## Rendering
 
@@ -88,13 +91,24 @@ query({
 // User tree example:
 query({
   from: "persona",
-  traverse: ["persona_pursues_job", "job_has_need"],
+  traverse: ["persona_pursues_job", "job_surfaces_need"],
   depth: 2,
   include: ["title", "status", "properties"],
   property_include: ["importance", "satisfaction", "frequency", "severity"],
   edge_include: ["type", "target"]
 })
+
+// Product breakdown example (feature → user_story requires two hops via epic):
+query({
+  from: "feature",
+  traverse: ["feature_decomposed_into_epic", "epic_specified_by_user_story"],
+  depth: 2,
+  include: ["title", "status"],
+  edge_include: ["type", "target"]
+})
 ```
+
+> **Edge-name safety:** before building any `traverse` list, confirm each edge name with `resolve_edge_for_pair({ source_type, target_type })`. If the resolver returns `null`, that hop doesn't exist as a direct edge — find the intermediate node from `anchor_hint`/`alternate_anchors` and add it to the chain. A server-side `get_tree` tool is planned to supersede these hardcoded traverse lists; when it ships, prefer it over manual `query` calls.
 
 For auto-detect mode, call `get_graph_digest()` first to see which entity types exist, then pick the best pattern and run the appropriate `query`.
 

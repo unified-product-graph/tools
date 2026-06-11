@@ -165,7 +165,7 @@ Produce a markdown document with these sections:
 
 - **Maturity:** X/5: <level name>
 - **Connectivity:** X% (Y/Z entities connected)
-- **Domains covered:** X of 32
+- **Domains covered:** X of <N from list_domains()>
 - **Lifecycle balance:**
   - Strategy: X entities
   - Users: X entities
