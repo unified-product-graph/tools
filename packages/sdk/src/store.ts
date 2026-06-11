@@ -83,7 +83,6 @@ export class UPGFileStore {
   private filePath!: string
   private dirty = false
   private saveTimer: ReturnType<typeof setTimeout> | null = null
-  private selfWriteInProgress = false
   private watcher: FSWatcher | null = null
   /** Identity of the tool writing through this store, stamped on every flush. */
   private writer?: { tool: string; tool_version?: string }
@@ -673,19 +672,17 @@ export class UPGFileStore {
     const output = serializeCanonical(this.doc)
     const tmpPath = this.filePath + '.tmp'
 
-    this.selfWriteInProgress = true
-    try {
-      await fs.writeFile(tmpPath, output, 'utf-8')
-      await fs.rename(tmpPath, this.filePath)
-      this.dirty = false
-      this.computeHash()
-      this.baselineFileHash = this.hashRawContent(output)
-      this.snapshotBaseline()
-    } finally {
-      setTimeout(() => {
-        this.selfWriteInProgress = false
-      }, 150)
-    }
+    // Atomic write + rename. The watcher recognises this as our own write by
+    // comparing the file hash to baselineFileHash (set below), so no timing
+    // flag is needed. The baseline is updated synchronously after the rename
+    // and before the watcher's async 'change' callback can run, so the watcher
+    // always sees the up-to-date baseline.
+    await fs.writeFile(tmpPath, output, 'utf-8')
+    await fs.rename(tmpPath, this.filePath)
+    this.dirty = false
+    this.computeHash()
+    this.baselineFileHash = this.hashRawContent(output)
+    this.snapshotBaseline()
   }
 
   // ── Three-Way Merge ───────────────────────────────────────────────────────
@@ -836,9 +833,14 @@ export class UPGFileStore {
       awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 },
     })
     this.watcher.on('change', async () => {
-      if (this.selfWriteInProgress) return
       try {
         const raw = await fs.readFile(this.filePath, 'utf-8')
+        // Ignore our OWN writes. A timing flag is unreliable here: chokidar's
+        // awaitWriteFinish delays the change event past any fixed self-write
+        // window, so the event for our own save arrives looking external. Instead
+        // compare the file to what we last wrote/loaded (baselineFileHash): if it
+        // matches, this is not an external change. Timing-independent.
+        if (this.hashRawContent(raw) === this.baselineFileHash) return
         const parsed = JSON.parse(raw)
         if (!validateUPGDocument(parsed).valid) return
 

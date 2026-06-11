@@ -1531,53 +1531,93 @@ export const deduplicateNodes: ToolHandler = (args, ctx): ToolResult => {
 
   let nodesRemoved = 0
   let edgesRedirected = 0
+  let edgesDropped = 0
+  const structuralWarnings: string[] = []
+
+  // Keeper selection by provenance timestamp (mirrors the SDK ordering ladder:
+  // properties.created_at / created / node.created_at). The old code used a
+  // constant comparator that did not actually sort by age.
+  const createdAt = (n: UPGBaseNode): number => {
+    const props = (n.properties ?? {}) as Record<string, unknown>
+    const raw = props.created_at ?? props.created ?? (n as { created_at?: unknown }).created_at
+    const t = typeof raw === 'string' ? Date.parse(raw) : NaN
+    return Number.isNaN(t) ? 0 : t
+  }
 
   for (const group of duplicates) {
-    const allInGroup = store.getAllNodes().filter((n) => group.ids.includes(n.id))
-    allInGroup.sort(() => {
-      if (keepStrategy === 'oldest') return 0
-      return -1
+    const inGroup = store.getAllNodes().filter((n) => group.ids.includes(n.id))
+    inGroup.sort((a, b) => {
+      const d = keepStrategy === 'oldest' ? createdAt(a) - createdAt(b) : createdAt(b) - createdAt(a)
+      return d !== 0 ? d : a.id.localeCompare(b.id)
     })
 
-    const keeper = allInGroup[0]
-    const toRemove = allInGroup.slice(1)
+    const keeper = inGroup[0]
+    const removeIds = new Set(inGroup.slice(1).map((n) => n.id))
+    if (removeIds.size === 0) continue
+    const groupIds = new Set<string>([keeper.id, ...removeIds])
 
-    for (const dup of toRemove) {
-      const edges = store.getEdgesForNode(dup.id)
-      for (const edge of edges) {
-        const newEdge: UPGEdge = {
-          id: edgeId(),
-          source: edge.source === dup.id ? keeper.id : edge.source,
-          target: edge.target === dup.id ? keeper.id : edge.target,
-          type: edge.type,
-        }
-        if (newEdge.source !== newEdge.target) {
-          try {
-            store.addEdge(newEdge)
-            edgesRedirected++
-          } catch {
-            // skip edges that fail validation
-          }
+    // The external inbound (parent) edges the GROUP had — the structural edges
+    // that MUST survive on the keeper. The previous bug dropped these (a
+    // best-effort redirect + cascading removeNode), orphaning the kept node
+    // from its parent so it vanished from the tree. We assert they survive.
+    const expectedInbound = new Set<string>()
+    for (const nid of groupIds) {
+      for (const e of store.getEdgesForNode(nid)) {
+        if (e.target === nid && !groupIds.has(e.source)) expectedInbound.add(`${e.source}|${e.type}`)
+      }
+    }
+
+    // Re-home EVERY removed node's edges (inbound + outbound) onto the keeper
+    // BEFORE removing any node, so removeNode's cascade can't drop a structural
+    // edge the keeper needs. Both endpoints route through the group map, so an
+    // intra-group edge collapses to a self-loop and is dropped. addEdge unions
+    // an identical (source, target, type) onto the existing edge, so
+    // duplicates merge rather than multiply.
+    for (const dupId of removeIds) {
+      for (const edge of store.getEdgesForNode(dupId)) {
+        const source = removeIds.has(edge.source) ? keeper.id : edge.source
+        const target = removeIds.has(edge.target) ? keeper.id : edge.target
+        if (source === target) continue // self-loop (intra-group or self-edge)
+        try {
+          store.addEdge({ id: edgeId(), source, target, type: edge.type })
+          edgesRedirected++
+        } catch {
+          // An endpoint no longer resolves; count it rather than hide it.
+          edgesDropped++
         }
       }
-      store.removeNode(dup.id)
+    }
+    for (const dupId of removeIds) {
+      store.removeNode(dupId)
       nodesRemoved++
+    }
+
+    // Structural-parent guarantee: every external inbound edge the group had
+    // must now be on the keeper. Surface any that are not (should be none).
+    const keeperInbound = new Set(
+      store.getEdgesForNode(keeper.id)
+        .filter((e) => e.target === keeper.id)
+        .map((e) => `${e.source}|${e.type}`),
+    )
+    for (const sig of expectedInbound) {
+      if (!keeperInbound.has(sig)) {
+        const [src, type] = sig.split('|')
+        structuralWarnings.push(`"${keeper.title}" (${keeper.type}): inbound ${type} from ${src} was not preserved`)
+      }
     }
   }
 
-  return text(
-    JSON.stringify(
-      {
-        merged: true,
-        groups_merged: duplicates.length,
-        nodes_removed: nodesRemoved,
-        edges_redirected: edgesRedirected,
-        strategy: keepStrategy,
-      },
-      null,
-      2,
-    ),
-  )
+  const payload: Record<string, unknown> = {
+    merged: true,
+    groups_merged: duplicates.length,
+    nodes_removed: nodesRemoved,
+    edges_redirected: edgesRedirected,
+    strategy: keepStrategy,
+  }
+  if (edgesDropped > 0) payload.edges_dropped = edgesDropped
+  if (structuralWarnings.length > 0) payload.structural_warnings = structuralWarnings
+
+  return text(JSON.stringify(payload, null, 2))
 }
 
 export type { ToolContext }

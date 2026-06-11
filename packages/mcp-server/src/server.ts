@@ -168,6 +168,41 @@ export function withActiveProductEcho(result: ToolResult, store: UPGFileStore): 
   return { content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }] }
 }
 
+/**
+ * Idempotent dispatch for mutating MCP calls (batch-write duplicate-delivery
+ * fix). A re-delivered tool call (same JSON-RPC request id, e.g. a transport
+ * resend) must not execute twice and write a second copy. `run` memoises the
+ * in-flight/finished result per request id and replays it, so a re-delivery is
+ * a no-op that returns the original response. The cached value is the PROMISE,
+ * so a re-delivery arriving while the first is still in flight awaits the same
+ * execution rather than starting a second. Bounded by count (oldest evicted);
+ * an undefined key (no request id) is never memoised. One instance per server
+ * instance == per stdio session.
+ */
+export function createIdempotentDispatch<T>(max = 256) {
+  const ledger = new Map<string, Promise<T>>()
+  return {
+    has(key: string): boolean {
+      return ledger.has(key)
+    },
+    get size(): number {
+      return ledger.size
+    },
+    run(key: string | undefined, exec: () => Promise<T>): Promise<T> {
+      if (key === undefined) return exec()
+      const existing = ledger.get(key)
+      if (existing) return existing
+      const p = exec()
+      ledger.set(key, p)
+      if (ledger.size > max) {
+        const oldest = ledger.keys().next().value
+        if (oldest !== undefined) ledger.delete(oldest)
+      }
+      return p
+    },
+  }
+}
+
 export function createServer(store: UPGFileStore) {
   const server = new Server(
     { name: 'unified-product-graph', version: SERVER_VERSION },
@@ -203,45 +238,68 @@ export function createServer(store: UPGFileStore) {
     return { tools: TOOL_DEFINITIONS }
   })
 
+  // ── Idempotency ledger (batch-write duplicate-delivery fix) ─────────────────
+  // A mutating tool call (e.g. batch_create_nodes) can be DELIVERED MORE THAN
+  // ONCE: a transport-level resend re-runs the handler, which mints fresh ids
+  // and writes a second copy. The duplicate often lands a few calls later, so a
+  // post-write recount can't catch it. `idempotency.run` memoises the result per
+  // JSON-RPC request id and replays it, so a re-delivery is a no-op.
+  type CallResult = { content: ToolResult['content']; isError?: true }
+  const idempotency = createIdempotentDispatch<CallResult>()
+
   // ── tools/call ────────────────────────────────────────────────────────────
   const logFile = process.env.UPG_MCP_LOG
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args = {} } = request.params
-    const handler = getToolHandler(name)
-    const t0 = logFile ? Date.now() : 0
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    const reqKey =
+      extra && extra.requestId !== undefined && extra.requestId !== null
+        ? String(extra.requestId)
+        : undefined
 
-    // Batch-4 #20: expect_product guard on active-product writes — abort before
-    // the handler runs if the active product isn't the one the caller expected.
-    const isActiveWrite = ACTIVE_PRODUCT_WRITE_TOOLS.has(name)
-    if (isActiveWrite && typeof args.expect_product === 'string' && args.expect_product.length > 0) {
-      const ident = activeProductIdentity(ctx.store)
-      if (!matchesActiveProduct(args.expect_product, ident)) {
-        const guard = textError(
-          `expect_product guard: active product is "${ident.title ?? ident.id ?? '(unknown)'}"` +
-          `${ident.id ? ` (id: ${ident.id})` : ''}, but this call expected "${args.expect_product}". ` +
-          `Refusing to write. Run switch_product to the intended product first, or drop expect_product.`,
-        )
-        if (logFile) {
-          fs.appendFileSync(logFile, JSON.stringify({ ts: t0, tool: name, params: args, result: guard, durationMs: 0 }) + '\n')
+    if (reqKey !== undefined && idempotency.has(reqKey) && logFile) {
+      fs.appendFileSync(
+        logFile,
+        JSON.stringify({ ts: Date.now(), tool: request.params.name, requestId: reqKey, replay: true }) + '\n',
+      )
+    }
+
+    return idempotency.run(reqKey, async (): Promise<CallResult> => {
+      const { name, arguments: args = {} } = request.params
+      const handler = getToolHandler(name)
+      const t0 = logFile ? Date.now() : 0
+
+      // Batch-4 #20: expect_product guard on active-product writes — abort before
+      // the handler runs if the active product isn't the one the caller expected.
+      const isActiveWrite = ACTIVE_PRODUCT_WRITE_TOOLS.has(name)
+      if (isActiveWrite && typeof args.expect_product === 'string' && args.expect_product.length > 0) {
+        const ident = activeProductIdentity(ctx.store)
+        if (!matchesActiveProduct(args.expect_product, ident)) {
+          const guard = textError(
+            `expect_product guard: active product is "${ident.title ?? ident.id ?? '(unknown)'}"` +
+            `${ident.id ? ` (id: ${ident.id})` : ''}, but this call expected "${args.expect_product}". ` +
+            `Refusing to write. Run switch_product to the intended product first, or drop expect_product.`,
+          )
+          if (logFile) {
+            fs.appendFileSync(logFile, JSON.stringify({ ts: t0, tool: name, params: args, result: guard, durationMs: 0 }) + '\n')
+          }
+          return guard as CallResult
         }
-        return guard as { content: typeof guard.content; isError?: true }
       }
-    }
 
-    let result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
+      let result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
 
-    // Batch-4 #20: echo the active product on successful active-product writes.
-    if (isActiveWrite && !result.isError) {
-      result = withActiveProductEcho(result, ctx.store)
-    }
-    if (logFile) {
-      const entry = JSON.stringify({ ts: t0, tool: name, params: args, result, durationMs: Date.now() - t0 })
-      fs.appendFileSync(logFile, entry + '\n')
-    }
-    // ToolResult is structurally identical to the SDK's CallToolResult variant
-    // of ServerResult, but the SDK's union has an index signature my narrower
-    // type doesn't satisfy. Cast at the boundary so handlers can stay typed.
-    return result as { content: typeof result.content; isError?: true }
+      // Batch-4 #20: echo the active product on successful active-product writes.
+      if (isActiveWrite && !result.isError) {
+        result = withActiveProductEcho(result, ctx.store)
+      }
+      if (logFile) {
+        const entry = JSON.stringify({ ts: t0, tool: name, params: args, result, durationMs: Date.now() - t0 })
+        fs.appendFileSync(logFile, entry + '\n')
+      }
+      // ToolResult is structurally identical to the SDK's CallToolResult variant
+      // of ServerResult, but the SDK's union has an index signature my narrower
+      // type doesn't satisfy. Cast at the boundary so handlers can stay typed.
+      return result as CallResult
+    })
   })
 
   return {
