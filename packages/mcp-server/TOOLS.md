@@ -508,7 +508,7 @@ response is automatically truncated. Surfaced as
 
 ### `migrate_properties`
 
-Apply `UPG_PROPERTY_MIGRATIONS` graph-wide with no type rename or edge migration. Pure property pass: `drop_props`, `rename_top_level`, `lift_property_to_top_level`, `drop_when_self_referential`. Default `dry_run=true` previews the per-rule change set; pass `dry_run=false` to commit. Use when you want property cleanup standalone; `migrate_type` folds the same pass into its rename.
+Apply `UPG_PROPERTY_MIGRATIONS` graph-wide with no type rename or edge migration. Pure property pass over all kinds: `drop_props`, `rename_top_level`, `lift_property_to_top_level`, `drop_when_self_referential`, `remap_property_value` (stale enum values, e.g. the 0.9.12 data_flow / integration_pattern / api_contract / service tightenings), and `reshape_value_to_assessment` (a bare number wrapped into an assessment object on its scale, e.g. the 0.10.2 market_trend impact / relevance). `validate_graph` property_drift now surfaces every value-aware rule, so a graph that went invalid on a tightening points here. Default `dry_run=true` previews the per-rule change set; pass `dry_run=false` to commit. Use when you want property cleanup standalone; `migrate_type` folds the same pass into its rename.
 
 **Atomicity:** `non-atomic. Mutations are applied node-by-node; a mid-flight
 error may leave the graph partially migrated.`
@@ -1417,7 +1417,7 @@ separate filesystem operations.`
 | `source_product_id` | string |  | Product ID of the source node |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` | ✓ | Cross-product relationship type |
 
 **Returns:**
 

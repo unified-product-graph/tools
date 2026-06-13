@@ -1409,9 +1409,12 @@ export const migrateType: ToolHandler = (args, ctx): ToolResult => {
 }
 
 /**
- * Walk every node and apply `UPG_PROPERTY_MIGRATIONS` (renames, lifts, drops).
- * Skips entity-type renames and edge changes. Use `dry_run: true` (default)
- * to preview. Pass `dry_run: false` to commit.
+ * Walk every node and apply `UPG_PROPERTY_MIGRATIONS` (renames, lifts, drops,
+ * value remaps, and number-to-assessment reshapes). Skips entity-type renames
+ * and edge changes. Use `dry_run: true` (default) to preview. Pass
+ * `dry_run: false` to commit. Value-aware rules (`remap_property_value`,
+ * `reshape_value_to_assessment`) heal the enum and shape tightenings that
+ * `validate_graph` property_drift now flags.
  *
  * @returns JSON: `{ top_level_renames, lifted_properties, dropped_props,
  *   dropped_self_referential, dry_run }`.

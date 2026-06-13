@@ -375,6 +375,18 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     }
     if (!map.has(key)) map.set(key, { via, action })
   }
+  // Value-aware rules (remap_property_value / reshape_value_to_assessment): unlike
+  // lift/drop, these KEEP the property key, so key-presence alone would flag
+  // correctly-shaped nodes. They are checked against the actual VALUE below.
+  // (0.10.2: makes the existing 0.9.12 enum remaps + the new market_trend reshape
+  // discoverable via validate_graph instead of being silent until a write fails.)
+  type ValueMigrationRule = { property: string; via: string; check: 'remap' | 'reshape'; value_map?: Record<string, string> }
+  const valueMigrationRulesByType = new Map<string, ValueMigrationRule[]>()
+  const addValueRule = (type: string, rule: ValueMigrationRule) => {
+    const list = valueMigrationRulesByType.get(type) ?? []
+    list.push(rule)
+    valueMigrationRulesByType.set(type, list)
+  }
   for (const [v, rules] of Object.entries(UPG_PROPERTY_MIGRATIONS)) {
     for (const r of rules) {
       const via = `UPG_PROPERTY_MIGRATIONS['${v}']`
@@ -382,6 +394,10 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
         addPropertyKey(r.type, r.from_property, via, `lift to top-level '${r.to}'`)
       } else if (r.kind === 'drop_props') {
         for (const key of r.drop_props) addPropertyKey(r.type, key, via, 'drop')
+      } else if (r.kind === 'remap_property_value') {
+        addValueRule(r.type, { property: r.property, via, check: 'remap', value_map: r.value_map })
+      } else if (r.kind === 'reshape_value_to_assessment') {
+        addValueRule(r.type, { property: r.property, via, check: 'reshape' })
       }
     }
   }
@@ -506,7 +522,8 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       const effectiveType = (getReplacementType(node.type as string) ?? node.type) as string
       const propsKeys = propertyMigrationKeysByType.get(effectiveType)
       if (node.properties) {
-        for (const key of Object.keys(node.properties)) {
+        const bag = node.properties as Record<string, unknown>
+        for (const key of Object.keys(bag)) {
           const hit = propsKeys?.get(key) ?? propertyMigrationKeysWildcard.get(key)
           if (hit && propertyDrift.length < limit) {
             propertyDrift.push({
@@ -515,6 +532,30 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
               property: key,
               via: hit.via,
             })
+          }
+        }
+        // Value-aware: remap_property_value (a stale enum value) and
+        // reshape_value_to_assessment (a bare number where an assessment is
+        // expected) keep the same key, so only a genuinely-stale VALUE is drift.
+        const valueRules = [
+          ...(valueMigrationRulesByType.get(effectiveType) ?? []),
+          ...(valueMigrationRulesByType.get('*') ?? []),
+        ]
+        for (const vr of valueRules) {
+          if (propertyDrift.length >= limit) break
+          const val = bag[vr.property]
+          if (val === undefined) continue
+          // A value listed in a remap value_map needs migrating (it is either
+          // renamed or split out to a sibling property), so presence is the
+          // staleness signal. A reshape is stale when the value is still a bare
+          // number (or numeric string) rather than an assessment object.
+          const stale =
+            vr.check === 'remap'
+              ? typeof val === 'string' && !!vr.value_map && val in vr.value_map
+              : typeof val === 'number' ||
+                (typeof val === 'string' && val.trim() !== '' && Number.isFinite(Number(val)))
+          if (stale) {
+            propertyDrift.push({ id: node.id, type: node.type as string, property: vr.property, via: vr.via })
           }
         }
       }

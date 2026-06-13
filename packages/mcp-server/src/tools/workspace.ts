@@ -698,6 +698,9 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
   const portfolioDoc = portfolioStore.getDocument()
   if (portfolioDoc) {
     for (const productId of [derivedSourceProductId, derivedTargetProductId]) {
+      // The registry tier is a pseudo-product (e.g. a classification cross-edge
+      // targeting `registry/{value}`); never register it as a product. (0.10.2)
+      if (productId === REGISTRY_PRODUCT_ID) continue
       const lookup = findProductFileById(cwd, productId)
       const wasNew = registerProductOnPortfolio(portfolioDoc, {
         id: productId,
@@ -1308,6 +1311,7 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
       if (e.target_product_id) productIds.add(e.target_product_id)
     }
     for (const pid of productIds) {
+      if (pid === REGISTRY_PRODUCT_ID) continue // pseudo-product; never register (0.10.2)
       const lookup = findProductFileById(cwd, pid)
       const wasNew = registerProductOnPortfolio(portfolioDoc, {
         id: pid,

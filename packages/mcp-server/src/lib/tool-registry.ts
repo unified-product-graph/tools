@@ -862,7 +862,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'migrate_properties',
     description:
-      'Apply `UPG_PROPERTY_MIGRATIONS` graph-wide with no type rename or edge migration. Pure property pass: `drop_props`, `rename_top_level`, `lift_property_to_top_level`, `drop_when_self_referential`. Default `dry_run=true` previews the per-rule change set; pass `dry_run=false` to commit. Use when you want property cleanup standalone; `migrate_type` folds the same pass into its rename.',
+      'Apply `UPG_PROPERTY_MIGRATIONS` graph-wide with no type rename or edge migration. Pure property pass over all kinds: `drop_props`, `rename_top_level`, `lift_property_to_top_level`, `drop_when_self_referential`, `remap_property_value` (stale enum values, e.g. the 0.9.12 data_flow / integration_pattern / api_contract / service tightenings), and `reshape_value_to_assessment` (a bare number wrapped into an assessment object on its scale, e.g. the 0.10.2 market_trend impact / relevance). `validate_graph` property_drift now surfaces every value-aware rule, so a graph that went invalid on a tightening points here. Default `dry_run=true` previews the per-rule change set; pass `dry_run=false` to commit. Use when you want property cleanup standalone; `migrate_type` folds the same pass into its rename.',
     inputSchema: {
       type: 'object' as const,
       properties: {
