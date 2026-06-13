@@ -12,7 +12,7 @@ import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType } from '@unified-product-graph/core'
 import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties } from '@unified-product-graph/core'
-import { UPGPortfolioStore } from '@unified-product-graph/sdk'
+import { UPGPortfolioStore, UPGFileStore } from '@unified-product-graph/sdk'
 import {
   resolvePortfolioPath,
   openPortfolioStoreIfExists,
@@ -725,17 +725,23 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     if (registeredProducts.length > 0) portfolioStore.markDirty()
   }
 
+  let outcome: { status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge }
   try {
-    portfolioStore.addCrossEdge(newEdge)
+    outcome = portfolioStore.addCrossEdge(newEdge)
     await portfolioStore.flush()
   } catch (err) {
     return textError(`Failed to write cross-product edge: ${(err as Error).message}`)
   }
 
+  // 0.10.6 (edge-property-upsert brief #4): report the STORED edge + the write
+  // status so a no-op (`unchanged`) is distinguishable from an applied write and
+  // the response never echoes unapplied properties as if stored.
   return text(
     JSON.stringify(
       {
-        edge: newEdge,
+        edge: outcome.edge,
+        status: outcome.status,
+        applied: outcome.status !== 'unchanged',
         portfolio_file: path.relative(cwd, portfolioPath),
         ...(registeredProducts.length > 0
           ? { registered_products: registeredProducts }
@@ -911,9 +917,31 @@ export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<
     return textError(`Invalid confidence: ${confidenceArg}. Valid: low, medium, high.`)
   }
 
-  // Pick the specialised vs generic edge from the source node's type.
+  const nodeProductId = args.node_product_id as string | undefined
+
+  // Pick the specialised vs generic edge from the source node's type. The source
+  // may live in a non-active (e.g. watched competitor) product when it is
+  // qualified `{product_id}/{node_id}` or `node_product_id` is supplied; the
+  // active store can't see it. 0.10.6 (upsert brief #3): resolve the type against
+  // the OWNING product so a qualified competitor source writes the specialised
+  // edge instead of mis-typing as the polymorphic one (which duplicated the cell).
   const bareNodeId = nodeId.includes('/') ? nodeId.split('/')[1] : nodeId
-  const sourceType = ctx.store.getNode(bareNodeId)?.type
+  const activeProductId = ctx.store.getProduct().id
+  const owningProductId = nodeId.includes('/') ? nodeId.split('/')[0] : (nodeProductId ?? activeProductId)
+  let sourceType = ctx.store.getNode(bareNodeId)?.type
+  if (owningProductId && owningProductId !== activeProductId && owningProductId !== REGISTRY_PRODUCT_ID) {
+    // Cross-product source: read the owning product to learn the node's type.
+    const lookup = findProductFileById(process.cwd(), owningProductId)
+    if (lookup?.file_path) {
+      try {
+        const s = new UPGFileStore()
+        await s.loadReadOnly(path.resolve(process.cwd(), lookup.file_path))
+        sourceType = s.getNode(bareNodeId)?.type ?? sourceType
+      } catch {
+        /* unresolvable owning product: fall back to the polymorphic edge */
+      }
+    }
+  }
   const edgeType =
     sourceType === 'competitor'
       ? 'competitor_classified_as_classification_value'
@@ -925,12 +953,9 @@ export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<
     ...(args.rationale !== undefined ? { rationale: args.rationale } : {}),
     ...(args.evidence !== undefined ? { evidence: args.evidence } : {}),
   }
-
-  const nodeProductId = args.node_product_id as string | undefined
   const isCross = classificationValueId.includes('/') || !!nodeProductId
 
   if (isCross) {
-    const activeProductId = ctx.store.getProduct().id
     const sourceProductId = nodeProductId ?? (nodeId.includes('/') ? undefined : activeProductId)
     return createCrossProductEdge(
       {
@@ -1471,19 +1496,29 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
     if (registeredProducts.length > 0) portfolioStore.markDirty()
   }
 
+  // 0.10.6 (edge-property-upsert brief): each add is now an upsert — an existing
+  // (source, target, type) carrying new properties is updated in place rather
+  // than silently no-op'd, so the 218-edge backfill lands in one batch. Report
+  // the STORED edges + per-status counts so a no-op is distinguishable.
+  const results: Array<{ status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge }> = []
   try {
-    for (const e of prepared) portfolioStore.addCrossEdge(e)
+    for (const e of prepared) results.push(portfolioStore.addCrossEdge(e))
     await portfolioStore.flush()
   } catch (err) {
     return textError(`Failed to write cross-product edges: ${(err as Error).message}`)
   }
 
+  const counts = { created: 0, updated: 0, unchanged: 0 }
+  for (const r of results) counts[r.status]++
+  const applied = counts.created + counts.updated
+
   return text(
     JSON.stringify(
       {
-        message: `Created ${prepared.length} cross-product edge(s)`,
-        created: prepared,
-        count: prepared.length,
+        message: `Applied ${applied}/${results.length} cross-product edge(s) (${counts.created} created, ${counts.updated} updated, ${counts.unchanged} unchanged)`,
+        edges: results.map((r) => ({ status: r.status, edge: r.edge })),
+        count: results.length,
+        counts,
         portfolio_file: path.relative(cwd, portfolioPath),
         ...(registeredProducts.length > 0 ? { registered_products: registeredProducts } : {}),
       },

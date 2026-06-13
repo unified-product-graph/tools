@@ -20,8 +20,8 @@ import * as path from 'node:path'
 import * as fs from 'node:fs'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
-import { UPGFileStore, computeGraphDigest, openPortfolioStoreIfExists } from '@unified-product-graph/sdk'
-import { REGISTRY_PRODUCT_ID } from '@unified-product-graph/core'
+import { UPGFileStore, computeGraphDigest, openPortfolioStoreIfExists, type UPGPortfolioStore } from '@unified-product-graph/sdk'
+import { REGISTRY_PRODUCT_ID, UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
 import { preflightPayload } from '../lib/payload-guard.js'
 import { traverseGraph, type GraphReader, type TraverseParams } from '../lib/graph-traverse.js'
 import { findWorkspaceUpgFiles } from './workspace.js'
@@ -103,6 +103,114 @@ async function readerFor(
 }
 
 /**
+ * Cross-edge traversal extension (0.10.6, query-path brief B).
+ *
+ * The per-product BFS in `traverseGraph` stops at product boundaries: cross-
+ * product edges live in `portfolio.upg`, not in any single product's reader, so
+ * a `traverse: ["competitor_classified_as_classification_value"]` returned
+ * `total_edges: 0`. This builds a one-hop expansion off the portfolio's cross
+ * edges, keyed by qualified source (`{product_id}/{node_id}`), restricted to the
+ * cross-edge types the caller explicitly named in `traverse[]`. The registry (or
+ * other-product) target is resolved to a terminal node so the matrix
+ * ("which competitors are value X?") is returned, with each cross edge's
+ * `properties` (confidence / assessed_on / ...) intact.
+ */
+interface CrossExpansion {
+  /** qualified source id (`{product_id}/{node_id}`) -> outgoing cross edges of the requested types */
+  bySource: Map<string, Array<{ id: string; type: string; source: string; target: string; properties?: Record<string, unknown> }>>
+  /** Project a cross-edge target id into a terminal node (resolves registry canonicals). */
+  resolveTarget: (target: string) => Record<string, unknown>
+}
+
+/** Which `traverse[]` entries are positive cross-edge types (negations and within-graph types excluded). */
+function requestedCrossTypes(traverse: string[] | undefined): string[] {
+  if (!traverse) return []
+  const cross = new Set(UPG_CROSS_EDGE_TYPES as readonly string[])
+  return [...new Set(traverse.filter((t) => !t.startsWith('!') && cross.has(t)))]
+}
+
+function buildCrossExpansion(
+  portfolioStore: UPGPortfolioStore,
+  crossTypes: string[],
+  includeFields: Set<string>,
+): CrossExpansion {
+  const wanted = new Set(crossTypes)
+  const bySource = new Map<string, Array<{ id: string; type: string; source: string; target: string; properties?: Record<string, unknown> }>>()
+  for (const e of portfolioStore.getAllCrossEdges()) {
+    if (!wanted.has(e.type)) continue
+    const props = (e as { properties?: Record<string, unknown> }).properties
+    const arr = bySource.get(e.source) ?? []
+    arr.push({ id: e.id, type: e.type, source: e.source, target: e.target, ...(props ? { properties: props } : {}) })
+    bySource.set(e.source, arr)
+  }
+  const resolveTarget = (target: string): Record<string, unknown> => {
+    if (target.startsWith(`${REGISTRY_PRODUCT_ID}/`)) {
+      const bareId = target.slice(REGISTRY_PRODUCT_ID.length + 1)
+      const canonical = portfolioStore.getRegistryNode(bareId)
+      if (canonical) {
+        const node: Record<string, unknown> = { id: target, type: canonical.type }
+        if (includeFields.has('title')) node.title = canonical.title
+        if (includeFields.has('status') && canonical.status) node.status = canonical.status
+        return node
+      }
+    }
+    // Non-registry (or unresolved) target: surface the qualified id as the node.
+    return { id: target }
+  }
+  return { bySource, resolveTarget }
+}
+
+/**
+ * Classification distribution (0.10.6, query-path brief D): the "positioning
+ * view" as a one-call projection. Walks the portfolio's
+ * `*_classified_as_classification_value` cross edges, groups each by the
+ * registry axis its target value belongs to (via the registry-internal
+ * `classification_axis_includes_classification_value` edges), and counts members
+ * per value. Returns `undefined` when no classification edges exist, so
+ * portfolios without the tier keep their existing digest output.
+ */
+function buildClassificationDistribution(portfolioStore: UPGPortfolioStore): Record<string, unknown> | undefined {
+  const classifyEdges = portfolioStore
+    .getAllCrossEdges()
+    .filter((e) => e.type.endsWith('_classified_as_classification_value'))
+  if (classifyEdges.length === 0) return undefined
+
+  // value bare id -> axis bare id (from registry-internal axis->value edges).
+  const valueToAxis = new Map<string, string>()
+  for (const e of portfolioStore.listRegistryEdges('classification_axis_includes_classification_value')) {
+    valueToAxis.set(e.target, e.source)
+  }
+  const label = (bareId: string): string => portfolioStore.getRegistryNode(bareId)?.title ?? bareId
+
+  // axis bare id -> (value bare id -> count); '__unaxed__' collects values with no axis edge.
+  const UNAXED = '__unaxed__'
+  const axes = new Map<string, Map<string, number>>()
+  for (const e of classifyEdges) {
+    const valueBare = e.target.startsWith(`${REGISTRY_PRODUCT_ID}/`)
+      ? e.target.slice(REGISTRY_PRODUCT_ID.length + 1)
+      : e.target
+    const axisBare = valueToAxis.get(valueBare) ?? UNAXED
+    const byValue = axes.get(axisBare) ?? new Map<string, number>()
+    byValue.set(valueBare, (byValue.get(valueBare) ?? 0) + 1)
+    axes.set(axisBare, byValue)
+  }
+
+  const axisList = [...axes.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([axisBare, byValue]) => {
+      const values = [...byValue.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([valueBare, count]) => ({ value: valueBare, label: label(valueBare), count }))
+      const total = values.reduce((s, v) => s + v.count, 0)
+      return axisBare === UNAXED
+        ? { axis: null, label: 'unaxed', values, total }
+        : { axis: axisBare, label: label(axisBare), values, total }
+    })
+
+  return { total_classified_edges: classifyEdges.length, axes: axisList }
+}
+
+/**
  * `portfolio_query`: run the single-product `query` traversal across every
  * product in scope, tagging each subgraph with its source `product_id`. Same
  * traversal semantics as `query` (BFS over typed edges with field projection),
@@ -164,6 +272,27 @@ export const portfolioQuery: ToolHandler = async (args, ctx): Promise<ToolResult
     property_include: args.property_include as string[] | undefined,
   }
 
+  // Cross-edge traversal (0.10.6, brief B): when a cross-edge type is named in
+  // `traverse[]`, load the portfolio once and expand matched nodes one hop out
+  // over the portfolio's cross edges to their registry / other-product targets.
+  // Off by default (no cross types named) so existing within-graph queries are
+  // byte-identical.
+  const crossTypes = requestedCrossTypes(params.traverse)
+  const includeFields = new Set(params.include ?? ['title', 'status', 'type'])
+  includeFields.add('id'); includeFields.add('type')
+  const emitEdges = !(params.edge_include !== undefined && params.edge_include.length === 0)
+  let expansion: CrossExpansion | null = null
+  if (crossTypes.length > 0) {
+    // Best-effort: a missing or legacy/malformed portfolio doc just means no
+    // cross-edge expansion (the within-graph traversal is unaffected).
+    try {
+      const portfolioStore = await openPortfolioStoreIfExists(cwd)
+      if (portfolioStore) expansion = buildCrossExpansion(portfolioStore, crossTypes, includeFields)
+    } catch {
+      /* no usable portfolio document: skip cross-edge expansion */
+    }
+  }
+
   const matched: Array<Record<string, unknown>> = []
   const emptyProducts: string[] = []
   const errored: Array<{ product_id: string | null; file: string; error: string }> = []
@@ -191,16 +320,43 @@ export const portfolioQuery: ToolHandler = async (args, ctx): Promise<ToolResult
       emptyProducts.push(product.id ?? product.file)
       continue
     }
-    totalNodes += r.total_nodes
-    totalEdges += r.total_edges
+
+    const nodes = [...r.nodes]
+    const edges = [...r.edges]
+    // Expand cross edges off the within-product nodes (qualified by product id).
+    if (expansion && product.id) {
+      const seenTargets = new Set<string>(nodes.map((n) => String((n as { id?: unknown }).id)))
+      for (const n of r.nodes) {
+        const bareId = String((n as { id?: unknown }).id)
+        const qualified = `${product.id}/${bareId}`
+        for (const ce of expansion.bySource.get(qualified) ?? []) {
+          if (emitEdges) {
+            edges.push({
+              id: ce.id,
+              type: ce.type,
+              source: ce.source,
+              target: ce.target,
+              ...(ce.properties ? { properties: ce.properties } : {}),
+            })
+          }
+          if (!seenTargets.has(ce.target)) {
+            seenTargets.add(ce.target)
+            nodes.push(expansion.resolveTarget(ce.target))
+          }
+        }
+      }
+    }
+
+    totalNodes += nodes.length
+    totalEdges += edges.length
     matched.push({
       product_id: product.id,
       file: product.file,
       title: product.title,
-      total_nodes: r.total_nodes,
-      total_edges: r.total_edges,
-      nodes: r.nodes,
-      edges: r.edges,
+      total_nodes: nodes.length,
+      total_edges: edges.length,
+      nodes,
+      edges,
       ...(r.truncated ? { truncated: true, truncated_at_depth: r.truncated_at_depth } : {}),
     })
   }
@@ -306,6 +462,17 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
     },
   }
   if (coverageProfile) response.coverage_profile = coverageProfile
+  // Classification distribution (0.10.6, brief D): the positioning view, per axis.
+  // Best-effort: a missing or legacy/malformed portfolio doc never breaks the digest.
+  try {
+    const portfolioStore = await openPortfolioStoreIfExists(cwd)
+    if (portfolioStore) {
+      const classification = buildClassificationDistribution(portfolioStore)
+      if (classification) response.classification = classification
+    }
+  } catch {
+    /* no usable portfolio document: omit the classification block */
+  }
   if (errored.length > 0) response.errored_products = errored
   if (unmatched.length > 0) response.unmatched_scope = unmatched
   if (watchedProducts.length > 0) {

@@ -1577,7 +1577,7 @@ export class UPGPortfolioStore {
    * area-anchored edge types (`area_serves_persona` / `area_targets_market_segment`)
    * carry a bare portfolio-tier `product_area` id as their source.
    */
-  addCrossEdge(edge: UPGCrossEdge): void {
+  addCrossEdge(edge: UPGCrossEdge): { status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge } {
     if (!this.doc) throw new Error('Portfolio document not loaded. Call loadOrInit() first.')
     if (!edge.id) throw new Error('Cross-edge must have an id')
     // Area-anchored edges source from a portfolio `product_area` id, not a
@@ -1608,9 +1608,25 @@ export class UPGPortfolioStore {
     const existing = this.doc.cross_edges.find(
       (e) => e.source === edge.source && e.target === edge.target && e.type === edge.type,
     )
-    if (existing) return
+    if (existing) {
+      // 0.10.6 (edge-property-upsert brief): an idempotent hit that carries
+      // `properties` is an UPSERT, not a no-op — shallow-merge the supplied
+      // properties onto the existing edge so the 218-edge confidence backfill
+      // reaches edges that already exist. Without properties, it stays a no-op.
+      // The existing edge's id is preserved (we never re-id on update).
+      if (edge.properties && Object.keys(edge.properties).length > 0) {
+        const before = JSON.stringify(existing.properties ?? {})
+        existing.properties = { ...(existing.properties ?? {}), ...edge.properties }
+        if (JSON.stringify(existing.properties) !== before) {
+          this.scheduleSave()
+          return { status: 'updated', edge: existing }
+        }
+      }
+      return { status: 'unchanged', edge: existing }
+    }
     this.doc.cross_edges.push(edge)
     this.scheduleSave()
+    return { status: 'created', edge }
   }
 
   /**

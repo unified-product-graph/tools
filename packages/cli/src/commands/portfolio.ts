@@ -32,7 +32,7 @@ import {
   computeGraphDigest,
   edgeId,
 } from '@unified-product-graph/sdk'
-import { UPG_CROSS_EDGE_TYPES, validateEdgeProperties, type UPGCrossEdgeType, type UPGEdgeType } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, validateEdgeProperties, type UPGCrossEdgeType, type UPGEdgeType } from '@unified-product-graph/core'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
 import { upgHeader, success, fail, label } from '../lib/formatter.js'
 import { die, runtimeError, usageError, violation } from '../lib/errors.js'
@@ -96,6 +96,53 @@ function applyScope(
   const products = all.filter((p) => scope.some((w) => matches(p, w)))
   const unmatched = scope.filter((w) => !all.some((p) => matches(p, w)))
   return { products, unmatched }
+}
+
+/**
+ * Classification distribution (0.10.6, brief D): per registry axis, the count of
+ * members per value, computed from the portfolio's classify cross edges. Mirrors
+ * the MCP `portfolio_digest` classification block. Returns undefined when no
+ * classify edges (or no usable portfolio) exist.
+ */
+async function buildClassificationDistribution(cwd: string): Promise<Record<string, unknown> | undefined> {
+  let pfStore
+  try {
+    pfStore = await openPortfolioStoreIfExists(cwd)
+  } catch {
+    return undefined
+  }
+  if (!pfStore) return undefined
+  const classifyEdges = pfStore.getAllCrossEdges().filter((e) => e.type.endsWith('_classified_as_classification_value'))
+  if (classifyEdges.length === 0) return undefined
+
+  const valueToAxis = new Map<string, string>()
+  for (const e of pfStore.listRegistryEdges('classification_axis_includes_classification_value')) {
+    valueToAxis.set(e.target, e.source)
+  }
+  const label = (bareId: string): string => pfStore!.getRegistryNode(bareId)?.title ?? bareId
+  const UNAXED = '__unaxed__'
+  const axes = new Map<string, Map<string, number>>()
+  for (const e of classifyEdges) {
+    const valueBare = e.target.startsWith(`${REGISTRY_PRODUCT_ID}/`)
+      ? e.target.slice(REGISTRY_PRODUCT_ID.length + 1)
+      : e.target
+    const axisBare = valueToAxis.get(valueBare) ?? UNAXED
+    const byValue = axes.get(axisBare) ?? new Map<string, number>()
+    byValue.set(valueBare, (byValue.get(valueBare) ?? 0) + 1)
+    axes.set(axisBare, byValue)
+  }
+  const axisList = [...axes.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([axisBare, byValue]) => {
+      const values = [...byValue.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([valueBare, count]) => ({ value: valueBare, label: label(valueBare), count }))
+      const total = values.reduce((s, v) => s + v.count, 0)
+      return axisBare === UNAXED
+        ? { axis: null, label: 'unaxed', values, total }
+        : { axis: axisBare, label: label(axisBare), values, total }
+    })
+  return { total_classified_edges: classifyEdges.length, axes: axisList }
 }
 
 // ── portfolio list ────────────────────────────────────────────────────────────
@@ -277,6 +324,8 @@ const healthSub = new Command('health')
 
       if (opts.json) {
         const out: Record<string, unknown> = { products: summaries, rollup }
+        const classification = await buildClassificationDistribution(cwd)
+        if (classification) out.classification = classification
         if (unmatched.length > 0) out.unmatched_scope = unmatched
         console.log(JSON.stringify(out, null, 2))
         return
@@ -352,6 +401,40 @@ const querySub = new Command('query')
         return
       }
 
+      // Cross-edge traversal (0.10.6, brief B): when a cross-edge type is named
+      // in --traverse, load the portfolio once and expand matched nodes one hop
+      // out over the portfolio's cross edges to their registry / other-product
+      // targets (the per-product BFS otherwise stops at product boundaries).
+      const crossWanted = new Set(
+        (traverse ?? []).filter((t) => (UPG_CROSS_EDGE_TYPES as readonly string[]).includes(t)),
+      )
+      let crossBySource: Map<string, Array<{ id: string; source: string; target: string; type: string; properties?: Record<string, unknown> }>> | null = null
+      let resolveCrossTarget: ((target: string) => { id: string; type?: string; title?: string }) | null = null
+      if (crossWanted.size > 0) {
+        try {
+          const pfStore = await openPortfolioStoreIfExists(cwd)
+          if (pfStore) {
+            crossBySource = new Map()
+            for (const e of pfStore.getAllCrossEdges()) {
+              if (!crossWanted.has(e.type)) continue
+              const props = (e as { properties?: Record<string, unknown> }).properties
+              const arr = crossBySource.get(e.source) ?? []
+              arr.push({ id: e.id, source: e.source, target: e.target, type: e.type, ...(props ? { properties: props } : {}) })
+              crossBySource.set(e.source, arr)
+            }
+            resolveCrossTarget = (target: string) => {
+              if (target.startsWith(`${REGISTRY_PRODUCT_ID}/`)) {
+                const canonical = pfStore.getRegistryNode(target.slice(REGISTRY_PRODUCT_ID.length + 1))
+                if (canonical) return { id: target, type: canonical.type, title: canonical.title }
+              }
+              return { id: target }
+            }
+          }
+        } catch {
+          /* no usable portfolio document: skip cross-edge expansion */
+        }
+      }
+
       const matched: Array<Record<string, unknown>> = []
       const emptyProducts: string[] = []
       let totalNodes = 0
@@ -381,7 +464,7 @@ const querySub = new Command('query')
           const visited = new Set<string>()
           const queue: Array<{ id: string; d: number }> = roots.map((r) => ({ id: r.id, d: 0 }))
           const resultNodes: Array<{ id: string; type: string; title: string; status?: string }> = []
-          const resultEdges: Array<{ id: string; source: string; target: string; type: string }> = []
+          const resultEdges: Array<{ id: string; source: string; target: string; type: string; properties?: Record<string, unknown> }> = []
 
           while (queue.length > 0 && resultNodes.length < perProductLimit) {
             const item = queue.shift()!
@@ -399,6 +482,23 @@ const querySub = new Command('query')
               for (const e of edgesBySource.get(item.id) ?? []) {
                 resultEdges.push({ id: e.id, source: e.source, target: e.target, type: e.type })
                 if (!visited.has(e.target)) queue.push({ id: e.target, d: item.d + 1 })
+              }
+            }
+          }
+
+          // Cross-edge expansion: follow the portfolio's cross edges one hop out
+          // from each matched node (qualified by product id) to its target.
+          if (crossBySource && resolveCrossTarget && product.id) {
+            const seen = new Set<string>(resultNodes.map((n) => n.id))
+            for (const n of [...resultNodes]) {
+              const qualified = `${product.id}/${n.id}`
+              for (const ce of crossBySource.get(qualified) ?? []) {
+                resultEdges.push({ id: ce.id, source: ce.source, target: ce.target, type: ce.type, ...(ce.properties ? { properties: ce.properties } : {}) })
+                if (!seen.has(ce.target)) {
+                  seen.add(ce.target)
+                  const t = resolveCrossTarget(ce.target)
+                  resultNodes.push({ id: t.id, type: t.type ?? 'unknown', title: t.title ?? t.id })
+                }
               }
             }
           }
