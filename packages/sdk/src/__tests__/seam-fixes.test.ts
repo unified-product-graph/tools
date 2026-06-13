@@ -226,7 +226,7 @@ describe(' plan scope', () => {
 
   it('exhaustive opt-in scores the full universe', async () => {
     const store = await freshStore()
-    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(315)
+    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(316)
   })
 
   it('accepts a canonical region id AND an atomic-domain id', async () => {

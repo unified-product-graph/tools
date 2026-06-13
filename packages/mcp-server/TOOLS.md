@@ -161,7 +161,7 @@ succeed or fail independently of the session update.`
 | ---- | ---- | -------- | ----------- |
 | `custom` | object |  | Arbitrary key-value pairs for cross-skill state |
 | `focus_area` | string |  | Set the current focus area (e.g. "strategy", "validation", "user_research") |
-| `lens` | `product` \| `ux_design` \| `engineering` \| `growth` \| `business` \| `research` \| `marketing` \| `full` |  | Switch the active lens. Changes what context, skills, and gaps are surfaced first. Canonical lens ids (derived from core): product, ux_design, engineering, growth, business, research, marketing, full. |
+| `lens` | `product` \| `ux_design` \| `engineering` \| `growth` \| `business` \| `research` \| `marketing` \| `competitive` \| `full` |  | Switch the active lens. Changes what context, skills, and gaps are surfaced first. Canonical lens ids (derived from core): product, ux_design, engineering, growth, business, research, marketing, full. |
 | `persist_lens` | boolean |  | If true, also save the lens to the .upg file so it persists across sessions |
 | `recommendation` | string |  | Record a recommendation given to the user (e.g. "Run /upg-new-strategy to fill strategy gap") |
 | `skill_invoked` | string |  | Register that this skill was just invoked (e.g. "upg-show-status") |
@@ -1411,11 +1411,12 @@ separate filesystem operations.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `properties` | object |  | Edge metadata, accepted only for cross-edge types declared carries_properties (e.g. feature_rivals_competitor_feature, carrying the parity assessment parity_status / quality / is_gap / assessed_on / evidence / confidence). Rejected for types that do not carry properties. |
 | `source_id` | string | ✓ | Source node ID |
 | `source_product_id` | string |  | Product ID of the source node |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -1442,6 +1443,8 @@ portfolio edge are separate mutations.`
 | ---- | ---- | -------- | ----------- |
 | `area_id` | string |  | Optional product_area id (resolved against portfolio.upg) to place the new product under. |
 | `description` | string |  | Optional product description |
+| `dir` | string |  | Optional subfolder under .upg/ to write the graph into (e.g. "competitors"). The file lands at .upg/<dir>/<slug>.upg and is registered in workspace.json with that subpath, so a watched portfolio can keep its intelligence graphs in competitors/. Absent writes flat at .upg/<slug>.upg. No leading slash or "..". |
+| `member_kind` | `product` \| `org_rollup` \| `watched` |  | Workspace member kind. product (default) = a product under management; org_rollup = the company umbrella graph; watched = a monitored intelligence graph (e.g. a competitor). Stamped into $upg.member_kind and cached in workspace.json; watched and rollup members are excluded from counts.products and product-spine expectations. |
 | `name` | string | ✓ | Product display title (required, non-empty). |
 | `portfolio_id` | string |  | Optional portfolio id (resolved against portfolio.upg) to place the new product under. A portfolio id that resolves only in the active graph still attaches via an in-graph edge (DEPRECATED; prefer attach_product_to_portfolio). |
 | `slug` | string |  | Optional slug for the .upg filename. Defaults to a slug derived from `name`. Collisions append `-2`, `-3`, … |

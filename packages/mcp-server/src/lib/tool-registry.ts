@@ -809,6 +809,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: 'string',
           description: 'Optional product_area id (resolved against portfolio.upg) to place the new product under.',
         },
+        dir: {
+          type: 'string',
+          description:
+            'Optional subfolder under .upg/ to write the graph into (e.g. "competitors"). The file lands at .upg/<dir>/<slug>.upg and is registered in workspace.json with that subpath, so a watched portfolio can keep its intelligence graphs in competitors/. Absent writes flat at .upg/<slug>.upg. No leading slash or "..".',
+        },
+        member_kind: {
+          type: 'string',
+          enum: ['product', 'org_rollup', 'watched'],
+          description:
+            'Workspace member kind. product (default) = a product under management; org_rollup = the company umbrella graph; watched = a monitored intelligence graph (e.g. a competitor). Stamped into $upg.member_kind and cached in workspace.json; watched and rollup members are excluded from counts.products and product-spine expectations.',
+        },
       },
       required: ['name'],
     },
@@ -1774,6 +1785,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         source_product_id: { type: 'string', description: 'Product ID of the source node' },
         target_product_id: { type: 'string', description: 'Product ID of the target node' },
+        properties: {
+          type: 'object',
+          description:
+            'Edge metadata, accepted only for cross-edge types declared carries_properties (e.g. feature_rivals_competitor_feature, carrying the parity assessment parity_status / quality / is_gap / assessed_on / evidence / confidence). Rejected for types that do not carry properties.',
+        },
       },
       required: ['source_id', 'target_id', 'type'],
     },

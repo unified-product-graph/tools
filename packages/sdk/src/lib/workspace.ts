@@ -37,6 +37,12 @@ import {
 export interface WorkspaceProduct {
   file: string
   title: string
+  /**
+   * Workspace member kind (0.10.0, #45), cached from the graph's
+   * `$upg.member_kind` for fast enumeration. `product` (default / absent),
+   * `org_rollup` (company umbrella), or `watched` (monitored intelligence graph).
+   */
+  member_kind?: 'product' | 'org_rollup' | 'watched'
 }
 
 export interface InitWorkspaceArgs {
@@ -248,6 +254,23 @@ export interface CreateProductArgs {
   portfolio_id?: string
   /** Optional `product_area` id (resolved against portfolio.upg) to place the new product under. */
   area_id?: string
+  /**
+   * Optional subfolder under `.upg/` to write the graph into, e.g. `competitors`
+   * (UPG 0.9.27, issue #44). The file lands at `.upg/<dir>/<slug>.upg` and is
+   * registered in `workspace.json` with its workspace-relative subpath
+   * (`competitors/<slug>.upg`). Used so a `watched` portfolio defaults its
+   * intelligence graphs into `competitors/`. Absent writes flat at `.upg/<slug>.upg`
+   * (back-compat). Leading slashes and `..` segments are rejected.
+   */
+  dir?: string
+  /**
+   * Optional workspace member kind (0.10.0, #45): `org_rollup` (company umbrella)
+   * or `watched` (monitored intelligence graph, e.g. a competitor). Stamped into
+   * the new graph's `$upg.member_kind` and cached in workspace.json + the
+   * portfolio registry. Absent / `product` = an ordinary product; watched and
+   * rollup members are excluded from `counts.products`.
+   */
+  member_kind?: 'product' | 'org_rollup' | 'watched'
 }
 
 export interface CreateProductResult {
@@ -272,8 +295,19 @@ function computeIntegrityChecksum(doc: UPGDocument): string {
 }
 
 export async function createProduct(args: CreateProductArgs): Promise<CreateProductResult> {
-  const { cwd, store, name, slug: slugArg, description, stage, portfolio_id, area_id } = args
+  const { cwd, store, name, slug: slugArg, description, stage, portfolio_id, area_id, dir, member_kind } = args
   const upgDir = path.resolve(cwd, '.upg')
+
+  // Optional target subfolder (#44). Reject leading slashes and `..`/empty
+  // segments so a graph can only ever land INSIDE .upg/. Absent → flat at root.
+  let targetDir = upgDir
+  if (dir !== undefined) {
+    const cleaned = dir.trim().replace(/^[/\\]+/, '')
+    if (cleaned.length === 0 || cleaned.split(/[/\\]+/).some((seg) => seg === '..' || seg === '')) {
+      throw new InvalidProductNameError('dir must be a relative path inside .upg/ (no leading slash, no "..")')
+    }
+    targetDir = path.resolve(upgDir, cleaned)
+  }
 
   // Workspace mode required; single-file mode has no place to put the new sibling.
   try {
@@ -281,6 +315,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
   } catch {
     throw new WorkspaceNotInitialisedError()
   }
+  if (targetDir !== upgDir) await fsp.mkdir(targetDir, { recursive: true })
 
   // Validate name. Trim whitespace; reject empty / non-string.
   if (typeof name !== 'string' || name.trim().length === 0) {
@@ -302,16 +337,19 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
 
   // Slug: prefer explicit, otherwise derive from name. Resolve collision against
   // existing workspace files (each .upg basename without extension is a slug).
-  const upgDirEntries = await fsp.readdir(upgDir, { withFileTypes: true })
+  const dirEntries = await fsp.readdir(targetDir, { withFileTypes: true })
   const existingSlugs = new Set(
-    upgDirEntries
+    dirEntries
       .filter((e) => e.isFile() && e.name.endsWith('.upg'))
       .map((e) => path.basename(e.name, '.upg')),
   )
   const baseSlug = slugArg && slugArg.trim().length > 0 ? generateSlug(slugArg) : generateSlug(trimmedName)
   const slug = resolveSlugCollision(baseSlug, existingSlugs)
   const filename = `${slug}.upg`
-  const destPath = path.join(upgDir, filename)
+  const destPath = path.join(targetDir, filename)
+  // Workspace-relative, forward-slashed path for registration + the return.
+  // Flat product → `slug.upg`; subfolder product → `competitors/slug.upg`. (#44)
+  const workspaceFile = path.relative(upgDir, destPath).split(path.sep).join('/')
 
   // Mint product ID via the canonical generator so it matches every other
   // server-minted ID prefix.
@@ -344,6 +382,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
     },
     nodes: [productNode],
     edges: [],
+    ...(member_kind === 'org_rollup' || member_kind === 'watched' ? { member_kind } : {}),
   }
   newDoc._integrity = {
     checksum: computeIntegrityChecksum(newDoc),
@@ -372,7 +411,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
   }
   workspace.products = [
     ...workspace.products,
-    { file: filename, title: trimmedName },
+    { file: workspaceFile, title: trimmedName, ...(member_kind === 'org_rollup' || member_kind === 'watched' ? { member_kind } : {}) },
   ]
   await fsp.writeFile(
     workspacePath,
@@ -395,8 +434,9 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
     if (portfolioDoc) {
       let dirty = registerProductOnPortfolio(portfolioDoc, {
         id: newProductId,
-        file_path: path.join('.upg', filename),
+        file_path: `.upg/${workspaceFile}`,
         title: trimmedName,
+        ...(member_kind === 'org_rollup' || member_kind === 'watched' ? { member_kind } : {}),
       })
       if (area_id) {
         const a = addProductToArea(portfolioDoc, area_id, newProductId)
@@ -447,7 +487,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
 
   return {
     id: newProductId,
-    file: filename,
+    file: workspaceFile,
     slug,
     title: trimmedName,
     workspace_path: '.upg/',

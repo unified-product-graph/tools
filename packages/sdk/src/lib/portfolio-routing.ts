@@ -197,6 +197,9 @@ function appendPortfolio(
   ) {
     entity.hierarchy_model = props.hierarchy_model
   }
+  if (props.kind === 'owned' || props.kind === 'watched') {
+    entity.kind = props.kind
+  }
   if (Array.isArray(props.products)) {
     entity.products = props.products.filter((p): p is string => typeof p === 'string')
   }
@@ -325,6 +328,12 @@ export interface PortfolioProductReference {
   file_path?: string
   /** Display title; denormalised from the product's own `product.title`. */
   title?: string
+  /**
+   * Workspace member kind (0.10.0, #45), cached from the product graph's
+   * `$upg.member_kind`. `watched` / `org_rollup` members are registered for
+   * reference but excluded from `counts.products`. Absent = `product`.
+   */
+  member_kind?: 'product' | 'org_rollup' | 'watched'
 }
 
 /**
@@ -358,6 +367,7 @@ export function registerProductOnPortfolio(
   const entry: PortfolioProductReference = { id: ref.id }
   if (ref.file_path) entry.file_path = ref.file_path
   if (ref.title) entry.title = ref.title
+  if (ref.member_kind === 'org_rollup' || ref.member_kind === 'watched') entry.member_kind = ref.member_kind
   products.push(entry)
   //: flag the store dirty so the in-memory append survives flush().
   store?.markDirty()

@@ -286,7 +286,7 @@ describe(' Seam 4 — update_session_context lens validation', () => {
     const result = await dispatch(updateSessionContext, { lens: 'design' }, ctx)
     expect(result.isError).toBe(true)
     expect(result.content[0].text).toMatch(/Invalid lens "design"/)
-    expect(result.content[0].text).toMatch(/product, ux_design, engineering, growth, business, research, marketing, full/)
+    expect(result.content[0].text).toMatch(/product, ux_design, engineering, growth, business, research, marketing, competitive, full/)
   })
 
   it('rejects an arbitrary invalid lens', async () => {
@@ -295,8 +295,8 @@ describe(' Seam 4 — update_session_context lens validation', () => {
     expect(result.content[0].text).toMatch(/Invalid lens "banana"/)
   })
 
-  it('accepts all 8 canonical lenses', async () => {
-    expect(CANONICAL_LENS_IDS).toHaveLength(8)
+  it('accepts all 9 canonical lenses', async () => {
+    expect(CANONICAL_LENS_IDS).toHaveLength(9)
     for (const lens of CANONICAL_LENS_IDS) {
       const result = await dispatch(updateSessionContext, { lens }, ctx)
       expect(result.isError, `lens "${lens}" should be accepted`).toBeUndefined()

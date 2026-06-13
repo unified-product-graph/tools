@@ -26,6 +26,7 @@ import { preflightPayload } from '../lib/payload-guard.js'
 import { traverseGraph, type GraphReader, type TraverseParams } from '../lib/graph-traverse.js'
 import { findWorkspaceUpgFiles } from './workspace.js'
 import { validateGraph } from './validation.js'
+import { buildProductKindMap } from '../lib/portfolio-kind.js'
 
 /** A workspace product resolved to its on-disk file + header identity. */
 interface ScopedProduct {
@@ -252,9 +253,11 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
     : undefined
   const cwd = process.cwd()
   const { products, unmatched } = resolveScopedProducts(cwd, scope)
+  const kindMap = buildProductKindMap(cwd)
 
   const summaries: Array<Record<string, unknown>> = []
   const errored: Array<{ product_id: string | null; file: string; error: string }> = []
+  const watchedProducts: Array<{ product_id: string | null; file: string }> = []
   const byStage: Record<string, number> = {}
   let totalNodes = 0
   let totalEdges = 0
@@ -273,9 +276,12 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
         .slice(0, 5)
         .map(([type, count]) => ({ type, count }))
 
+      const kind = (product.id && kindMap.get(product.id)) || 'owned'
+      if (kind === 'watched') watchedProducts.push({ product_id: product.id, file: product.file })
       summaries.push({
         product_id: product.id,
         file: product.file,
+        kind,
         title: digest.product.title,
         stage: digest.product.stage || null,
         total_nodes: digest.counts.total_nodes,
@@ -302,6 +308,11 @@ export const portfolioDigest: ToolHandler = async (args, ctx): Promise<ToolResul
   if (coverageProfile) response.coverage_profile = coverageProfile
   if (errored.length > 0) response.errored_products = errored
   if (unmatched.length > 0) response.unmatched_scope = unmatched
+  if (watchedProducts.length > 0) {
+    response.watched_products = watchedProducts
+    response.note_watched =
+      'Products in a watched portfolio (kind: watched, e.g. competitor intelligence graphs) appear here for visibility, but their coverage_pct and health reflect monitoring depth, not product-management health. Exclude them when judging owned-portfolio health.'
+  }
   if (products.length === 0) {
     response.note =
       scope && scope.length > 0

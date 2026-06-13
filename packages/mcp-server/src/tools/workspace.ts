@@ -11,7 +11,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType } from '@unified-product-graph/core'
-import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties } from '@unified-product-graph/core'
 import { UPGPortfolioStore } from '@unified-product-graph/sdk'
 import {
   resolvePortfolioPath,
@@ -58,6 +58,16 @@ function isExistingFile(p: string): boolean {
  */
 export function findWorkspaceUpgFiles(cwd: string): string[] {
   const candidates: string[] = []
+  const seen = new Set<string>()
+  const add = (abs: string) => {
+    const resolved = path.resolve(abs)
+    if (!seen.has(resolved)) {
+      seen.add(resolved)
+      candidates.push(resolved)
+    }
+  }
+
+  // (a) Filesystem scan: root + immediate subdirs (the historical behaviour).
   let topEntries: fs.Dirent[]
   try {
     topEntries = fs.readdirSync(cwd, { withFileTypes: true })
@@ -66,13 +76,13 @@ export function findWorkspaceUpgFiles(cwd: string): string[] {
   }
   for (const entry of topEntries) {
     if (entry.isFile() && entry.name.endsWith('.upg')) {
-      candidates.push(path.join(cwd, entry.name))
+      add(path.join(cwd, entry.name))
     } else if (entry.isDirectory() && (entry.name === '.upg' || !entry.name.startsWith('.'))) {
       try {
         const subEntries = fs.readdirSync(path.join(cwd, entry.name), { withFileTypes: true })
         for (const sub of subEntries) {
           if (sub.isFile() && sub.name.endsWith('.upg')) {
-            candidates.push(path.join(cwd, entry.name, sub.name))
+            add(path.join(cwd, entry.name, sub.name))
           }
         }
       } catch {
@@ -80,6 +90,25 @@ export function findWorkspaceUpgFiles(cwd: string): string[] {
       }
     }
   }
+
+  // (b) Registry-driven discovery (#44): honour any workspace.json-registered
+  // subpath at any depth, so a graph in `competitors/<slug>/` is discoverable
+  // even though the filesystem scan above only reaches one level. The registry
+  // is the source of truth; the scan is the convenience fallback. Tolerant:
+  // a missing/malformed workspace.json leaves the scan results untouched.
+  try {
+    const ws = JSON.parse(fs.readFileSync(path.join(cwd, '.upg', 'workspace.json'), 'utf-8')) as {
+      products?: Array<{ file?: unknown }>
+    }
+    for (const p of ws.products ?? []) {
+      if (typeof p.file !== 'string') continue
+      const abs = path.resolve(cwd, '.upg', p.file)
+      if (fs.existsSync(abs)) add(abs)
+    }
+  } catch {
+    // no workspace.json or malformed — the filesystem scan stands alone
+  }
+
   return candidates
 }
 
@@ -101,6 +130,7 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
     id: string | null
     file: string
     title: string
+    member_kind: string
     stage: string | null
     nodes: number
     edges: number
@@ -154,6 +184,7 @@ export const listLocalProducts: ToolHandler = (_args, _ctx): ToolResult => {
         id: pid,
         file: path.relative(cwd, filePath),
         title: doc.product?.title ?? '(untitled)',
+        member_kind: (doc.$upg?.member_kind as string | undefined) ?? 'product',
         stage: coerced.canonical ?? null,
         nodes: Array.isArray(doc.nodes) ? doc.nodes.length : 0,
         edges: Array.isArray(doc.edges) ? doc.edges.length : 0,
@@ -268,17 +299,24 @@ export const getWorkspaceInfo: ToolHandler = async (_args, ctx): Promise<ToolRes
   try {
     const raw = await fsp.readFile(workspacePath, 'utf-8')
     const workspace = JSON.parse(raw)
+    // Match the active product by its workspace-relative path so subfolder
+    // graphs (`competitors/<slug>.upg`) resolve, while legacy bare-filename
+    // entries still match a root product (rel === basename there). (#44)
+    const upgDir = path.join(cwd, '.upg')
+    const currentRel = path.relative(upgDir, currentFile).split(path.sep).join('/')
     const currentBasename = path.basename(currentFile)
 
     const products = (
       workspace.products as Array<{
         file: string
         title: string
+        member_kind?: string
       }>
     ).map((p) => ({
       file: p.file,
       title: p.title,
-      active: p.file === currentBasename,
+      ...(p.member_kind && p.member_kind !== 'product' ? { member_kind: p.member_kind } : {}),
+      active: p.file === currentRel || p.file === currentBasename,
     }))
 
     return text(
@@ -286,7 +324,7 @@ export const getWorkspaceInfo: ToolHandler = async (_args, ctx): Promise<ToolRes
         {
           mode: 'workspace',
           workspace_path: '.upg/',
-          current_product: currentBasename,
+          current_product: currentRel,
           products,
         },
         null,
@@ -383,6 +421,8 @@ export const createProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
       stage: args.stage as never,
       portfolio_id: args.portfolio_id as string | undefined,
       area_id: args.area_id as string | undefined,
+      dir: args.dir as string | undefined,
+      member_kind: args.member_kind as 'product' | 'org_rollup' | 'watched' | undefined,
     })
     return text(
       JSON.stringify({ message: `Created product: ${result.title}`, ...result }, null, 2),
@@ -562,6 +602,19 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     )
   }
 
+  // Edge metadata is gated: only cross-edge types declared `carries_properties`
+  // in the catalogue (e.g. feature_rivals_competitor_feature, carrying the parity
+  // assessment parity_status / quality / is_gap / assessed_on / evidence /
+  // confidence) may carry properties. (0.10.0, #38)
+  const propsArg = args.properties as Record<string, unknown> | undefined
+  const hasProps = !!propsArg && Object.keys(propsArg).length > 0
+  if (hasProps && !edgeCarriesProperties(edgeTypeArg)) {
+    return textError(
+      `Cross-product edge type "${edgeTypeArg}" does not carry properties. Only types declared ` +
+      `carries_properties (e.g. feature_rivals_competitor_feature) may carry edge metadata.`,
+    )
+  }
+
   // Qualify IDs; accept both bare IDs (with product context) and
   // pre-qualified `{product_id}/{node_id}` strings.
   let qualifiedSource: string
@@ -629,6 +682,7 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     type: edgeTypeArg as UPGCrossEdgeType,
     source_product_id: derivedSourceProductId,
     target_product_id: derivedTargetProductId,
+    ...(hasProps ? { properties: propsArg } : {}),
   }
 
   // Auto-register both products on portfolio.upg.products[]. Cross-

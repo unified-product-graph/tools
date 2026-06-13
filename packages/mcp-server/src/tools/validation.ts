@@ -38,6 +38,7 @@ import { preflightPayload } from '../lib/payload-guard.js'
 import { computeSchemaDriftSummary } from '@unified-product-graph/sdk'
 import { collectAntiPatternInputs } from '@unified-product-graph/sdk'
 import { validateEdgeTypePair } from '@unified-product-graph/sdk'
+import { classifyProductKind } from '../lib/portfolio-kind.js'
 import { checkPropertyTypes } from '@unified-product-graph/sdk'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
 import type {
@@ -821,8 +822,19 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     graphTopologySelfLoops.length === 0 &&
     propertyTypeDrift.length === 0
   const driftClean = skipDrift || structurallyClean
+  // A watched intelligence graph (member of a `watched` portfolio, e.g. a
+  // competitor graph) is not a product under management: its product-spine
+  // anti-pattern violations are category errors and must not flip `valid`.
+  // Structural drift still gates validity; violations are still reported, but
+  // advisory, and `watched_intelligence_graph` flags the suppression. Only
+  // classified when there is something to suppress (avoids the portfolio read
+  // on the clean path). (spec issue #39, UPG 0.9.27)
+  const watchedGraph =
+    !skipAntiPatterns &&
+    (antiPatternViolations?.length ?? 0) > 0 &&
+    classifyProductKind(process.cwd(), store.getProduct().id) === 'watched'
   const antiPatternClean =
-    skipAntiPatterns || (antiPatternViolations?.length ?? 0) === 0
+    skipAntiPatterns || watchedGraph || (antiPatternViolations?.length ?? 0) === 0
   const valid = driftClean && antiPatternClean
   // Only meaningful when drift was actually evaluated.
   const structurallyValid = skipDrift ? undefined : structurallyClean
@@ -849,6 +861,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // can read them via `response.edge_type_pair_drift` etc.
   const response = {
     valid,
+    ...(watchedGraph ? { watched_intelligence_graph: true } : {}),
     // N4 (UPG QA 0.8.7): additive structural-conformance signal. true ⟺ every
     // drift class is 0, independent of anti-pattern health. Omitted when
     // `skip_drift` is true (structure was not assessed). A CI gate that wants

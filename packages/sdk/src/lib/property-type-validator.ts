@@ -94,6 +94,11 @@ function matchesDeclaredType(value: unknown, declaredType: PropertyDefinition['t
       return typeof value === 'boolean'
     case 'string[]':
       return Array.isArray(value) && value.every((v) => typeof v === 'string')
+    case 'object[]':
+      return (
+        Array.isArray(value) &&
+        value.every((v) => typeof v === 'object' && v !== null && !Array.isArray(v))
+      )
     case 'object':
       return typeof value === 'object' && value !== null && !Array.isArray(value)
     default:
@@ -108,6 +113,8 @@ function describeActualType(value: unknown): string {
   if (value === null) return 'null'
   if (Array.isArray(value)) {
     if (value.every((v) => typeof v === 'string')) return 'string[]'
+    if (value.length > 0 && value.every((v) => typeof v === 'object' && v !== null && !Array.isArray(v)))
+      return 'object[]'
     if (value.length === 0) return 'array (empty)'
     return `array (mixed: ${[...new Set(value.map((v) => typeof v))].join(', ')})`
   }
