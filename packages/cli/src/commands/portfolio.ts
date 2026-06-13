@@ -32,10 +32,10 @@ import {
   computeGraphDigest,
   edgeId,
 } from '@unified-product-graph/sdk'
-import { UPG_CROSS_EDGE_TYPES, type UPGCrossEdgeType } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, validateEdgeProperties, type UPGCrossEdgeType, type UPGEdgeType } from '@unified-product-graph/core'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
 import { upgHeader, success, fail, label } from '../lib/formatter.js'
-import { die, runtimeError, usageError } from '../lib/errors.js'
+import { die, runtimeError, usageError, violation } from '../lib/errors.js'
 import { sanitizeForTerminal } from '../lib/sanitize.js'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -612,10 +612,16 @@ const edgesSub = new Command('edges')
   .description('List cross-product edges in the portfolio document (list_portfolio_cross_edges).')
   .option('--file <path>', 'Path to portfolio.upg (default: .upg/portfolio.upg)')
   .option('--type <type>', 'Filter by edge type')
+  .option('--source-product <id>', 'Filter by source product id')
+  .option('--group-by <field>', 'Group results by "source" or "target"')
   .option('--json', 'Machine-readable JSON output')
   .action(async (opts) => {
     try {
       const cwd = process.cwd()
+      const groupBy = opts.groupBy as string | undefined
+      if (groupBy !== undefined && groupBy !== 'source' && groupBy !== 'target') {
+        die(usageError(`Invalid --group-by: "${sanitizeForTerminal(groupBy)}". Valid: source, target.`))
+      }
       const portfolioPath = resolvePortfolioFile(opts.file)
       if (!portfolioPath) {
         if (opts.json) {
@@ -627,8 +633,40 @@ const edgesSub = new Command('edges')
         return
       }
       const portfolioStore = await openPortfolioStoreIfExists(cwd)
-      const edges = portfolioStore?.getAllCrossEdges() ?? []
-      const filtered = opts.type ? edges.filter((e) => e.type === opts.type) : edges
+      let filtered = portfolioStore?.getAllCrossEdges() ?? []
+      if (opts.type) filtered = filtered.filter((e) => e.type === opts.type)
+      if (opts.sourceProduct) filtered = filtered.filter((e) => e.source_product_id === opts.sourceProduct)
+
+      if (groupBy) {
+        const groups: Record<string, typeof filtered> = {}
+        for (const e of filtered) {
+          const key = (groupBy === 'source' ? e.source : e.target) as string
+          ;(groups[key] ??= []).push(e)
+        }
+        if (opts.json) {
+          console.log(JSON.stringify(
+            { grouped_by: groupBy, group_count: Object.keys(groups).length, total: filtered.length, groups },
+            null, 2,
+          ))
+          return
+        }
+        console.log(upgHeader('Portfolio Edges'))
+        const keys = Object.keys(groups)
+        if (keys.length === 0) {
+          console.log('  No cross-product edges. Use `upg portfolio connect` to add one.\n')
+          return
+        }
+        for (const key of keys) {
+          console.log(`  ${chalk.bold.white(sanitizeForTerminal(key))}  ${chalk.dim(`(${groups[key].length})`)}`)
+          for (const e of groups[key]) {
+            const other = groupBy === 'source' ? e.target : e.source
+            console.log(`    ${chalk.dim(sanitizeForTerminal(e.type))}  ${chalk.white(sanitizeForTerminal(other))}`)
+          }
+          console.log()
+        }
+        console.log(`  ${label(`${filtered.length} edge(s) in ${keys.length} group(s)`)}\n`)
+        return
+      }
 
       if (opts.json) {
         console.log(JSON.stringify({ cross_edges: filtered, total: filtered.length }, null, 2))
@@ -662,6 +700,7 @@ const connectSub = new Command('connect')
   .option('--file <path>', 'Path to portfolio.upg (default: .upg/portfolio.upg)')
   .option('--source-product <id>', 'Source product id (when src is a bare node id)')
   .option('--target-product <id>', 'Target product id (when tgt is a bare node id)')
+  .option('--properties <json>', 'Edge property bag as JSON (only for property-carrying edge types)')
   .option('--json', 'Machine-readable JSON output')
   .action(async (src: string, tgt: string, opts) => {
     try {
@@ -715,6 +754,23 @@ const connectSub = new Command('connect')
         ))
       }
 
+      // Optional property bag (0.10.5): parse + validate against the edge type's
+      // catalogue schema before persisting. No-op for edges without a
+      // `property_schema`; rejects unknown keys / off-scale assessments at the
+      // write surface, matching `create_cross_product_edge` (MCP).
+      let properties: Record<string, unknown> | undefined
+      if (opts.properties) {
+        try {
+          properties = JSON.parse(opts.properties) as Record<string, unknown>
+        } catch (err) {
+          die(usageError(`--properties is not valid JSON: ${(err as Error).message}`))
+        }
+        const errors = validateEdgeProperties(edgeType, properties)
+        if (errors.length > 0) {
+          die(usageError(`Invalid edge properties:\n  - ${errors.join('\n  - ')}`))
+        }
+      }
+
       const portfolioStore = new UPGPortfolioStore()
       await portfolioStore.loadOrInit(portfolioPath)
 
@@ -728,6 +784,7 @@ const connectSub = new Command('connect')
         type: edgeType as UPGCrossEdgeType,
         source_product_id: derivedSourceProduct,
         target_product_id: derivedTargetProduct,
+        ...(properties ? { properties } : {}),
       }
 
       portfolioStore.addCrossEdge(newEdge)
@@ -744,6 +801,140 @@ const connectSub = new Command('connect')
       console.log(`\n  ${success(`Created "${sanitizeForTerminal(edgeType)}" edge`)}`)
       console.log(`  ${chalk.dim('src')} ${chalk.white(sanitizeForTerminal(qualifiedSource))}`)
       console.log(`  ${chalk.dim('tgt')} ${chalk.white(sanitizeForTerminal(qualifiedTarget))}`)
+      console.log(`  ${chalk.dim('id')}  ${chalk.dim(sanitizeForTerminal(newEdge.id))}\n`)
+    } catch (err) {
+      die(err)
+    }
+  })
+
+// ── portfolio classify ────────────────────────────────────────────────────────
+
+/** Friendly confidence enum, canonical confidence_5 assessment (0.10.5). Mirrors the MCP CLASSIFICATION_CONFIDENCE_MAP. */
+const CLASSIFICATION_CONFIDENCE_MAP: Record<string, { value: number; label: string; scale_id: string }> = {
+  low: { value: 2, label: 'low', scale_id: 'confidence_5' },
+  medium: { value: 3, label: 'medium', scale_id: 'confidence_5' },
+  high: { value: 5, label: 'high', scale_id: 'confidence_5' },
+}
+
+const classifySub = new Command('classify')
+  .description('Place a node in a classification cell, carrying optional confidence / provenance (create_classification_edge).')
+  .arguments('<node-id> <classification-value-id>')
+  .option('--confidence <level>', 'Confidence: low, medium, or high (becomes a confidence_5 assessment)')
+  .option('--assessed-on <date>', 'ISO date of the assessment (default: today)')
+  .option('--rationale <text>', 'Short note on why this node sits in this cell')
+  .option('--evidence <ref>', 'A source URL, or a competitor_signal / evidence node id')
+  .option('--node-product <id>', 'Product id owning the node (forces cross-product routing)')
+  .option('--file <path>', 'Path to the active product .upg file (default: auto-discovered)')
+  .option('--json', 'Machine-readable JSON output')
+  .action(async (nodeId: string, classificationValueId: string, opts) => {
+    try {
+      const confidenceArg = opts.confidence as string | undefined
+      if (confidenceArg !== undefined && !(confidenceArg in CLASSIFICATION_CONFIDENCE_MAP)) {
+        die(usageError(`Invalid confidence: "${sanitizeForTerminal(confidenceArg)}". Valid: low, medium, high.`))
+      }
+
+      const cwd = process.cwd()
+
+      // Source node type picks the specialised vs generic edge. We resolve it
+      // against the active product store (a `competitor` source writes the
+      // dedicated edge; anything else, or an unresolvable source, writes the
+      // polymorphic edge, which is valid for any source and carries the same schema).
+      const filePath = await discoverUPGFile(opts.file)
+      const store = await loadStore(filePath)
+      const bareNodeId = nodeId.includes('/') ? nodeId.split('/')[1] : nodeId
+      const sourceType = store.getNode(bareNodeId)?.type
+      const edgeType =
+        sourceType === 'competitor'
+          ? 'competitor_classified_as_classification_value'
+          : 'node_classified_as_classification_value'
+
+      const properties: Record<string, unknown> = {
+        ...(confidenceArg !== undefined ? { confidence: CLASSIFICATION_CONFIDENCE_MAP[confidenceArg] } : {}),
+        assessed_on: (opts.assessedOn as string | undefined) ?? new Date().toISOString().slice(0, 10),
+        ...(opts.rationale !== undefined ? { rationale: opts.rationale } : {}),
+        ...(opts.evidence !== undefined ? { evidence: opts.evidence } : {}),
+      }
+      const propErrors = validateEdgeProperties(edgeType, properties)
+      if (propErrors.length > 0) {
+        store.stopWatching()
+        die(usageError(`Invalid classification properties:\n  - ${propErrors.join('\n  - ')}`))
+      }
+
+      const nodeProductId = opts.nodeProduct as string | undefined
+      const isCross = classificationValueId.includes('/') || !!nodeProductId
+
+      // ── Within-graph: both node and value live in the active product. ──
+      if (!isCross) {
+        const value = store.getNode(classificationValueId)
+        if (!value) {
+          store.stopWatching()
+          die(violation(
+            `Classification value not found in the active product: ${sanitizeForTerminal(classificationValueId)}. ` +
+            `Pass a registry value (registry/{value}) or --node-product to route cross-product.`,
+          ))
+        }
+        const built = {
+          id: edgeId(),
+          source: bareNodeId,
+          target: classificationValueId,
+          type: edgeType as UPGEdgeType,
+          properties,
+        }
+        const stored = store.addEdge(built) as unknown as { id: string } | undefined
+        const edge = stored ?? built
+        await store.flush()
+        store.stopWatching()
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: true, edge, scope: 'within_graph' }, null, 2))
+          return
+        }
+        console.log(`\n  ${success(`Classified "${sanitizeForTerminal(bareNodeId)}" (${edgeType})`)}`)
+        console.log(`  ${chalk.dim('cell')} ${chalk.white(sanitizeForTerminal(classificationValueId))}`)
+        if (confidenceArg) console.log(`  ${chalk.dim('confidence')} ${sanitizeForTerminal(confidenceArg)}`)
+        console.log(`  ${chalk.dim('id')}  ${chalk.dim(sanitizeForTerminal(edge.id))}\n`)
+        return
+      }
+
+      // ── Cross-product: value (and/or node) qualified across products. ──
+      store.stopWatching()
+      const portfolioPath = resolvePortfolioFile(undefined)
+      if (!portfolioPath) {
+        die(runtimeError('No workspace found. Run `upg init --workspace` first.'))
+      }
+
+      const activeProductId = store.getProduct?.()?.id
+      const qualifiedSource = nodeId.includes('/')
+        ? nodeId
+        : `${nodeProductId ?? activeProductId}/${bareNodeId}`
+      const sourceProductId = nodeProductId ?? qualifiedSource.split('/')[0]
+      const targetProductId = classificationValueId.split('/')[0]
+
+      const portfolioStore = new UPGPortfolioStore()
+      await portfolioStore.loadOrInit(portfolioPath)
+      const newEdge = {
+        id: edgeId(),
+        source: qualifiedSource,
+        target: classificationValueId,
+        type: edgeType as UPGCrossEdgeType,
+        source_product_id: sourceProductId,
+        target_product_id: targetProductId,
+        properties,
+      }
+      portfolioStore.addCrossEdge(newEdge)
+      await portfolioStore.flush()
+
+      if (opts.json) {
+        console.log(JSON.stringify({
+          ok: true,
+          edge: newEdge,
+          scope: 'cross_product',
+          portfolio_file: path.relative(cwd, portfolioPath),
+        }, null, 2))
+        return
+      }
+      console.log(`\n  ${success(`Classified "${sanitizeForTerminal(qualifiedSource)}" (${edgeType})`)}`)
+      console.log(`  ${chalk.dim('cell')} ${chalk.white(sanitizeForTerminal(classificationValueId))}`)
+      if (confidenceArg) console.log(`  ${chalk.dim('confidence')} ${sanitizeForTerminal(confidenceArg)}`)
       console.log(`  ${chalk.dim('id')}  ${chalk.dim(sanitizeForTerminal(newEdge.id))}\n`)
     } catch (err) {
       die(err)
@@ -879,6 +1070,7 @@ export const portfolioCommand = new Command('portfolio')
   .addCommand(checkSub)
   .addCommand(edgesSub)
   .addCommand(connectSub)
+  .addCommand(classifySub)
   .addCommand(disconnectSub)
   .addCommand(migrateSub)
 

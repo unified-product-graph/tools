@@ -3,13 +3,14 @@ import { sanitizeForTerminal } from '../lib/sanitize.js'
 import { discoverUPGFile, loadStore, inferEdgeType, edgeId, wrapEdgeInferenceError } from '../lib/graph.js'
 import { isKnownEdgeType } from '../lib/inference.js'
 import { EXIT, die, violation } from '../lib/errors.js'
-import type { UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
+import { validateEdgeProperties, type UPGEdge, type UPGEdgeType } from '@unified-product-graph/core'
 
 export const connectCommand = new Command('connect')
   .arguments('<source-id> <target-id>')
   .description('Create an edge between 2 nodes. Type is auto-inferred.')
   .option('--file <path>', 'Path to .upg file')
   .option('--type <type>', 'Edge type. Auto-inferred if omitted')
+  .option('--properties <json>', 'Edge property bag as JSON (only for property-carrying edge types)')
   .option('--json', 'Machine-readable JSON output')
   .action(async (sourceId, targetId, opts) => {
     try {
@@ -61,7 +62,33 @@ export const connectCommand = new Command('connect')
       // otherwise a duplicate connect prints a fresh id that does not exist in
       // the graph. (`?? built` keeps this correct against an older SDK whose
       // addEdge still returns void — the local edge IS the stored one there.)
-      const built: UPGEdge = { id: edgeId(), source: sourceId, target: targetId, type: edgeType as UPGEdgeType }
+      // Optional property bag (0.10.5): parse, then validate against the edge
+      // type's catalogue schema. `validateEdgeProperties` is a no-op for edges
+      // that do not declare a `property_schema`; it rejects unknown keys and
+      // off-scale assessments (e.g. confidence value 7) at exit 2, mirroring the
+      // `create_edge` MCP write surface.
+      let properties: Record<string, unknown> | undefined
+      if (opts.properties) {
+        try {
+          properties = JSON.parse(opts.properties) as Record<string, unknown>
+        } catch (err) {
+          store.stopWatching()
+          die(violation(`--properties is not valid JSON: ${(err as Error).message}`))
+        }
+        const errors = validateEdgeProperties(edgeType, properties)
+        if (errors.length > 0) {
+          store.stopWatching()
+          die(violation(`Invalid edge properties:\n  - ${errors.join('\n  - ')}`))
+        }
+      }
+
+      const built: UPGEdge = {
+        id: edgeId(),
+        source: sourceId,
+        target: targetId,
+        type: edgeType as UPGEdgeType,
+        ...(properties ? { properties } : {}),
+      }
       // The cast spans both SDK signatures: the current base typed `addEdge` as
       // returning `void`, Geordi's branch returns the canonical `UPGEdge`.
       // Treating the result as `UPGEdge | undefined` lets this compile against

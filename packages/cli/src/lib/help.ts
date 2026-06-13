@@ -311,10 +311,12 @@ export const helpTopics: Record<string, HelpEntry> = {
     options: [
       FILE_OPT, JSON_OPT,
       { flag: '--type <type>', desc: 'Edge type. Auto-inferred if omitted' },
+      { flag: '--properties <json>', desc: 'Edge property bag as JSON (only for property-carrying edge types; unknown keys / off-scale values rejected)' },
     ],
     examples: [
       { cmd: 'upg connect n_persona n_job', comment: 'infers persona_pursues_job' },
       { cmd: 'upg connect n_a n_b --type relates_to' },
+      { cmd: 'upg connect comp_x cv_tier --type node_classified_as_classification_value --properties \'{"confidence":{"value":3,"label":"medium"}}\'' },
       { cmd: 'upg connect n_a n_b --json' },
     ],
     seeAlso: 'upg create',
@@ -539,8 +541,8 @@ export const helpTopics: Record<string, HelpEntry> = {
     seeAlso: 'upg portfolio, upg spec',
   },
   portfolio: {
-    usage: 'upg portfolio <list|attach|detach|health|query|check|edges|connect|disconnect|migrate> [options]',
-    summary: 'Cross-product and portfolio operations: portfolio membership, cross-product edges, a portfolio digest, and validation including portfolio anti-patterns.',
+    usage: 'upg portfolio <list|attach|detach|health|query|check|edges|connect|classify|disconnect|migrate> [options]',
+    summary: 'Cross-product and portfolio operations: portfolio membership, cross-product edges, classification cells, a portfolio digest, and validation including portfolio anti-patterns. `connect --properties` and `classify` carry confidence / provenance on property-carrying edges; `edges --type/--source-product/--group-by` filter the listing.',
     options: [
       FILE_OPT, JSON_OPT,
     ],
@@ -548,6 +550,8 @@ export const helpTopics: Record<string, HelpEntry> = {
       { cmd: 'upg portfolio list' },
       { cmd: 'upg portfolio check', comment: 'portfolio validation + anti-patterns' },
       { cmd: 'upg portfolio health' },
+      { cmd: 'upg portfolio classify comp_x registry/cv_leader --confidence high --evidence sig_q2', comment: 'classification cell with provenance' },
+      { cmd: 'upg portfolio edges --group-by source' },
     ],
     seeAlso: 'upg registry, upg health',
   },
