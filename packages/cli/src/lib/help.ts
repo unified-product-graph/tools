@@ -393,14 +393,18 @@ export const helpTopics: Record<string, HelpEntry> = {
     seeAlso: 'upg workspace, upg mcp setup',
   },
   workspace: {
-    usage: 'upg workspace [action] [arg]',
-    summary: 'Workspace actions: list (default), switch <name>.',
-    options: [],
+    usage: 'upg workspace [action] [items...]',
+    summary: 'Workspace actions: list (default), switch <name>, rekind --kind <kind> <file...>.',
+    options: [
+      { flag: '--kind <kind>', desc: 'For rekind: product | org_rollup | watched' },
+      { flag: '--json', desc: 'Machine-readable JSON output (rekind)' },
+    ],
     examples: [
       { cmd: 'upg workspace', comment: 'list products' },
       { cmd: 'upg workspace switch my-product' },
+      { cmd: "upg workspace rekind --kind watched .upg/competitor-*.upg", comment: 'bulk set member_kind' },
     ],
-    seeAlso: 'upg init --workspace',
+    seeAlso: 'upg init --workspace, upg product update --member-kind',
   },
   import: {
     usage: 'upg import --from <tool> [options]',
@@ -640,9 +644,18 @@ export const helpTopics: Record<string, HelpEntry> = {
   },
   product: {
     usage: 'upg product update [options]',
-    summary: 'Edit product-level fields (title, description, stage).',
-    options: [FILE_OPT, JSON_OPT, { flag: '--title <t>', desc: 'New title' }, { flag: '--stage <s>', desc: 'Product stage' }],
-    examples: [{ cmd: 'upg product update --stage growth' }],
+    summary: 'Edit product-level fields (title, description, stage, member_kind).',
+    options: [
+      FILE_OPT,
+      JSON_OPT,
+      { flag: '--title <t>', desc: 'New title' },
+      { flag: '--stage <s>', desc: 'Product stage' },
+      { flag: '--member-kind <kind>', desc: 'Workspace member kind: product | org_rollup | watched' },
+    ],
+    examples: [
+      { cmd: 'upg product update --stage growth' },
+      { cmd: 'upg product update --member-kind watched --file .upg/competitor-x.upg' },
+    ],
     seeAlso: 'upg workspace, upg init',
   },
   batch: {

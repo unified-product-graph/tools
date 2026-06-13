@@ -1,13 +1,16 @@
 import { Command } from 'commander'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { die, runtimeError, usageError } from '../lib/errors.js'
+import { die, runtimeError, usageError, violation } from '../lib/errors.js'
+import { loadStore } from '../lib/graph.js'
+import { updateProduct, UPG_MEMBER_KINDS } from '@unified-product-graph/sdk'
 
 export const workspaceCommand = new Command('workspace')
-  .arguments('[action]')
-  .description('Workspace actions: list (default), switch <name>, add <title>.')
-  .arguments('[arg]')
-  .action(async (action, arg) => {
+  .arguments('[action] [items...]')
+  .description('Workspace actions: list (default), switch <name>, rekind --kind <kind> <file...>.')
+  .option('--kind <kind>', 'For rekind: product | org_rollup | watched')
+  .option('--json', 'Machine-readable JSON output (rekind)')
+  .action(async (action: string | undefined, items: string[] | undefined, cmd: Command) => {
     try {
       const cwd = process.cwd()
       const workspacePath = path.join(cwd, '.upg', 'workspace.json')
@@ -20,7 +23,8 @@ export const workspaceCommand = new Command('workspace')
           console.log(`\nWorkspace: ${workspace.products?.length ?? 0} product(s)\n`)
           for (const p of workspace.products ?? []) {
             const active = p.file === workspace.default_product ? ' (active)' : ''
-            console.log(`  ${p.title}  ${p.file}${active}`)
+            const kind = p.member_kind && p.member_kind !== 'product' ? `  [${p.member_kind}]` : ''
+            console.log(`  ${p.title}  ${p.file}${kind}${active}`)
           }
           console.log()
         } catch {
@@ -39,15 +43,16 @@ export const workspaceCommand = new Command('workspace')
       }
 
       if (action === 'switch') {
-        if (!arg) die(usageError('Usage: upg workspace switch <name>'))
+        const name = items?.[0]
+        if (!name) die(usageError('Usage: upg workspace switch <name>'))
         const raw = await fs.readFile(workspacePath, 'utf-8')
         const workspace = JSON.parse(raw)
         const match = workspace.products?.find(
           (p: { file: string; title: string }) =>
-            p.file === arg || p.file === `${arg}.upg` || p.title.toLowerCase() === arg.toLowerCase()
+            p.file === name || p.file === `${name}.upg` || p.title.toLowerCase() === name.toLowerCase()
         )
         if (!match) {
-          die(runtimeError(`Product not found: "${arg}". Available: ${workspace.products?.map((p: { title: string }) => p.title).join(', ')}`))
+          die(runtimeError(`Product not found: "${name}". Available: ${workspace.products?.map((p: { title: string }) => p.title).join(', ')}`))
         }
         workspace.default_product = match.file
         await fs.writeFile(workspacePath, JSON.stringify(workspace, null, 2) + '\n', 'utf-8')
@@ -55,7 +60,59 @@ export const workspaceCommand = new Command('workspace')
         return
       }
 
-      die(usageError(`Unknown action: "${action}". Use: list, switch`))
+      // ── rekind: bulk set member_kind across many graphs (spec #44, 0.10.1) ──
+      // Pass files as positional args; shell globs expand naturally, e.g.
+      //   upg workspace rekind --kind watched .upg/competitor-*.upg
+      // Each file's $upg.member_kind is set (integrity resealed) and the
+      // workspace.json cache + portfolio.upg registry are reconciled.
+      if (action === 'rekind') {
+        const kind = (cmd.opts() as { kind?: string }).kind
+        const json = (cmd.opts() as { json?: boolean }).json === true
+        if (!kind) {
+          die(usageError('Usage: upg workspace rekind --kind <product|org_rollup|watched> <file...>'))
+        }
+        if (!(UPG_MEMBER_KINDS as readonly string[]).includes(kind)) {
+          die(violation(`Invalid --kind "${kind}". Valid: ${UPG_MEMBER_KINDS.join(', ')}.`))
+        }
+        const files = items ?? []
+        if (files.length === 0) {
+          die(usageError(
+            'No files given. Pass one or more .upg files (shell globs expand), e.g. `upg workspace rekind --kind watched .upg/competitor-*.upg`.',
+          ))
+        }
+        const results: Array<{ file: string; ok: boolean; changed: boolean; error?: string }> = []
+        for (const f of files) {
+          try {
+            const store = await loadStore(f)
+            try {
+              const r = await updateProduct({ store, member_kind: kind as never, cwd })
+              await store.flush()
+              results.push({ file: f, ok: true, changed: r.updated.includes('member_kind') })
+            } finally {
+              store.stopWatching()
+            }
+          } catch (e) {
+            results.push({ file: f, ok: false, changed: false, error: (e as Error).message })
+          }
+        }
+        const okCount = results.filter((r) => r.ok).length
+        const changedCount = results.filter((r) => r.changed).length
+        const failedCount = results.length - okCount
+        if (json) {
+          process.stdout.write(JSON.stringify({ ok: failedCount === 0, kind, results }, null, 2) + '\n')
+        } else {
+          console.log(`\nRe-kind to "${kind}": ${okCount}/${results.length} ok (${changedCount} changed)\n`)
+          for (const r of results) {
+            const mark = r.ok ? (r.changed ? '✓' : '=') : '✗'
+            console.log(`  ${mark} ${r.file}${r.error ? `  ${r.error}` : ''}`)
+          }
+          console.log()
+        }
+        if (failedCount > 0) process.exitCode = 1
+        return
+      }
+
+      die(usageError(`Unknown action: "${action}". Use: list, switch, rekind`))
     } catch (err) {
       die(err)
     }

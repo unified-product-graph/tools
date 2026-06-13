@@ -30,6 +30,7 @@ import { edgeId, productId } from './id.js'
 import {
   openPortfolioStoreIfExists,
   registerProductOnPortfolio,
+  setProductMemberKindOnPortfolio,
   addProductToArea,
   addProductToPortfolio,
 } from './portfolio-routing.js'
@@ -91,6 +92,21 @@ export class InvalidProductStageError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'InvalidProductStageError'
+  }
+}
+
+/** Canonical workspace member kinds (spec #44/#45). `product` is the default. */
+export const UPG_MEMBER_KINDS = ['product', 'org_rollup', 'watched'] as const
+export type UPGMemberKind = (typeof UPG_MEMBER_KINDS)[number]
+
+/**
+ * Thrown when a product write attempts to persist a non-canonical
+ * `member_kind`. Echoes the valid set (consistent with InvalidProductStageError).
+ */
+export class InvalidMemberKindError extends Error {
+  constructor(value: string) {
+    super(`Invalid member_kind: "${value}". Valid: ${UPG_MEMBER_KINDS.join(', ')}.`)
+    this.name = 'InvalidMemberKindError'
   }
 }
 
@@ -506,24 +522,40 @@ export interface UpdateProductArgs {
   description?: string
   health_status?: string
   url?: string
+  /** spec #44 (0.10.1): re-kind an existing graph (product | org_rollup | watched). */
+  member_kind?: UPGMemberKind
+  /**
+   * Workspace root. Required to keep the `workspace.json` cache and the
+   * `portfolio.upg` registry in sync on a `member_kind` re-kind. When omitted,
+   * only the graph's own `$upg.member_kind` is updated (still the source of truth).
+   */
+  cwd?: string
 }
 
 export interface UpdateProductResult {
   product: Record<string, unknown>
   /** Which header fields were changed. */
   updated: string[]
+  /** The graph's member kind after the update (when member_kind was supplied). */
+  member_kind?: UPGMemberKind
 }
 
 /**
  * Update the product header (`$upg.product`): the canonical home of a product's
  * lifecycle `stage` (the value `get_graph_digest` reads), plus title /
- * description / health_status / url. Strict stage validation mirrors
- * createProduct. Mutates the header in place + marks the store dirty; the caller
- * flushes. Closes the gap where the only way to set a product's stage was to
- * hand-edit the integrity-hashed file.
+ * description / health_status / url, and the workspace `member_kind`. Strict
+ * stage / member_kind validation mirrors createProduct. Mutates the header in
+ * place + marks the store dirty; the caller flushes the product file.
+ *
+ * A `member_kind` change is the full re-kind: it sets `$upg.member_kind` on the
+ * graph (the caller's flush reseals integrity) AND — when `cwd` is given —
+ * reconciles the `workspace.json` cache (so `list_local_products` reflects it)
+ * and the `portfolio.upg` registry (so `$upg.counts.products` and the watched
+ * anti-pattern scoping reflect it). Closes the gap where the only way to set
+ * stage or kind was to hand-edit the integrity-hashed file (spec #44).
  */
-export function updateProduct(args: UpdateProductArgs): UpdateProductResult {
-  const { store, stage, title, description, health_status, url } = args
+export async function updateProduct(args: UpdateProductArgs): Promise<UpdateProductResult> {
+  const { store, stage, title, description, health_status, url, member_kind, cwd } = args
   const product = store.getProduct() as unknown as
     | (Record<string, unknown> & { stage?: string; title?: string })
     | undefined
@@ -531,6 +563,9 @@ export function updateProduct(args: UpdateProductArgs): UpdateProductResult {
   if (stage !== undefined) {
     const stageError = validateProductStageStrict(stage)
     if (stageError !== null) throw new InvalidProductStageError(stageError)
+  }
+  if (member_kind !== undefined && !UPG_MEMBER_KINDS.includes(member_kind)) {
+    throw new InvalidMemberKindError(member_kind)
   }
   const updated: string[] = []
   if (stage !== undefined) {
@@ -553,6 +588,59 @@ export function updateProduct(args: UpdateProductArgs): UpdateProductResult {
     product.url = url
     updated.push('url')
   }
+  if (member_kind !== undefined) {
+    const before = store.getMemberKind()
+    store.setMemberKind(member_kind) // marks dirty only when changed
+    if (store.getMemberKind() !== before) updated.push('member_kind')
+    // Reconcile the workspace.json cache + portfolio.upg registry even when the
+    // graph value was already correct, so a partially-applied prior re-kind heals.
+    if (cwd) await syncMemberKindCaches(cwd, store, member_kind)
+  }
   if (updated.length > 0) store.markDirty()
-  return { product, updated }
+  return { product, updated, ...(member_kind !== undefined ? { member_kind } : {}) }
+}
+
+/**
+ * Keep the workspace.json cache and portfolio.upg registry member_kind in sync
+ * with a graph's `$upg.member_kind` after a re-kind. Best-effort: the graph file
+ * is the source of truth, so a missing workspace.json / portfolio.upg is not an
+ * error. (spec #44, UPG 0.10.1)
+ */
+async function syncMemberKindCaches(
+  cwd: string,
+  store: UPGFileStore,
+  kind: UPGMemberKind,
+): Promise<void> {
+  const filePath = store.getFilePath()
+  // 1. workspace.json cache — keyed by the product's workspace-relative path
+  //    (or bare basename for legacy root entries), matching list_local_products.
+  try {
+    const upgDir = path.join(cwd, '.upg')
+    const workspacePath = path.join(upgDir, 'workspace.json')
+    const rel = path.relative(upgDir, filePath).split(path.sep).join('/')
+    const base = path.basename(filePath)
+    const ws = JSON.parse(await fsp.readFile(workspacePath, 'utf-8')) as { products?: WorkspaceProduct[] }
+    const entry = ws.products?.find((p) => p.file === rel || p.file === base)
+    if (entry) {
+      if (kind === 'product') delete entry.member_kind
+      else entry.member_kind = kind
+      await fsp.writeFile(workspacePath, JSON.stringify(ws, null, 2) + '\n', 'utf-8')
+    }
+  } catch {
+    // No workspace.json (single-file mode): the graph's $upg.member_kind stands.
+  }
+  // 2. portfolio.upg registry — drives $upg.counts.products and the watched
+  //    anti-pattern scoping (buildProductKindMap reads products[].member_kind).
+  try {
+    const portfolioStore = await openPortfolioStoreIfExists(cwd)
+    if (portfolioStore) {
+      const doc = portfolioStore.getDocument()
+      const pid = (store.getProduct() as { id?: string } | undefined)?.id
+      if (doc && pid && setProductMemberKindOnPortfolio(doc, pid, kind, portfolioStore)) {
+        await portfolioStore.flush()
+      }
+    }
+  } catch {
+    // No portfolio.upg yet: counts/scoping derive from the registry once created.
+  }
 }

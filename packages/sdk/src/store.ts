@@ -941,6 +941,33 @@ export class UPGFileStore {
   }
 
   /**
+   * The graph's workspace member kind (spec #44/#45): `product` (default),
+   * `org_rollup` (company umbrella), or `watched` (monitored intelligence
+   * graph). Read from the in-memory doc, where `normalizeDocument` lifts
+   * `$upg.member_kind` to a top-level field (absent = product).
+   */
+  getMemberKind(): 'product' | 'org_rollup' | 'watched' {
+    const k = (this.doc as { member_kind?: string }).member_kind
+    return k === 'org_rollup' || k === 'watched' ? k : 'product'
+  }
+
+  /**
+   * Set the workspace member kind and mark dirty; the canonical serializer
+   * stamps `$upg.member_kind` and reseals `$upg.integrity` on flush. Setting
+   * `product` clears the field (the absent default), so a watched / org_rollup
+   * graph can be re-kinded back to a product. No-op (and not dirtied) when the
+   * value is unchanged. (spec #44, UPG 0.10.1)
+   */
+  setMemberKind(kind: 'product' | 'org_rollup' | 'watched'): void {
+    const doc = this.doc as { member_kind?: string }
+    const current = doc.member_kind === 'org_rollup' || doc.member_kind === 'watched' ? doc.member_kind : 'product'
+    if (current === kind) return
+    if (kind === 'product') delete doc.member_kind
+    else doc.member_kind = kind
+    this.markDirty()
+  }
+
+  /**
    * Declare the tool writing through this store ( / M7). Its `tool` and
    * `tool_version` are stamped into `source` (provenance) on every flush, so the
    * file records its LAST writer. Call once after construction/load from each

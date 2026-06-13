@@ -62,6 +62,7 @@ import {
   listPortfolios,
   getOrganization,
   createCrossProductEdge,
+  createParityEdge,
   linkAreaToAudience,
   batchCreateCrossProductEdges,
   deleteCrossProductEdgeTool,
@@ -827,7 +828,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'update_product',
     description:
-      "Update the product header (`$upg.product`): stage, title, description, health_status, url. The supported way to advance a product's lifecycle stage; it writes the value get_graph_digest reads, without hand-editing the .upg file.",
+      "Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. Re-kinding to watched / org_rollup also reconciles the workspace.json cache and the portfolio.upg registry so list_local_products, counts.products, and the watched anti-pattern scoping all reflect it.",
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -836,6 +837,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         description: { type: 'string', description: 'Product description.' },
         health_status: { type: 'string', description: 'Product health (free-form, e.g. on_track / at_risk).' },
         url: { type: 'string', description: 'Product URL.' },
+        member_kind: {
+          type: 'string',
+          enum: ['product', 'org_rollup', 'watched'],
+          description: 'Workspace member kind. product (default, an owned product), org_rollup (company umbrella graph), or watched (a monitored intelligence graph, e.g. a competitor, excluded from product coverage / counts).',
+        },
       },
     },
   },
@@ -1795,6 +1801,40 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'create_parity_edge',
+    description:
+      'Create the parity / rivalry edge `feature_rivals_competitor_feature` from our `feature` to a `competitor_feature`, carrying the assessment (parity_status / quality / is_gap / assessed_on / evidence / confidence) as edge metadata. A typed convenience over the generic edge writers: it fixes the edge type, validates the parity enums, derives `is_gap` from `parity_status` when omitted, and routes automatically. Within the active graph it writes a catalogue edge (like `create_edge`); cross-product (their `competitor_feature` in a separate watched intelligence graph) it writes a cross-edge (like `create_cross_product_edge`), with the our-side product defaulting to the active product. The edge is authoritative; the node `parity_status` is a denormalised single-rival cache that `validate_graph` checks for divergence.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        feature_id: { type: 'string', description: 'Our feature node id (the rivalry edge source). Bare, or {product_id}/{node_id} in cross mode.' },
+        competitor_feature_id: { type: 'string', description: 'Their competitor_feature node id (the target). Bare for within-graph, or {product_id}/{node_id} for a competitor in a separate watched graph.' },
+        parity_status: {
+          type: 'string',
+          enum: ['ahead', 'behind', 'parity', 'unique_to_us', 'unique_to_them'],
+          description: 'Our standing versus theirs on this feature.',
+        },
+        quality: {
+          type: 'string',
+          enum: ['better', 'same', 'worse', 'missing'],
+          description: 'Relative quality of our equivalent.',
+        },
+        is_gap: { type: 'boolean', description: 'Gap in our offering. Defaults to true when parity_status is behind or unique_to_them.' },
+        assessed_on: { type: 'string', description: 'ISO date the assessment was made.' },
+        evidence: { type: 'string', description: 'Free text, or an evidence / competitor_signal node id backing the assessment.' },
+        confidence: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          description: 'Confidence in the assessment.',
+        },
+        feature_product_id: { type: 'string', description: 'Cross mode: product id of our feature (defaults to the active product).' },
+        competitor_product_id: { type: 'string', description: 'Cross mode: product id of the watched graph holding the competitor_feature.' },
+        auto_create_portfolio: { type: 'boolean', description: 'Cross mode only: create an empty portfolio document if none exists (default false).' },
+      },
+      required: ['feature_id', 'competitor_feature_id', 'parity_status'],
+    },
+  },
+  {
     name: 'link_area_to_audience',
     description:
       'Link a product area to a canonical audience: create an `area_serves_persona` (target is a registry persona) or `area_targets_market_segment` (target is a registry market_segment) cross-edge, with optional `relevance` (primary/secondary) and `audience_role` qualifiers. The edge type is inferred from the canonical entity\'s type. Source is the product_area id; target is `registry/{canonical_id}`. This is the only path that creates the area↔audience edges. Idempotent: an existing edge is updated (qualifiers), not duplicated.',
@@ -2310,6 +2350,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   list_portfolios: listPortfolios,
   get_organization: getOrganization,
   create_cross_product_edge: createCrossProductEdge,
+  create_parity_edge: createParityEdge,
   link_area_to_audience: linkAreaToAudience,
   delete_cross_product_edge: deleteCrossProductEdgeTool,
   batch_create_cross_product_edges: batchCreateCrossProductEdges,

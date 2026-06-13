@@ -450,10 +450,11 @@ describe(' / DT-SIM-2: two-product guard', () => {
 describe(' §B product stage write surface', () => {
   it('updateProduct writes the header stage and rejects a non-canonical stage', async () => {
     const store = await freshStore()
-    const r = updateProduct({ store, stage: 'build' })
+    const r = await updateProduct({ store, stage: 'build' })
     expect(r.updated).toContain('stage')
     expect((store.getProduct() as { stage?: string }).stage).toBe('build')
-    expect(() => updateProduct({ store, stage: 'mvp' as never })).toThrow(InvalidProductStageError)
+    // updateProduct is async (0.10.1): a non-canonical stage rejects, not throws.
+    await expect(updateProduct({ store, stage: 'mvp' as never })).rejects.toThrow(InvalidProductStageError)
   })
 
   it('update_node on a product node syncs $upg.product.stage (closes the desync)', async () => {

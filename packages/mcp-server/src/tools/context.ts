@@ -72,11 +72,16 @@ export const getProductContext: ToolHandler = (args, ctx): ToolResult => {
     countsByType[n.type] = (countsByType[n.type] ?? 0) + 1
   }
 
+  const memberKind = store.getMemberKind()
   const lines: string[] = [
     `## ${product.title}`,
     product.description ? `\n${product.description}` : '',
     product.stage ? `\nStage: ${product.stage}` : '',
     `\nLens: ${sessionContext.lens}`,
+    // spec #44: surface the workspace member kind so an agent can tell an owned
+    // product from a watched intelligence graph / company rollup without a
+    // separate list_local_products call.
+    `\nMember kind: ${memberKind}`,
   ]
 
   if (sessionContext.lens === 'engineering') {

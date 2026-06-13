@@ -375,6 +375,34 @@ export function registerProductOnPortfolio(
 }
 
 /**
+ * Update an EXISTING portfolio registry entry's `member_kind` (spec #44, UPG
+ * 0.10.1). Unlike `registerProductOnPortfolio` (which only adds), this upserts
+ * the kind on a product already in `products[]`, so a re-kind keeps
+ * `$upg.counts.products` (derived from product-kind members on flush) and the
+ * anti-pattern `watched`-scoping (`buildProductKindMap`) in sync with the
+ * graph's own `$upg.member_kind`. Sets `watched` / `org_rollup`; clears the
+ * field for `product` (the absent default). Returns true when the entry was
+ * found and changed; the caller flushes.
+ */
+export function setProductMemberKindOnPortfolio(
+  doc: UPGPortfolioDocument,
+  productId: string,
+  kind: 'product' | 'org_rollup' | 'watched',
+  store?: { markDirty: () => void },
+): boolean {
+  if (!productId) return false
+  const products = doc.products as unknown as PortfolioProductReference[]
+  const entry = products.find((p) => p.id === productId)
+  if (!entry) return false
+  const current = entry.member_kind === 'org_rollup' || entry.member_kind === 'watched' ? entry.member_kind : 'product'
+  if (current === kind) return false
+  if (kind === 'product') delete entry.member_kind
+  else entry.member_kind = kind
+  store?.markDirty()
+  return true
+}
+
+/**
  * Best-effort lookup of a product's `.upg` file and title given its product
  * id. Walks the workspace `.upg/` directory looking for a file whose
  * `product.id` matches. Returns null when not found or when the workspace

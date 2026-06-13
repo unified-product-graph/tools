@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 123 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 124 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 123 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 28 tools
+- [Workspace & Portfolios](#workspace-portfolios): 29 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1253,6 +1253,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`batch_register_instance`](#batch-register-instance)
 - [`clone_structure`](#clone-structure)
 - [`create_cross_product_edge`](#create-cross-product-edge)
+- [`create_parity_edge`](#create-parity-edge)
 - [`create_product`](#create-product)
 - [`create_registry_edge`](#create-registry-edge)
 - [`define_canonical_entity`](#define-canonical-entity)
@@ -1428,6 +1429,36 @@ JSON: `{ edge, portfolio_file }`.
 when the workspace is not initialised.
 
 **See also:** `list_portfolios`, `list_portfolio_cross_edges`, `migrate_cross_edges`
+
+
+### `create_parity_edge`
+
+Create the parity / rivalry edge `feature_rivals_competitor_feature` from our `feature` to a `competitor_feature`, carrying the assessment (parity_status / quality / is_gap / assessed_on / evidence / confidence) as edge metadata. A typed convenience over the generic edge writers: it fixes the edge type, validates the parity enums, derives `is_gap` from `parity_status` when omitted, and routes automatically. Within the active graph it writes a catalogue edge (like `create_edge`); cross-product (their `competitor_feature` in a separate watched intelligence graph) it writes a cross-edge (like `create_cross_product_edge`), with the our-side product defaulting to the active product. The edge is authoritative; the node `parity_status` is a denormalised single-rival cache that `validate_graph` checks for divergence.
+
+**Atomicity:** `inherits the delegated writer's atomicity.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `assessed_on` | string |  | ISO date the assessment was made. |
+| `auto_create_portfolio` | boolean |  | Cross mode only: create an empty portfolio document if none exists (default false). |
+| `competitor_feature_id` | string | ✓ | Their competitor_feature node id (the target). Bare for within-graph, or {product_id}/{node_id} for a competitor in a separate watched graph. |
+| `competitor_product_id` | string |  | Cross mode: product id of the watched graph holding the competitor_feature. |
+| `confidence` | `low` \| `medium` \| `high` |  | Confidence in the assessment. |
+| `evidence` | string |  | Free text, or an evidence / competitor_signal node id backing the assessment. |
+| `feature_id` | string | ✓ | Our feature node id (the rivalry edge source). Bare, or {product_id}/{node_id} in cross mode. |
+| `feature_product_id` | string |  | Cross mode: product id of our feature (defaults to the active product). |
+| `is_gap` | boolean |  | Gap in our offering. Defaults to true when parity_status is behind or unique_to_them. |
+| `parity_status` | `ahead` \| `behind` \| `parity` \| `unique_to_us` \| `unique_to_them` | ✓ | Our standing versus theirs on this feature. |
+| `quality` | `better` \| `same` \| `worse` \| `missing` |  | Relative quality of our equivalent. |
+
+**Returns:**
+
+JSON: the created edge (within-graph `create_edge` shape, or the
+cross-product `{ edge, portfolio_file }` shape).
+
+**See also:** `create_edge`, `create_cross_product_edge`, `validate_graph`
 
 
 ### `create_product`
@@ -1940,7 +1971,7 @@ JSON: `{ canonical, qualified_id, instance_count, portfolio_file }`.
 
 ### `update_product`
 
-Update the product header (`$upg.product`): stage, title, description, health_status, url. The supported way to advance a product's lifecycle stage; it writes the value get_graph_digest reads, without hand-editing the .upg file.
+Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. Re-kinding to watched / org_rollup also reconciles the workspace.json cache and the portfolio.upg registry so list_local_products, counts.products, and the watched anti-pattern scoping all reflect it.
 
 **Atomicity:** `atomic (single flush).`
 
@@ -1950,6 +1981,7 @@ Update the product header (`$upg.product`): stage, title, description, health_st
 | ---- | ---- | -------- | ----------- |
 | `description` | string |  | Product description. |
 | `health_status` | string |  | Product health (free-form, e.g. on_track / at_risk). |
+| `member_kind` | `product` \| `org_rollup` \| `watched` |  | Workspace member kind. product (default, an owned product), org_rollup (company umbrella graph), or watched (a monitored intelligence graph, e.g. a competitor, excluded from product coverage / counts). |
 | `stage` | string |  | Product lifecycle stage (canonical UPGProductStage). |
 | `title` | string |  | Product display title. |
 | `url` | string |  | Product URL. |

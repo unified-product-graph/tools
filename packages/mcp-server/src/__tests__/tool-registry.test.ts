@@ -85,7 +85,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 123 tools', () => {
+  it('exposes the expected 124 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -124,7 +124,10 @@ describe('Tool registry: completeness', () => {
     // + get_tree (0.9.15): server-side canonical tree assembly (local-only). → 121.
     // + 2 tree-pattern introspection tools (0.9.20): list_tree_patterns,
     //   get_tree_pattern (the catalogue behind get_tree, made queryable). → 123.
-    expect(TOOL_DEFINITIONS).toHaveLength(123)
+    // + create_parity_edge (0.10.1 spec issue #38 fast-follow): typed writer for
+    //   feature_rivals_competitor_feature, local-only (cross-product portfolio
+    //   write, like link_area_to_audience). → 124.
+    expect(TOOL_DEFINITIONS).toHaveLength(124)
   })
 })
 

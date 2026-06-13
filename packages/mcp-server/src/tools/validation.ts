@@ -146,6 +146,20 @@ interface PolymorphicUpgradeHintEntry {
   rationale: string
 }
 
+// spec issue #38 (UPG 0.10.1): parity divergence. The
+// `feature_rivals_competitor_feature` edge carries the authoritative parity
+// assessment; the `competitor_feature` node's `parity_status` is a denormalised
+// single-rival cache. When a competitor_feature has exactly one inbound rivalry
+// edge and the cached node value disagrees with the edge's assessment, the cache
+// is stale. Advisory only — never flips `valid`.
+interface ParityDivergenceEntry {
+  competitor_feature_id: string
+  feature_id: string
+  edge_id: string
+  node_parity_status: string
+  edge_parity_status: string
+}
+
 // Pre-computed polymorphic set for O(1) membership checks.
 const POLYMORPHIC_EDGE_SET = new Set<string>(UPG_POLYMORPHIC_EDGE_KEYS)
 
@@ -748,6 +762,44 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     }
   }
 
+  // ── Parity divergence (advisory, spec issue #38, UPG 0.10.1) ──────
+  // The feature_rivals_competitor_feature edge is authoritative for parity; the
+  // competitor_feature node's `parity_status` is a denormalised single-rival
+  // cache. When a competitor_feature has exactly one inbound rivalry edge and
+  // the cached node value disagrees with the edge's assessment, surface it so
+  // the cache can be reconciled to the edge. Within-graph only (the edge and
+  // both endpoints live in this store); cross-product divergence is a
+  // portfolio-tier concern. Advisory only: never flips `valid`.
+  const parityDivergence: ParityDivergenceEntry[] = []
+  {
+    const RIVALS = 'feature_rivals_competitor_feature'
+    const inboundByTarget = new Map<string, Array<(typeof doc.edges)[number]>>()
+    for (const edge of doc.edges) {
+      if (edge.type !== RIVALS) continue
+      const list = inboundByTarget.get(edge.target) ?? []
+      list.push(edge)
+      inboundByTarget.set(edge.target, list)
+    }
+    for (const [cfId, edges] of inboundByTarget) {
+      if (edges.length !== 1) continue // only the single-rival cache case
+      if (parityDivergence.length >= limit) break
+      const edge = edges[0]
+      const cf = nodeById.get(cfId)
+      if (!cf || cf.type !== 'competitor_feature') continue
+      const nodeParity = (cf.properties as Record<string, unknown> | undefined)?.parity_status
+      const edgeParity = (edge as { properties?: Record<string, unknown> }).properties?.parity_status
+      if (typeof nodeParity !== 'string' || typeof edgeParity !== 'string') continue
+      if (nodeParity === edgeParity) continue
+      parityDivergence.push({
+        competitor_feature_id: cfId,
+        feature_id: edge.source,
+        edge_id: edge.id,
+        node_parity_status: nodeParity,
+        edge_parity_status: edgeParity,
+      })
+    }
+  }
+
   // ── Anti-pattern evaluation ─────────────────────────────────────
   // Pure evaluator over pre-computed inputs. The collector walks the store
   // once and returns the 7-field stats shape consumed by `evaluateAntiPatterns`.
@@ -783,6 +835,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     graphTopologySelfLoops.length +
     propertyTypeDrift.length +
     polymorphicUpgradeHints.length +
+    parityDivergence.length +
     (antiPatternViolations?.length ?? 0)
   const guardOutcome = preflightPayload({
     toolName: 'validate_graph',
@@ -879,6 +932,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       graph_topology_self_loops: graphTopologySelfLoops.length,
       property_type_drift: propertyTypeDrift.length,
       polymorphic_upgrade_hints: includePolymorphicUpgrades ? polymorphicUpgradeHints.length : undefined,
+      parity_divergence: parityDivergence.length > 0 ? parityDivergence.length : undefined,
     },
     _hash: currentHash,
   } as ValidateGraphResult & {
@@ -887,6 +941,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     graph_topology_self_loops?: GraphTopologySelfLoopEntry[]
     property_type_drift?: PropertyTypeDriftEntry[]
     polymorphic_with_typed_alternative?: PolymorphicUpgradeHintEntry[]
+    parity_divergence?: ParityDivergenceEntry[]
   }
   if (!skipDrift) {
     if (includes('entity_drift')) response.entity_drift = entityDrift
@@ -903,6 +958,9 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // suggestions, not schema-drift errors, and are controlled solely by
   // include_polymorphic_upgrades. When skip_drift is true they still appear.
   if (includePolymorphicUpgrades) response.polymorphic_with_typed_alternative = polymorphicUpgradeHints
+  // Parity divergence is advisory and independent of skip_drift (it is not a
+  // schema-drift class); surfaced only when something actually diverges.
+  if (parityDivergence.length > 0) response.parity_divergence = parityDivergence
   if (antiPatternViolations) {
     response.anti_pattern_violations = antiPatternViolations
   }

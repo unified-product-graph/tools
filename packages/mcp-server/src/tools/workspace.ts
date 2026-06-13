@@ -28,10 +28,12 @@ import {
   initWorkspace,
   InvalidProductNameError,
   InvalidProductStageError,
+  InvalidMemberKindError,
   WorkspaceAlreadyExistsError,
   WorkspaceNotInitialisedError,
 } from '@unified-product-graph/sdk'
 import { coerceProductStage } from '@unified-product-graph/core'
+import { createEdge } from './edges.js'
 
 /**
  * True only when `p` exists AND is a regular file. Used by `switch_product`
@@ -455,17 +457,19 @@ export const createProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
 export const updateProductTool: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
   try {
-    const result = updateProduct({
+    const result = await updateProduct({
       store,
       stage: args.stage as never,
       title: args.title as string | undefined,
       description: args.description as string | undefined,
       health_status: args.health_status as string | undefined,
       url: args.url as string | undefined,
+      member_kind: args.member_kind as 'product' | 'org_rollup' | 'watched' | undefined,
+      cwd: process.cwd(),
     })
     if (result.updated.length === 0) {
       return textError(
-        'Nothing to update: pass at least one of: stage, title, description, health_status, url.',
+        'Nothing to update: pass at least one of: stage, title, description, health_status, url, member_kind.',
       )
     }
     await store.flush()
@@ -473,7 +477,9 @@ export const updateProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
       JSON.stringify({ message: `Updated product (${result.updated.join(', ')})`, ...result }, null, 2),
     )
   } catch (err) {
-    if (err instanceof InvalidProductStageError) return textError(err.message)
+    if (err instanceof InvalidProductStageError || err instanceof InvalidMemberKindError) {
+      return textError(err.message)
+    }
     return textError(`update_product failed: ${(err as Error).message}`)
   }
 }
@@ -726,6 +732,118 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
       null,
       2,
     ),
+  )
+}
+
+/**
+ * Create a parity / rivalry edge from our `feature` to a `competitor_feature`
+ * (spec issue #38, UPG 0.10.1). A typed convenience over the generic edge
+ * writers for the single `feature_rivals_competitor_feature` edge type: it fixes
+ * the edge type, validates the parity enums, derives `is_gap` from
+ * `parity_status` when omitted, and packs the assessment (parity_status /
+ * quality / is_gap / assessed_on / evidence / confidence) onto the edge as
+ * metadata. The edge is authoritative; the node `parity_status` is a
+ * denormalised single-rival cache (`validate_graph` warns on divergence).
+ *
+ * Routing mirrors the edge type's dual catalogue + cross-edge registration:
+ * - WITHIN the active graph (their `competitor_feature` lives alongside our
+ *   `feature`): writes a catalogue edge via `create_edge`.
+ * - CROSS-product (their `competitor_feature` lives in a separate watched
+ *   intelligence graph): writes a cross-edge via `create_cross_product_edge`.
+ *   Cross mode is selected when `competitor_feature_id` is qualified
+ *   (`{product_id}/{node_id}`) or a product id is supplied; the our-side
+ *   `feature_product_id` defaults to the active product.
+ *
+ * Parameters:
+ * - `feature_id` (required): our `feature` (the rivalry edge source).
+ * - `competitor_feature_id` (required): their `competitor_feature` (target);
+ *   bare for within-graph, or `{product_id}/{node_id}` for cross-product.
+ * - `parity_status` (required): ahead | behind | parity | unique_to_us | unique_to_them.
+ * - `quality`: better | same | worse | missing.
+ * - `is_gap`: boolean (default: parity_status in behind / unique_to_them).
+ * - `assessed_on`: ISO date the assessment was made.
+ * - `evidence`: free text, or an evidence / competitor_signal node id.
+ * - `confidence`: low | medium | high.
+ * - `feature_product_id` / `competitor_product_id`: qualify bare ids in cross mode.
+ * - `auto_create_portfolio`: cross mode only; create an empty portfolio doc if absent.
+ *
+ * @returns JSON: the created edge (within-graph `create_edge` shape, or the
+ *   cross-product `{ edge, portfolio_file }` shape).
+ * @atomicity inherits the delegated writer's atomicity.
+ * @see create_edge
+ * @see create_cross_product_edge
+ * @see validate_graph
+ */
+export const createParityEdge: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const featureId = args.feature_id as string | undefined
+  const competitorFeatureId = args.competitor_feature_id as string | undefined
+  const parityStatus = args.parity_status as string | undefined
+  if (!featureId) return textError('Missing required parameter: feature_id (our feature)')
+  if (!competitorFeatureId) {
+    return textError('Missing required parameter: competitor_feature_id (their competitor_feature)')
+  }
+  if (!parityStatus) return textError('Missing required parameter: parity_status')
+
+  const PARITY = ['ahead', 'behind', 'parity', 'unique_to_us', 'unique_to_them']
+  if (!PARITY.includes(parityStatus)) {
+    return textError(`Invalid parity_status: ${parityStatus}. Valid: ${PARITY.join(', ')}.`)
+  }
+  const quality = args.quality as string | undefined
+  if (quality !== undefined && !['better', 'same', 'worse', 'missing'].includes(quality)) {
+    return textError(`Invalid quality: ${quality}. Valid: better, same, worse, missing.`)
+  }
+  const confidence = args.confidence as string | undefined
+  if (confidence !== undefined && !['low', 'medium', 'high'].includes(confidence)) {
+    return textError(`Invalid confidence: ${confidence}. Valid: low, medium, high.`)
+  }
+
+  // is_gap denormalises from parity_status when not given: `behind` and
+  // `unique_to_them` are the gap states.
+  const isGap = typeof args.is_gap === 'boolean'
+    ? (args.is_gap as boolean)
+    : parityStatus === 'behind' || parityStatus === 'unique_to_them'
+
+  const properties: Record<string, unknown> = {
+    parity_status: parityStatus,
+    ...(quality !== undefined ? { quality } : {}),
+    is_gap: isGap,
+    ...(args.assessed_on !== undefined ? { assessed_on: args.assessed_on } : {}),
+    ...(args.evidence !== undefined ? { evidence: args.evidence } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
+  }
+
+  const competitorProductId = args.competitor_product_id as string | undefined
+  const featureProductId = args.feature_product_id as string | undefined
+  const isCross = competitorFeatureId.includes('/') || !!competitorProductId || !!featureProductId
+
+  if (isCross) {
+    // Our feature defaults to the active product when the source isn't qualified.
+    const activeProductId = ctx.store.getProduct().id
+    const sourceProductId = featureProductId ?? (featureId.includes('/') ? undefined : activeProductId)
+    return createCrossProductEdge(
+      {
+        source_id: featureId,
+        target_id: competitorFeatureId,
+        type: 'feature_rivals_competitor_feature',
+        ...(sourceProductId ? { source_product_id: sourceProductId } : {}),
+        ...(competitorProductId ? { target_product_id: competitorProductId } : {}),
+        properties,
+        ...(args.auto_create_portfolio !== undefined
+          ? { auto_create_portfolio: args.auto_create_portfolio }
+          : {}),
+      },
+      ctx,
+    )
+  }
+
+  return createEdge(
+    {
+      source_id: featureId,
+      target_id: competitorFeatureId,
+      type: 'feature_rivals_competitor_feature',
+      properties,
+    },
+    ctx,
   )
 }
 

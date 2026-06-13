@@ -19,6 +19,7 @@ import { die, usageError, violation, runtimeError } from '../lib/errors.js'
 import {
   updateProduct,
   InvalidProductStageError,
+  InvalidMemberKindError,
 } from '@unified-product-graph/sdk'
 
 // ── sub-command: update ────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ const updateCmd = new Command('update')
   .option('--stage <stage>', 'New product stage (e.g. concept, discovery, build, launch, growth, maturity, sunset)')
   .option('--health-status <status>', 'New health status (e.g. on_track, at_risk, off_track)')
   .option('--url <url>', 'Product URL')
+  .option('--member-kind <kind>', 'Workspace member kind: product | org_rollup | watched')
   .option('--json', 'Machine-readable JSON output')
   .action(async (opts: {
     file?: string
@@ -39,6 +41,7 @@ const updateCmd = new Command('update')
     stage?: string
     healthStatus?: string
     url?: string
+    memberKind?: string
     json?: boolean
   }) => {
     try {
@@ -48,10 +51,11 @@ const updateCmd = new Command('update')
       const hasStage = opts.stage !== undefined
       const hasHealthStatus = opts.healthStatus !== undefined
       const hasUrl = opts.url !== undefined
+      const hasMemberKind = opts.memberKind !== undefined
 
-      if (!hasTitle && !hasDescription && !hasStage && !hasHealthStatus && !hasUrl) {
+      if (!hasTitle && !hasDescription && !hasStage && !hasHealthStatus && !hasUrl && !hasMemberKind) {
         die(usageError(
-          'Nothing to update: pass at least one of --title, --description, --stage, --health-status, or --url.',
+          'Nothing to update: pass at least one of --title, --description, --stage, --health-status, --url, or --member-kind.',
         ))
       }
 
@@ -67,19 +71,21 @@ const updateCmd = new Command('update')
       // updateProduct throws InvalidProductStageError for a bad stage value
       // (exit 2, policy violation) and a plain Error for any other problem.
       // Both are re-raised after stopping the watcher.
-      let result: ReturnType<typeof updateProduct>
+      let result: Awaited<ReturnType<typeof updateProduct>>
       try {
-        result = updateProduct({
+        result = await updateProduct({
           store,
           title: opts.title,
           description: opts.description,
           stage: opts.stage as never,
           health_status: opts.healthStatus,
           url: opts.url,
+          member_kind: opts.memberKind as 'product' | 'org_rollup' | 'watched' | undefined,
+          cwd: process.cwd(),
         })
       } catch (innerErr) {
         store.stopWatching()
-        if (innerErr instanceof InvalidProductStageError) {
+        if (innerErr instanceof InvalidProductStageError || innerErr instanceof InvalidMemberKindError) {
           die(violation(innerErr.message))
         }
         throw innerErr
@@ -129,7 +135,7 @@ export const productCommand = new Command('product')
     console.log('  Subcommands:')
     console.log()
     console.log('    update   Edit product-level header fields')
-    console.log('             Options: --title, --description, --stage, --health-status, --url')
+    console.log('             Options: --title, --description, --stage, --health-status, --url, --member-kind')
     console.log()
     console.log('  Global option: --file <path>  (targets a specific .upg file)')
     console.log()

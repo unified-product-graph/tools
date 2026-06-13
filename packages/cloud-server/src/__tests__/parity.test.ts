@@ -136,6 +136,12 @@ const CLOUD_NA = new Set([
   'promote_to_canonical',
   'create_registry_edge',
   'link_area_to_audience',
+  // create_parity_edge (0.10.1, spec issue #38 fast-follow): typed writer for the
+  // feature_rivals_competitor_feature parity edge. Local-only for the same reason
+  // as the other cross-product writers — it can target a competitor_feature in a
+  // separate watched .upg graph (a workspace concept with no single-product cloud
+  // analogue). Cloud parity is a tracked follow-up.
+  'create_parity_edge',
   // get_tree reached cloud parity in 0.9.16: the assembler moved to the shared
   // @unified-product-graph/mcp-tooling package, and the cloud handler builds an
   // in-memory GraphReader from a one-shot product load. REQUIRED on cloud now.
