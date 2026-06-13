@@ -228,12 +228,36 @@ export const getNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
     const canonical = portfolioStore?.getRegistryNode(bareId)
     if (!canonical) return textError(`Registry node not found: ${nodeId}`)
     const target = `${REGISTRY_PRODUCT_ID}/${bareId}`
-    const instances = portfolioStore!
-      .getAllCrossEdges()
+    const allCross = portfolioStore!.getAllCrossEdges()
+    const instances = allCross
       .filter((e) => e.type === 'instance_of' && e.target === target)
       .map((e) => ({ source: e.source, product_id: e.source_product_id, alias: e.alias ?? false }))
+    // 0.10.4 (read-path brief A): when the canonical is a classification_value,
+    // attach the incoming `*_classified_as_classification_value` edges so
+    // "which competitors / nodes are classified as value X?" is one get_node
+    // call, with each classification's properties (confidence / assessed_on / ...).
+    const classifiedBy = allCross
+      .filter((e) => e.type.endsWith('_classified_as_classification_value') && e.target === target)
+      .map((e) => ({
+        source: e.source,
+        product_id: e.source_product_id,
+        type: e.type,
+        ...((e as { properties?: Record<string, unknown> }).properties
+          ? { properties: (e as { properties?: Record<string, unknown> }).properties }
+          : {}),
+      }))
     return text(
-      JSON.stringify({ node: canonical, registry: true, instance_count: instances.length, instances }, null, 2),
+      JSON.stringify(
+        {
+          node: canonical,
+          registry: true,
+          instance_count: instances.length,
+          instances,
+          ...(classifiedBy.length > 0 ? { classified_by_count: classifiedBy.length, classified_by: classifiedBy } : {}),
+        },
+        null,
+        2,
+      ),
     )
   }
 

@@ -127,7 +127,9 @@ describe('Tool registry: completeness', () => {
     // + create_parity_edge (0.10.1 spec issue #38 fast-follow): typed writer for
     //   feature_rivals_competitor_feature, local-only (cross-product portfolio
     //   write, like link_area_to_audience). → 124.
-    expect(TOOL_DEFINITIONS).toHaveLength(124)
+    // + create_classification_edge (0.10.4): typed writer for the classification
+    //   edges, local-only (same cross-product portfolio write). → 125.
+    expect(TOOL_DEFINITIONS).toHaveLength(125)
   })
 })
 

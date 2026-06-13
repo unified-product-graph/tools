@@ -8,7 +8,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
-import { UPG_EDGE_CATALOG, UPG_EDGE_TYPES, resolveContainmentEdge } from '@unified-product-graph/core'
+import { UPG_EDGE_CATALOG, UPG_EDGE_TYPES, resolveContainmentEdge, validateEdgeProperties } from '@unified-product-graph/core'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
 import { validateExplicitEdgeType } from '@unified-product-graph/sdk'
 import { preflightPayload } from '../lib/payload-guard.js'
@@ -226,6 +226,17 @@ export const createEdge: ToolHandler = (args, ctx): ToolResult => {
     // Always return the hint on a bad type — even when an endpoint doesn't
     // resolve, the fuzzy name match still offers a did_you_mean (#28).
     return textError(unknownEdgeTypeHint(explicitType, srcType, tgtType))
+  }
+
+  // Validate edge properties against the type's property_schema when it has one
+  // (the classification edges, 0.10.4). No-op for schema-less edge types, so
+  // parity / framework-exercise edges keep their unvalidated bag.
+  const propsArg = args.properties as Record<string, unknown> | undefined
+  if (explicitType && propsArg && Object.keys(propsArg).length > 0) {
+    const propErrors = validateEdgeProperties(explicitType, propsArg)
+    if (propErrors.length > 0) {
+      return textError(`Invalid properties for "${explicitType}": ${propErrors.join('; ')}`)
+    }
   }
 
   const result = createEdgeLib(store, {

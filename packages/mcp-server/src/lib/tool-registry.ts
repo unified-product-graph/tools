@@ -63,6 +63,7 @@ import {
   getOrganization,
   createCrossProductEdge,
   createParityEdge,
+  createClassificationEdge,
   linkAreaToAudience,
   batchCreateCrossProductEdges,
   deleteCrossProductEdgeTool,
@@ -1835,6 +1836,29 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'create_classification_edge',
+    description:
+      'Place a node in a classification cell, carrying optional confidence and provenance as edge metadata (confidence / assessed_on / rationale / evidence). A typed convenience over the generic edge writers, mirroring create_parity_edge: it picks the edge type from the source node type (a competitor source writes competitor_classified_as_classification_value; any other node writes the polymorphic node_classified_as_classification_value), expands a friendly confidence (low/medium/high) into the canonical confidence_5 assessment, defaults assessed_on to today, and routes automatically. A registry/{value} target (or a supplied node_product_id) writes a cross-edge; a bare local value writes a catalogue edge.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        node_id: { type: 'string', description: 'The node being classified (the edge source). Bare, or {product_id}/{node_id}.' },
+        classification_value_id: { type: 'string', description: 'The target classification_value. Bare for a local value, or registry/{value} for a canonical.' },
+        node_product_id: { type: 'string', description: 'Cross mode: product id holding node_id (defaults to the active product).' },
+        confidence: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          description: 'Confidence this node belongs in this cell. Expanded to a confidence_5 assessment.',
+        },
+        assessed_on: { type: 'string', description: 'ISO date the classification was made or last re-checked. Defaults to today.' },
+        rationale: { type: 'string', description: 'Short note on why this node sits in this cell.' },
+        evidence: { type: 'string', description: 'A source URL, or a competitor_signal / evidence node id backing the classification.' },
+        auto_create_portfolio: { type: 'boolean', description: 'Cross mode only: create an empty portfolio document if none exists (default false).' },
+      },
+      required: ['node_id', 'classification_value_id'],
+    },
+  },
+  {
     name: 'link_area_to_audience',
     description:
       'Link a product area to a canonical audience: create an `area_serves_persona` (target is a registry persona) or `area_targets_market_segment` (target is a registry market_segment) cross-edge, with optional `relevance` (primary/secondary) and `audience_role` qualifiers. The edge type is inferred from the canonical entity\'s type. Source is the product_area id; target is `registry/{canonical_id}`. This is the only path that creates the area↔audience edges. Idempotent: an existing edge is updated (qualifiers), not duplicated.',
@@ -1883,6 +1907,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               },
               source_product_id: { type: 'string', description: 'Product ID of the source node (qualifies a bare source_id)' },
               target_product_id: { type: 'string', description: 'Product ID of the target node (qualifies a bare target_id)' },
+              properties: { type: 'object', description: 'Edge metadata, accepted only for cross-edge types declared carries_properties (e.g. the classification edges). Validated against the type property_schema; rejected for types that do not carry properties.' },
             },
             required: ['source_id', 'target_id', 'type'],
           },
@@ -1895,8 +1920,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_portfolio_cross_edges',
     description:
-      'List all cross-product edges stored in the portfolio document (`.upg/portfolio.upg`). Empty list when the portfolio document is absent.',
-    inputSchema: { type: 'object' as const, properties: {} },
+      'List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered and grouped. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix (e.g. all classification edges grouped by source) instead of the full unfiltered dump.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        type: { type: 'string', description: 'Filter to one cross-edge type (e.g. competitor_classified_as_classification_value).' },
+        source_product_id: { type: 'string', description: 'Filter to edges whose source node is in this product.' },
+        group_by: { type: 'string', enum: ['source', 'target'], description: 'Group edges by source or target endpoint (the comparison matrix) instead of a flat list.' },
+      },
+    },
   },
   {
     name: 'define_canonical_entity',
@@ -2351,6 +2383,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_organization: getOrganization,
   create_cross_product_edge: createCrossProductEdge,
   create_parity_edge: createParityEdge,
+  create_classification_edge: createClassificationEdge,
   link_area_to_audience: linkAreaToAudience,
   delete_cross_product_edge: deleteCrossProductEdgeTool,
   batch_create_cross_product_edges: batchCreateCrossProductEdges,

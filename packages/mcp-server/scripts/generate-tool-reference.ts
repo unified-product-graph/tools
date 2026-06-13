@@ -145,6 +145,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getOrganization: 'get_organization',
   createCrossProductEdge: 'create_cross_product_edge',
   createParityEdge: 'create_parity_edge',
+  createClassificationEdge: 'create_classification_edge',
   linkAreaToAudience: 'link_area_to_audience',
   deleteCrossProductEdgeTool: 'delete_cross_product_edge',
   batchCreateCrossProductEdges: 'batch_create_cross_product_edges',

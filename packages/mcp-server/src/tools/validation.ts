@@ -28,6 +28,7 @@ import {
   evaluateAntiPatterns,
   walkMigrationChainToCanonical,
   migrateStatusValue,
+  validateEdgeProperties,
   type UPGAntiPatternSeverity,
   type UPGProductStage,
 } from '@unified-product-graph/core'
@@ -580,6 +581,30 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
           expected_type: v.expected_type,
           actual_type: v.actual_type,
           reason: v.reason,
+        })
+      }
+    }
+  }
+
+  // Edge property drift (0.10.4): an edge whose type declares a property_schema
+  // (the classification edges) is validated against it — off-scale assessment
+  // values, an unknown key, or a missing required assessment field surface as
+  // property_type_drift. validateEdgeProperties is a no-op for schema-less edge
+  // types, so parity / framework-exercise edges are untouched.
+  if (includes('property_type_drift')) {
+    for (const edge of doc.edges) {
+      if (propertyTypeDrift.length >= limit) break
+      const edgeProps = (edge as { properties?: Record<string, unknown> }).properties
+      if (!edgeProps) continue
+      for (const msg of validateEdgeProperties(edge.type as string, edgeProps)) {
+        if (propertyTypeDrift.length >= limit) break
+        propertyTypeDrift.push({
+          id: edge.id,
+          type: edge.type as string,
+          property: '(edge property)',
+          expected_type: 'valid',
+          actual_type: 'invalid',
+          reason: msg,
         })
       }
     }

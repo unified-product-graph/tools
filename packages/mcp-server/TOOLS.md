@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 124 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 125 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 124 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 29 tools
+- [Workspace & Portfolios](#workspace-portfolios): 30 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1252,6 +1252,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`batch_define_canonical_entity`](#batch-define-canonical-entity)
 - [`batch_register_instance`](#batch-register-instance)
 - [`clone_structure`](#clone-structure)
+- [`create_classification_edge`](#create-classification-edge)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_parity_edge`](#create-parity-edge)
 - [`create_product`](#create-product)
@@ -1399,6 +1400,32 @@ warnings? }`.
 the source has no clonable shape under the given scope.
 
 **See also:** `portfolio_validate`, `batch_create_nodes`, `switch_product`
+
+
+### `create_classification_edge`
+
+Place a node in a classification cell, carrying optional confidence and provenance as edge metadata (confidence / assessed_on / rationale / evidence). A typed convenience over the generic edge writers, mirroring create_parity_edge: it picks the edge type from the source node type (a competitor source writes competitor_classified_as_classification_value; any other node writes the polymorphic node_classified_as_classification_value), expands a friendly confidence (low/medium/high) into the canonical confidence_5 assessment, defaults assessed_on to today, and routes automatically. A registry/{value} target (or a supplied node_product_id) writes a cross-edge; a bare local value writes a catalogue edge.
+
+**Atomicity:** `inherits the delegated writer's atomicity.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `assessed_on` | string |  | ISO date the classification was made or last re-checked. Defaults to today. |
+| `auto_create_portfolio` | boolean |  | Cross mode only: create an empty portfolio document if none exists (default false). |
+| `classification_value_id` | string | ✓ | The target classification_value. Bare for a local value, or registry/{value} for a canonical. |
+| `confidence` | `low` \| `medium` \| `high` |  | Confidence this node belongs in this cell. Expanded to a confidence_5 assessment. |
+| `evidence` | string |  | A source URL, or a competitor_signal / evidence node id backing the classification. |
+| `node_id` | string | ✓ | The node being classified (the edge source). Bare, or {product_id}/{node_id}. |
+| `node_product_id` | string |  | Cross mode: product id holding node_id (defaults to the active product). |
+| `rationale` | string |  | Short note on why this node sits in this cell. |
+
+**Returns:**
+
+JSON: the created edge (within-graph or cross-product shape).
+
+**See also:** `create_cross_product_edge`, `create_edge`
 
 
 ### `create_cross_product_edge`
@@ -1696,15 +1723,22 @@ coerced to `concept`), or `null` when unset — matching what
 
 ### `list_portfolio_cross_edges`
 
-List all cross-product edges stored in the portfolio document (`.upg/portfolio.upg`). Empty list when the portfolio document is absent.
+List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered and grouped. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix (e.g. all classification edges grouped by source) instead of the full unfiltered dump.
 
 **Atomicity:** `atomic (read-only)`
 
-_No arguments._
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `group_by` | `source` \| `target` |  | Group edges by source or target endpoint (the comparison matrix) instead of a flat list. |
+| `source_product_id` | string |  | Filter to edges whose source node is in this product. |
+| `type` | string |  | Filter to one cross-edge type (e.g. competitor_classified_as_classification_value). |
 
 **Returns:**
 
-JSON: `{ cross_edges: UPGCrossEdge[], total, portfolio_file? }`.
+JSON: flat `{ cross_edges, total, portfolio_file? }`, or when grouped
+`{ grouped_by, groups: Record<endpoint, UPGCrossEdge[]>, total, group_count }`.
 
 **See also:** `create_cross_product_edge`
 

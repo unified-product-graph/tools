@@ -11,7 +11,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType } from '@unified-product-graph/core'
-import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties } from '@unified-product-graph/core'
 import { UPGPortfolioStore } from '@unified-product-graph/sdk'
 import {
   resolvePortfolioPath,
@@ -620,6 +620,15 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
       `carries_properties (e.g. feature_rivals_competitor_feature) may carry edge metadata.`,
     )
   }
+  // When the type declares a typed property_schema (the classification edges,
+  // 0.10.4), reject unknown keys and off-scale/missing-required values. Types
+  // with carries_properties but no schema (parity) keep the unvalidated bag.
+  if (hasProps) {
+    const propErrors = validateEdgeProperties(edgeTypeArg, propsArg)
+    if (propErrors.length > 0) {
+      return textError(`Invalid properties for "${edgeTypeArg}": ${propErrors.join('; ')}`)
+    }
+  }
 
   // Qualify IDs; accept both bare IDs (with product context) and
   // pre-qualified `{product_id}/{node_id}` strings.
@@ -850,6 +859,105 @@ export const createParityEdge: ToolHandler = async (args, ctx): Promise<ToolResu
   )
 }
 
+/** Friendly confidence enum → canonical confidence_5 assessment (0.10.4). */
+const CLASSIFICATION_CONFIDENCE_MAP: Record<string, { value: number; label: string; scale_id: string }> = {
+  low: { value: 2, label: 'low', scale_id: 'confidence_5' },
+  medium: { value: 3, label: 'medium', scale_id: 'confidence_5' },
+  high: { value: 5, label: 'high', scale_id: 'confidence_5' },
+}
+
+/**
+ * Typed convenience writer for a classification: place a node in a classification
+ * cell, carrying optional confidence / provenance (0.10.4). Mirrors
+ * `create_parity_edge`: friendly args, automatic within-graph vs cross-product
+ * routing, and confidence coercion so callers never hand-assemble the
+ * confidence_5 assessment.
+ *
+ * Edge type is chosen by the source node's type: a `competitor` source writes
+ * `competitor_classified_as_classification_value`; anything else writes the
+ * polymorphic `node_classified_as_classification_value`. (When the source lives
+ * in a non-active product and can't be resolved, the generic edge is used; it is
+ * valid for any source and carries the identical schema.)
+ *
+ * Routing: a `registry/{value}` or otherwise-qualified `classification_value_id`,
+ * or a supplied `node_product_id`, selects cross-product (`create_cross_product_edge`);
+ * a bare local value writes a catalogue edge (`create_edge`).
+ *
+ * Parameters:
+ * - `node_id` (required): the thing being classified (bare, or `{product}/{node}`).
+ * - `classification_value_id` (required): target value (bare local, or `registry/{value}`).
+ * - `node_product_id`: qualify a bare `node_id` in cross mode (defaults to active product).
+ * - `confidence`: low | medium | high — expanded to a confidence_5 assessment.
+ * - `assessed_on`: ISO date; defaults to today when omitted (provenance for staleness).
+ * - `rationale`: short note on why this node sits in this cell.
+ * - `evidence`: a source URL, or a competitor_signal / evidence node id.
+ * - `auto_create_portfolio`: cross mode only; create an empty portfolio doc if absent.
+ *
+ * @returns JSON: the created edge (within-graph or cross-product shape).
+ * @atomicity inherits the delegated writer's atomicity.
+ * @see create_cross_product_edge
+ * @see create_edge
+ */
+export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const nodeId = args.node_id as string | undefined
+  const classificationValueId = args.classification_value_id as string | undefined
+  if (!nodeId) return textError('Missing required parameter: node_id (the node being classified)')
+  if (!classificationValueId) {
+    return textError('Missing required parameter: classification_value_id (the target value; bare or registry/{value})')
+  }
+
+  const confidenceArg = args.confidence as string | undefined
+  if (confidenceArg !== undefined && !(confidenceArg in CLASSIFICATION_CONFIDENCE_MAP)) {
+    return textError(`Invalid confidence: ${confidenceArg}. Valid: low, medium, high.`)
+  }
+
+  // Pick the specialised vs generic edge from the source node's type.
+  const bareNodeId = nodeId.includes('/') ? nodeId.split('/')[1] : nodeId
+  const sourceType = ctx.store.getNode(bareNodeId)?.type
+  const edgeType =
+    sourceType === 'competitor'
+      ? 'competitor_classified_as_classification_value'
+      : 'node_classified_as_classification_value'
+
+  const properties: Record<string, unknown> = {
+    ...(confidenceArg !== undefined ? { confidence: CLASSIFICATION_CONFIDENCE_MAP[confidenceArg] } : {}),
+    assessed_on: (args.assessed_on as string | undefined) ?? new Date().toISOString().slice(0, 10),
+    ...(args.rationale !== undefined ? { rationale: args.rationale } : {}),
+    ...(args.evidence !== undefined ? { evidence: args.evidence } : {}),
+  }
+
+  const nodeProductId = args.node_product_id as string | undefined
+  const isCross = classificationValueId.includes('/') || !!nodeProductId
+
+  if (isCross) {
+    const activeProductId = ctx.store.getProduct().id
+    const sourceProductId = nodeProductId ?? (nodeId.includes('/') ? undefined : activeProductId)
+    return createCrossProductEdge(
+      {
+        source_id: nodeId,
+        target_id: classificationValueId,
+        type: edgeType,
+        ...(sourceProductId ? { source_product_id: sourceProductId } : {}),
+        properties,
+        ...(args.auto_create_portfolio !== undefined
+          ? { auto_create_portfolio: args.auto_create_portfolio }
+          : {}),
+      },
+      ctx,
+    )
+  }
+
+  return createEdge(
+    {
+      source_id: nodeId,
+      target_id: classificationValueId,
+      type: edgeType,
+      properties,
+    },
+    ctx,
+  )
+}
+
 /**
  * Link a product area to a canonical audience (Batch-5 #29): create an
  * `area_serves_persona` (→ a registry persona) or `area_targets_market_segment`
@@ -997,14 +1105,24 @@ export const linkAreaToAudience: ToolHandler = async (args, _ctx): Promise<ToolR
 }
 
 /**
- * List all cross-product edges in the portfolio document
- * (`.upg/portfolio.upg`). Returns an empty list if no portfolio exists yet.
+ * List cross-product edges in the portfolio document (`.upg/portfolio.upg`),
+ * with optional filtering and grouping (0.10.4, read-path brief C) so a large
+ * portfolio's edges can be read back as a focused matrix instead of one
+ * overflowing dump.
  *
- * @returns JSON: `{ cross_edges: UPGCrossEdge[], total, portfolio_file? }`.
+ * Parameters:
+ * - `type`: filter to one cross-edge type (e.g. `competitor_classified_as_classification_value`).
+ * - `source_product_id`: filter to edges whose source is in this product.
+ * - `group_by`: `source` or `target` — return edges grouped by that endpoint
+ *   (the comparison matrix: source -> its targets, or target -> its members)
+ *   instead of a flat list.
+ *
+ * @returns JSON: flat `{ cross_edges, total, portfolio_file? }`, or when grouped
+ *   `{ grouped_by, groups: Record<endpoint, UPGCrossEdge[]>, total, group_count }`.
  * @atomicity atomic (read-only)
  * @see create_cross_product_edge
  */
-export const listPortfolioCrossEdges: ToolHandler = async (_args, _ctx): Promise<ToolResult> => {
+export const listPortfolioCrossEdges: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
   const cwd = process.cwd()
   const portfolioPath = resolvePortfolioPath(cwd)
   if (!portfolioPath) {
@@ -1020,17 +1138,36 @@ export const listPortfolioCrossEdges: ToolHandler = async (_args, _ctx): Promise
     return textError(`Failed to load portfolio document: ${(err as Error).message}`)
   }
 
-  const edges = portfolioStore.getAllCrossEdges()
+  const typeFilter = args.type as string | undefined
+  const sourceProductFilter = args.source_product_id as string | undefined
+  const groupBy = args.group_by as string | undefined
+  if (groupBy !== undefined && groupBy !== 'source' && groupBy !== 'target') {
+    return textError(`Invalid group_by: ${groupBy}. Valid: source, target.`)
+  }
+
+  let edges = portfolioStore.getAllCrossEdges()
+  if (typeFilter) edges = edges.filter((e) => e.type === typeFilter)
+  if (sourceProductFilter) edges = edges.filter((e) => e.source_product_id === sourceProductFilter)
+
+  const portfolio_file = path.relative(cwd, portfolioPath)
+
+  if (groupBy) {
+    const groups: Record<string, typeof edges> = {}
+    for (const e of edges) {
+      const key = (groupBy === 'source' ? e.source : e.target) as string
+      ;(groups[key] ??= []).push(e)
+    }
+    return text(
+      JSON.stringify(
+        { grouped_by: groupBy, group_count: Object.keys(groups).length, total: edges.length, groups, portfolio_file },
+        null,
+        2,
+      ),
+    )
+  }
+
   return text(
-    JSON.stringify(
-      {
-        cross_edges: edges,
-        total: edges.length,
-        portfolio_file: path.relative(cwd, portfolioPath),
-      },
-      null,
-      2,
-    ),
+    JSON.stringify({ cross_edges: edges, total: edges.length, portfolio_file }, null, 2),
   )
 }
 
@@ -1284,6 +1421,17 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
     if (targetIdArg.includes('/')) qualifiedTarget = targetIdArg
     else if (targetProductId) qualifiedTarget = `${targetProductId}/${targetIdArg}`
     else return textError(`edges[${i}]: target_id "${targetIdArg}" is a bare node id. Supply target_product_id or a qualified {product_id}/{node_id}.`)
+    // Edge metadata, gated the same way the single writer gates it (0.10.4 fix:
+    // the batch writer previously dropped properties silently).
+    const propsArg = e.properties as Record<string, unknown> | undefined
+    const hasProps = !!propsArg && Object.keys(propsArg).length > 0
+    if (hasProps && !edgeCarriesProperties(edgeTypeArg)) {
+      return textError(`edges[${i}]: cross-product edge type "${edgeTypeArg}" does not carry properties.`)
+    }
+    if (hasProps) {
+      const propErrors = validateEdgeProperties(edgeTypeArg, propsArg)
+      if (propErrors.length > 0) return textError(`edges[${i}]: invalid properties for "${edgeTypeArg}": ${propErrors.join('; ')}`)
+    }
     prepared.push({
       id: edgeId(),
       source: qualifiedSource,
@@ -1291,6 +1439,7 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
       type: edgeTypeArg as UPGCrossEdgeType,
       source_product_id: sourceProductId ?? qualifiedSource.split('/')[0],
       target_product_id: targetProductId ?? qualifiedTarget.split('/')[0],
+      ...(hasProps ? { properties: propsArg } : {}),
     })
   }
 

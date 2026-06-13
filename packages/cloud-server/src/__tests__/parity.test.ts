@@ -142,6 +142,11 @@ const CLOUD_NA = new Set([
   // separate watched .upg graph (a workspace concept with no single-product cloud
   // analogue). Cloud parity is a tracked follow-up.
   'create_parity_edge',
+  // create_classification_edge (0.10.4): typed writer for the classification
+  // edges, local-only for the same reason as create_parity_edge (it can target a
+  // competitor in a separate watched .upg graph). Cloud parity is a tracked
+  // follow-up.
+  'create_classification_edge',
   // get_tree reached cloud parity in 0.9.16: the assembler moved to the shared
   // @unified-product-graph/mcp-tooling package, and the cloud handler builds an
   // in-memory GraphReader from a one-shot product load. REQUIRED on cloud now.
