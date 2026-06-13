@@ -562,6 +562,40 @@ describe('canonical registry (0.9.6)', () => {
     expect(err).toMatch(/not found in the registry/i)
   })
 
+  // create_registry_edge takes ANY catalog edge whose endpoints resolve to
+  // matching registry canonicals (no allowlist) — so a registry-tier
+  // classification axis works today without a dedicated cross-edge. This is the
+  // hierarchy twin of the 0.10.2/0.10.3 `*_classified_as_classification_value`
+  // cross-edges: the axis->value containment lives once in the registry, and
+  // graphs classify against its values rather than redefine the taxonomy.
+  it('create_registry_edge supports classification_axis_includes_classification_value at the registry tier (0.10.3)', async () => {
+    const ctx = await activeCtx()
+    await batchDefineCanonicalEntity(
+      {
+        entities: [
+          { type: 'classification_axis', title: 'Delivery Architecture', canonical_id: 'classification_axis_delivery_architecture' },
+          { type: 'classification_value', title: 'OSS / Self-host', canonical_id: 'classification_value_oss_self_host' },
+        ],
+      },
+      ctx,
+    )
+    const body = bodyOf(
+      await createRegistryEdge(
+        {
+          source_id: 'classification_axis_delivery_architecture',
+          target_id: 'classification_value_oss_self_host',
+          type: 'classification_axis_includes_classification_value',
+        },
+        ctx,
+      ),
+    )
+    expect(body.edge.type).toBe('classification_axis_includes_classification_value')
+    expect(body.edge.source).toBe('classification_axis_delivery_architecture')
+    expect(body.edge.target).toBe('classification_value_oss_self_host')
+    const pf = readPortfolio() as { registry?: { edges?: Array<{ type: string }> } }
+    expect(pf.registry?.edges?.map((e) => e.type)).toContain('classification_axis_includes_classification_value')
+  })
+
   // ── portfolio_validate foundations anti-patterns (0.9.13, scope:'portfolio') ──
 
   it('portfolio_validate fires the three foundations anti-patterns and stays clean when satisfied', async () => {
