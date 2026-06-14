@@ -157,6 +157,8 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getPortfolioTree: 'get_portfolio_tree',
   auditPropertyCoverage: 'audit_property_coverage',
   diffClassification: 'diff_classification',
+  compareClassifications: 'compare_classifications',
+  aggregateEdgePropertiesTool: 'aggregate_edge_properties',
   portfolioValidate: 'portfolio_validate',
   cloneStructure: 'clone_structure',
   defineCanonicalEntity: 'define_canonical_entity',

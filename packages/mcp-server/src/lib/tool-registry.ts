@@ -72,7 +72,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
-import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification, compareClassifications, aggregateEdgePropertiesTool } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
 import {
   defineCanonicalEntity,
@@ -2182,6 +2182,34 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'compare_classifications',
+    description:
+      'Compare two classified nodes (competitors) axis-by-axis: where they AGREE (same classification_value), DIVERGE (different values), or where only one has been graded. The bridge from the classification layer to the parity layer: `create_parity_edge` writes a parity relationship, this derives which axes warrant one. Reuses the same per-node profile assembly as `get_portfolio_tree` competitor_profile, so axis / value / confidence resolution is identical, then joins the two. Divergences are ordered first (the actionable rows). Titles resolve to entity names. Read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        a: { type: 'string', description: 'First node to compare (qualified or bare id, e.g. p_rival/n_acme or a registry competitor id).' },
+        b: { type: 'string', description: 'Second node to compare (qualified or bare id).' },
+        axis: { type: 'string', description: 'Restrict the comparison to one classification axis (bare or qualified id). Omit to compare across every axis either node is graded on.' },
+      },
+      required: ['a', 'b'],
+    },
+  },
+  {
+    name: 'aggregate_edge_properties',
+    description:
+      'Aggregate the distribution of one property across every portfolio cross-edge of a type, optionally grouped by a dimension. The digest of the property layer: turns the by-eye "165 high / 53 medium / 0 low, mediums cluster on ext_api_sdk" count over a `jq` dump into one call. `property` defaults to `confidence` (an assessment-object property buckets by its `label`). `group_by`: `none` (one overall distribution, default), `axis` (the classification axis the target value belongs to), `competitor` (the source node), or `value` (the target value). Read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        edge_type: { type: 'string', description: 'Cross-edge type to aggregate (e.g. competitor_classified_as_classification_value).' },
+        group_by: { type: 'string', enum: ['none', 'axis', 'competitor', 'value'], description: 'Dimension to group the distribution by. Default none (one overall distribution).' },
+        property: { type: 'string', description: 'The edge property whose distribution to compute. Default confidence.' },
+      },
+      required: ['edge_type'],
+    },
+  },
+  {
     name: 'portfolio_validate',
     description:
       'Run `validate_graph` ACROSS every product in scope in one call (the audit counterpart to `portfolio_digest`). Replaces the `switch_product` + `validate_graph` round-trip per product. Each product is checked by the SAME single-product code path (schema drift + anti-patterns), so per-product verdicts never diverge. Returns a per-product `valid` / `structurally_valid` + drift + anti-pattern counts, plus a portfolio rollup with `all_valid`. Read-only; the active product is read live, the rest read-only.',
@@ -2453,6 +2481,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_portfolio_tree: getPortfolioTree,
   audit_property_coverage: auditPropertyCoverage,
   diff_classification: diffClassification,
+  compare_classifications: compareClassifications,
+  aggregate_edge_properties: aggregateEdgePropertiesTool,
   portfolio_validate: portfolioValidate,
   clone_structure: cloneStructure,
   migrate_cross_edges: migrateCrossEdges,

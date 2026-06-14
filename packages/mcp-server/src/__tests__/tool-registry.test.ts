@@ -137,7 +137,11 @@ describe('Tool registry: completeness', () => {
     // + diff_classification (0.11.0): reads the append-only reclassification
     //   history (signals[]) to show what moved on the landscape, local-only
     //   (portfolio read layer, no single-product cloud analogue). → 128.
-    expect(TOOL_DEFINITIONS).toHaveLength(128)
+    // + 2 classification-analysis read tools (0.11.2): compare_classifications
+    //   (two competitors axis-by-axis, feeds the parity layer) and
+    //   aggregate_edge_properties (property-layer distribution digest), both
+    //   local-only (portfolio read layer). → 130.
+    expect(TOOL_DEFINITIONS).toHaveLength(130)
   })
 })
 

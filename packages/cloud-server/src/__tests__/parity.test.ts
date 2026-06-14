@@ -130,6 +130,13 @@ const CLOUD_NA = new Set([
   // Local-only — the history lives in the portfolio workspace document, which
   // the single-product-per-request cloud server has no analogue for.
   'diff_classification',
+  // classification-analysis read tools (0.11.2): compare_classifications derives
+  // two competitors' axis-by-axis agree/diverge (feeding the parity layer);
+  // aggregate_edge_properties digests a cross-edge property's distribution. Both
+  // read the portfolio document — a .upg-file workspace concept with no
+  // single-product cloud analogue.
+  'compare_classifications',
+  'aggregate_edge_properties',
   // portfolio-wide audit (0.9.3, batch-4 #19): runs validate_graph across the
   // .upg-file workspace in one call. Local-only for the same reason as the
   // portfolio read layer — no cloud analogue (single-product-per-request).

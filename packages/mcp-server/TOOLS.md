@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 128 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 130 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 128 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 33 tools
+- [Workspace & Portfolios](#workspace-portfolios): 35 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1247,12 +1247,14 @@ when no editable field is supplied.
 
 _Multi-product discovery, switching, init, cross-product edges._
 
+- [`aggregate_edge_properties`](#aggregate-edge-properties)
 - [`attach_product_to_portfolio`](#attach-product-to-portfolio)
 - [`audit_property_coverage`](#audit-property-coverage)
 - [`batch_create_cross_product_edges`](#batch-create-cross-product-edges)
 - [`batch_define_canonical_entity`](#batch-define-canonical-entity)
 - [`batch_register_instance`](#batch-register-instance)
 - [`clone_structure`](#clone-structure)
+- [`compare_classifications`](#compare-classifications)
 - [`create_classification_edge`](#create-classification-edge)
 - [`create_cross_product_edge`](#create-cross-product-edge)
 - [`create_parity_edge`](#create-parity-edge)
@@ -1280,6 +1282,31 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`switch_product`](#switch-product)
 - [`update_canonical_entity`](#update-canonical-entity)
 - [`update_product`](#update-product)
+
+### `aggregate_edge_properties`
+
+Aggregate the distribution of one property across every portfolio cross-edge of a type, optionally grouped by a dimension. The digest of the property layer: turns the by-eye "165 high / 53 medium / 0 low, mediums cluster on ext_api_sdk" count over a `jq` dump into one call. `property` defaults to `confidence` (an assessment-object property buckets by its `label`). `group_by`: `none` (one overall distribution, default), `axis` (the classification axis the target value belongs to), `competitor` (the source node), or `value` (the target value). Read-only.
+
+**Atomicity:** `atomic (read-only). Reads the portfolio document only; never mutates.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `edge_type` | string | ✓ | Cross-edge type to aggregate (e.g. competitor_classified_as_classification_value). |
+| `group_by` | `none` \| `axis` \| `competitor` \| `value` |  | Dimension to group the distribution by. Default none (one overall distribution). |
+| `property` | string |  | The edge property whose distribution to compute. Default confidence. |
+
+**Returns:**
+
+JSON: `{ shape: "edge_property_aggregate", edge_type, property,
+group_by, total, with_property, without_property, overall: [{ key, count }],
+groups?: [{ group, group_label?, total, with_property, distribution }] }`.
+`overall` is the whole-type distribution; `groups` appears when `group_by` is
+not `none`.
+
+**See also:** `audit_property_coverage`, `list_portfolio_cross_edges`
+
 
 ### `attach_product_to_portfolio`
 
@@ -1428,6 +1455,31 @@ warnings? }`.
 the source has no clonable shape under the given scope.
 
 **See also:** `portfolio_validate`, `batch_create_nodes`, `switch_product`
+
+
+### `compare_classifications`
+
+Compare two classified nodes (competitors) axis-by-axis: where they AGREE (same classification_value), DIVERGE (different values), or where only one has been graded. The bridge from the classification layer to the parity layer: `create_parity_edge` writes a parity relationship, this derives which axes warrant one. Reuses the same per-node profile assembly as `get_portfolio_tree` competitor_profile, so axis / value / confidence resolution is identical, then joins the two. Divergences are ordered first (the actionable rows). Titles resolve to entity names. Read-only.
+
+**Atomicity:** `atomic (read-only). Reads the portfolio document and, for title
+resolution, referenced product files read-only; never mutates active state.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `a` | string | ✓ | First node to compare (qualified or bare id, e.g. p_rival/n_acme or a registry competitor id). |
+| `axis` | string |  | Restrict the comparison to one classification axis (bare or qualified id). Omit to compare across every axis either node is graded on. |
+| `b` | string | ✓ | Second node to compare (qualified or bare id). |
+
+**Returns:**
+
+JSON: `{ shape: "comparison", a, b, axes: Array<{ axis, axis_label,
+a: [{value, value_label, confidence?}], b: [...], status }>, stats:
+{ shared_axes, agreements, divergences, a_only, b_only } }`. Divergences are
+ordered first (the actionable rows).
+
+**See also:** `get_portfolio_tree`, `create_parity_edge`
 
 
 ### `create_classification_edge`

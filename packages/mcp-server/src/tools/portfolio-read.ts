@@ -26,6 +26,8 @@ import {
   openPortfolioStoreIfExists,
   assembleLandscape,
   assembleCompetitorProfile,
+  assembleComparison,
+  aggregateEdgeProperties,
   buildPortfolioNodeIndex,
   buildValueAxisMap,
   type UPGPortfolioStore,
@@ -1307,4 +1309,113 @@ export const diffClassification: ToolHandler = async (args, _ctx): Promise<ToolR
   if (guard.kind === 'refuse') return guard.result
   if (guard.kind === 'warn') Object.assign(response, guard.fields)
   return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * compare_classifications (UPG 0.11.2, read-path-tooling brief #5) — compare two
+ * classified nodes (competitors) axis-by-axis: where they agree (same value),
+ * diverge (different values), or only one is graded. The bridge from the
+ * classification layer to the parity layer: `create_parity_edge` writes a parity
+ * relationship, this derives which axes one should be written for. Reuses the
+ * same per-node profile assembly as `get_portfolio_tree({ shape: "competitor_profile" })`,
+ * so axis/value/confidence resolution is identical, then joins the two profiles.
+ *
+ * Portfolio-grain, local-only (CLOUD_NA) — reads the portfolio workspace document.
+ *
+ * @returns JSON: `{ shape: "comparison", a, b, axes: Array<{ axis, axis_label,
+ *   a: [{value, value_label, confidence?}], b: [...], status }>, stats:
+ *   { shared_axes, agreements, divergences, a_only, b_only } }`. Divergences are
+ *   ordered first (the actionable rows).
+ * @atomicity atomic (read-only). Reads the portfolio document and, for title
+ *   resolution, referenced product files read-only; never mutates active state.
+ * @see get_portfolio_tree
+ * @see create_parity_edge
+ */
+export const compareClassifications: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const a = args.a as string | undefined
+  const b = args.b as string | undefined
+  if (!a || !b) return textError('compare_classifications requires both `a` and `b`: the qualified ids of the two nodes to compare.')
+  const axis = args.axis as string | undefined
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return text(JSON.stringify({ shape: 'comparison', a: null, b: null, axes: [], note: 'No workspace portfolio document found.' }, null, 2))
+  }
+  const doc = portfolioStore.getDocument()
+  if (!doc) return textError('Portfolio document failed to load.')
+
+  // Resolve titles for both subjects (and any classified sources they may share an
+  // axis with) from their product files, mirroring get_portfolio_tree.
+  const index = buildPortfolioNodeIndex(doc)
+  await enrichIndexFromProducts(cwd, ctx.store as UPGFileStore, index, [a, b])
+
+  const result = assembleComparison(doc, { a, b, axis, node_index: index }) as Record<string, unknown>
+
+  const guard = preflightPayload({
+    toolName: 'compare_classifications',
+    nodeCount: 0,
+    edgeCount: Array.isArray(result.axes) ? result.axes.length : 0,
+    compactEdges: false,
+    argsHint: `a=${a}, b=${b}, axis=${axis ?? 'all'}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
+  if (guard.kind === 'warn') Object.assign(result, guard.fields)
+  return text(JSON.stringify(result, null, 2))
+}
+
+/**
+ * aggregate_edge_properties (UPG 0.11.2, read-path-tooling brief #6) — the digest
+ * of the property layer. Aggregate the distribution of one property across every
+ * portfolio cross-edge of a type, optionally grouped by a dimension. Turns the
+ * by-eye "165 high / 53 medium / 0 low, mediums cluster on ext_api_sdk" count
+ * over a `jq` dump into one call. `property` defaults to `confidence` (an
+ * assessment object buckets by its `label`).
+ *
+ * Portfolio-grain, local-only (CLOUD_NA) — reads the portfolio workspace document.
+ *
+ * @returns JSON: `{ shape: "edge_property_aggregate", edge_type, property,
+ *   group_by, total, with_property, without_property, overall: [{ key, count }],
+ *   groups?: [{ group, group_label?, total, with_property, distribution }] }`.
+ *   `overall` is the whole-type distribution; `groups` appears when `group_by` is
+ *   not `none`.
+ * @atomicity atomic (read-only). Reads the portfolio document only; never mutates.
+ * @see audit_property_coverage
+ * @see list_portfolio_cross_edges
+ */
+export const aggregateEdgePropertiesTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const edgeType = args.edge_type as string | undefined
+  if (!edgeType) return textError('Missing required parameter: edge_type.')
+  if (!(UPG_CROSS_EDGE_TYPES as readonly string[]).includes(edgeType)) {
+    return textError(`Unknown cross-edge type: "${edgeType}". See list_cross_edge_types.`)
+  }
+  const groupByArg = args.group_by as string | undefined
+  const validGroups = ['none', 'axis', 'competitor', 'value'] as const
+  if (groupByArg !== undefined && !(validGroups as readonly string[]).includes(groupByArg)) {
+    return textError(`Invalid group_by: "${groupByArg}". Valid: ${validGroups.join(', ')}.`)
+  }
+  const groupBy = (groupByArg as (typeof validGroups)[number] | undefined) ?? 'none'
+  const property = (args.property as string | undefined) ?? 'confidence'
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return text(JSON.stringify({ shape: 'edge_property_aggregate', edge_type: edgeType, property, group_by: groupBy, total: 0, with_property: 0, without_property: 0, overall: [], note: 'No workspace portfolio document found.' }, null, 2))
+  }
+  const doc = portfolioStore.getDocument()
+  if (!doc) return textError('Portfolio document failed to load.')
+
+  const index = buildPortfolioNodeIndex(doc)
+  const result = aggregateEdgeProperties(doc, { edge_type: edgeType, group_by: groupBy, property, node_index: index }) as Record<string, unknown>
+
+  const guard = preflightPayload({
+    toolName: 'aggregate_edge_properties',
+    nodeCount: 0,
+    edgeCount: Array.isArray(result.groups) ? result.groups.length : (Array.isArray(result.overall) ? result.overall.length : 0),
+    compactEdges: false,
+    argsHint: `edge_type=${edgeType}, group_by=${groupBy}, property=${property}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
+  if (guard.kind === 'warn') Object.assign(result, guard.fields)
+  return text(JSON.stringify(result, null, 2))
 }

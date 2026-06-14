@@ -522,3 +522,306 @@ export function titleFromIndex(
 ): string | undefined {
   return index.get(qualifiedId)?.title ?? index.get(`${REGISTRY_PRODUCT_ID}/${bareOf(qualifiedId)}`)?.title
 }
+
+/* ───────────────────────── #5 compare_classifications ───────────────────────── */
+
+/** One side's position(s) on an axis in a comparison. */
+export interface ComparisonSide {
+  value: string
+  value_label: string
+  confidence?: unknown
+}
+
+/** One axis row of a two-node classification comparison. */
+export interface ComparisonAxisRow {
+  /** Bare axis id (or synthetic `axis:<slug>`), null for the unaxed bucket. */
+  axis: string | null
+  axis_label: string | null
+  a: ComparisonSide[]
+  b: ComparisonSide[]
+  /**
+   * `agree`   — both graded, identical value set;
+   * `diverge` — both graded, value sets differ;
+   * `a_only`  — only A graded on this axis;
+   * `b_only`  — only B graded on this axis.
+   */
+  status: 'agree' | 'diverge' | 'a_only' | 'b_only'
+}
+
+export interface ComparisonResult {
+  shape: 'comparison'
+  a: { id: string; type: string; title: string } | null
+  b: { id: string; type: string; title: string } | null
+  axes: ComparisonAxisRow[]
+  stats: {
+    shared_axes: number
+    agreements: number
+    divergences: number
+    a_only: number
+    b_only: number
+  }
+  note?: string
+}
+
+/** Group one node's profile positions by axis key (axis bare id, or '__unaxed__'). */
+function positionsByAxis(positions: ProfilePosition[]): Map<string, ProfilePosition[]> {
+  const UNAXED = '__unaxed__'
+  const byAxis = new Map<string, ProfilePosition[]>()
+  for (const p of positions) {
+    const key = p.axis ?? UNAXED
+    ;(byAxis.get(key) ?? byAxis.set(key, []).get(key)!).push(p)
+  }
+  return byAxis
+}
+
+/**
+ * Compare two classified nodes (competitors) axis-by-axis: where they sit at the
+ * same value (agree), at different values (diverge), or where only one has been
+ * graded. The derivation that feeds the parity layer — `create_parity_edge` is
+ * the writer, this is the reader that tells you which axes to write a parity edge
+ * for. Builds each side via {@link assembleCompetitorProfile}, so axis/value/
+ * confidence resolution is identical to a single-node profile, then joins on axis.
+ *
+ * `a` and `b` are the qualified (or bare) ids of the two nodes to compare.
+ * A node graded multiple values on one axis (a multi-value categorical axis) is
+ * compared as a SET: agree iff the value-id sets are equal.
+ */
+export function assembleComparison(
+  doc: UPGPortfolioDocument,
+  opts: { a?: string; b?: string; axis?: string; node_index?: Map<string, PortfolioNodeRef> } = {},
+): ComparisonResult {
+  const index = opts.node_index ?? buildPortfolioNodeIndex(doc)
+  const empty = (which: 'a' | 'b'): ComparisonResult => ({
+    shape: 'comparison',
+    a: null,
+    b: null,
+    axes: [],
+    stats: { shared_axes: 0, agreements: 0, divergences: 0, a_only: 0, b_only: 0 },
+    note: `compare_classifications requires both \`a\` and \`b\`: the qualified ids of the two nodes to compare (missing: ${which}).`,
+  })
+  if (!opts.a) return empty('a')
+  if (!opts.b) return empty('b')
+
+  const profA = assembleCompetitorProfile(doc, { from_id: opts.a, node_index: index })
+  const profB = assembleCompetitorProfile(doc, { from_id: opts.b, node_index: index })
+
+  // Optional single-axis focus: keep only positions on the requested axis.
+  const axisFilter = opts.axis ? bareOf(opts.axis) : undefined
+  const keep = (p: ProfilePosition): boolean => !axisFilter || p.axis === axisFilter
+  const byA = positionsByAxis(profA.positions.filter(keep))
+  const byB = positionsByAxis(profB.positions.filter(keep))
+
+  const UNAXED = '__unaxed__'
+  const axisKeys = [...new Set([...byA.keys(), ...byB.keys()])]
+  const sideOf = (ps: ProfilePosition[] | undefined): ComparisonSide[] =>
+    (ps ?? []).map((p) => ({
+      value: p.value,
+      value_label: p.value_label,
+      ...(p.confidence !== undefined ? { confidence: p.confidence } : {}),
+    }))
+  const labelFor = (ps: ProfilePosition[] | undefined): { axis: string | null; axis_label: string | null } => {
+    const p = (ps ?? [])[0]
+    return { axis: p?.axis ?? null, axis_label: p?.axis_label ?? null }
+  }
+  const valueSet = (sides: ComparisonSide[]): string => [...new Set(sides.map((s) => s.value))].sort().join('|')
+
+  let agreements = 0
+  let divergences = 0
+  let aOnly = 0
+  let bOnly = 0
+  const rows: ComparisonAxisRow[] = axisKeys.map((key) => {
+    const aPs = byA.get(key)
+    const bPs = byB.get(key)
+    const a = sideOf(aPs)
+    const b = sideOf(bPs)
+    const meta = aPs ? labelFor(aPs) : labelFor(bPs)
+    let status: ComparisonAxisRow['status']
+    if (a.length > 0 && b.length > 0) {
+      if (valueSet(a) === valueSet(b)) { status = 'agree'; agreements++ }
+      else { status = 'diverge'; divergences++ }
+    } else if (a.length > 0) { status = 'a_only'; aOnly++ }
+    else { status = 'b_only'; bOnly++ }
+    return {
+      axis: key === UNAXED ? null : meta.axis,
+      axis_label: key === UNAXED ? null : meta.axis_label,
+      a,
+      b,
+      status,
+    }
+  })
+  // Shared axes (both graded) first, ordered diverge before agree (divergences
+  // are the actionable rows), then single-side rows; unaxed last.
+  const order: Record<ComparisonAxisRow['status'], number> = { diverge: 0, agree: 1, a_only: 2, b_only: 3 }
+  rows.sort((x, y) => {
+    if (x.axis === null && y.axis !== null) return 1
+    if (y.axis === null && x.axis !== null) return -1
+    return order[x.status] - order[y.status] || (x.axis_label ?? '~').localeCompare(y.axis_label ?? '~')
+  })
+
+  const result: ComparisonResult = {
+    shape: 'comparison',
+    a: profA.subject,
+    b: profB.subject,
+    axes: rows,
+    stats: {
+      shared_axes: agreements + divergences,
+      agreements,
+      divergences,
+      a_only: aOnly,
+      b_only: bOnly,
+    },
+  }
+  if (rows.length === 0) {
+    result.note =
+      profA.positions.length === 0 || profB.positions.length === 0
+        ? 'At least one node has no classification edges (or none on the requested axis). Classify both via create_classification_edge to compare.'
+        : 'No overlapping or distinct axes to compare.'
+  }
+  return result
+}
+
+/* ─────────────────────── #6 aggregate_edge_properties ─────────────────────── */
+
+/** One bucket in a property distribution. */
+export interface DistributionBucket {
+  key: string
+  count: number
+}
+
+/** One group's property distribution (when `group_by` is not `none`). */
+export interface AggregateGroup {
+  group: string
+  group_label?: string
+  total: number
+  with_property: number
+  distribution: DistributionBucket[]
+}
+
+export interface AggregateResult {
+  shape: 'edge_property_aggregate'
+  edge_type: string
+  property: string
+  group_by: 'none' | 'axis' | 'competitor' | 'value'
+  total: number
+  with_property: number
+  without_property: number
+  /** The distribution over ALL edges of the type (always present). */
+  overall: DistributionBucket[]
+  /** Per-group distributions, present when `group_by` is not `none`. */
+  groups?: AggregateGroup[]
+  note?: string
+}
+
+/** Bucket key for a property value: an assessment object reduces to its `label`. */
+function bucketKeyOf(v: unknown): string {
+  if (v !== null && typeof v === 'object') {
+    const label = (v as { label?: unknown }).label
+    if (typeof label === 'string') return label
+    return JSON.stringify(v)
+  }
+  return String(v)
+}
+
+/** Sort a count map into descending-count buckets (ties alphabetical). */
+function toBuckets(counts: Map<string, number>): DistributionBucket[] {
+  return [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+}
+
+/**
+ * Aggregate the distribution of one property across every portfolio cross-edge
+ * of a type, optionally grouped by a dimension. The digest of the property layer
+ * that turns "I counted 165 high / 53 medium by eye over the jq dump" into one
+ * call. `property` defaults to `confidence`; an assessment-object property
+ * (`{ value, label, scale_id }`) buckets by its `label`.
+ *
+ * `group_by`:
+ *  - `none` (default): one overall distribution.
+ *  - `axis`: group by the classification axis the target value belongs to (for
+ *    `*_classified_as_classification_value` edges).
+ *  - `competitor`: group by the source node (the classified entity).
+ *  - `value`: group by the target value.
+ */
+export function aggregateEdgeProperties(
+  doc: UPGPortfolioDocument,
+  opts: { edge_type: string; group_by?: AggregateResult['group_by']; property?: string; node_index?: Map<string, PortfolioNodeRef> },
+): AggregateResult {
+  const index = opts.node_index ?? buildPortfolioNodeIndex(doc)
+  const valueAxis = buildValueAxisMap(doc)
+  const property = opts.property ?? 'confidence'
+  const groupBy = opts.group_by ?? 'none'
+  const edges = (doc.cross_edges ?? []).filter((e) => e.type === opts.edge_type)
+
+  const overall = new Map<string, number>()
+  let withProperty = 0
+  // group key -> { label, total edges, with-property count, distribution }
+  const groups = new Map<string, { label?: string; total: number; withProp: number; dist: Map<string, number> }>()
+
+  const groupKeyFor = (e: UPGCrossEdge): { key: string; label?: string } => {
+    if (groupBy === 'competitor') {
+      const ref = index.get(e.source)
+      return { key: e.source, label: ref?.title }
+    }
+    if (groupBy === 'value') {
+      const bare = bareOf(e.target)
+      return { key: bare, label: index.get(`${REGISTRY_PRODUCT_ID}/${bare}`)?.title ?? bare }
+    }
+    // axis
+    const bare = bareOf(e.target)
+    const ax = valueAxis.get(bare)
+    return ax ? { key: ax.axis, label: ax.label } : { key: '__unaxed__', label: 'unaxed' }
+  }
+
+  for (const e of edges) {
+    const props = (e.properties ?? {}) as Record<string, unknown>
+    const has = property in props
+    if (has) {
+      withProperty++
+      const k = bucketKeyOf(props[property])
+      overall.set(k, (overall.get(k) ?? 0) + 1)
+    }
+    if (groupBy !== 'none') {
+      const { key, label } = groupKeyFor(e)
+      const g = groups.get(key) ?? { label, total: 0, withProp: 0, dist: new Map<string, number>() }
+      g.total++
+      if (has) {
+        g.withProp++
+        const k = bucketKeyOf(props[property])
+        g.dist.set(k, (g.dist.get(k) ?? 0) + 1)
+      }
+      groups.set(key, g)
+    }
+  }
+
+  const result: AggregateResult = {
+    shape: 'edge_property_aggregate',
+    edge_type: opts.edge_type,
+    property,
+    group_by: groupBy,
+    total: edges.length,
+    with_property: withProperty,
+    without_property: edges.length - withProperty,
+    overall: toBuckets(overall),
+  }
+  if (groupBy !== 'none') {
+    result.groups = [...groups.entries()]
+      .map(([group, g]) => ({
+        group: group === '__unaxed__' ? 'unaxed' : group,
+        ...(g.label ? { group_label: g.label } : {}),
+        total: g.total,
+        with_property: g.withProp,
+        distribution: toBuckets(g.dist),
+      }))
+      // Biggest groups first; unaxed sinks to the bottom.
+      .sort((x, y) => {
+        if (x.group === 'unaxed' && y.group !== 'unaxed') return 1
+        if (y.group === 'unaxed' && x.group !== 'unaxed') return -1
+        return y.total - x.total || (x.group_label ?? x.group).localeCompare(y.group_label ?? y.group)
+      })
+  }
+  if (edges.length === 0) {
+    result.note = `No cross-edges of type "${opts.edge_type}" in this portfolio.`
+  }
+  return result
+}
