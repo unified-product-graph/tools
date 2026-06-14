@@ -121,6 +121,10 @@ const CLOUD_NA = new Set([
   // it spans the .upg-file workspace (portfolio document + product files),
   // which the single-product-per-request cloud server has no analogue for.
   'get_portfolio_tree',
+  // audit_property_coverage (0.10.8): audits portfolio cross-edges for missing
+  // required properties. Local-only — reads the portfolio document, a .upg-file
+  // workspace concept with no single-product cloud analogue.
+  'audit_property_coverage',
   // portfolio-wide audit (0.9.3, batch-4 #19): runs validate_graph across the
   // .upg-file workspace in one call. Local-only for the same reason as the
   // portfolio read layer — no cloud analogue (single-product-per-request).

@@ -34,6 +34,31 @@ describe('portfolio cross-edge write idempotency', () => {
     fs.rmSync(dir, { recursive: true, force: true })
   })
 
+  it('previewCrossEdge forecasts create/update/unchanged without mutating (dry_run substrate)', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upg-pf-preview-'))
+    const store = new UPGPortfolioStore()
+    await store.loadOrInit(path.join(dir, 'portfolio.upg'))
+
+    const withProps = (id: string, props?: Record<string, unknown>): UPGCrossEdge =>
+      ({ id, source: 'prod_a/n_1', target: 'registry/cv_x', type: 'competitor_classified_as_classification_value', ...(props ? { properties: props } : {}) }) as UPGCrossEdge
+
+    // Nothing stored yet -> create, and the preview must not persist it.
+    expect(store.previewCrossEdge(withProps('p1', { confidence: { label: 'high' } })).would).toBe('create')
+    expect(store.getAllCrossEdges()).toHaveLength(0)
+
+    store.addCrossEdge(withProps('e1', { confidence: { label: 'high' } }))
+    // Same triple, no new props -> unchanged.
+    expect(store.previewCrossEdge(withProps('p2')).would).toBe('unchanged')
+    // Same triple, a new property -> update (merge would change the bag).
+    expect(store.previewCrossEdge(withProps('p3', { assessed_on: '2026-06-15' })).would).toBe('update')
+    // Same triple, identical existing property -> unchanged (merge is a no-op).
+    expect(store.previewCrossEdge(withProps('p4', { confidence: { label: 'high' } })).would).toBe('unchanged')
+    // Still exactly one edge: no preview mutated the store.
+    expect(store.getAllCrossEdges()).toHaveLength(1)
+
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
   it('writeToDisk persists and leaves no orphan .tmp file', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upg-pf-tmp-'))
     const pfPath = path.join(dir, 'portfolio.upg')

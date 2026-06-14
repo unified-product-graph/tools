@@ -155,6 +155,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   portfolioQuery: 'portfolio_query',
   portfolioDigest: 'portfolio_digest',
   getPortfolioTree: 'get_portfolio_tree',
+  auditPropertyCoverage: 'audit_property_coverage',
   portfolioValidate: 'portfolio_validate',
   cloneStructure: 'clone_structure',
   defineCanonicalEntity: 'define_canonical_entity',

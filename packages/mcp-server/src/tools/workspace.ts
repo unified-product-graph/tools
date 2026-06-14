@@ -702,6 +702,25 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     ...(hasProps ? { properties: propsArg } : {}),
   }
 
+  // Dry-run pre-flight (0.10.8): forecast create / update / unchanged WITHOUT
+  // writing or registering products, so a large batch is safe to reason about
+  // before it runs. Returns the would-be-stored edge.
+  if (args.dry_run === true) {
+    const preview = portfolioStore.previewCrossEdge(newEdge)
+    return text(
+      JSON.stringify(
+        {
+          dry_run: true,
+          would: preview.would,
+          edge: preview.edge,
+          portfolio_file: path.relative(cwd, portfolioPath),
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
   // Auto-register both products on portfolio.upg.products[]. Cross-
   // edges referring to products that aren't listed are still valid but harder
   // to follow; the registry gives a stable lookup table for tooling.
@@ -1191,6 +1210,29 @@ export const listPortfolioCrossEdges: ToolHandler = async (args, _ctx): Promise<
   if (typeFilter) edges = edges.filter((e) => e.type === typeFilter)
   if (sourceProductFilter) edges = edges.filter((e) => e.source_product_id === sourceProductFilter)
 
+  // Freshness filter (0.10.8): keep edges whose `properties.assessed_on` is older
+  // than a cutoff — the read path for "which cells are stale?". An edge with NO
+  // assessed_on is the stalest (never assessed) and is kept. `assessed_before`
+  // is an absolute ISO date; `older_than_days` is relative to now (the latter
+  // wins if both are given).
+  const olderThanDays = typeof args.older_than_days === 'number' ? (args.older_than_days as number) : undefined
+  const assessedBefore = typeof args.assessed_before === 'string' ? (args.assessed_before as string) : undefined
+  let staleCutoff: number | undefined
+  if (olderThanDays !== undefined) staleCutoff = Date.now() - Math.max(0, olderThanDays) * 86_400_000
+  else if (assessedBefore !== undefined) {
+    const t = Date.parse(assessedBefore)
+    if (Number.isNaN(t)) return textError(`Invalid assessed_before date: "${assessedBefore}". Use an ISO date (e.g. 2026-06-15).`)
+    staleCutoff = t
+  }
+  if (staleCutoff !== undefined) {
+    edges = edges.filter((e) => {
+      const a = (e.properties as { assessed_on?: unknown } | undefined)?.assessed_on
+      if (typeof a !== 'string') return true // never assessed = stalest
+      const t = Date.parse(a)
+      return Number.isNaN(t) || t < staleCutoff!
+    })
+  }
+
   const portfolio_file = path.relative(cwd, portfolioPath)
 
   // Title index (registry + instance_of), built once, only when needed.
@@ -1542,6 +1584,31 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
     await portfolioStore.loadOrInit(portfolioPath)
   } catch (err) {
     return textError(`Failed to load portfolio document: ${(err as Error).message}`)
+  }
+
+  // Dry-run pre-flight (0.10.8): forecast the whole batch (created / updated /
+  // unchanged) WITHOUT writing or registering products. Each edge is previewed
+  // against the persisted state, so a backfill of distinct edges reports exactly
+  // what the real write will do. (In-batch duplicate (source, target, type)
+  // pairs are previewed independently, not sequenced.)
+  if (args.dry_run === true) {
+    const previews = prepared.map((e) => portfolioStore.previewCrossEdge(e))
+    const wouldCounts = { create: 0, update: 0, unchanged: 0 }
+    for (const p of previews) wouldCounts[p.would]++
+    return text(
+      JSON.stringify(
+        {
+          dry_run: true,
+          message: `Would apply ${wouldCounts.create + wouldCounts.update}/${previews.length} cross-product edge(s) (${wouldCounts.create} create, ${wouldCounts.update} update, ${wouldCounts.unchanged} unchanged)`,
+          edges: previews.map((p) => ({ would: p.would, edge: p.edge })),
+          count: previews.length,
+          would_counts: wouldCounts,
+          portfolio_file: path.relative(cwd, portfolioPath),
+        },
+        null,
+        2,
+      ),
+    )
   }
 
   // Auto-register every referenced product (dedup), then add all edges + one flush.

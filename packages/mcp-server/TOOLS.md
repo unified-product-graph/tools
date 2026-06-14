@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 126 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 127 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 126 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 31 tools
+- [Workspace & Portfolios](#workspace-portfolios): 32 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1248,6 +1248,7 @@ when no editable field is supplied.
 _Multi-product discovery, switching, init, cross-product edges._
 
 - [`attach_product_to_portfolio`](#attach-product-to-portfolio)
+- [`audit_property_coverage`](#audit-property-coverage)
 - [`batch_create_cross_product_edges`](#batch-create-cross-product-edges)
 - [`batch_define_canonical_entity`](#batch-define-canonical-entity)
 - [`batch_register_instance`](#batch-register-instance)
@@ -1305,6 +1306,30 @@ portfolio id (the message points at list_portfolios / list_local_products).
 **See also:** `assign_product_to_area`, `create_product`
 
 
+### `audit_property_coverage`
+
+Audit which portfolio cross-edges of a given type are MISSING required `properties` keys (the completeness check for a property backfill, without a shell over `portfolio.upg`). Given `edge_type` and `required_keys`, returns the edges that lack any of them, plus (when `check_values`) the edges whose present values fail the type property schema. Resolves entity titles. Example: `audit_property_coverage({ edge_type: "competitor_classified_as_classification_value", required_keys: ["confidence", "assessed_on"] })` returns `missing: []` once every classify edge carries both. Read-only.
+
+**Atomicity:** `atomic (read-only). Reads the portfolio document only.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `check_values` | boolean |  | Also report edges whose PRESENT properties fail the type property schema (off-scale, missing nested keys). Default true. |
+| `edge_type` | string | ✓ | Cross-edge type to audit (e.g. competitor_classified_as_classification_value). |
+| `required_keys` | array | ✓ | The properties keys that should be present on every edge of this type (e.g. ["confidence", "assessed_on"]). |
+| `source_product_id` | string |  | Restrict to edges whose source node is in this product. |
+
+**Returns:**
+
+JSON: `{ edge_type, required_keys, total, complete,
+missing: [{ edge_id, source, target, source_title?, target_title?,
+missing_keys }], malformed?: [...] }`.
+
+**See also:** `list_portfolio_cross_edges`, `get_portfolio_tree`
+
+
 ### `batch_create_cross_product_edges`
 
 Create up to 50 cross-product edges in one atomic write (the portfolio-tier mirror of batch_create_edges). Every edge is validated and qualified before anything is written; if any is invalid the whole batch is rejected. Referenced products are auto-registered.
@@ -1316,6 +1341,7 @@ Create up to 50 cross-product edges in one atomic write (the portfolio-tier mirr
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `auto_create_portfolio` | boolean |  | Create an empty portfolio document if none exists (default false) |
+| `dry_run` | boolean |  | Forecast the batch without mutating: returns { dry_run: true, would_counts, edges:[{ would, edge }] } and writes nothing. The pre-flight that makes a large backfill safe to reason about. |
 | `edges` | array | ✓ | Cross-product edges to create (max 50). Each: { source_id, target_id, type, source_product_id?, target_product_id? }. |
 
 **Returns:**
@@ -1440,6 +1466,7 @@ separate filesystem operations.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `dry_run` | boolean |  | Forecast the write without mutating: returns { dry_run: true, would: create \| update \| unchanged, edge } and writes nothing. Use to reason about a write before running it. |
 | `properties` | object |  | Edge metadata, accepted only for cross-edge types declared carries_properties (e.g. feature_rivals_competitor_feature, carrying the parity assessment parity_status / quality / is_gap / assessed_on / evidence / confidence). Rejected for types that do not carry properties. |
 | `source_id` | string | ✓ | Source node ID |
 | `source_product_id` | string |  | Product ID of the source node |
@@ -1747,7 +1774,7 @@ coerced to `concept`), or `null` when unset — matching what
 
 ### `list_portfolio_cross_edges`
 
-List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered, grouped, title-resolved, property-projected, and paginated. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix; `resolve_titles` (default on) names entities ("Sitecore") instead of opaque ids; `property_include` trims heavy edge properties; `limit` / `offset` page the flat list. For the nested axis to value to members view use `get_portfolio_tree`.
+List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered, grouped, title-resolved, property-projected, freshness-filtered, and paginated. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix; `resolve_titles` (default on) names entities ("Sitecore") instead of opaque ids; `property_include` trims heavy edge properties; `older_than_days` / `assessed_before` return the stale set (edges whose assessed_on is old or absent); `limit` / `offset` page the flat list. For the nested axis to value to members view use `get_portfolio_tree`.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -1755,9 +1782,11 @@ List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`)
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `assessed_before` | string |  | Freshness filter: keep only edges assessed before this ISO date (e.g. 2026-06-15). An edge with no assessed_on counts as stale. |
 | `group_by` | `source` \| `target` |  | Group edges by source or target endpoint (the comparison matrix) instead of a flat list. |
 | `limit` | number |  | Max edges to return in the flat list (ignored when group_by is set). |
 | `offset` | number |  | Skip this many edges before the page (flat list only). |
+| `older_than_days` | number |  | Freshness filter: keep only edges whose properties.assessed_on is older than this many days (the stale set). An edge with no assessed_on counts as stale. Wins over assessed_before. |
 | `property_include` | array |  | Keep only these keys of each edge properties object (e.g. ["confidence"]). Pass [] to drop properties entirely. |
 | `resolve_titles` | boolean |  | Add source_title / target_title to each edge, resolved from the registry and instance_of registrations. Default true. |
 | `source_product_id` | string |  | Filter to edges whose source node is in this product. |

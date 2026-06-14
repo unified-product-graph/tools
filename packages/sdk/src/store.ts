@@ -1630,6 +1630,31 @@ export class UPGPortfolioStore {
   }
 
   /**
+   * Non-mutating forecast of what {@link addCrossEdge} would do: the substrate
+   * for the `dry_run` write flag. Mirrors addCrossEdge's create / update /
+   * unchanged decision exactly (idempotent hit + property upsert merge) but
+   * touches nothing on disk or in memory. `edge` is the would-be-stored edge
+   * (the existing edge with merged properties on `update`, the existing edge on
+   * `unchanged`, the incoming edge on `create`).
+   */
+  previewCrossEdge(edge: UPGCrossEdge): { would: 'create' | 'update' | 'unchanged'; edge: UPGCrossEdge } {
+    if (!this.doc) throw new Error('Portfolio document not loaded. Call loadOrInit() first.')
+    const existing = this.doc.cross_edges.find(
+      (e) => e.source === edge.source && e.target === edge.target && e.type === edge.type,
+    )
+    if (existing) {
+      if (edge.properties && Object.keys(edge.properties).length > 0) {
+        const merged = { ...(existing.properties ?? {}), ...edge.properties }
+        if (JSON.stringify(merged) !== JSON.stringify(existing.properties ?? {})) {
+          return { would: 'update', edge: { ...existing, properties: merged } }
+        }
+      }
+      return { would: 'unchanged', edge: existing }
+    }
+    return { would: 'create', edge }
+  }
+
+  /**
    * Remove a cross-product edge by ID.
    * @returns The removed edge, or null if not found.
    */

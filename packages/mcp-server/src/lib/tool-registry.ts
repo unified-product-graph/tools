@@ -72,7 +72,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
-import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
 import {
   defineCanonicalEntity,
@@ -1797,6 +1797,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description:
             'Edge metadata, accepted only for cross-edge types declared carries_properties (e.g. feature_rivals_competitor_feature, carrying the parity assessment parity_status / quality / is_gap / assessed_on / evidence / confidence). Rejected for types that do not carry properties.',
         },
+        dry_run: { type: 'boolean', description: 'Forecast the write without mutating: returns { dry_run: true, would: create | update | unchanged, edge } and writes nothing. Use to reason about a write before running it.' },
       },
       required: ['source_id', 'target_id', 'type'],
     },
@@ -1913,6 +1914,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           },
         },
         auto_create_portfolio: { type: 'boolean', description: 'Create an empty portfolio document if none exists (default false)' },
+        dry_run: { type: 'boolean', description: 'Forecast the batch without mutating: returns { dry_run: true, would_counts, edges:[{ would, edge }] } and writes nothing. The pre-flight that makes a large backfill safe to reason about.' },
       },
       required: ['edges'],
     },
@@ -1920,7 +1922,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_portfolio_cross_edges',
     description:
-      'List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered, grouped, title-resolved, property-projected, and paginated. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix; `resolve_titles` (default on) names entities ("Sitecore") instead of opaque ids; `property_include` trims heavy edge properties; `limit` / `offset` page the flat list. For the nested axis to value to members view use `get_portfolio_tree`.',
+      'List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered, grouped, title-resolved, property-projected, freshness-filtered, and paginated. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix; `resolve_titles` (default on) names entities ("Sitecore") instead of opaque ids; `property_include` trims heavy edge properties; `older_than_days` / `assessed_before` return the stale set (edges whose assessed_on is old or absent); `limit` / `offset` page the flat list. For the nested axis to value to members view use `get_portfolio_tree`.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -1929,6 +1931,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         group_by: { type: 'string', enum: ['source', 'target'], description: 'Group edges by source or target endpoint (the comparison matrix) instead of a flat list.' },
         resolve_titles: { type: 'boolean', description: 'Add source_title / target_title to each edge, resolved from the registry and instance_of registrations. Default true.' },
         property_include: { type: 'array', items: { type: 'string' }, description: 'Keep only these keys of each edge properties object (e.g. ["confidence"]). Pass [] to drop properties entirely.' },
+        older_than_days: { type: 'number', description: 'Freshness filter: keep only edges whose properties.assessed_on is older than this many days (the stale set). An edge with no assessed_on counts as stale. Wins over assessed_before.' },
+        assessed_before: { type: 'string', description: 'Freshness filter: keep only edges assessed before this ISO date (e.g. 2026-06-15). An edge with no assessed_on counts as stale.' },
         limit: { type: 'number', description: 'Max edges to return in the flat list (ignored when group_by is set).' },
         offset: { type: 'number', description: 'Skip this many edges before the page (flat list only).' },
       },
@@ -2147,6 +2151,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         include_properties: { type: 'array', items: { type: 'string' }, description: 'Classification-edge property keys to inline on each leaf, in addition to the always-included confidence / assessed_on.' },
         include_members: { type: 'boolean', description: 'Landscape only. Force classified members to inline on the whole-portfolio overview (counts-only by default). Subject to the payload guard.' },
       },
+    },
+  },
+  {
+    name: 'audit_property_coverage',
+    description:
+      'Audit which portfolio cross-edges of a given type are MISSING required `properties` keys (the completeness check for a property backfill, without a shell over `portfolio.upg`). Given `edge_type` and `required_keys`, returns the edges that lack any of them, plus (when `check_values`) the edges whose present values fail the type property schema. Resolves entity titles. Example: `audit_property_coverage({ edge_type: "competitor_classified_as_classification_value", required_keys: ["confidence", "assessed_on"] })` returns `missing: []` once every classify edge carries both. Read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        edge_type: { type: 'string', description: 'Cross-edge type to audit (e.g. competitor_classified_as_classification_value).' },
+        required_keys: { type: 'array', items: { type: 'string' }, description: 'The properties keys that should be present on every edge of this type (e.g. ["confidence", "assessed_on"]).' },
+        source_product_id: { type: 'string', description: 'Restrict to edges whose source node is in this product.' },
+        check_values: { type: 'boolean', description: 'Also report edges whose PRESENT properties fail the type property schema (off-scale, missing nested keys). Default true.' },
+      },
+      required: ['edge_type', 'required_keys'],
     },
   },
   {
@@ -2419,6 +2438,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
   get_portfolio_tree: getPortfolioTree,
+  audit_property_coverage: auditPropertyCoverage,
   portfolio_validate: portfolioValidate,
   clone_structure: cloneStructure,
   migrate_cross_edges: migrateCrossEdges,

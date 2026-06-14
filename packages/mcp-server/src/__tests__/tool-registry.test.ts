@@ -132,7 +132,9 @@ describe('Tool registry: completeness', () => {
     // + get_portfolio_tree (0.10.7): assembles the classification landscape /
     //   competitor profile from portfolio.upg cross-edges, local-only (portfolio
     //   read layer, no single-product cloud analogue). → 126.
-    expect(TOOL_DEFINITIONS).toHaveLength(126)
+    // + audit_property_coverage (0.10.8): audits portfolio cross-edges for
+    //   missing required properties, local-only (portfolio read layer). → 127.
+    expect(TOOL_DEFINITIONS).toHaveLength(127)
   })
 })
 

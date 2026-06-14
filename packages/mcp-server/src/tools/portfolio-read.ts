@@ -31,7 +31,7 @@ import {
   type UPGPortfolioStore,
   type PortfolioNodeRef,
 } from '@unified-product-graph/sdk'
-import { REGISTRY_PRODUCT_ID, UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
+import { REGISTRY_PRODUCT_ID, UPG_CROSS_EDGE_TYPES, validateEdgeProperties } from '@unified-product-graph/core'
 import { preflightPayload } from '../lib/payload-guard.js'
 import { traverseGraph, type GraphReader, type TraverseParams } from '../lib/graph-traverse.js'
 import { findWorkspaceUpgFiles } from './workspace.js'
@@ -1121,6 +1121,101 @@ export const getPortfolioTree: ToolHandler = async (args, ctx): Promise<ToolResu
   })
   if (guard.kind === 'refuse') return guard.result
   const response = result as Record<string, unknown>
+  if (guard.kind === 'warn') Object.assign(response, guard.fields)
+  return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * `audit_property_coverage`: given a cross-edge type and the property keys that
+ * should be present, return the portfolio cross-edges that LACK them (and,
+ * optionally, the ones whose present values are malformed against the type's
+ * property schema). The completeness check that turns "I ran the writes" into
+ * "the data is actually backfilled" — without a shell pipeline over
+ * `portfolio.upg` (0.10.8, read-path-tooling brief #1).
+ *
+ * Parameters:
+ * - `edge_type` (required): the cross-edge type to audit (e.g.
+ *   `competitor_classified_as_classification_value`).
+ * - `required_keys` (required): the `properties` keys that should be present on
+ *   every edge of that type (e.g. `["confidence", "assessed_on"]`).
+ * - `source_product_id`: restrict to edges whose source is in this product.
+ * - `check_values` (default true): also report edges whose PRESENT properties
+ *   fail the type's property schema (e.g. a `confidence` missing its `label`,
+ *   an off-scale value) under `malformed`.
+ *
+ * @returns JSON: `{ edge_type, required_keys, total, complete,
+ *   missing: [{ edge_id, source, target, source_title?, target_title?,
+ *   missing_keys }], malformed?: [...] }`.
+ * @atomicity atomic (read-only). Reads the portfolio document only.
+ * @see list_portfolio_cross_edges
+ * @see get_portfolio_tree
+ */
+export const auditPropertyCoverage: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const edgeType = args.edge_type as string | undefined
+  if (!edgeType) return textError('Missing required parameter: edge_type.')
+  if (!(UPG_CROSS_EDGE_TYPES as readonly string[]).includes(edgeType)) {
+    return textError(`Unknown cross-edge type: "${edgeType}". See list_cross_edge_types.`)
+  }
+  const requiredKeys = Array.isArray(args.required_keys) ? (args.required_keys as string[]) : undefined
+  if (!requiredKeys || requiredKeys.length === 0) {
+    return textError('Missing required parameter: required_keys (a non-empty array of property keys).')
+  }
+  const sourceProductFilter = args.source_product_id as string | undefined
+  const checkValues = args.check_values !== false
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return text(JSON.stringify({ edge_type: edgeType, required_keys: requiredKeys, total: 0, complete: 0, missing: [], note: 'No workspace portfolio document found.' }, null, 2))
+  }
+  const doc = portfolioStore.getDocument()
+  if (!doc) return textError('Portfolio document failed to load.')
+
+  let edges = portfolioStore.getAllCrossEdges().filter((e) => e.type === edgeType)
+  if (sourceProductFilter) edges = edges.filter((e) => e.source_product_id === sourceProductFilter)
+
+  const index = buildPortfolioNodeIndex(doc)
+  const titleOf = (qid: string): string | undefined => index.get(qid)?.title
+
+  const missing: Array<Record<string, unknown>> = []
+  const malformed: Array<Record<string, unknown>> = []
+  let complete = 0
+  for (const e of edges) {
+    const props = (e.properties ?? {}) as Record<string, unknown>
+    const missingKeys = requiredKeys.filter((k) => !(k in props))
+    const row = () => {
+      const r: Record<string, unknown> = { edge_id: e.id, source: e.source, target: e.target }
+      const st = titleOf(e.source)
+      const tt = titleOf(e.target)
+      if (st) r.source_title = st
+      if (tt) r.target_title = tt
+      return r
+    }
+    if (missingKeys.length > 0) missing.push({ ...row(), missing_keys: missingKeys })
+    else complete++
+    if (checkValues && Object.keys(props).length > 0) {
+      const issues = validateEdgeProperties(edgeType, props)
+      if (issues.length > 0) malformed.push({ ...row(), issues })
+    }
+  }
+
+  const response: Record<string, unknown> = {
+    edge_type: edgeType,
+    required_keys: requiredKeys,
+    total: edges.length,
+    complete,
+    missing,
+  }
+  if (checkValues) response.malformed = malformed
+
+  const guard = preflightPayload({
+    toolName: 'audit_property_coverage',
+    nodeCount: 0,
+    edgeCount: missing.length + malformed.length,
+    compactEdges: false,
+    argsHint: `edge_type=${edgeType}, total=${edges.length}, missing=${missing.length}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
   if (guard.kind === 'warn') Object.assign(response, guard.fields)
   return text(JSON.stringify(response, null, 2))
 }
