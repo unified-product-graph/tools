@@ -11,7 +11,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType } from '@unified-product-graph/core'
-import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties, friendlyToAssessment } from '@unified-product-graph/core'
 import { UPGPortfolioStore, UPGFileStore } from '@unified-product-graph/sdk'
 import { buildPortfolioNodeIndex } from '@unified-product-graph/sdk'
 import { preflightPayload } from '../lib/payload-guard.js'
@@ -886,12 +886,14 @@ export const createParityEdge: ToolHandler = async (args, ctx): Promise<ToolResu
   )
 }
 
-/** Friendly confidence enum → canonical confidence_5 assessment (0.10.4). */
-const CLASSIFICATION_CONFIDENCE_MAP: Record<string, { value: number; label: string; scale_id: string }> = {
-  low: { value: 2, label: 'low', scale_id: 'confidence_5' },
-  medium: { value: 3, label: 'medium', scale_id: 'confidence_5' },
-  high: { value: 5, label: 'high', scale_id: 'confidence_5' },
-}
+/**
+ * Accepted friendly confidence words. The value/label expansion is NOT defined
+ * here — it comes from the single pinned source, `confidence_5.friendly_aliases`
+ * via `friendlyToAssessment` (0.11.1) — so this writer can never disagree with
+ * the rest of the graph on what `high` means. (Before 0.11.1 a local map here
+ * expanded `high → 5`, off by one from the value-4 population.)
+ */
+const CLASSIFICATION_CONFIDENCE_SCALE = 'confidence_5'
 
 /**
  * Typed convenience writer for a classification: place a node in a classification
@@ -902,9 +904,13 @@ const CLASSIFICATION_CONFIDENCE_MAP: Record<string, { value: number; label: stri
  *
  * Edge type is chosen by the source node's type: a `competitor` source writes
  * `competitor_classified_as_classification_value`; anything else writes the
- * polymorphic `node_classified_as_classification_value`. (When the source lives
- * in a non-active product and can't be resolved, the generic edge is used; it is
- * valid for any source and carries the identical schema.)
+ * polymorphic `node_classified_as_classification_value`. A qualified
+ * `{product}/{node}` source is resolved against the owning product file and,
+ * failing that, the portfolio's `instance_of` index (0.11.1) — so a competitor in
+ * a watched graph routes to the specialised edge and upserts the existing cell
+ * rather than duplicating it under the polymorphic type. Only a genuinely
+ * unresolvable source falls back to the generic edge (valid for any source,
+ * identical schema).
  *
  * Routing: a `registry/{value}` or otherwise-qualified `classification_value_id`,
  * or a supplied `node_product_id`, selects cross-product (`create_cross_product_edge`);
@@ -934,7 +940,11 @@ export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<
   }
 
   const confidenceArg = args.confidence as string | undefined
-  if (confidenceArg !== undefined && !(confidenceArg in CLASSIFICATION_CONFIDENCE_MAP)) {
+  // Expand via the pinned scale aliases (0.11.1) so `high` is value 4 / label
+  // "Confident", agreeing with the generic writers and the backfilled population.
+  const confidenceAssessment =
+    confidenceArg !== undefined ? friendlyToAssessment(CLASSIFICATION_CONFIDENCE_SCALE, confidenceArg) : undefined
+  if (confidenceArg !== undefined && !confidenceAssessment) {
     return textError(`Invalid confidence: ${confidenceArg}. Valid: low, medium, high.`)
   }
 
@@ -959,8 +969,24 @@ export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<
         await s.loadReadOnly(path.resolve(process.cwd(), lookup.file_path))
         sourceType = s.getNode(bareNodeId)?.type ?? sourceType
       } catch {
-        /* unresolvable owning product: fall back to the polymorphic edge */
+        /* unresolvable owning product: fall back to the portfolio index below */
       }
+    }
+  }
+  // Portfolio fallback (0.11.1): a competitor in a watched/portfolio workspace is
+  // often NOT a locally-resolvable product file, so the owning-product lookup
+  // above leaves sourceType unresolved and the writer mis-types the edge as the
+  // polymorphic `node_…` — which then duplicates the cell instead of upserting
+  // (a different edge type is a different dedup key). The portfolio's
+  // `instance_of` cross-edges already map `{pid}/{nid}` to its canonical type, so
+  // resolve a qualified source through the node index. This is what makes a
+  // qualified competitor source route to `competitor_…` and land on the existing
+  // edge.
+  if (sourceType !== 'competitor' && nodeId.includes('/')) {
+    const pfDoc = (await openPortfolioStoreIfExists(process.cwd()))?.getDocument()
+    if (pfDoc) {
+      const resolved = buildPortfolioNodeIndex(pfDoc).get(nodeId)?.type
+      if (resolved) sourceType = resolved
     }
   }
   const edgeType =
@@ -969,7 +995,7 @@ export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<
       : 'node_classified_as_classification_value'
 
   const properties: Record<string, unknown> = {
-    ...(confidenceArg !== undefined ? { confidence: CLASSIFICATION_CONFIDENCE_MAP[confidenceArg] } : {}),
+    ...(confidenceAssessment ? { confidence: confidenceAssessment } : {}),
     assessed_on: (args.assessed_on as string | undefined) ?? new Date().toISOString().slice(0, 10),
     ...(args.rationale !== undefined ? { rationale: args.rationale } : {}),
     ...(args.evidence !== undefined ? { evidence: args.evidence } : {}),

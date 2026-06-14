@@ -31,8 +31,9 @@ import {
   deleteCrossProductEdge,
   computeGraphDigest,
   edgeId,
+  buildPortfolioNodeIndex,
 } from '@unified-product-graph/sdk'
-import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, validateEdgeProperties, type UPGCrossEdgeType, type UPGEdgeType } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, validateEdgeProperties, friendlyToAssessment, type UPGCrossEdgeType, type UPGEdgeType } from '@unified-product-graph/core'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
 import { upgHeader, success, fail, label } from '../lib/formatter.js'
 import { die, runtimeError, usageError, violation } from '../lib/errors.js'
@@ -909,12 +910,14 @@ const connectSub = new Command('connect')
 
 // ── portfolio classify ────────────────────────────────────────────────────────
 
-/** Friendly confidence enum, canonical confidence_5 assessment (0.10.5). Mirrors the MCP CLASSIFICATION_CONFIDENCE_MAP. */
-const CLASSIFICATION_CONFIDENCE_MAP: Record<string, { value: number; label: string; scale_id: string }> = {
-  low: { value: 2, label: 'low', scale_id: 'confidence_5' },
-  medium: { value: 3, label: 'medium', scale_id: 'confidence_5' },
-  high: { value: 5, label: 'high', scale_id: 'confidence_5' },
-}
+/**
+ * Accepted friendly confidence words. The value/label expansion comes from the
+ * single pinned source — `confidence_5.friendly_aliases` via `friendlyToAssessment`
+ * (0.11.1) — so the CLI and the MCP `create_classification_edge` can never
+ * disagree on what `high` means (both: value 4 / "Confident"). Before 0.11.1 a
+ * local map here expanded `high → 5`, off by one from the value-4 population.
+ */
+const CLASSIFICATION_CONFIDENCE_SCALE = 'confidence_5'
 
 const classifySub = new Command('classify')
   .description('Place a node in a classification cell, carrying optional confidence / provenance (create_classification_edge).')
@@ -929,27 +932,38 @@ const classifySub = new Command('classify')
   .action(async (nodeId: string, classificationValueId: string, opts) => {
     try {
       const confidenceArg = opts.confidence as string | undefined
-      if (confidenceArg !== undefined && !(confidenceArg in CLASSIFICATION_CONFIDENCE_MAP)) {
+      const confidenceAssessment =
+        confidenceArg !== undefined ? friendlyToAssessment(CLASSIFICATION_CONFIDENCE_SCALE, confidenceArg) : undefined
+      if (confidenceArg !== undefined && !confidenceAssessment) {
         die(usageError(`Invalid confidence: "${sanitizeForTerminal(confidenceArg)}". Valid: low, medium, high.`))
       }
 
       const cwd = process.cwd()
 
-      // Source node type picks the specialised vs generic edge. We resolve it
-      // against the active product store (a `competitor` source writes the
-      // dedicated edge; anything else, or an unresolvable source, writes the
-      // polymorphic edge, which is valid for any source and carries the same schema).
+      // Source node type picks the specialised vs generic edge. Resolve it against
+      // the active product store, then — for a qualified `{pid}/{nid}` source that
+      // is not local — the portfolio's `instance_of` index (0.11.1), so a competitor
+      // in a watched graph routes to the specialised edge and upserts the existing
+      // cell instead of duplicating under the polymorphic type. Only a genuinely
+      // unresolvable source falls back to the polymorphic edge.
       const filePath = await discoverUPGFile(opts.file)
       const store = await loadStore(filePath)
       const bareNodeId = nodeId.includes('/') ? nodeId.split('/')[1] : nodeId
-      const sourceType = store.getNode(bareNodeId)?.type
+      let sourceType = store.getNode(bareNodeId)?.type
+      if (sourceType !== 'competitor' && nodeId.includes('/')) {
+        const pfDoc = (await openPortfolioStoreIfExists(cwd))?.getDocument()
+        if (pfDoc) {
+          const resolved = buildPortfolioNodeIndex(pfDoc).get(nodeId)?.type
+          if (resolved) sourceType = resolved
+        }
+      }
       const edgeType =
         sourceType === 'competitor'
           ? 'competitor_classified_as_classification_value'
           : 'node_classified_as_classification_value'
 
       const properties: Record<string, unknown> = {
-        ...(confidenceArg !== undefined ? { confidence: CLASSIFICATION_CONFIDENCE_MAP[confidenceArg] } : {}),
+        ...(confidenceAssessment ? { confidence: confidenceAssessment } : {}),
         assessed_on: (opts.assessedOn as string | undefined) ?? new Date().toISOString().slice(0, 10),
         ...(opts.rationale !== undefined ? { rationale: opts.rationale } : {}),
         ...(opts.evidence !== undefined ? { evidence: opts.evidence } : {}),

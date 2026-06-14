@@ -142,7 +142,7 @@ describe('portfolio classify (within-graph)', () => {
     const out = JSON.parse(r.stdout)
     expect(out.scope).toBe('within_graph')
     expect(out.edge.type).toBe('node_classified_as_classification_value')
-    expect(out.edge.properties.confidence.value).toBe(5)
+    expect(out.edge.properties.confidence.value).toBe(4) // 0.11.1: high pins to 4 (Confident)
     expect(out.edge.properties.assessed_on).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(out.edge.properties.rationale).toBe('strong fit')
   })
@@ -188,14 +188,14 @@ describe('portfolio classify (cross-product) + edges filters', () => {
     expect(out.edge.type).toBe('competitor_classified_as_classification_value')
     expect(out.edge.source).toBe('p_alpha/p_alpha_comp')
     expect(out.edge.target).toBe('registry/cv_leader')
-    expect(out.edge.properties.confidence.value).toBe(5)
+    expect(out.edge.properties.confidence.value).toBe(4) // 0.11.1: high pins to 4 (Confident)
     expect(out.edge.properties.evidence).toBe('sig_q2')
 
     // round-trips through `portfolio edges`
     const edges = run(['portfolio', 'edges', '--json'], tmp)
     const ej = JSON.parse(edges.stdout)
     expect(ej.total).toBe(1)
-    expect(ej.cross_edges[0].properties.confidence.value).toBe(5)
+    expect(ej.cross_edges[0].properties.confidence.value).toBe(4) // 0.11.1: high pins to 4
   })
 
   it('groups cross edges by source', () => {

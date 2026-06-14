@@ -103,7 +103,8 @@ describe('classification edge properties + read path (0.10.4)', () => {
     expect(edge.type).toBe('competitor_classified_as_classification_value')
     expect(edge.target).toBe(VALUE)
     const props = edge.properties as Record<string, unknown>
-    expect(props.confidence).toEqual({ value: 5, label: 'high', scale_id: 'confidence_5' })
+    // 0.11.1: high pins to value 4 / canonical label "Confident" (was 5/"high").
+    expect(props.confidence).toEqual({ value: 4, label: 'Confident', scale_id: 'confidence_5' })
     expect(typeof props.assessed_on).toBe('string')
     expect(props.rationale).toBe('Ships an agent')
   })
@@ -118,7 +119,7 @@ describe('classification edge properties + read path (0.10.4)', () => {
     expect(res.isError).toBeFalsy()
     const edge = res.body?.edge as Record<string, unknown>
     expect(edge.type).toBe('node_classified_as_classification_value')
-    expect((edge.properties as Record<string, unknown>).confidence).toEqual({ value: 3, label: 'medium', scale_id: 'confidence_5' })
+    expect((edge.properties as Record<string, unknown>).confidence).toEqual({ value: 3, label: 'Some evidence', scale_id: 'confidence_5' })
   })
 
   it('rejects off-scale, wrong-scale, and unknown-key properties via the generic writer', async () => {
@@ -148,7 +149,7 @@ describe('classification edge properties + read path (0.10.4)', () => {
     const mine = classifiedBy?.find((c) => c.source === 'p_comp/n_comp')
     expect(mine).toBeTruthy()
     expect(mine?.type).toBe('competitor_classified_as_classification_value')
-    expect((mine?.properties as Record<string, unknown>)?.confidence).toEqual({ value: 5, label: 'high', scale_id: 'confidence_5' })
+    expect((mine?.properties as Record<string, unknown>)?.confidence).toEqual({ value: 4, label: 'Confident', scale_id: 'confidence_5' })
   })
 
   it('read path C: list_portfolio_cross_edges filters by type and groups by source', async () => {

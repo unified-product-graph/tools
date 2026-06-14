@@ -219,6 +219,7 @@ describe('classification read + write closure (0.10.6)', () => {
     expect(body.edge.type).toBe('competitor_classified_as_classification_value')
     expect(body.edge.target).toBe('registry/cv_integrated')
     expect(body.status).toBe('created')
-    expect(body.edge.properties.confidence.value).toBe(5)
+    // 0.11.1: friendly "high" pins to value 4 (Confident), not 5.
+    expect(body.edge.properties.confidence.value).toBe(4)
   })
 })
