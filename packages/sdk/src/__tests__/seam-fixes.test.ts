@@ -340,7 +340,8 @@ describe(' client conveniences', () => {
       ],
     })
     expect(r.ok).toBe(true)
-    if (r.ok) {
+    // a non-dry-run create returns BatchCreateOk; narrow off the validate_only discriminant
+    if (r.ok && !('validate_only' in r)) {
       expect(r.count).toBe(2)
       expect(r.edges.length).toBe(1) // parent_ref auto-edge
     }

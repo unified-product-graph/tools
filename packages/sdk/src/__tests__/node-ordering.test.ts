@@ -48,7 +48,7 @@ describe('compareNodesWithinType', () => {
   })
 
   it('falls back to numeric-aware locale compare', () => {
-    const items = ['Item 10', 'Item 2', 'Item 1'].map((title) => node({ type: 'note', title }))
+    const items = ['Item 10', 'Item 2', 'Item 1'].map((title) => node({ type: 'feature', title }))
     expect(titles([...items].sort(compareNodesWithinType))).toEqual(['Item 1', 'Item 2', 'Item 10'])
   })
 

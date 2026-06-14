@@ -24,6 +24,18 @@
  * child type is a gap; optional children are silent when absent. Uniform across
  * every pattern.
  *
+ * Spine resolution (`prefer_via`): the DAG-once rule above keeps a genuine
+ * multi-PARENT node from exploding, but a node reachable from ONE parent by two
+ * declared paths (e.g. `user_journey -> journey_step` directly AND through
+ * `journey_phase`) would still render once in full and once as a hollow
+ * `shared` ref. A slot's `prefer_via` names the canonical spine: such a child
+ * renders under the grouping layer only, never as a redundant direct ref (J1).
+ *
+ * Canonical order (`order_by`): children are returned grouped by declared slot
+ * order, then sorted by the slot's `order_by` scalar (`phase_order`,
+ * `step_order`, ...). Order is a property of the data, not the viewer, so the
+ * server sorts once rather than every client re-sorting (J2).
+ *
  * Lives in the SDK (the graph-data layer) so every consumer assembles identical
  * trees from one source: the local file-backed server, the cloud Postgres-backed
  * server, and the CLI. The SDK `UPGFileStore` satisfies {@link GraphReader}
@@ -139,6 +151,75 @@ function childrenOf(reader: GraphReader, nodeId: string, childTypes: string[]): 
   return out
 }
 
+/** One child slot of a pattern's child_map (carries `order_by` / `prefer_via`). */
+type ChildSlot = UPGTreePattern['child_map'][string][number]
+
+/**
+ * Child ids this node reaches REDUNDANTLY and must not render directly (J1).
+ * For every slot declaring `prefer_via`, the children of the slot's type that
+ * are also grandchildren through one of this node's `prefer_via`-typed children
+ * belong on that spine. Those are excluded from the node's direct children so a
+ * node reachable both directly and through a grouping layer renders once (under
+ * the group), never twice. A child not on any spine is absent here and still
+ * renders directly. Cheap: one edge scan per `prefer_via`-typed child.
+ */
+function spineCovered(
+  reader: GraphReader,
+  slots: readonly ChildSlot[],
+  candidates: ChildRef[],
+): Set<string> {
+  const covered = new Set<string>()
+  for (const slot of slots) {
+    const via = slot.prefer_via
+    if (!via) continue
+    for (const ref of candidates) {
+      if (ref.type !== via) continue
+      for (const gc of childrenOf(reader, ref.id, [slot.type])) covered.add(gc.id)
+    }
+  }
+  return covered
+}
+
+/** Numeric value of `key` on a node's properties, or null when unset / non-numeric. */
+function orderValue(reader: GraphReader, id: string, key: string): number | null {
+  const v = reader.getNode(id)?.properties?.[key]
+  return typeof v === 'number' ? v : null
+}
+
+/**
+ * Children in canonical order (J2): grouped by their slot's declared position,
+ * then ascending by the slot's `order_by` scalar (nodes lacking it sort last),
+ * stable within ties. Order is a property of the data, not the viewer, so the
+ * server returns it sorted rather than leaving every client to re-sort. Returns
+ * a new array; does not mutate the input.
+ */
+function sortChildren(reader: GraphReader, slots: readonly ChildSlot[], refs: ChildRef[]): ChildRef[] {
+  const slotIndex = new Map<string, number>()
+  const orderKey = new Map<string, string>()
+  slots.forEach((s, i) => {
+    if (!slotIndex.has(s.type)) slotIndex.set(s.type, i)
+    if (s.order_by && !orderKey.has(s.type)) orderKey.set(s.type, s.order_by)
+  })
+  return refs
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => {
+      const sa = slotIndex.get(a.r.type) ?? 0
+      const sb = slotIndex.get(b.r.type) ?? 0
+      if (sa !== sb) return sa - sb
+      const ka = orderKey.get(a.r.type)
+      const kb = orderKey.get(b.r.type)
+      const va = ka ? orderValue(reader, a.r.id, ka) : null
+      const vb = kb ? orderValue(reader, b.r.id, kb) : null
+      if (va !== vb) {
+        if (va === null) return 1
+        if (vb === null) return -1
+        return va - vb
+      }
+      return a.i - b.i // stable: preserve edge order within a tie
+    })
+    .map((x) => x.r)
+}
+
 /**
  * Assemble the tree forest for a pattern. Tries the anchor, then each fallback,
  * stopping at the first that yields a non-empty forest with at least one child
@@ -173,21 +254,34 @@ export function assembleTree(
       const childTypes = slots.map((s) => s.type)
       const requiredTypes = slots.filter((s) => s.required).map((s) => s.type)
 
+      // All candidate typed children, in edge order. Used for gap presence
+      // (does the graph hold such a child AT ALL) before spine collapse removes
+      // a node that exists under a preferred grouping layer.
+      const candidates = childrenOf(reader, node.id, childTypes)
+
       if (depth >= maxDepth) {
-        if (childrenOf(reader, node.id, childTypes).length > 0) truncated = true
+        if (candidates.length > 0) truncated = true
         return
       }
 
-      const childRefs = childrenOf(reader, node.id, childTypes)
-
-      // Gap = a required child type with no graph child of that type.
+      // Gap = a required child type with no graph child of that type. Computed
+      // from the unfiltered candidates so a required child reachable only via a
+      // collapsed spine is never falsely reported missing.
       if (requiredTypes.length > 0) {
-        const presentTypes = new Set(childRefs.map((c) => c.type))
+        const presentTypes = new Set(candidates.map((c) => c.type))
         const missing = requiredTypes.filter((t) => !presentTypes.has(t))
         if (missing.length > 0) {
           gaps.push({ node_id: node.id, type: node.type, title: node.title, missing })
         }
       }
+
+      // Collapse redundant DAG paths (J1), then sort into canonical order (J2).
+      const covered = spineCovered(reader, slots, candidates)
+      const childRefs = sortChildren(
+        reader,
+        slots,
+        covered.size > 0 ? candidates.filter((c) => !covered.has(c.id)) : candidates,
+      )
 
       for (const cref of childRefs) {
         if (nodes >= maxNodes) { truncated = true; return }

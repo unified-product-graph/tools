@@ -297,6 +297,112 @@ describe('get_tree (0.9.15)', () => {
     expect(body.roots[0].children[0].id).toBe('k1')
   })
 
+  it('J1: collapses the redundant journey->step path through the phase spine (no double-count)', async () => {
+    // A step reachable BOTH directly (user_journey_contains_journey_step) and via
+    // its phase (passes_through -> spans) must render ONCE, under the phase. A step
+    // in NO phase still renders directly (the direct path is the fallback, never a
+    // silent drop). Mirror of the G5 silent-drop fix.
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'uj', type: 'user_journey', title: 'Onboarding' },
+        { id: 'ph', type: 'journey_phase', title: 'Set up', properties: { phase_order: 0 } },
+        { id: 'st1', type: 'journey_step', title: 'Sign up', properties: { step_order: 1 } },
+        { id: 'st2', type: 'journey_step', title: 'Pick template', properties: { step_order: 0 } },
+        { id: 'st3', type: 'journey_step', title: 'Orphan step (no phase)', properties: { step_order: 0 } },
+        { id: 'a1', type: 'journey_action', title: 'Click sign up', properties: { action_order: 0 } },
+      ],
+      edges: [
+        e('e1', 'uj', 'ph', 'user_journey_passes_through_journey_phase'),
+        // Redundant DIRECT edges to steps that also hang off the phase:
+        e('e2', 'uj', 'st1', 'user_journey_contains_journey_step'),
+        e('e3', 'uj', 'st2', 'user_journey_contains_journey_step'),
+        // st3 is direct-only (in no phase):
+        e('e4', 'uj', 'st3', 'user_journey_contains_journey_step'),
+        e('e5', 'ph', 'st1', 'journey_phase_spans_journey_step'),
+        e('e6', 'ph', 'st2', 'journey_phase_spans_journey_step'),
+        e('e7', 'st1', 'a1', 'journey_step_has_action'),
+      ],
+    }
+    const store = await load(doc)
+    // depth 5 so the action leaf renders (journey natural_depth is 3).
+    const body = bodyOf(getTree({ pattern: 'journey', depth: 5 }, makeCtx(store)))
+    const uj = body.roots.find((r: { id: string }) => r.id === 'uj')
+    // Journey's direct children: the phase (slot 0) then the orphan step (slot 1).
+    // st1/st2 are NOT here -- they collapsed onto the phase spine.
+    expect(uj.children.map((c: { id: string }) => c.id)).toEqual(['ph', 'st3'])
+    // The phase holds the two steps, sorted by step_order (st2=0 before st1=1).
+    const ph = uj.children.find((c: { id: string }) => c.id === 'ph')
+    expect(ph.children.map((c: { id: string }) => c.id)).toEqual(['st2', 'st1'])
+    // The collapsed step keeps its subtree (rendered under the phase, not hollow).
+    const st1 = ph.children.find((c: { id: string }) => c.id === 'st1')
+    expect(st1.children.map((c: { id: string }) => c.id)).toEqual(['a1'])
+    expect(st1.shared).toBeUndefined()
+    // The orphan step renders directly and is not a shared reference.
+    const st3 = uj.children.find((c: { id: string }) => c.id === 'st3')
+    expect(st3.shared).toBeUndefined()
+    // No hollow duplicate anywhere: the redundant path produced zero shared refs.
+    expect(body.stats.shared_refs).toBe(0)
+  })
+
+  it('J1: falls back to the direct journey->step path when the journey has no phases', async () => {
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'uj', type: 'user_journey', title: 'Quick flow' },
+        { id: 'st1', type: 'journey_step', title: 'Second', properties: { step_order: 1 } },
+        { id: 'st2', type: 'journey_step', title: 'First', properties: { step_order: 0 } },
+      ],
+      edges: [
+        e('e1', 'uj', 'st1', 'user_journey_contains_journey_step'),
+        e('e2', 'uj', 'st2', 'user_journey_contains_journey_step'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'journey' }, makeCtx(store)))
+    const uj = body.roots.find((r: { id: string }) => r.id === 'uj')
+    // No phase grouping -> steps render directly, in step_order.
+    expect(uj.children.map((c: { id: string }) => c.id)).toEqual(['st2', 'st1'])
+  })
+
+  it('J2: returns children in canonical *_order, nulls last', async () => {
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'uj', type: 'user_journey', title: 'J' },
+        { id: 'phA', type: 'journey_phase', title: 'A', properties: { phase_order: 2 } },
+        { id: 'phB', type: 'journey_phase', title: 'B', properties: { phase_order: 0 } },
+        { id: 'phC', type: 'journey_phase', title: 'C (no order)' }, // null -> last
+        { id: 'sA1', type: 'journey_step', title: 'A.second', properties: { step_order: 1 } },
+        { id: 'sA2', type: 'journey_step', title: 'A.first', properties: { step_order: 0 } },
+      ],
+      edges: [
+        e('e1', 'uj', 'phA', 'user_journey_passes_through_journey_phase'),
+        e('e2', 'uj', 'phB', 'user_journey_passes_through_journey_phase'),
+        e('e3', 'uj', 'phC', 'user_journey_passes_through_journey_phase'),
+        e('e4', 'phA', 'sA1', 'journey_phase_spans_journey_step'),
+        e('e5', 'phA', 'sA2', 'journey_phase_spans_journey_step'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'journey' }, makeCtx(store)))
+    const uj = body.roots.find((r: { id: string }) => r.id === 'uj')
+    // Phases ascending by phase_order, the unset one last.
+    expect(uj.children.map((c: { id: string }) => c.id)).toEqual(['phB', 'phA', 'phC'])
+    // Steps within a phase ascending by step_order.
+    const phA = uj.children.find((c: { id: string }) => c.id === 'phA')
+    expect(phA.children.map((c: { id: string }) => c.id)).toEqual(['sA2', 'sA1'])
+  })
+
   it('rejects an unknown pattern', () => {
     const ctx = makeCtx(new UPGFileStore())
     const r = getTree({ pattern: 'not-a-pattern' }, ctx) as { content: { text: string }[]; isError?: true }
