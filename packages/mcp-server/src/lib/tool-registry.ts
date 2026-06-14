@@ -72,7 +72,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
-import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
 import {
   defineCanonicalEntity,
@@ -2169,6 +2169,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'diff_classification',
+    description:
+      'Show what MOVED on the competitive classification landscape: each competitor reclassification (from one classification_value to another on an axis) since a date. Reads the append-only reclassification history auto-recorded at the classify-write chokepoint, so "did AEM move from integrated to agentic" is one call instead of in-head reasoning. Returns transitions with resolved titles (competitor, from, to), sorted newest first. Pairs with `list_portfolio_cross_edges` freshness (which decides WHEN to re-assess); this surfaces WHAT changed. Empty when nothing moved or no history exists. Read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        product: { type: 'string', description: 'Restrict to reclassifications of competitors owned by this product (matched on the competitor id product prefix).' },
+        competitor: { type: 'string', description: 'Restrict to one competitor by its qualified id (e.g. p_rival/n_acme).' },
+        since: { type: 'string', description: 'ISO date. Only transitions observed on or after this date (e.g. 2026-06-01). Omit for all history.' },
+      },
+    },
+  },
+  {
     name: 'portfolio_validate',
     description:
       'Run `validate_graph` ACROSS every product in scope in one call (the audit counterpart to `portfolio_digest`). Replaces the `switch_product` + `validate_graph` round-trip per product. Each product is checked by the SAME single-product code path (schema drift + anti-patterns), so per-product verdicts never diverge. Returns a per-product `valid` / `structurally_valid` + drift + anti-pattern counts, plus a portfolio rollup with `all_valid`. Read-only; the active product is read live, the rest read-only.',
@@ -2439,6 +2452,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   portfolio_digest: portfolioDigest,
   get_portfolio_tree: getPortfolioTree,
   audit_property_coverage: auditPropertyCoverage,
+  diff_classification: diffClassification,
   portfolio_validate: portfolioValidate,
   clone_structure: cloneStructure,
   migrate_cross_edges: migrateCrossEdges,

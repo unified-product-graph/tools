@@ -125,6 +125,11 @@ const CLOUD_NA = new Set([
   // required properties. Local-only — reads the portfolio document, a .upg-file
   // workspace concept with no single-product cloud analogue.
   'audit_property_coverage',
+  // diff_classification (0.11.0): reads the append-only reclassification history
+  // (portfolio signals[]) to show what moved on the classification landscape.
+  // Local-only — the history lives in the portfolio workspace document, which
+  // the single-product-per-request cloud server has no analogue for.
+  'diff_classification',
   // portfolio-wide audit (0.9.3, batch-4 #19): runs validate_graph across the
   // .upg-file workspace in one call. Local-only for the same reason as the
   // portfolio read layer — no cloud analogue (single-product-per-request).

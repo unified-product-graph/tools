@@ -25,6 +25,7 @@ import {
   type DanglingEdgeReport,
   type DanglingEdgeClass,
 } from './lib/dangling-edges.js'
+import { buildValueAxisMap } from './lib/portfolio-landscape.js'
 import {
   computeSchemaDriftSummary,
   renderDriftSummary,
@@ -1625,8 +1626,113 @@ export class UPGPortfolioStore {
       return { status: 'unchanged', edge: existing }
     }
     this.doc.cross_edges.push(edge)
+    this.emitReclassificationIfMoved(edge)
     this.scheduleSave()
     return { status: 'created', edge }
+  }
+
+  /** Classify cross-edge type suffix (e.g. `competitor_classified_as_classification_value`). */
+  private static readonly CLASSIFY_SUFFIX = '_classified_as_classification_value'
+
+  /**
+   * Auto-emit at the classify-write chokepoint (UPG 0.11.0). When a classify
+   * cross-edge is created to a new value that SUPERSEDES a sibling
+   * classification of the same competitor on the SAME axis (a genuine move,
+   * e.g. ai_integrated to ai_agentic), append an append-only `reclassification`
+   * `competitor_signal` to `signals[]` — so `diff_classification` can answer
+   * "what moved" without the graph ever having held prior state explicitly.
+   *
+   * Record-only and non-destructive: the superseded edge is NOT removed (a
+   * `categorical` axis may legitimately carry several values, so collapsing to
+   * one would corrupt current state). Detection requires BOTH values to resolve
+   * to the same axis (registry edge OR `axis:` tag) — if either is unaxed we
+   * cannot prove a single-axis move and skip. First-time classifications (no
+   * superseded sibling) are not moves and emit nothing. No-double-emit: an
+   * identical (competitor, axis, from, to, observed_at) signal is appended once.
+   */
+  private emitReclassificationIfMoved(newEdge: UPGCrossEdge): void {
+    if (!this.doc) return
+    if (!newEdge.type.endsWith(UPGPortfolioStore.CLASSIFY_SUFFIX)) return
+    const bare = (q: string): string => q.split('/').pop() ?? q
+    const axisMap = buildValueAxisMap(this.doc)
+    const toValue = bare(newEdge.target)
+    const newAxis = axisMap.get(toValue)?.axis
+    if (!newAxis) return // new value unaxed: cannot attribute the move to an axis
+
+    // The superseded cell: same competitor, same classify type, a DIFFERENT
+    // value that resolves to the SAME axis.
+    const sibling = this.doc.cross_edges.find(
+      (e) =>
+        e !== newEdge &&
+        e.type === newEdge.type &&
+        e.source === newEdge.source &&
+        e.target !== newEdge.target &&
+        axisMap.get(bare(e.target))?.axis === newAxis,
+    )
+    if (!sibling) return // first classification on this axis: not a move
+
+    const fromValue = bare(sibling.target)
+    const observedAt =
+      (newEdge.properties?.assessed_on as string | undefined) ?? new Date().toISOString()
+
+    this.doc.signals ??= []
+    const alreadyLogged = this.doc.signals.some((s) => {
+      const p = s.properties ?? {}
+      return (
+        p.signal_type === 'reclassification' &&
+        p.competitor === newEdge.source &&
+        p.axis === newAxis &&
+        p.from_value === fromValue &&
+        p.to_value === toValue &&
+        p.observed_at === observedAt
+      )
+    })
+    if (alreadyLogged) return
+
+    const fingerprint = `${newEdge.source}|${newAxis}|${fromValue}|${toValue}|${observedAt}`
+    const axisLabel = axisMap.get(toValue)?.label ?? newAxis
+    const signal: UPGBaseNode = {
+      id: `sig_reclass_${createHash('sha256').update(fingerprint).digest('hex').slice(0, 12)}`,
+      type: 'competitor_signal',
+      title: `Reclassified on ${axisLabel}: ${fromValue} to ${toValue}`,
+      properties: {
+        signal_type: 'reclassification',
+        competitor: newEdge.source,
+        axis: newAxis,
+        from_value: fromValue,
+        to_value: toValue,
+        observed_at: observedAt,
+        summary: `${newEdge.source} reclassified on ${axisLabel}: ${fromValue} to ${toValue}`,
+        ...(newEdge.properties?.confidence ? { confidence: newEdge.properties.confidence } : {}),
+        ...(newEdge.properties?.observed_by ? { observed_by: newEdge.properties.observed_by } : {}),
+      },
+    }
+    this.doc.signals.push(signal)
+  }
+
+  /**
+   * Read the append-only reclassification history — the substrate for
+   * `diff_classification`. Filters `signals[]` to `reclassification`
+   * competitor_signals, optionally by owning product (matched on the
+   * `competitor` qualified id's product prefix) and by `observed_at >= since`.
+   */
+  getReclassificationSignals(opts: { product?: string; since?: string } = {}): UPGBaseNode[] {
+    const signals = (this.doc?.signals ?? []).filter(
+      (s) => (s.properties ?? {}).signal_type === 'reclassification',
+    )
+    return signals.filter((s) => {
+      const p = s.properties ?? {}
+      if (opts.product) {
+        const competitor = String(p.competitor ?? '')
+        const prod = competitor.includes('/') ? competitor.split('/')[0] : competitor
+        if (prod !== opts.product) return false
+      }
+      if (opts.since) {
+        const at = String(p.observed_at ?? '')
+        if (!at || at < opts.since) return false
+      }
+      return true
+    })
   }
 
   /**

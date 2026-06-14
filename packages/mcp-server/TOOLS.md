@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 127 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 128 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 127 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 32 tools
+- [Workspace & Portfolios](#workspace-portfolios): 33 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1261,6 +1261,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`define_canonical_entity`](#define-canonical-entity)
 - [`delete_cross_product_edge`](#delete-cross-product-edge)
 - [`detach_product_from_portfolio`](#detach-product-from-portfolio)
+- [`diff_classification`](#diff-classification)
 - [`get_organization`](#get-organization)
 - [`get_portfolio_tree`](#get-portfolio-tree)
 - [`get_workspace_info`](#get-workspace-info)
@@ -1643,6 +1644,28 @@ not a member, so retries are idempotent.
 - textError on a missing workspace or an unknown portfolio id.
 
 **See also:** `attach_product_to_portfolio`
+
+
+### `diff_classification`
+
+Show what MOVED on the competitive classification landscape: each competitor reclassification (from one classification_value to another on an axis) since a date. Reads the append-only reclassification history auto-recorded at the classify-write chokepoint, so "did AEM move from integrated to agentic" is one call instead of in-head reasoning. Returns transitions with resolved titles (competitor, from, to), sorted newest first. Pairs with `list_portfolio_cross_edges` freshness (which decides WHEN to re-assess); this surfaces WHAT changed. Empty when nothing moved or no history exists. Read-only.
+
+**Atomicity:** `atomic (read-only). Reads the portfolio document only; never mutates.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `competitor` | string |  | Restrict to one competitor by its qualified id (e.g. p_rival/n_acme). |
+| `product` | string |  | Restrict to reclassifications of competitors owned by this product (matched on the competitor id product prefix). |
+| `since` | string |  | ISO date. Only transitions observed on or after this date (e.g. 2026-06-01). Omit for all history. |
+
+**Returns:**
+
+JSON: `{ product?, competitor?, since?, total, transitions: Array<{
+signal_id, competitor, competitor_title?, axis, from_value, from_title?,
+to_value, to_title?, observed_at, confidence?, observed_by? }> }`, newest
+first. Empty `transitions` when nothing moved or no history exists.
 
 
 ### `get_organization`

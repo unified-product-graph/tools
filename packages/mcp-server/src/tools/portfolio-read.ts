@@ -1219,3 +1219,92 @@ export const auditPropertyCoverage: ToolHandler = async (args, _ctx): Promise<To
   if (guard.kind === 'warn') Object.assign(response, guard.fields)
   return text(JSON.stringify(response, null, 2))
 }
+
+/**
+ * diff_classification (UPG 0.11.0) — what moved on the competitive classification
+ * landscape since a date. Reads the append-only reclassification history
+ * (`signals[]`, auto-emitted at the classify-write chokepoint) and projects each
+ * transition (from_value to to_value on an axis) with resolved titles. The payoff
+ * of the self-updating competitive tier: pairs with the 0.10.8 freshness query
+ * (which decides WHEN to re-assess) and surfaces WHAT changed.
+ *
+ * Portfolio-grain, local-only (CLOUD_NA) — the history lives in the portfolio
+ * workspace document, which the single-product-per-request cloud has no analogue
+ * for.
+ *
+ * @returns JSON: `{ product?, competitor?, since?, total, transitions: Array<{
+ *   signal_id, competitor, competitor_title?, axis, from_value, from_title?,
+ *   to_value, to_title?, observed_at, confidence?, observed_by? }> }`, newest
+ *   first. Empty `transitions` when nothing moved or no history exists.
+ * @atomicity atomic (read-only). Reads the portfolio document only; never mutates.
+ */
+export const diffClassification: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const product = args.product as string | undefined
+  const competitor = args.competitor as string | undefined
+  const since = args.since as string | undefined
+  if (since !== undefined && Number.isNaN(Date.parse(since))) {
+    return textError(`Invalid \`since\` date: "${since}". Pass an ISO date like "2026-06-01".`)
+  }
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return text(JSON.stringify({ product, since, total: 0, transitions: [], note: 'No workspace portfolio document found.' }, null, 2))
+  }
+  const doc = portfolioStore.getDocument()
+  if (!doc) return textError('Portfolio document failed to load.')
+
+  let signals = portfolioStore.getReclassificationSignals({
+    ...(product ? { product } : {}),
+    ...(since ? { since } : {}),
+  })
+  if (competitor) signals = signals.filter((s) => (s.properties ?? {}).competitor === competitor)
+
+  const index = buildPortfolioNodeIndex(doc)
+  const titleOf = (qid: string): string | undefined => index.get(qid)?.title
+  const valueTitle = (valueId: string): string | undefined => index.get(`${REGISTRY_PRODUCT_ID}/${valueId}`)?.title
+
+  const transitions = signals
+    .map((s) => {
+      const p = (s.properties ?? {}) as Record<string, unknown>
+      const comp = String(p.competitor ?? '')
+      const fromValue = p.from_value as string | undefined
+      const toValue = p.to_value as string | undefined
+      const row: Record<string, unknown> = {
+        signal_id: s.id,
+        competitor: comp,
+        axis: p.axis,
+        from_value: fromValue,
+        to_value: toValue,
+        observed_at: p.observed_at,
+      }
+      const ct = titleOf(comp)
+      if (ct) row.competitor_title = ct
+      if (fromValue) { const ft = valueTitle(fromValue); if (ft) row.from_title = ft }
+      if (toValue) { const tt = valueTitle(toValue); if (tt) row.to_title = tt }
+      if (p.confidence !== undefined) row.confidence = p.confidence
+      if (p.observed_by !== undefined) row.observed_by = p.observed_by
+      return row
+    })
+    // Most recent move first.
+    .sort((a, b) => String(b.observed_at ?? '').localeCompare(String(a.observed_at ?? '')))
+
+  const response: Record<string, unknown> = {
+    ...(product ? { product } : {}),
+    ...(competitor ? { competitor } : {}),
+    ...(since ? { since } : {}),
+    total: transitions.length,
+    transitions,
+  }
+
+  const guard = preflightPayload({
+    toolName: 'diff_classification',
+    nodeCount: 0,
+    edgeCount: transitions.length,
+    compactEdges: false,
+    argsHint: `product=${product ?? 'all'}, since=${since ?? 'any'}, total=${transitions.length}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
+  if (guard.kind === 'warn') Object.assign(response, guard.fields)
+  return text(JSON.stringify(response, null, 2))
+}

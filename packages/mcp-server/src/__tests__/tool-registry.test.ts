@@ -134,7 +134,10 @@ describe('Tool registry: completeness', () => {
     //   read layer, no single-product cloud analogue). → 126.
     // + audit_property_coverage (0.10.8): audits portfolio cross-edges for
     //   missing required properties, local-only (portfolio read layer). → 127.
-    expect(TOOL_DEFINITIONS).toHaveLength(127)
+    // + diff_classification (0.11.0): reads the append-only reclassification
+    //   history (signals[]) to show what moved on the landscape, local-only
+    //   (portfolio read layer, no single-product cloud analogue). → 128.
+    expect(TOOL_DEFINITIONS).toHaveLength(128)
   })
 })
 
