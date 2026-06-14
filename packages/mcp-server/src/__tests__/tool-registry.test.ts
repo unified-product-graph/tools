@@ -129,7 +129,10 @@ describe('Tool registry: completeness', () => {
     //   write, like link_area_to_audience). → 124.
     // + create_classification_edge (0.10.4): typed writer for the classification
     //   edges, local-only (same cross-product portfolio write). → 125.
-    expect(TOOL_DEFINITIONS).toHaveLength(125)
+    // + get_portfolio_tree (0.10.7): assembles the classification landscape /
+    //   competitor profile from portfolio.upg cross-edges, local-only (portfolio
+    //   read layer, no single-product cloud analogue). → 126.
+    expect(TOOL_DEFINITIONS).toHaveLength(126)
   })
 })
 

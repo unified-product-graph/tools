@@ -20,7 +20,17 @@ import * as path from 'node:path'
 import * as fs from 'node:fs'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
-import { UPGFileStore, computeGraphDigest, openPortfolioStoreIfExists, type UPGPortfolioStore } from '@unified-product-graph/sdk'
+import {
+  UPGFileStore,
+  computeGraphDigest,
+  openPortfolioStoreIfExists,
+  assembleLandscape,
+  assembleCompetitorProfile,
+  buildPortfolioNodeIndex,
+  buildValueAxisMap,
+  type UPGPortfolioStore,
+  type PortfolioNodeRef,
+} from '@unified-product-graph/sdk'
 import { REGISTRY_PRODUCT_ID, UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
 import { preflightPayload } from '../lib/payload-guard.js'
 import { traverseGraph, type GraphReader, type TraverseParams } from '../lib/graph-traverse.js'
@@ -175,26 +185,28 @@ function buildClassificationDistribution(portfolioStore: UPGPortfolioStore): Rec
     .filter((e) => e.type.endsWith('_classified_as_classification_value'))
   if (classifyEdges.length === 0) return undefined
 
-  // value bare id -> axis bare id (from registry-internal axis->value edges).
-  const valueToAxis = new Map<string, string>()
-  for (const e of portfolioStore.listRegistryEdges('classification_axis_includes_classification_value')) {
-    valueToAxis.set(e.target, e.source)
-  }
+  const doc = portfolioStore.getDocument()
+  // Shared axis resolution: a `classification_axis_includes_classification_value`
+  // registry edge first, then an `axis:<slug>` tag on the value node. A graph
+  // wired either way (or partly each) resolves; the old registry-edge-only path
+  // reported every value as unaxed on the common tag-only graph.
+  const valueAxis = doc ? buildValueAxisMap(doc) : new Map()
   const label = (bareId: string): string => portfolioStore.getRegistryNode(bareId)?.title ?? bareId
 
-  // axis bare id -> (value bare id -> count); '__unaxed__' collects values with no axis edge.
+  // axis bare id -> (value bare id -> count); '__unaxed__' collects unresolved values.
   const UNAXED = '__unaxed__'
   const axes = new Map<string, Map<string, number>>()
   for (const e of classifyEdges) {
     const valueBare = e.target.startsWith(`${REGISTRY_PRODUCT_ID}/`)
       ? e.target.slice(REGISTRY_PRODUCT_ID.length + 1)
       : e.target
-    const axisBare = valueToAxis.get(valueBare) ?? UNAXED
+    const axisBare = valueAxis.get(valueBare)?.axis ?? UNAXED
     const byValue = axes.get(axisBare) ?? new Map<string, number>()
     byValue.set(valueBare, (byValue.get(valueBare) ?? 0) + 1)
     axes.set(axisBare, byValue)
   }
 
+  const axisLabel = (axisBare: string): string => valueAxisLabelFor(valueAxis, axisBare) ?? label(axisBare)
   const axisList = [...axes.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([axisBare, byValue]) => {
@@ -204,10 +216,27 @@ function buildClassificationDistribution(portfolioStore: UPGPortfolioStore): Rec
       const total = values.reduce((s, v) => s + v.count, 0)
       return axisBare === UNAXED
         ? { axis: null, label: 'unaxed', values, total }
-        : { axis: axisBare, label: label(axisBare), values, total }
+        : { axis: axisBare, label: axisLabel(axisBare), values, total }
     })
 
-  return { total_classified_edges: classifyEdges.length, axes: axisList }
+  return {
+    total_classified_edges: classifyEdges.length,
+    axes: axisList,
+    // Discoverability: point an agent that has never seen this graph at the tool
+    // that renders the full nested view, so the landscape is reachable, not just
+    // present (read-path brief, ask #4).
+    render_with: 'get_portfolio_tree',
+    note: `This portfolio has a classification landscape across ${axisList.filter((a) => a.axis !== null).length} axes. Render it with get_portfolio_tree({ shape: "landscape" }) (anchor at an axis or value for members), or a competitor's position with get_portfolio_tree({ shape: "competitor_profile", from_id }).`,
+  }
+}
+
+/** Display label for an axis bare id, recovered from any value that resolved to it. */
+function valueAxisLabelFor(
+  valueAxis: Map<string, { axis: string; label: string }>,
+  axisBare: string,
+): string | undefined {
+  for (const v of valueAxis.values()) if (v.axis === axisBare) return v.label
+  return undefined
 }
 
 /**
@@ -918,5 +947,180 @@ export const portfolioValidate: ToolHandler = async (args, ctx): Promise<ToolRes
   } catch {
     // advisory; never fail the whole validate on its account
   }
+  return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * Enrich a portfolio node index with file-loaded product titles for any
+ * qualified ids in `wanted` the index could not already resolve (registry
+ * canonicals and `instance_of`-registered nodes resolve from the document
+ * alone). Loads each referenced product file read-only at most once. Best-effort:
+ * an unloadable product simply leaves its nodes unresolved (the assembler falls
+ * back to the bare id as the title).
+ */
+async function enrichIndexFromProducts(
+  cwd: string,
+  activeStore: UPGFileStore,
+  index: Map<string, PortfolioNodeRef>,
+  wanted: Iterable<string>,
+): Promise<void> {
+  // Group the still-unresolved qualified ids by product id.
+  const byProduct = new Map<string, Set<string>>()
+  for (const qid of wanted) {
+    if (index.has(qid)) continue
+    const slash = qid.indexOf('/')
+    if (slash === -1) continue
+    const pid = qid.slice(0, slash)
+    if (pid === REGISTRY_PRODUCT_ID) continue
+    ;(byProduct.get(pid) ?? byProduct.set(pid, new Set()).get(pid)!).add(qid.slice(slash + 1))
+  }
+  if (byProduct.size === 0) return
+
+  const activeId = (() => {
+    try {
+      return activeStore.getDocument()?.product?.id
+    } catch {
+      return undefined
+    }
+  })()
+
+  for (const [pid, nodeIds] of byProduct) {
+    let store: UPGFileStore | null = null
+    let title: string | undefined
+    if (activeId && pid === activeId) {
+      store = activeStore
+      try {
+        title = activeStore.getDocument()?.product?.title
+      } catch {
+        /* ignore */
+      }
+    } else {
+      for (const absPath of findWorkspaceUpgFiles(cwd)) {
+        try {
+          const doc = JSON.parse(fs.readFileSync(absPath, 'utf-8')) as { product?: { id?: string; title?: string } }
+          if (doc.product?.id === pid) {
+            const s = new UPGFileStore()
+            await s.loadReadOnly(absPath)
+            store = s
+            title = doc.product.title
+            break
+          }
+        } catch {
+          // skip malformed
+        }
+      }
+    }
+    if (!store) continue
+    for (const nodeId of nodeIds) {
+      const n = store.getNode(nodeId)
+      if (!n) continue
+      index.set(`${pid}/${nodeId}`, {
+        id: `${pid}/${nodeId}`,
+        bare_id: nodeId,
+        type: n.type,
+        title: n.title,
+        status: n.status as string | undefined,
+        product_id: pid,
+        product_title: title,
+      })
+    }
+  }
+}
+
+/**
+ * `get_portfolio_tree`: assemble a portfolio-grain tree from the shared
+ * classification registry and the `*_classified_as_classification_value` cross
+ * edges in `.upg/portfolio.upg`. The portfolio-grain complement to `get_tree`
+ * (which is product-scoped): two shapes a human or downstream actually consumes.
+ *
+ * - `shape: "landscape"` (default): classification axis -> its values -> the
+ *   nodes classified at each value, every leaf carrying the edge's `confidence`
+ *   / `assessed_on`. Anchor at one axis or value with `from_id`
+ *   (`registry/classification_value_…` or `registry/classification_axis_…`), or
+ *   omit it for the whole portfolio. Values whose axis is not wired (no
+ *   `classification_axis_includes_classification_value` edge and no `axis:` tag)
+ *   are grouped under an `axis: null` "unaxed" bucket, surfaced rather than hidden.
+ * - `shape: "competitor_profile"`: one classified node (a competitor) ->
+ *   its position on every axis it has been graded against, each carrying
+ *   confidence. `from_id` is required (the qualified id of the node to profile).
+ *
+ * Node titles resolve from the document where possible (registry canonicals,
+ * and product-local nodes via their `instance_of` edge), and from a read-only
+ * product-file load otherwise, so output names entities ("Directus") rather than
+ * opaque ids.
+ *
+ * Parameters:
+ * - `shape`: `landscape` (default) or `competitor_profile`.
+ * - `from_id`: anchor node id (qualified or bare). Optional for landscape;
+ *   required for competitor_profile.
+ * - `include_properties`: classification-edge property keys to inline on each
+ *   leaf, in addition to the always-included `confidence` / `assessed_on`.
+ * - `include_members`: landscape only. Force the classified members to inline
+ *   even on the whole-portfolio overview (which is counts-only by default to
+ *   stay under the transport cap). Honoured subject to the payload guard.
+ *
+ * @returns JSON: the landscape or profile structure (see the SDK shapes).
+ * @atomicity atomic (read-only). Reads the portfolio document and, for title
+ *   resolution, referenced product files read-only; never mutates active state.
+ * @see portfolio_digest
+ * @see list_portfolio_cross_edges
+ * @see get_tree
+ */
+export const getPortfolioTree: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const shape = (args.shape as string | undefined) ?? 'landscape'
+  if (shape !== 'landscape' && shape !== 'competitor_profile') {
+    return textError(`Invalid shape: "${shape}". Valid: landscape, competitor_profile.`)
+  }
+  const fromId = args.from_id as string | undefined
+  const includeProperties = Array.isArray(args.include_properties)
+    ? (args.include_properties as string[])
+    : undefined
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return text(
+      JSON.stringify(
+        { shape, note: 'No workspace portfolio document found. Run from a directory with a .upg/ workspace.' },
+        null,
+        2,
+      ),
+    )
+  }
+  const doc = portfolioStore.getDocument()
+  if (!doc) return textError('Portfolio document failed to load.')
+
+  // Resolve titles: registry + instance_of from the document, then enrich any
+  // remaining classified-node sources from their product files.
+  const index = buildPortfolioNodeIndex(doc)
+  const classifySources = (doc.cross_edges ?? [])
+    .filter((e) => e.type.endsWith('_classified_as_classification_value'))
+    .map((e) => e.source)
+  await enrichIndexFromProducts(cwd, ctx.store as UPGFileStore, index, classifySources)
+  // The profile subject may itself need a file-loaded title.
+  if (shape === 'competitor_profile' && fromId) await enrichIndexFromProducts(cwd, ctx.store as UPGFileStore, index, [fromId])
+
+  const includeMembers = typeof args.include_members === 'boolean' ? (args.include_members as boolean) : undefined
+  const result =
+    shape === 'competitor_profile'
+      ? assembleCompetitorProfile(doc, { from_id: fromId, include_properties: includeProperties, node_index: index })
+      : assembleLandscape(doc, { from_id: fromId, include_properties: includeProperties, node_index: index, include_members: includeMembers })
+
+  // Estimate from what is actually rendered: inlined members (landscape detail)
+  // or positions (profile); a counts-only overview renders one row per value.
+  const renderedCount =
+    result.shape === 'landscape'
+      ? (result.stats.members_included ? result.stats.members : result.stats.values)
+      : result.stats.positions
+  const guard = preflightPayload({
+    toolName: 'get_portfolio_tree',
+    nodeCount: 0,
+    edgeCount: renderedCount,
+    compactEdges: false, // leaves carry title + confidence + assessed_on
+    argsHint: `shape=${shape}, from_id=${fromId ?? '(all)'}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
+  const response = result as Record<string, unknown>
+  if (guard.kind === 'warn') Object.assign(response, guard.fields)
   return text(JSON.stringify(response, null, 2))
 }

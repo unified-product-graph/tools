@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 125 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 126 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 125 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 30 tools
+- [Workspace & Portfolios](#workspace-portfolios): 31 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1261,6 +1261,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`delete_cross_product_edge`](#delete-cross-product-edge)
 - [`detach_product_from_portfolio`](#detach-product-from-portfolio)
 - [`get_organization`](#get-organization)
+- [`get_portfolio_tree`](#get-portfolio-tree)
 - [`get_workspace_info`](#get-workspace-info)
 - [`init_workspace`](#init-workspace)
 - [`link_area_to_audience`](#link-area-to-audience)
@@ -1633,6 +1634,29 @@ Returns `{ organization: null }` when no portfolio document exists yet.
 **See also:** `list_portfolios`
 
 
+### `get_portfolio_tree`
+
+Assemble a portfolio-grain tree from the shared classification registry and the `*_classified_as_classification_value` cross edges in `.upg/portfolio.upg` (the portfolio complement to `get_tree`, which is product-scoped). `shape: "landscape"` (default) returns classification axis to its values to the nodes classified at each value, every leaf carrying `confidence` / `assessed_on`; anchor at one axis or value with `from_id`, or omit for the whole portfolio. `shape: "competitor_profile"` returns one node (a competitor) and its position on every axis it has been graded against; `from_id` required. Titles resolve to entity names (e.g. "Directus"), not opaque ids. Values with no wired axis surface under an `unaxed` bucket. Read-only.
+
+**Atomicity:** `atomic (read-only). Reads the portfolio document and, for title
+resolution, referenced product files read-only; never mutates active state.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `from_id` | string |  | Anchor node id (qualified or bare). Optional for landscape (a classification axis or value); required for competitor_profile (the node to profile). |
+| `include_members` | boolean |  | Landscape only. Force classified members to inline on the whole-portfolio overview (counts-only by default). Subject to the payload guard. |
+| `include_properties` | array |  | Classification-edge property keys to inline on each leaf, in addition to the always-included confidence / assessed_on. |
+| `shape` | `landscape` \| `competitor_profile` |  | landscape (axis to value to classified members, default) or competitor_profile (one node to its per-axis positions). |
+
+**Returns:**
+
+JSON: the landscape or profile structure (see the SDK shapes).
+
+**See also:** `portfolio_digest`, `list_portfolio_cross_edges`, `get_tree`
+
+
 ### `get_workspace_info`
 
 Workspace info: which product is loaded, what other products are available, current workspace mode.
@@ -1723,7 +1747,7 @@ coerced to `concept`), or `null` when unset — matching what
 
 ### `list_portfolio_cross_edges`
 
-List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered and grouped. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix (e.g. all classification edges grouped by source) instead of the full unfiltered dump.
+List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered, grouped, title-resolved, property-projected, and paginated. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix; `resolve_titles` (default on) names entities ("Sitecore") instead of opaque ids; `property_include` trims heavy edge properties; `limit` / `offset` page the flat list. For the nested axis to value to members view use `get_portfolio_tree`.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -1732,15 +1756,20 @@ List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`)
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `group_by` | `source` \| `target` |  | Group edges by source or target endpoint (the comparison matrix) instead of a flat list. |
+| `limit` | number |  | Max edges to return in the flat list (ignored when group_by is set). |
+| `offset` | number |  | Skip this many edges before the page (flat list only). |
+| `property_include` | array |  | Keep only these keys of each edge properties object (e.g. ["confidence"]). Pass [] to drop properties entirely. |
+| `resolve_titles` | boolean |  | Add source_title / target_title to each edge, resolved from the registry and instance_of registrations. Default true. |
 | `source_product_id` | string |  | Filter to edges whose source node is in this product. |
 | `type` | string |  | Filter to one cross-edge type (e.g. competitor_classified_as_classification_value). |
 
 **Returns:**
 
-JSON: flat `{ cross_edges, total, portfolio_file? }`, or when grouped
-`{ grouped_by, groups: Record<endpoint, UPGCrossEdge[]>, total, group_count }`.
+JSON: flat `{ cross_edges, total, returned, offset?, has_more?,
+portfolio_file? }`, or when grouped `{ grouped_by, groups, total,
+group_count }`.
 
-**See also:** `create_cross_product_edge`
+**See also:** `get_portfolio_tree`, `create_cross_product_edge`
 
 
 ### `list_portfolios`

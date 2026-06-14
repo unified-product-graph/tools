@@ -72,7 +72,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
-import { portfolioQuery, portfolioDigest, portfolioValidate } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
 import {
   defineCanonicalEntity,
@@ -1920,13 +1920,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_portfolio_cross_edges',
     description:
-      'List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered and grouped. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix (e.g. all classification edges grouped by source) instead of the full unfiltered dump.',
+      'List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered, grouped, title-resolved, property-projected, and paginated. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix; `resolve_titles` (default on) names entities ("Sitecore") instead of opaque ids; `property_include` trims heavy edge properties; `limit` / `offset` page the flat list. For the nested axis to value to members view use `get_portfolio_tree`.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         type: { type: 'string', description: 'Filter to one cross-edge type (e.g. competitor_classified_as_classification_value).' },
         source_product_id: { type: 'string', description: 'Filter to edges whose source node is in this product.' },
         group_by: { type: 'string', enum: ['source', 'target'], description: 'Group edges by source or target endpoint (the comparison matrix) instead of a flat list.' },
+        resolve_titles: { type: 'boolean', description: 'Add source_title / target_title to each edge, resolved from the registry and instance_of registrations. Default true.' },
+        property_include: { type: 'array', items: { type: 'string' }, description: 'Keep only these keys of each edge properties object (e.g. ["confidence"]). Pass [] to drop properties entirely.' },
+        limit: { type: 'number', description: 'Max edges to return in the flat list (ignored when group_by is set).' },
+        offset: { type: 'number', description: 'Skip this many edges before the page (flat list only).' },
       },
     },
   },
@@ -2128,6 +2132,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: { type: 'string' },
           description: 'Batch-4 #22: coverage region ids (keys of the `coverage` block, e.g. understanding, discovery, building) to score each product against, so "is this product at parity?" is a direct read across the portfolio. Adds `coverage_profile_pct` to every product summary.',
         },
+      },
+    },
+  },
+  {
+    name: 'get_portfolio_tree',
+    description:
+      'Assemble a portfolio-grain tree from the shared classification registry and the `*_classified_as_classification_value` cross edges in `.upg/portfolio.upg` (the portfolio complement to `get_tree`, which is product-scoped). `shape: "landscape"` (default) returns classification axis to its values to the nodes classified at each value, every leaf carrying `confidence` / `assessed_on`; anchor at one axis or value with `from_id`, or omit for the whole portfolio. `shape: "competitor_profile"` returns one node (a competitor) and its position on every axis it has been graded against; `from_id` required. Titles resolve to entity names (e.g. "Directus"), not opaque ids. Values with no wired axis surface under an `unaxed` bucket. Read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        shape: { type: 'string', enum: ['landscape', 'competitor_profile'], description: 'landscape (axis to value to classified members, default) or competitor_profile (one node to its per-axis positions).' },
+        from_id: { type: 'string', description: 'Anchor node id (qualified or bare). Optional for landscape (a classification axis or value); required for competitor_profile (the node to profile).' },
+        include_properties: { type: 'array', items: { type: 'string' }, description: 'Classification-edge property keys to inline on each leaf, in addition to the always-included confidence / assessed_on.' },
+        include_members: { type: 'boolean', description: 'Landscape only. Force classified members to inline on the whole-portfolio overview (counts-only by default). Subject to the payload guard.' },
       },
     },
   },
@@ -2400,6 +2418,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   create_registry_edge: createRegistryEdge,
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
+  get_portfolio_tree: getPortfolioTree,
   portfolio_validate: portfolioValidate,
   clone_structure: cloneStructure,
   migrate_cross_edges: migrateCrossEdges,

@@ -66,6 +66,7 @@ export * from './lib/anti-pattern-inputs.js'
 export * from './lib/property-type-validator.js'
 export * from './lib/length-caps.js'
 export * from './lib/tree-assemble.js'
+export * from './lib/portfolio-landscape.js'
 
 // ── Expression + resolver hints ─────────────────────────────────────────────
 export * from './lib/expression.js'

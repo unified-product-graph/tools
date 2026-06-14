@@ -13,6 +13,8 @@ import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType } from '@unified-product-graph/core'
 import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties } from '@unified-product-graph/core'
 import { UPGPortfolioStore, UPGFileStore } from '@unified-product-graph/sdk'
+import { buildPortfolioNodeIndex } from '@unified-product-graph/sdk'
+import { preflightPayload } from '../lib/payload-guard.js'
 import {
   resolvePortfolioPath,
   openPortfolioStoreIfExists,
@@ -1131,20 +1133,33 @@ export const linkAreaToAudience: ToolHandler = async (args, _ctx): Promise<ToolR
 
 /**
  * List cross-product edges in the portfolio document (`.upg/portfolio.upg`),
- * with optional filtering and grouping (0.10.4, read-path brief C) so a large
- * portfolio's edges can be read back as a focused matrix instead of one
- * overflowing dump.
+ * with optional filtering, grouping, title resolution, property projection, and
+ * pagination so a large portfolio's edges read back as a focused, agent-usable
+ * matrix instead of one overflowing dump (0.10.4 read-path brief C; titles +
+ * projection + pagination, 0.10.7).
  *
  * Parameters:
  * - `type`: filter to one cross-edge type (e.g. `competitor_classified_as_classification_value`).
  * - `source_product_id`: filter to edges whose source is in this product.
- * - `group_by`: `source` or `target` — return edges grouped by that endpoint
- *   (the comparison matrix: source -> its targets, or target -> its members)
- *   instead of a flat list.
+ * - `group_by`: `source` or `target` -- group edges by that endpoint
+ *   (the comparison matrix) instead of a flat list.
+ * - `resolve_titles` (default true): add `source_title` / `target_title` to each
+ *   edge, resolved from the registry and `instance_of` registrations, so output
+ *   names entities ("Sitecore") rather than opaque ids.
+ * - `property_include`: keep only these keys of each edge's `properties` (e.g.
+ *   `["confidence"]`), trimming a heavy assessment payload to what is needed.
+ *   Pass `[]` to drop properties entirely.
+ * - `limit` / `offset`: page the FLAT list (ignored when `group_by` is set).
  *
- * @returns JSON: flat `{ cross_edges, total, portfolio_file? }`, or when grouped
- *   `{ grouped_by, groups: Record<endpoint, UPGCrossEdge[]>, total, group_count }`.
+ * For the nested axis -> value -> classified-members view of the classification
+ * matrix, use `get_portfolio_tree` ({ shape: "landscape" }); this tool is the
+ * raw edge reader.
+ *
+ * @returns JSON: flat `{ cross_edges, total, returned, offset?, has_more?,
+ *   portfolio_file? }`, or when grouped `{ grouped_by, groups, total,
+ *   group_count }`.
  * @atomicity atomic (read-only)
+ * @see get_portfolio_tree
  * @see create_cross_product_edge
  */
 export const listPortfolioCrossEdges: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
@@ -1169,6 +1184,8 @@ export const listPortfolioCrossEdges: ToolHandler = async (args, _ctx): Promise<
   if (groupBy !== undefined && groupBy !== 'source' && groupBy !== 'target') {
     return textError(`Invalid group_by: ${groupBy}. Valid: source, target.`)
   }
+  const resolveTitles = args.resolve_titles !== false
+  const propertyInclude = Array.isArray(args.property_include) ? (args.property_include as string[]) : undefined
 
   let edges = portfolioStore.getAllCrossEdges()
   if (typeFilter) edges = edges.filter((e) => e.type === typeFilter)
@@ -1176,11 +1193,33 @@ export const listPortfolioCrossEdges: ToolHandler = async (args, _ctx): Promise<
 
   const portfolio_file = path.relative(cwd, portfolioPath)
 
+  // Title index (registry + instance_of), built once, only when needed.
+  const portfolioDoc = portfolioStore.getDocument()
+  const index = resolveTitles && portfolioDoc ? buildPortfolioNodeIndex(portfolioDoc) : undefined
+  const titleOf = (qid: string): string | undefined => index?.get(qid)?.title
+
+  // Project each edge: optional title decoration + property trimming.
+  const project = (e: UPGCrossEdge): Record<string, unknown> => {
+    const out: Record<string, unknown> = { ...e }
+    if (propertyInclude && e.properties) {
+      const picked: Record<string, unknown> = {}
+      for (const k of propertyInclude) if (k in e.properties) picked[k] = e.properties[k]
+      out.properties = picked
+    }
+    if (resolveTitles) {
+      const st = titleOf(e.source)
+      const tt = titleOf(e.target)
+      if (st) out.source_title = st
+      if (tt) out.target_title = tt
+    }
+    return out
+  }
+
   if (groupBy) {
-    const groups: Record<string, typeof edges> = {}
+    const groups: Record<string, Array<Record<string, unknown>>> = {}
     for (const e of edges) {
       const key = (groupBy === 'source' ? e.source : e.target) as string
-      ;(groups[key] ??= []).push(e)
+      ;(groups[key] ??= []).push(project(e))
     }
     return text(
       JSON.stringify(
@@ -1191,9 +1230,39 @@ export const listPortfolioCrossEdges: ToolHandler = async (args, _ctx): Promise<
     )
   }
 
-  return text(
-    JSON.stringify({ cross_edges: edges, total: edges.length, portfolio_file }, null, 2),
-  )
+  // Flat list: paginate.
+  const total = edges.length
+  const offsetRaw = typeof args.offset === 'number' ? (args.offset as number) : 0
+  const offset = Math.max(0, Math.floor(offsetRaw))
+  const hasLimit = typeof args.limit === 'number'
+  const limit = hasLimit ? Math.max(1, Math.floor(args.limit as number)) : undefined
+  const page = limit !== undefined ? edges.slice(offset, offset + limit) : edges.slice(offset)
+  const projected = page.map(project)
+
+  const response: Record<string, unknown> = {
+    cross_edges: projected,
+    total,
+    returned: projected.length,
+    portfolio_file,
+  }
+  if (offset > 0 || limit !== undefined) {
+    response.offset = offset
+    response.has_more = offset + projected.length < total
+  }
+
+  // Guard: even projected, a very large flat page can exceed the transport cap.
+  // These are edge rows (title-decorated when resolve_titles), not full nodes.
+  const guard = preflightPayload({
+    toolName: 'list_portfolio_cross_edges',
+    nodeCount: 0,
+    edgeCount: projected.length,
+    compactEdges: !resolveTitles,
+    argsHint: `total=${total}, returned=${projected.length}${limit !== undefined ? `, limit=${limit}` : ' (no limit; pass limit/offset to page)'}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
+  if (guard.kind === 'warn') Object.assign(response, guard.fields)
+
+  return text(JSON.stringify(response, null, 2))
 }
 
 /**

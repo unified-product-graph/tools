@@ -115,6 +115,12 @@ const CLOUD_NA = new Set([
   // server is single-product-per-request). Cloud parity is a tracked follow-up.
   'portfolio_query',
   'portfolio_digest',
+  // get_portfolio_tree (0.10.7): assembles the classification landscape /
+  // competitor profile from portfolio.upg cross-edges + the shared registry.
+  // Local-only for the same reason as the rest of the portfolio read layer:
+  // it spans the .upg-file workspace (portfolio document + product files),
+  // which the single-product-per-request cloud server has no analogue for.
+  'get_portfolio_tree',
   // portfolio-wide audit (0.9.3, batch-4 #19): runs validate_graph across the
   // .upg-file workspace in one call. Local-only for the same reason as the
   // portfolio read layer — no cloud analogue (single-product-per-request).
