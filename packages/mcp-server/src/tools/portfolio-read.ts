@@ -28,6 +28,7 @@ import {
   assembleCompetitorProfile,
   assembleComparison,
   aggregateEdgeProperties,
+  findSingleSelectOverlaps,
   buildPortfolioNodeIndex,
   buildValueAxisMap,
   type UPGPortfolioStore,
@@ -1418,4 +1419,51 @@ export const aggregateEdgePropertiesTool: ToolHandler = async (args, _ctx): Prom
   if (guard.kind === 'refuse') return guard.result
   if (guard.kind === 'warn') Object.assign(result, guard.fields)
   return text(JSON.stringify(result, null, 2))
+}
+
+/**
+ * audit_axis_overlap (UPG 0.11.3, brief #4) — list every classified source that
+ * carries more than one value on a `single`-select classification axis. That is
+ * the stale-edge symptom a reclassification leaves when the prior same-axis edge
+ * is not retired; 0.11.3 makes the classify writer supersede by default, and this
+ * is the regression guard + the detector for overlaps already in a graph. A clean
+ * graph returns `overlaps: []`. A `multi`-select axis is exempt (it may
+ * legitimately carry several values per source); unaxed values are skipped.
+ *
+ * Portfolio-grain, local-only (CLOUD_NA) — reads the portfolio workspace document.
+ *
+ * @returns JSON: `{ total, overlaps: Array<{ source, source_title?, axis,
+ *   axis_label, values: [{ value, value_label, edge_id, assessed_on? }] }> }`.
+ *   `total` is the number of (source, single-select axis) pairs with > 1 value.
+ * @atomicity atomic (read-only). Reads the portfolio document only; never mutates.
+ * @see create_classification_edge
+ * @see get_portfolio_tree
+ */
+export const auditAxisOverlap: ToolHandler = async (_args, _ctx): Promise<ToolResult> => {
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return text(JSON.stringify({ total: 0, overlaps: [], note: 'No workspace portfolio document found.' }, null, 2))
+  }
+  const doc = portfolioStore.getDocument()
+  if (!doc) return textError('Portfolio document failed to load.')
+
+  const index = buildPortfolioNodeIndex(doc)
+  const overlaps = findSingleSelectOverlaps(doc, { node_index: index })
+  const response: Record<string, unknown> = { total: overlaps.length, overlaps }
+  if (overlaps.length === 0) {
+    response.note =
+      'No source holds more than one value on a single-select axis. Clean: every single-select classification has one current value (supersede is working).'
+  }
+
+  const guard = preflightPayload({
+    toolName: 'audit_axis_overlap',
+    nodeCount: 0,
+    edgeCount: overlaps.length,
+    compactEdges: false,
+    argsHint: `overlaps=${overlaps.length}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
+  if (guard.kind === 'warn') Object.assign(response, guard.fields)
+  return text(JSON.stringify(response, null, 2))
 }

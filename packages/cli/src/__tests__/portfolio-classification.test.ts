@@ -43,9 +43,11 @@ const PORTFOLIO = {
     nodes: [
       { id: 'ca_ai', type: 'classification_axis', title: 'AI Maturity' },
       { id: 'cv_agentic', type: 'classification_value', title: 'Agentic' },
+      { id: 'cv_integrated', type: 'classification_value', title: 'Integrated' },
     ],
     edges: [
       { id: 're1', source: 'ca_ai', target: 'cv_agentic', type: 'classification_axis_includes_classification_value' },
+      { id: 're2', source: 'ca_ai', target: 'cv_integrated', type: 'classification_axis_includes_classification_value' },
     ],
   },
   cross_edges: [
@@ -95,6 +97,28 @@ describe('CLI portfolio classification reads (0.10.6)', () => {
     const out = JSON.parse(r.stdout)
     const rival = out.products.find((p: { product_id: string }) => p.product_id === 'p_rival')
     expect(rival.total_edges).toBe(0)
+  })
+
+  it('0.11.3: classify supersedes the prior same-axis edge by default', () => {
+    // n_comp is on cv_agentic; reclassify to cv_integrated on the same (single-select) axis.
+    const r = run(['portfolio', 'classify', 'p_rival/n_comp', 'registry/cv_integrated', '--file', '.upg/rival.upg', '--json'], tmp)
+    expect(r.status).toBe(0)
+    const out = JSON.parse(r.stdout)
+    expect(out.superseded).toEqual([{ edge_id: 'ce_existing', target: 'registry/cv_agentic' }])
+    // On disk, only the new value remains on the axis.
+    const pf = JSON.parse(fs.readFileSync(path.join(tmp, '.upg', 'portfolio.upg'), 'utf-8'))
+    const classify = pf.cross_edges.filter((e: { type: string }) => e.type === 'competitor_classified_as_classification_value')
+    expect(classify.map((e: { target: string }) => e.target)).toEqual(['registry/cv_integrated'])
+  })
+
+  it('0.11.3: --no-supersede keeps both same-axis values', () => {
+    const r = run(['portfolio', 'classify', 'p_rival/n_comp', 'registry/cv_integrated', '--no-supersede', '--file', '.upg/rival.upg', '--json'], tmp)
+    expect(r.status).toBe(0)
+    const out = JSON.parse(r.stdout)
+    expect(out.superseded).toBeUndefined()
+    const pf = JSON.parse(fs.readFileSync(path.join(tmp, '.upg', 'portfolio.upg'), 'utf-8'))
+    const classify = pf.cross_edges.filter((e: { type: string }) => e.type === 'competitor_classified_as_classification_value')
+    expect(classify.map((e: { target: string }) => e.target).sort()).toEqual(['registry/cv_agentic', 'registry/cv_integrated'])
   })
 
   it('D: portfolio health --json carries a classification block', () => {

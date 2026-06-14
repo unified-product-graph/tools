@@ -746,9 +746,9 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
     if (registeredProducts.length > 0) portfolioStore.markDirty()
   }
 
-  let outcome: { status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge }
+  let outcome: { status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge; superseded?: UPGCrossEdge[] }
   try {
-    outcome = portfolioStore.addCrossEdge(newEdge)
+    outcome = portfolioStore.addCrossEdge(newEdge, { supersede: args.supersede !== false })
     await portfolioStore.flush()
   } catch (err) {
     return textError(`Failed to write cross-product edge: ${(err as Error).message}`)
@@ -763,6 +763,10 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
         edge: outcome.edge,
         status: outcome.status,
         applied: outcome.status !== 'unchanged',
+        // 0.11.3: a same-axis move on a single-select axis retires the prior edge.
+        ...(outcome.superseded && outcome.superseded.length > 0
+          ? { superseded: outcome.superseded.map((e) => ({ edge_id: e.id, target: e.target })) }
+          : {}),
         portfolio_file: path.relative(cwd, portfolioPath),
         ...(registeredProducts.length > 0
           ? { registered_products: registeredProducts }
@@ -1011,6 +1015,7 @@ export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<
         type: edgeType,
         ...(sourceProductId ? { source_product_id: sourceProductId } : {}),
         properties,
+        ...(args.supersede !== undefined ? { supersede: args.supersede } : {}),
         ...(args.auto_create_portfolio !== undefined
           ? { auto_create_portfolio: args.auto_create_portfolio }
           : {}),
@@ -1662,9 +1667,9 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
   // (source, target, type) carrying new properties is updated in place rather
   // than silently no-op'd, so the 218-edge backfill lands in one batch. Report
   // the STORED edges + per-status counts so a no-op is distinguishable.
-  const results: Array<{ status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge }> = []
+  const results: Array<{ status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge; superseded?: UPGCrossEdge[] }> = []
   try {
-    for (const e of prepared) results.push(portfolioStore.addCrossEdge(e))
+    for (const e of prepared) results.push(portfolioStore.addCrossEdge(e, { supersede: args.supersede !== false }))
     await portfolioStore.flush()
   } catch (err) {
     return textError(`Failed to write cross-product edges: ${(err as Error).message}`)
@@ -1673,14 +1678,16 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
   const counts = { created: 0, updated: 0, unchanged: 0 }
   for (const r of results) counts[r.status]++
   const applied = counts.created + counts.updated
+  const supersededCount = results.reduce((s, r) => s + (r.superseded?.length ?? 0), 0)
 
   return text(
     JSON.stringify(
       {
         message: `Applied ${applied}/${results.length} cross-product edge(s) (${counts.created} created, ${counts.updated} updated, ${counts.unchanged} unchanged)`,
-        edges: results.map((r) => ({ status: r.status, edge: r.edge })),
+        edges: results.map((r) => ({ status: r.status, edge: r.edge, ...(r.superseded && r.superseded.length > 0 ? { superseded: r.superseded.map((e) => ({ edge_id: e.id, target: e.target })) } : {}) })),
         count: results.length,
         counts,
+        ...(supersededCount > 0 ? { superseded_total: supersededCount } : {}),
         portfolio_file: path.relative(cwd, portfolioPath),
         ...(registeredProducts.length > 0 ? { registered_products: registeredProducts } : {}),
       },

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { UPGPortfolioDocument } from '@unified-product-graph/core'
-import { assembleComparison, aggregateEdgeProperties } from '../lib/portfolio-landscape.js'
+import { assembleComparison, aggregateEdgeProperties, findSingleSelectOverlaps } from '../lib/portfolio-landscape.js'
 
 /**
  * Two axes (pricing wired by a registry edge, buyer wired by an `axis:` tag) and
@@ -144,5 +144,30 @@ describe('aggregateEdgeProperties', () => {
     const r = aggregateEdgeProperties(fixture(), { edge_type: 'feature_rivals_competitor_feature' })
     expect(r.total).toBe(0)
     expect(r.note).toMatch(/no cross-edges/i)
+  })
+})
+
+describe('findSingleSelectOverlaps (0.11.3)', () => {
+  it('returns [] when every source holds one value per single-select axis', () => {
+    expect(findSingleSelectOverlaps(fixture())).toEqual([])
+  })
+
+  it('flags a source carrying two values on a single-select axis', () => {
+    const doc = fixture()
+    // Alpha now sits at BOTH Free and Paid on the (single-select) pricing axis.
+    doc.cross_edges!.push({ id: 'c6', source: 'p_alpha/n_a', target: 'registry/classification_value_free', type: 'competitor_classified_as_classification_value', properties: { confidence: { value: 3, label: 'Some evidence' }, assessed_on: '2026-06-10' } } as never)
+    const overlaps = findSingleSelectOverlaps(doc)
+    expect(overlaps).toHaveLength(1)
+    expect(overlaps[0]).toMatchObject({ source: 'p_alpha/n_a', source_title: 'Sitecore', axis: 'classification_axis_pricing' })
+    expect(overlaps[0].values.map((v) => v.value).sort()).toEqual(['classification_value_free', 'classification_value_paid'])
+  })
+
+  it('exempts a multi-select axis', () => {
+    const doc = fixture()
+    // Mark the pricing axis multi-select, then double-classify Alpha on it.
+    const axis = doc.registry!.nodes.find((n) => n.id === 'classification_axis_pricing')!
+    ;(axis as { properties?: Record<string, unknown> }).properties = { cardinality: 'multi' }
+    doc.cross_edges!.push({ id: 'c6', source: 'p_alpha/n_a', target: 'registry/classification_value_free', type: 'competitor_classified_as_classification_value' } as never)
+    expect(findSingleSelectOverlaps(doc)).toEqual([])
   })
 })

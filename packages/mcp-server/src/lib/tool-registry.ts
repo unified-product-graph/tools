@@ -72,7 +72,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
-import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification, compareClassifications, aggregateEdgePropertiesTool } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification, compareClassifications, aggregateEdgePropertiesTool, auditAxisOverlap } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
 import {
   defineCanonicalEntity,
@@ -1798,6 +1798,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             'Edge metadata, accepted only for cross-edge types declared carries_properties (e.g. feature_rivals_competitor_feature, carrying the parity assessment parity_status / quality / is_gap / assessed_on / evidence / confidence). Rejected for types that do not carry properties.',
         },
         dry_run: { type: 'boolean', description: 'Forecast the write without mutating: returns { dry_run: true, would: create | update | unchanged, edge } and writes nothing. Use to reason about a write before running it.' },
+        supersede: { type: 'boolean', description: 'Classification edges only. When a classify write moves a source to a new value on a single-select axis, retire the prior same-axis edge (default true) so the source carries one current value. Set false to keep both (additive). A multi-select axis always keeps both.' },
       },
       required: ['source_id', 'target_id', 'type'],
     },
@@ -1854,6 +1855,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         assessed_on: { type: 'string', description: 'ISO date the classification was made or last re-checked. Defaults to today.' },
         rationale: { type: 'string', description: 'Short note on why this node sits in this cell.' },
         evidence: { type: 'string', description: 'A source URL, or a competitor_signal / evidence node id backing the classification.' },
+        supersede: { type: 'boolean', description: 'When this classifies the source to a new value on a single-select axis, retire its prior same-axis edge (default true) and record the move in the reclassification history. Set false to keep both values (additive). A multi-select axis always keeps both.' },
         auto_create_portfolio: { type: 'boolean', description: 'Cross mode only: create an empty portfolio document if none exists (default false).' },
       },
       required: ['node_id', 'classification_value_id'],
@@ -1915,6 +1917,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         auto_create_portfolio: { type: 'boolean', description: 'Create an empty portfolio document if none exists (default false)' },
         dry_run: { type: 'boolean', description: 'Forecast the batch without mutating: returns { dry_run: true, would_counts, edges:[{ would, edge }] } and writes nothing. The pre-flight that makes a large backfill safe to reason about.' },
+        supersede: { type: 'boolean', description: 'Classification edges only. Retire a prior same-axis edge when a classify write moves a source on a single-select axis (default true). Set false to keep both (additive).' },
       },
       required: ['edges'],
     },
@@ -2210,6 +2213,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'audit_axis_overlap',
+    description:
+      'List every classified source that holds MORE THAN ONE value on a single-select classification axis (the stale-edge symptom a reclassification leaves when the prior same-axis edge is not retired). From 0.11.3 the classify writer supersedes by default, so this is the regression guard (a clean graph returns `overlaps: []`) and the detector for overlaps already in a graph. A `multi`-select axis is exempt; unaxed values are skipped. Titles resolve to entity names. Read-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
     name: 'portfolio_validate',
     description:
       'Run `validate_graph` ACROSS every product in scope in one call (the audit counterpart to `portfolio_digest`). Replaces the `switch_product` + `validate_graph` round-trip per product. Each product is checked by the SAME single-product code path (schema drift + anti-patterns), so per-product verdicts never diverge. Returns a per-product `valid` / `structurally_valid` + drift + anti-pattern counts, plus a portfolio rollup with `all_valid`. Read-only; the active product is read live, the rest read-only.',
@@ -2483,6 +2495,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   diff_classification: diffClassification,
   compare_classifications: compareClassifications,
   aggregate_edge_properties: aggregateEdgePropertiesTool,
+  audit_axis_overlap: auditAxisOverlap,
   portfolio_validate: portfolioValidate,
   clone_structure: cloneStructure,
   migrate_cross_edges: migrateCrossEdges,

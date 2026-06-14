@@ -20,7 +20,8 @@ import {
   syncFilePath,
   type ToolContext,
 } from '../lib/server-context.js'
-import { compareClassifications, aggregateEdgePropertiesTool } from '../tools/portfolio-read.js'
+import { compareClassifications, aggregateEdgePropertiesTool, auditAxisOverlap } from '../tools/portfolio-read.js'
+import { createCrossProductEdge } from '../tools/workspace.js'
 
 function doc(over: Partial<UPGDocument> & { product: UPGDocument['product'] }): UPGDocument {
   return { upg_version: '0.11', exported_at: new Date().toISOString(), source: { tool: 'test' }, nodes: [], edges: [], ...over }
@@ -138,5 +139,38 @@ describe('classification-analysis read tools (0.11.2)', () => {
   it('rejects an unknown edge type and an invalid group_by', async () => {
     expect((await aggregateEdgePropertiesTool({ edge_type: 'not_a_type' }, ctx)).isError).toBe(true)
     expect((await aggregateEdgePropertiesTool({ edge_type: 'competitor_classified_as_classification_value', group_by: 'bogus' }, ctx)).isError).toBe(true)
+  })
+
+  // ── 0.11.3 supersede + audit_axis_overlap ──
+  const classifyArgs = (target: string, extra: Record<string, unknown> = {}) => ({
+    source_id: 'p_rival/n_acme',
+    target_id: `registry/${target}`,
+    type: 'competitor_classified_as_classification_value',
+    source_product_id: 'p_rival',
+    properties: { confidence: { value: 4, label: 'Confident' }, assessed_on: '2026-06-20' },
+    ...extra,
+  })
+  // Acme starts on cv_free (pricing, single-select; edge c2). Pricing axis carries cv_free + cv_paid.
+  it('supersede (default) retires the prior same-axis edge and reports it', async () => {
+    const b = bodyOf(await createCrossProductEdge(classifyArgs('cv_paid'), ctx))
+    expect(b.status).toBe('created')
+    // The prior pricing edge (cv_free) was retired.
+    expect(b.superseded).toEqual([{ edge_id: 'c2', target: 'registry/cv_free' }])
+    // Audit is clean: one current value on the single-select pricing axis.
+    expect(bodyOf(await auditAxisOverlap({}, ctx)).total).toBe(0)
+  })
+
+  it('supersede:false keeps both values, which audit_axis_overlap then flags', async () => {
+    const b = bodyOf(await createCrossProductEdge(classifyArgs('cv_paid', { supersede: false }), ctx))
+    expect(b.status).toBe('created')
+    expect(b.superseded).toBeUndefined()
+    const audit = bodyOf(await auditAxisOverlap({}, ctx))
+    expect(audit.total).toBe(1)
+    expect(audit.overlaps[0]).toMatchObject({ source: 'p_rival/n_acme', source_title: 'Acme', axis: 'ca_pricing' })
+    expect(audit.overlaps[0].values.map((v: { value: string }) => v.value).sort()).toEqual(['cv_free', 'cv_paid'])
+  })
+
+  it('audit_axis_overlap is clean on the seeded graph', async () => {
+    expect(bodyOf(await auditAxisOverlap({}, ctx)).total).toBe(0)
   })
 })

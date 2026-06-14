@@ -141,7 +141,9 @@ describe('Tool registry: completeness', () => {
     //   (two competitors axis-by-axis, feeds the parity layer) and
     //   aggregate_edge_properties (property-layer distribution digest), both
     //   local-only (portfolio read layer). → 130.
-    expect(TOOL_DEFINITIONS).toHaveLength(130)
+    // + audit_axis_overlap (0.11.3): lists sources with >1 value on a single-
+    //   select axis (the supersede regression guard), local-only. → 131.
+    expect(TOOL_DEFINITIONS).toHaveLength(131)
   })
 })
 

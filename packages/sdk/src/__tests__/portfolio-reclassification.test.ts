@@ -20,7 +20,7 @@ const AXIS_INCLUDES = 'classification_axis_includes_classification_value'
 const CLASSIFY = 'competitor_classified_as_classification_value'
 
 /** Write a portfolio.upg with an AI-maturity axis carrying two linked values. */
-function writePortfolio(dir: string, opts: { axed?: boolean } = {}): string {
+function writePortfolio(dir: string, opts: { axed?: boolean; cardinality?: 'single' | 'multi' } = {}): string {
   const axed = opts.axed !== false
   const doc = {
     upg_version: '0.11',
@@ -34,7 +34,7 @@ function writePortfolio(dir: string, opts: { axed?: boolean } = {}): string {
     cross_edges: [],
     registry: {
       nodes: [
-        { id: 'ca_ai', type: 'classification_axis', title: 'AI Maturity' },
+        { id: 'ca_ai', type: 'classification_axis', title: 'AI Maturity', ...(opts.cardinality ? { properties: { cardinality: opts.cardinality } } : {}) },
         { id: 'cv_integrated', type: 'classification_value', title: 'Integrated' },
         { id: 'cv_agentic', type: 'classification_value', title: 'Agentic' },
         { id: 'competitor_acme', type: 'competitor', title: 'Acme' },
@@ -64,7 +64,7 @@ const classify = (id: string, value: string, assessed = '2026-09-01'): UPGCrossE
     properties: { confidence: { value: 4, label: 'high' }, assessed_on: assessed },
   }) as UPGCrossEdge
 
-async function load(dir: string, opts?: { axed?: boolean }): Promise<UPGPortfolioStore> {
+async function load(dir: string, opts?: { axed?: boolean; cardinality?: 'single' | 'multi' }): Promise<UPGPortfolioStore> {
   const store = new UPGPortfolioStore()
   await store.loadOrInit(writePortfolio(dir, opts))
   return store
@@ -101,13 +101,39 @@ describe('reclassification history auto-emit (0.11.0)', () => {
     fs.rmSync(dir, { recursive: true, force: true })
   })
 
-  it('is non-destructive: the superseded classify edge is kept', async () => {
+  it('supersede (default) retires the prior same-axis edge and reports it', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upg-reclass-'))
     const store = await load(dir)
     store.addCrossEdge(classify('c1', 'cv_integrated'))
-    store.addCrossEdge(classify('c2', 'cv_agentic'))
+    const out = store.addCrossEdge(classify('c2', 'cv_agentic'))
+    // Only the new value remains on the axis; the move was recorded.
+    expect(store.getAllCrossEdges().map((e) => e.target)).toEqual(['registry/cv_agentic'])
+    expect(out.superseded?.map((e) => e.id)).toEqual(['c1'])
+    expect(store.getReclassificationSignals()).toHaveLength(1)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('supersede:false keeps both edges (additive) while still recording the move', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upg-reclass-'))
+    const store = await load(dir)
+    store.addCrossEdge(classify('c1', 'cv_integrated'))
+    const out = store.addCrossEdge(classify('c2', 'cv_agentic'), { supersede: false })
     const targets = store.getAllCrossEdges().map((e) => e.target).sort()
     expect(targets).toEqual(['registry/cv_agentic', 'registry/cv_integrated'])
+    expect(out.superseded).toBeUndefined()
+    expect(store.getReclassificationSignals()).toHaveLength(1)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('a multi-select axis keeps both values but still records the move', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upg-reclass-'))
+    const store = await load(dir, { cardinality: 'multi' })
+    store.addCrossEdge(classify('c1', 'cv_integrated'))
+    const out = store.addCrossEdge(classify('c2', 'cv_agentic')) // supersede default true
+    const targets = store.getAllCrossEdges().map((e) => e.target).sort()
+    expect(targets).toEqual(['registry/cv_agentic', 'registry/cv_integrated'])
+    expect(out.superseded).toBeUndefined()
+    expect(store.getReclassificationSignals()).toHaveLength(1)
     fs.rmSync(dir, { recursive: true, force: true })
   })
 
@@ -123,12 +149,13 @@ describe('reclassification history auto-emit (0.11.0)', () => {
   it('does not double-emit an identical transition (delete + recreate)', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upg-reclass-'))
     const store = await load(dir)
+    // supersede:false keeps the `from` edge, so the SAME move is reproducible on retry.
     store.addCrossEdge(classify('c1', 'cv_integrated'))
-    store.addCrossEdge(classify('c2', 'cv_agentic'))
+    store.addCrossEdge(classify('c2', 'cv_agentic'), { supersede: false })
     expect(store.getReclassificationSignals()).toHaveLength(1)
     // The naive retry: drop the new edge, re-create the SAME move at the same date.
     store.removeCrossEdge('c2')
-    store.addCrossEdge(classify('c3', 'cv_agentic'))
+    store.addCrossEdge(classify('c3', 'cv_agentic'), { supersede: false })
     expect(store.getReclassificationSignals()).toHaveLength(1)
     fs.rmSync(dir, { recursive: true, force: true })
   })

@@ -680,6 +680,71 @@ export function assembleComparison(
   return result
 }
 
+/* ──────────────── single-select axis overlap audit (0.11.3, brief #4) ──────────────── */
+
+/** One source that holds more than one value on a single-select axis. */
+export interface AxisOverlap {
+  source: string
+  source_title?: string
+  axis: string
+  axis_label: string
+  /** The competing values on this axis (the stale-edge symptom of a half-applied move). */
+  values: Array<{ value: string; value_label: string; edge_id: string; assessed_on?: unknown }>
+}
+
+/**
+ * Find every classified source carrying more than one value on a `single`-select
+ * classification axis — the stale-edge symptom a reclassification leaves when it
+ * is not superseded (0.11.3, brief #4). The regression guard for the supersede
+ * fix: a clean graph returns `[]`. A `multi`-select axis is exempt (it may
+ * legitimately carry several values per source). Unaxed values are skipped (no
+ * axis to judge cardinality on). Pure; no I/O.
+ */
+export function findSingleSelectOverlaps(doc: UPGPortfolioDocument, opts: { node_index?: Map<string, PortfolioNodeRef> } = {}): AxisOverlap[] {
+  const index = opts.node_index ?? buildPortfolioNodeIndex(doc)
+  const valueAxis = buildValueAxisMap(doc)
+  const cardinalityOf = (axisBareId: string): 'single' | 'multi' => {
+    const node = (doc.registry?.nodes ?? []).find((n) => n.id === axisBareId && n.type === 'classification_axis')
+    return (node?.properties?.cardinality as 'single' | 'multi' | undefined) === 'multi' ? 'multi' : 'single'
+  }
+  const valueLabel = (bare: string): string => index.get(`${REGISTRY_PRODUCT_ID}/${bare}`)?.title ?? bare
+
+  // (source, axis) -> the distinct values held, with the edge that placed each.
+  const bySourceAxis = new Map<string, { source: string; axis: string; values: Map<string, { edge_id: string; assessed_on?: unknown }> }>()
+  for (const e of classifyEdges(doc)) {
+    const valueBare = bareOf(e.target)
+    const axis = valueAxis.get(valueBare)?.axis
+    if (!axis) continue
+    const key = `${e.source} ${axis}`
+    const entry = bySourceAxis.get(key) ?? { source: e.source, axis, values: new Map() }
+    // First edge per value wins as the placer (dedupe identical re-writes).
+    if (!entry.values.has(valueBare)) entry.values.set(valueBare, { edge_id: e.id, assessed_on: (e.properties ?? {}).assessed_on })
+    bySourceAxis.set(key, entry)
+  }
+
+  const overlaps: AxisOverlap[] = []
+  for (const { source, axis, values } of bySourceAxis.values()) {
+    if (values.size < 2) continue
+    if (cardinalityOf(axis) === 'multi') continue
+    overlaps.push({
+      source,
+      ...(index.get(source)?.title ? { source_title: index.get(source)!.title } : {}),
+      axis,
+      axis_label: valueAxisLabelOf(valueAxis, axis),
+      values: [...values.entries()]
+        .map(([value, v]) => ({ value, value_label: valueLabel(value), edge_id: v.edge_id, ...(v.assessed_on !== undefined ? { assessed_on: v.assessed_on } : {}) }))
+        .sort((a, b) => a.value_label.localeCompare(b.value_label)),
+    })
+  }
+  return overlaps.sort((a, b) => (a.source_title ?? a.source).localeCompare(b.source_title ?? b.source) || a.axis_label.localeCompare(b.axis_label))
+}
+
+/** Recover an axis's display label from any value resolved to it. */
+function valueAxisLabelOf(valueAxis: Map<string, ValueAxis>, axisBareId: string): string {
+  for (const v of valueAxis.values()) if (v.axis === axisBareId) return v.label
+  return axisBareId
+}
+
 /* ─────────────────────── #6 aggregate_edge_properties ─────────────────────── */
 
 /** One bucket in a property distribution. */

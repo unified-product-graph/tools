@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 130 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 131 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 130 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 16 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 35 tools
+- [Workspace & Portfolios](#workspace-portfolios): 36 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 48 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1249,6 +1249,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 
 - [`aggregate_edge_properties`](#aggregate-edge-properties)
 - [`attach_product_to_portfolio`](#attach-product-to-portfolio)
+- [`audit_axis_overlap`](#audit-axis-overlap)
 - [`audit_property_coverage`](#audit-property-coverage)
 - [`batch_create_cross_product_edges`](#batch-create-cross-product-edges)
 - [`batch_define_canonical_entity`](#batch-define-canonical-entity)
@@ -1334,6 +1335,23 @@ portfolio id (the message points at list_portfolios / list_local_products).
 **See also:** `assign_product_to_area`, `create_product`
 
 
+### `audit_axis_overlap`
+
+List every classified source that holds MORE THAN ONE value on a single-select classification axis (the stale-edge symptom a reclassification leaves when the prior same-axis edge is not retired). From 0.11.3 the classify writer supersedes by default, so this is the regression guard (a clean graph returns `overlaps: []`) and the detector for overlaps already in a graph. A `multi`-select axis is exempt; unaxed values are skipped. Titles resolve to entity names. Read-only.
+
+**Atomicity:** `atomic (read-only). Reads the portfolio document only; never mutates.`
+
+_No arguments._
+
+**Returns:**
+
+JSON: `{ total, overlaps: Array<{ source, source_title?, axis,
+axis_label, values: [{ value, value_label, edge_id, assessed_on? }] }> }`.
+`total` is the number of (source, single-select axis) pairs with > 1 value.
+
+**See also:** `create_classification_edge`, `get_portfolio_tree`
+
+
 ### `audit_property_coverage`
 
 Audit which portfolio cross-edges of a given type are MISSING required `properties` keys (the completeness check for a property backfill, without a shell over `portfolio.upg`). Given `edge_type` and `required_keys`, returns the edges that lack any of them, plus (when `check_values`) the edges whose present values fail the type property schema. Resolves entity titles. Example: `audit_property_coverage({ edge_type: "competitor_classified_as_classification_value", required_keys: ["confidence", "assessed_on"] })` returns `missing: []` once every classify edge carries both. Read-only.
@@ -1371,6 +1389,7 @@ Create up to 50 cross-product edges in one atomic write (the portfolio-tier mirr
 | `auto_create_portfolio` | boolean |  | Create an empty portfolio document if none exists (default false) |
 | `dry_run` | boolean |  | Forecast the batch without mutating: returns { dry_run: true, would_counts, edges:[{ would, edge }] } and writes nothing. The pre-flight that makes a large backfill safe to reason about. |
 | `edges` | array | ✓ | Cross-product edges to create (max 50). Each: { source_id, target_id, type, source_product_id?, target_product_id? }. |
+| `supersede` | boolean |  | Classification edges only. Retire a prior same-axis edge when a classify write moves a source on a single-select axis (default true). Set false to keep both (additive). |
 
 **Returns:**
 
@@ -1500,6 +1519,7 @@ Place a node in a classification cell, carrying optional confidence and provenan
 | `node_id` | string | ✓ | The node being classified (the edge source). Bare, or {product_id}/{node_id}. |
 | `node_product_id` | string |  | Cross mode: product id holding node_id (defaults to the active product). |
 | `rationale` | string |  | Short note on why this node sits in this cell. |
+| `supersede` | boolean |  | When this classifies the source to a new value on a single-select axis, retire its prior same-axis edge (default true) and record the move in the reclassification history. Set false to keep both values (additive). A multi-select axis always keeps both. |
 
 **Returns:**
 
@@ -1523,6 +1543,7 @@ separate filesystem operations.`
 | `properties` | object |  | Edge metadata, accepted only for cross-edge types declared carries_properties (e.g. feature_rivals_competitor_feature, carrying the parity assessment parity_status / quality / is_gap / assessed_on / evidence / confidence). Rejected for types that do not carry properties. |
 | `source_id` | string | ✓ | Source node ID |
 | `source_product_id` | string |  | Product ID of the source node |
+| `supersede` | boolean |  | Classification edges only. When a classify write moves a source to a new value on a single-select axis, retire the prior same-axis edge (default true) so the source carries one current value. Set false to keep both (additive). A multi-select axis always keeps both. |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
 | `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` | ✓ | Cross-product relationship type |

@@ -137,6 +137,10 @@ const CLOUD_NA = new Set([
   // single-product cloud analogue.
   'compare_classifications',
   'aggregate_edge_properties',
+  // audit_axis_overlap (0.11.3): lists sources holding >1 value on a single-select
+  // classification axis (the supersede regression guard). Reads the portfolio
+  // document — a .upg-file workspace concept with no single-product cloud analogue.
+  'audit_axis_overlap',
   // portfolio-wide audit (0.9.3, batch-4 #19): runs validate_graph across the
   // .upg-file workspace in one call. Local-only for the same reason as the
   // portfolio read layer — no cloud analogue (single-product-per-request).

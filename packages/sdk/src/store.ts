@@ -1578,7 +1578,10 @@ export class UPGPortfolioStore {
    * area-anchored edge types (`area_serves_persona` / `area_targets_market_segment`)
    * carry a bare portfolio-tier `product_area` id as their source.
    */
-  addCrossEdge(edge: UPGCrossEdge): { status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge } {
+  addCrossEdge(
+    edge: UPGCrossEdge,
+    opts: { supersede?: boolean } = {},
+  ): { status: 'created' | 'updated' | 'unchanged'; edge: UPGCrossEdge; superseded?: UPGCrossEdge[] } {
     if (!this.doc) throw new Error('Portfolio document not loaded. Call loadOrInit() first.')
     if (!edge.id) throw new Error('Cross-edge must have an id')
     // Area-anchored edges source from a portfolio `product_area` id, not a
@@ -1626,42 +1629,54 @@ export class UPGPortfolioStore {
       return { status: 'unchanged', edge: existing }
     }
     this.doc.cross_edges.push(edge)
-    this.emitReclassificationIfMoved(edge)
+    const superseded = this.handleClassificationMove(edge, opts.supersede !== false)
     this.scheduleSave()
-    return { status: 'created', edge }
+    return superseded.length > 0 ? { status: 'created', edge, superseded } : { status: 'created', edge }
   }
 
   /** Classify cross-edge type suffix (e.g. `competitor_classified_as_classification_value`). */
   private static readonly CLASSIFY_SUFFIX = '_classified_as_classification_value'
 
+  /** A `classification_axis` registry node's select cardinality (default `single`). */
+  private axisCardinality(axisBareId: string): 'single' | 'multi' {
+    const node = (this.doc?.registry?.nodes ?? []).find((n) => n.id === axisBareId && n.type === 'classification_axis')
+    return (node?.properties?.cardinality as 'single' | 'multi' | undefined) === 'multi' ? 'multi' : 'single'
+  }
+
   /**
-   * Auto-emit at the classify-write chokepoint (UPG 0.11.0). When a classify
-   * cross-edge is created to a new value that SUPERSEDES a sibling
-   * classification of the same competitor on the SAME axis (a genuine move,
-   * e.g. ai_integrated to ai_agentic), append an append-only `reclassification`
-   * `competitor_signal` to `signals[]` — so `diff_classification` can answer
-   * "what moved" without the graph ever having held prior state explicitly.
+   * Handle a classify-write at the chokepoint (UPG 0.11.0 history + 0.11.3
+   * supersede). When a classify cross-edge is created to a new value that
+   * SUPERSEDES a sibling classification of the same competitor on the SAME axis
+   * (a genuine move, e.g. ai_integrated to ai_agentic):
    *
-   * Record-only and non-destructive: the superseded edge is NOT removed (a
-   * `categorical` axis may legitimately carry several values, so collapsing to
-   * one would corrupt current state). Detection requires BOTH values to resolve
-   * to the same axis (registry edge OR `axis:` tag) — if either is unaxed we
-   * cannot prove a single-axis move and skip. First-time classifications (no
-   * superseded sibling) are not moves and emit nothing. No-double-emit: an
-   * identical (competitor, axis, from, to, observed_at) signal is appended once.
+   *  1. append an append-only `reclassification` `competitor_signal` to
+   *     `signals[]` — so `diff_classification` can answer "what moved" without
+   *     the graph ever having held prior state explicitly (0.11.0);
+   *  2. on a `single`-select axis (the default), RETIRE the prior same-axis
+   *     edge(s) so the competitor carries exactly one value per axis and the
+   *     current-state reads (`get_portfolio_tree`) stop double-counting (0.11.3).
+   *     `supersede` (default true) gates step 2; a `multi`-select axis keeps
+   *     every value (the move is still recorded). History is recorded either way.
+   *
+   * Detection requires BOTH values to resolve to the same axis (registry edge OR
+   * `axis:` tag) — if either is unaxed we cannot prove a single-axis move and
+   * skip. First-time classifications (no superseded sibling) are not moves.
+   * No-double-emit: an identical (competitor, axis, from, to, observed_at) signal
+   * is appended once. Returns the edges retired by supersede (empty when none).
    */
-  private emitReclassificationIfMoved(newEdge: UPGCrossEdge): void {
-    if (!this.doc) return
-    if (!newEdge.type.endsWith(UPGPortfolioStore.CLASSIFY_SUFFIX)) return
+  private handleClassificationMove(newEdge: UPGCrossEdge, supersede: boolean): UPGCrossEdge[] {
+    if (!this.doc) return []
+    if (!newEdge.type.endsWith(UPGPortfolioStore.CLASSIFY_SUFFIX)) return []
     const bare = (q: string): string => q.split('/').pop() ?? q
     const axisMap = buildValueAxisMap(this.doc)
     const toValue = bare(newEdge.target)
     const newAxis = axisMap.get(toValue)?.axis
-    if (!newAxis) return // new value unaxed: cannot attribute the move to an axis
+    if (!newAxis) return [] // new value unaxed: cannot attribute the move to an axis
 
-    // The superseded cell: same competitor, same classify type, a DIFFERENT
-    // value that resolves to the SAME axis.
-    const sibling = this.doc.cross_edges.find(
+    // The superseded cells: same competitor, same classify type, a DIFFERENT
+    // value that resolves to the SAME axis. Usually one; a graph that predates
+    // supersede may carry several stale siblings, all of which we retire.
+    const siblings = this.doc.cross_edges.filter(
       (e) =>
         e !== newEdge &&
         e.type === newEdge.type &&
@@ -1669,9 +1684,9 @@ export class UPGPortfolioStore {
         e.target !== newEdge.target &&
         axisMap.get(bare(e.target))?.axis === newAxis,
     )
-    if (!sibling) return // first classification on this axis: not a move
+    if (siblings.length === 0) return [] // first classification on this axis: not a move
 
-    const fromValue = bare(sibling.target)
+    const fromValue = bare(siblings[0].target)
     const observedAt =
       (newEdge.properties?.assessed_on as string | undefined) ?? new Date().toISOString()
 
@@ -1687,27 +1702,35 @@ export class UPGPortfolioStore {
         p.observed_at === observedAt
       )
     })
-    if (alreadyLogged) return
-
-    const fingerprint = `${newEdge.source}|${newAxis}|${fromValue}|${toValue}|${observedAt}`
-    const axisLabel = axisMap.get(toValue)?.label ?? newAxis
-    const signal: UPGBaseNode = {
-      id: `sig_reclass_${createHash('sha256').update(fingerprint).digest('hex').slice(0, 12)}`,
-      type: 'competitor_signal',
-      title: `Reclassified on ${axisLabel}: ${fromValue} to ${toValue}`,
-      properties: {
-        signal_type: 'reclassification',
-        competitor: newEdge.source,
-        axis: newAxis,
-        from_value: fromValue,
-        to_value: toValue,
-        observed_at: observedAt,
-        summary: `${newEdge.source} reclassified on ${axisLabel}: ${fromValue} to ${toValue}`,
-        ...(newEdge.properties?.confidence ? { confidence: newEdge.properties.confidence } : {}),
-        ...(newEdge.properties?.observed_by ? { observed_by: newEdge.properties.observed_by } : {}),
-      },
+    if (!alreadyLogged) {
+      const fingerprint = `${newEdge.source}|${newAxis}|${fromValue}|${toValue}|${observedAt}`
+      const axisLabel = axisMap.get(toValue)?.label ?? newAxis
+      const signal: UPGBaseNode = {
+        id: `sig_reclass_${createHash('sha256').update(fingerprint).digest('hex').slice(0, 12)}`,
+        type: 'competitor_signal',
+        title: `Reclassified on ${axisLabel}: ${fromValue} to ${toValue}`,
+        properties: {
+          signal_type: 'reclassification',
+          competitor: newEdge.source,
+          axis: newAxis,
+          from_value: fromValue,
+          to_value: toValue,
+          observed_at: observedAt,
+          summary: `${newEdge.source} reclassified on ${axisLabel}: ${fromValue} to ${toValue}`,
+          ...(newEdge.properties?.confidence ? { confidence: newEdge.properties.confidence } : {}),
+          ...(newEdge.properties?.observed_by ? { observed_by: newEdge.properties.observed_by } : {}),
+        },
+      }
+      this.doc.signals.push(signal)
     }
-    this.doc.signals.push(signal)
+
+    // Supersede: retire the prior same-axis edge(s) on a single-select axis, so
+    // current-state reads agree with the history just recorded. A multi-select
+    // axis keeps every value; an explicit `supersede:false` opts out.
+    if (!supersede || this.axisCardinality(newAxis) === 'multi') return []
+    const retiredIds = new Set(siblings.map((e) => e.id))
+    this.doc.cross_edges = this.doc.cross_edges.filter((e) => !retiredIds.has(e.id))
+    return siblings
   }
 
   /**

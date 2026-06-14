@@ -159,6 +159,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   diffClassification: 'diff_classification',
   compareClassifications: 'compare_classifications',
   aggregateEdgePropertiesTool: 'aggregate_edge_properties',
+  auditAxisOverlap: 'audit_axis_overlap',
   portfolioValidate: 'portfolio_validate',
   cloneStructure: 'clone_structure',
   defineCanonicalEntity: 'define_canonical_entity',

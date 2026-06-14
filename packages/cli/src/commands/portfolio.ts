@@ -927,6 +927,7 @@ const classifySub = new Command('classify')
   .option('--rationale <text>', 'Short note on why this node sits in this cell')
   .option('--evidence <ref>', 'A source URL, or a competitor_signal / evidence node id')
   .option('--node-product <id>', 'Product id owning the node (forces cross-product routing)')
+  .option('--no-supersede', 'Keep a prior same-axis classification instead of retiring it (additive; default is to supersede on a single-select axis)')
   .option('--file <path>', 'Path to the active product .upg file (default: auto-discovered)')
   .option('--json', 'Machine-readable JSON output')
   .action(async (nodeId: string, classificationValueId: string, opts) => {
@@ -1034,14 +1035,17 @@ const classifySub = new Command('classify')
         target_product_id: targetProductId,
         properties,
       }
-      portfolioStore.addCrossEdge(newEdge)
+      // commander stores `--no-supersede` as opts.supersede === false; default true.
+      const outcome = portfolioStore.addCrossEdge(newEdge, { supersede: opts.supersede !== false })
       await portfolioStore.flush()
+      const superseded = outcome.superseded ?? []
 
       if (opts.json) {
         console.log(JSON.stringify({
           ok: true,
           edge: newEdge,
           scope: 'cross_product',
+          ...(superseded.length > 0 ? { superseded: superseded.map((e) => ({ edge_id: e.id, target: e.target })) } : {}),
           portfolio_file: path.relative(cwd, portfolioPath),
         }, null, 2))
         return
@@ -1049,6 +1053,7 @@ const classifySub = new Command('classify')
       console.log(`\n  ${success(`Classified "${sanitizeForTerminal(qualifiedSource)}" (${edgeType})`)}`)
       console.log(`  ${chalk.dim('cell')} ${chalk.white(sanitizeForTerminal(classificationValueId))}`)
       if (confidenceArg) console.log(`  ${chalk.dim('confidence')} ${sanitizeForTerminal(confidenceArg)}`)
+      if (superseded.length > 0) console.log(`  ${chalk.dim('superseded')} ${chalk.white(superseded.map((e) => sanitizeForTerminal(e.target)).join(', '))}`)
       console.log(`  ${chalk.dim('id')}  ${chalk.dim(sanitizeForTerminal(newEdge.id))}\n`)
     } catch (err) {
       die(err)
