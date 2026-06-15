@@ -34,6 +34,7 @@ Use `mcp__unified-product-graph__get_tree` to fetch a tree in **one call**, and 
 /upg-show-tree architecture: Bounded Context → Service → API / Schema / Deployment
 /upg-show-tree journey: User Journey → Phase / Step → Action / Screen
 /upg-show-tree design_system: Design System → Component → Token
+/upg-show-tree commercial: Business Model → Revenue Stream / Cost Structure → Pricing Tier / Metric
 ```
 
 ## Named Tree Patterns
@@ -53,6 +54,7 @@ Each `pattern` id maps to a server-owned shape. Use the attribution below for th
 | `architecture` | Bounded Context → Service → API / Schema / Deployment | Eric Evans, *Domain-Driven Design*, 2003 |
 | `journey` | User Journey → Phase / Step → Action / Screen | Standard UX journey mapping |
 | `design_system` | Design System → Component → Token | Brad Frost, *Atomic Design*, 2016 |
+| `commercial` | Business Model → Revenue Stream / Cost Structure / Unit Economics → Pricing Tier / Metric / Pricing Strategy | Alexander Osterwalder, *Business Model Generation*, 2010 |
 
 ## Rendering
 
@@ -106,6 +108,7 @@ If none was specified, auto-detect from `get_graph_digest`:
 - service or bounded_context → `architecture`
 - user_journey → `journey`
 - design_system or design_component → `design_system`
+- business_model or revenue_stream → `commercial`
 - Otherwise → `strategy`, or render the product-rooted `product` tree
 
 ### Step 3: Render the tree

@@ -403,6 +403,69 @@ describe('get_tree (0.9.15)', () => {
     expect(phA.children.map((c: { id: string }) => c.id)).toEqual(['sA2', 'sA1'])
   })
 
+  it('commercial: roots at business_model, shares a dual-parent pricing_tier, decomposes a metric', async () => {
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'bm', type: 'business_model', title: 'Open-core SaaS' },
+        { id: 'rs', type: 'revenue_stream', title: 'Self-serve subs' },
+        { id: 'cs', type: 'cost_structure', title: 'Cloud COGS' },
+        { id: 'ue', type: 'unit_economics', title: 'Unit economics' },
+        { id: 'ps', type: 'pricing_strategy', title: 'Tiered pricing' },
+        { id: 'pt', type: 'pricing_tier', title: 'Team' }, // reached from BOTH rs and ps
+        { id: 'mrr', type: 'metric', title: 'Net New MRR' },
+        { id: 'new', type: 'metric', title: 'New MRR' }, // component of mrr
+        { id: 'gm', type: 'metric', title: 'Gross margin' },
+      ],
+      edges: [
+        e('e1', 'bm', 'rs', 'business_model_earns_via_revenue_stream'),
+        e('e2', 'bm', 'cs', 'business_model_costs_via_cost_structure'),
+        e('e3', 'bm', 'ue', 'business_model_measured_by_unit_economics'),
+        e('e4', 'rs', 'pt', 'revenue_stream_tiered_as_pricing_tier'),
+        e('e5', 'rs', 'mrr', 'revenue_stream_measured_by_metric'),
+        e('e6', 'rs', 'ps', 'revenue_stream_priced_by_pricing_strategy'),
+        e('e7', 'ps', 'pt', 'pricing_strategy_offers_pricing_tier'), // dual parent -> shared
+        e('e8', 'cs', 'gm', 'cost_structure_measured_by_metric'),
+        e('e9', 'mrr', 'new', 'metric_decomposes_into_metric'),
+      ],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'commercial', depth: 5 }, makeCtx(store)))
+    expect(body.pattern).toBe('commercial')
+    expect(body.anchor_used).toBe('business_model')
+    expect(body.gaps).toEqual([]) // all-optional
+    const bm = body.roots.find((r: { id: string }) => r.id === 'bm')
+    expect(bm.children.map((c: { id: string }) => c.id).sort()).toEqual(['cs', 'rs', 'ue'])
+    // pricing_tier hangs off both the stream (directly) and the strategy -> shared ref.
+    expect(body.stats.shared_refs).toBeGreaterThan(0)
+    // metric waterfall: Net New MRR decomposes into New MRR.
+    const rs = bm.children.find((c: { id: string }) => c.id === 'rs')
+    const mrr = rs.children.find((c: { id: string }) => c.id === 'mrr')
+    expect(mrr.children.map((c: { id: string }) => c.id)).toEqual(['new'])
+  })
+
+  it('commercial: falls back to product when no business_model exists', async () => {
+    const doc: UPGDocument = {
+      upg_version: '0.2',
+      exported_at: new Date().toISOString(),
+      source: { tool: 'test' },
+      product: { id: 'p', title: 'P', stage: 'growth' },
+      nodes: [
+        { id: 'prod', type: 'product', title: 'Studio' },
+        { id: 'rs', type: 'revenue_stream', title: 'Orphan stream' },
+      ],
+      edges: [],
+    }
+    const store = await load(doc)
+    const body = bodyOf(getTree({ pattern: 'commercial' }, makeCtx(store)))
+    expect(body.anchor_used).toBe('product')
+    expect(body.anchor_resolved_from).toBe('business_model')
+    expect(body.anchor_present).toBe(false)
+  })
+
   it('rejects an unknown pattern', () => {
     const ctx = makeCtx(new UPGFileStore())
     const r = getTree({ pattern: 'not-a-pattern' }, ctx) as { content: { text: string }[]; isError?: true }

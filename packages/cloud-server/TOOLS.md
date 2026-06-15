@@ -211,7 +211,7 @@ is not visible to the caller.
 
 ### `get_tree`
 
-Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system) from the product graph. Walks the pattern's type-driven child map over the live graph (drift-proof, follows whatever edge wired each parent to a child of the expected type), roots at the pattern anchor with fallback, and reports structural gaps. Returns nested data, not rendered text.
+Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial) from the product graph. Walks the pattern's type-driven child map over the live graph (drift-proof, follows whatever edge wired each parent to a child of the expected type), roots at the pattern anchor with fallback, and reports structural gaps. Returns nested data, not rendered text.
 
 **Atomicity:** `atomic (read-only). Reads the named product only.`
 
@@ -223,7 +223,7 @@ Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy
 | `from_id` | string |  | Explicit root node id. Defaults to the pattern's canonical anchor type. |
 | `include_properties` | array |  | Node property keys to inline on each tree node. |
 | `max_nodes` | number |  | Cap on assembled nodes. The tree is summarised (stats.truncated) rather than silently cut. |
-| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system |
+| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial |
 | `product_id` | string | ✓ | The product ID |
 
 **Returns:**
@@ -1587,7 +1587,7 @@ Return the full declarative record for one get_tree pattern: its region, anchor_
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system. |
+| `id` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial. |
 
 **Returns:**
 

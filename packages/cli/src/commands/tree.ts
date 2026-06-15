@@ -21,7 +21,7 @@ export const treeCommand = new Command('tree')
   .description('Tree view of the graph. Filter by entity type or domain, or assemble a named pattern.')
   .option('--file <path>', 'Path to .upg file')
   .option('--id <id>', 'Subtree rooted at a specific node')
-  .option('--pattern <id>', 'Assemble a named tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system)')
+  .option('--pattern <id>', 'Assemble a named tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial)')
   .option('--depth <n>', 'Maximum depth. Defaults to 10', parseInt, 10)
   .option('--json', 'Machine-readable nested JSON output')
   .action(async (filter, opts) => {
