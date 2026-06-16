@@ -112,6 +112,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   batchDeleteNodes: 'batch_delete_nodes',
   migrateType: 'migrate_type',
   migrateProperties: 'migrate_properties',
+  promoteScalarsToEdges: 'promote_scalars_to_edges',
   deduplicateNodes: 'deduplicate_nodes',
   // edges
   createEdge: 'create_edge',
@@ -220,6 +221,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listTypeMigrations: 'list_type_migrations',
   listEdgeMigrations: 'list_edge_migrations',
   listSplitMigrations: 'list_split_migrations',
+  listScalarToEdgeMigrations: 'list_scalar_to_edge_migrations',
   listLifecycles: 'list_lifecycles',
   getLifecycle: 'get_lifecycle',
   listStatusValues: 'list_status_values',

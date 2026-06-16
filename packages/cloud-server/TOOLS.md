@@ -1,6 +1,6 @@
 # UPG MCP Cloud Server Tool Reference
 
-Reference for the 97 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
+Reference for the 98 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
 
 ## Contents
 
@@ -14,7 +14,7 @@ Reference for the 97 tools exposed by `@unified-product-graph/cloud-server`. Gen
 - [Collaboration](#collaboration): 4 tools
 - [Analytics](#analytics): 1 tool
 - [Webhooks](#webhooks): 3 tools
-- [Spec Introspection](#spec-introspection): 46 tools
+- [Spec Introspection](#spec-introspection): 47 tools
 - [Portfolio](#portfolio): 4 tools
 - [Atomic Batches](#atomic-batches): 6 tools
 - [Validation](#validation): 1 tool
@@ -1250,6 +1250,7 @@ _Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regi
 - [`list_playbooks`](#list-playbooks)
 - [`list_product_stages`](#list-product-stages)
 - [`list_regions`](#list-regions)
+- [`list_scalar_to_edge_migrations`](#list-scalar-to-edge-migrations)
 - [`list_scales`](#list-scales)
 - [`list_split_migrations`](#list-split-migrations)
 - [`list_status_values`](#list-status-values)
@@ -1986,6 +1987,21 @@ _No arguments._
 JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count, coverage_keys, business_areas }>, area_taxonomy }`
 
 **See also:** `get_region`, `get_region_for_entity_type`, `list_domains`, `list_playbooks`
+
+
+### `list_scalar_to_edge_migrations`
+
+List every scalar→edge promotion from UPG_SCALAR_TO_EDGE_MIGRATIONS (P14 conformance: a scalar that named a first-class entity, e.g. business_model.north_star_metric, becomes a canonical edge). Each row includes the full UPGScalarToEdgeMigration record plus since. Non-paginated. (The lossless apply, promote_scalars_to_edges, is local-only.)
+
+**Atomicity:** `atomic (read-only)`
+
+_No arguments._
+
+**Returns:**
+
+JSON: `{ promotions: [...], total: number }`
+
+**See also:** `list_split_migrations`
 
 
 ### `list_scales`

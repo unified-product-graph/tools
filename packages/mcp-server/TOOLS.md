@@ -1,16 +1,16 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 131 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 133 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
 - [Context & Session](#context-session): 5 tools
-- [Nodes](#nodes): 16 tools
+- [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
 - [Workspace & Portfolios](#workspace-portfolios): 36 tools
 - [Schema](#schema): 1 tool
-- [Spec Introspection](#spec-introspection): 48 tools
+- [Spec Introspection](#spec-introspection): 49 tools
 - [Cloud Sync](#cloud-sync): 3 tools
 - [Validation](#validation): 3 tools
 
@@ -191,6 +191,7 @@ _Read, search, traverse, mutate, batch, migrate type/properties/status, dedupe._
 - [`migrate_properties`](#migrate-properties)
 - [`migrate_status`](#migrate-status)
 - [`migrate_type`](#migrate-type)
+- [`promote_scalars_to_edges`](#promote-scalars-to-edges)
 - [`query`](#query)
 - [`search_nodes`](#search-nodes)
 - [`update_node`](#update-node)
@@ -596,6 +597,25 @@ dropped_edges, unmapped_legacy_edges, defaults_applied, dry_run }`.
 - Returns a textError when `from_type` or `to_type` is missing.
 
 **See also:** `rename_edge_type`, `export_edges`, `update_node`
+
+
+### `promote_scalars_to_edges`
+
+Apply `UPG_SCALAR_TO_EDGE_MIGRATIONS` graph-wide (P14 conformance): promote scalar properties that name a first-class entity into canonical edges. Per rule: find-or-create the referenced entity by normalized title, link it with the canonical edge, then drop the now-redundant scalar (unless the rule keeps it as an actor display-cache). Lossless (the string becomes a real node) and idempotent (re-running mints/links nothing new). Snapshot the .upg first. Default `dry_run=true` previews the per-rule plan (minted / linked / dropped / skipped); pass `dry_run=false` to commit. The rules are listed by `list_scalar_to_edge_migrations`.
+
+**Atomicity:** `atomic per call (one save)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `dry_run` | boolean |  | Preview changes without applying (default true). Pass false to commit. |
+
+**Returns:**
+
+JSON: the `ApplyScalarToEdgeResult` plus `dry_run`.
+
+**See also:** `list_scalar_to_edge_migrations`, `migrate_properties`
 
 
 ### `query`
@@ -2256,6 +2276,7 @@ _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, reg
 - [`list_playbooks`](#list-playbooks)
 - [`list_product_stages`](#list-product-stages)
 - [`list_regions`](#list-regions)
+- [`list_scalar_to_edge_migrations`](#list-scalar-to-edge-migrations)
 - [`list_scales`](#list-scales)
 - [`list_split_migrations`](#list-split-migrations)
 - [`list_status_values`](#list-status-values)
@@ -3046,6 +3067,21 @@ _No arguments._
 JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count, coverage_keys, business_areas }>, area_taxonomy }`
 
 **See also:** `get_region`, `get_region_for_entity_type`, `list_domains`, `list_playbooks`
+
+
+### `list_scalar_to_edge_migrations`
+
+List every scalar→edge promotion from `UPG_SCALAR_TO_EDGE_MIGRATIONS` (P14 conformance: a scalar that named a first-class entity, e.g. `business_model.north_star_metric`, becomes a canonical edge). Each row: the full `UPGScalarToEdgeMigration` record plus `since`. The lossless apply is `promote_scalars_to_edges`. Non-paginated.
+
+**Atomicity:** `atomic (read-only)`
+
+_No arguments._
+
+**Returns:**
+
+JSON: `{ promotions: [...], total: number }`
+
+**See also:** `promote_scalars_to_edges`, `list_split_migrations`
 
 
 ### `list_scales`

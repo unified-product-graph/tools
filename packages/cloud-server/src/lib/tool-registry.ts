@@ -35,7 +35,7 @@ import {
   listAntiPatterns, getAntiPattern,
   listBenchmarks, listProductStages,
   // Spec catalogues (migrations, lifecycles, scales, framework metadata, domain rings)
-  listTypeMigrations, listEdgeMigrations, listSplitMigrations,
+  listTypeMigrations, listEdgeMigrations, listSplitMigrations, listScalarToEdgeMigrations,
   listLifecycles, getLifecycle, listStatusValues,
   listScales, getScale,
   listFrameworkCategories, listFrameworkStructurePatterns,
@@ -1271,6 +1271,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
+    name: 'list_scalar_to_edge_migrations',
+    description:
+      'List every scalar→edge promotion from UPG_SCALAR_TO_EDGE_MIGRATIONS (P14 conformance: a scalar that named a first-class entity, e.g. business_model.north_star_metric, becomes a canonical edge). Each row includes the full UPGScalarToEdgeMigration record plus since. Non-paginated. (The lossless apply, promote_scalars_to_edges, is local-only.)',
+    inputSchema: { type: 'object' as const, properties: {} },
+  },
+  {
     name: 'list_lifecycles',
     description:
       'List lifecycle definitions from UPG_LIFECYCLES. Response includes free_types (UPG_LIFECYCLE_FREE_TYPES: static types with no phase progression) and planned_types (UPG_LIFECYCLE_PLANNED_TYPES: lifecycle planned but not yet authored). Filters: entity_type (exact-match); lifecycle_only (when true, omits free/planned lists).',
@@ -1820,6 +1826,7 @@ const HANDLERS: Record<string, ToolBinding<CloudContext>['handler']> = {
   list_type_migrations: listTypeMigrations,
   list_edge_migrations: listEdgeMigrations,
   list_split_migrations: listSplitMigrations,
+  list_scalar_to_edge_migrations: listScalarToEdgeMigrations,
   list_lifecycles: listLifecycles,
   get_lifecycle: getLifecycle,
   list_status_values: listStatusValues,

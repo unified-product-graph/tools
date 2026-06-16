@@ -144,7 +144,10 @@ describe('Tool registry: completeness', () => {
     //   local-only (portfolio read layer). → 130.
     // + audit_axis_overlap (0.11.3): lists sources with >1 value on a single-
     //   select axis (the supersede regression guard), local-only. → 131.
-    expect(TOOL_DEFINITIONS).toHaveLength(131)
+    // + list_scalar_to_edge_migrations + promote_scalars_to_edges (0.12.0): the
+    //   P14 scalar→edge promotion surface — list the rules, then losslessly apply
+    //   them (find-or-create + link + drop). Local-only (migration layer). → 133.
+    expect(TOOL_DEFINITIONS).toHaveLength(133)
   })
 })
 

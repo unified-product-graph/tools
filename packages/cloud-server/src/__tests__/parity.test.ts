@@ -91,7 +91,8 @@ const CLOUD_NA = new Set([
   'get_organization',                // org / portfolio read
   'migrate_properties',              // cloud has migrate_type but not these two
   'migrate_status',
-  'start',                           // cold-start on-ramp; store-coupled, reads the local graph to recommend the first playbook. Cloud graphs could get the same on-ramp later (follow-up); local-only for 0.7.6.
+  'promote_scalars_to_edges',        // P14 scalar→edge apply (sibling to migrate_properties); local-only. Cloud exposes the read (list_scalar_to_edge_migrations).
+  'start',                         // cold-start on-ramp; store-coupled, reads the local graph to recommend the first playbook. Cloud graphs could get the same on-ramp later (follow-up); local-only for 0.7.6.
   // workspace write surface (0.8.15/654): portfolio.upg membership +
   // product-header writes. Local-only today (portfolio.upg is a .upg-file
   // workspace concept); cloud parity is a tracked follow-up.

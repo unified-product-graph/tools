@@ -75,6 +75,7 @@ import {
   UPG_MIGRATIONS,
   UPG_EDGE_MIGRATIONS,
   UPG_SPLIT_MIGRATIONS,
+  UPG_SCALAR_TO_EDGE_MIGRATIONS,
   UPG_LIFECYCLES,
   UPG_LIFECYCLE_FREE_TYPES,
   UPG_LIFECYCLE_PLANNED_TYPES,
@@ -1810,6 +1811,30 @@ export const listSplitMigrations: ToolHandler = (): ToolResult => {
   }
 
   return text(JSON.stringify({ splits, total: splits.length }, null, 2))
+}
+
+/**
+ * List every scalar→edge promotion from `UPG_SCALAR_TO_EDGE_MIGRATIONS` (the
+ * version-scoped registry of P14 conformance rules that turn a scalar naming a
+ * first-class entity — e.g. `business_model.north_star_metric` — into a canonical
+ * edge). Each row carries the full `UPGScalarToEdgeMigration` record plus `since`
+ * (the introducing spec version). The lossless apply lives in
+ * `promote_scalars_to_edges`.
+ *
+ * @returns JSON: `{ promotions: [...], total: number }`
+ * @atomicity atomic (read-only)
+ * @see promote_scalars_to_edges
+ * @see list_split_migrations
+ */
+export const listScalarToEdgeMigrations: ToolHandler = (): ToolResult => {
+  const promotions: Array<Record<string, unknown>> = []
+  for (const [since, entries] of Object.entries(UPG_SCALAR_TO_EDGE_MIGRATIONS)) {
+    for (const m of entries) {
+      promotions.push({ ...m, since })
+    }
+  }
+
+  return text(JSON.stringify({ promotions, total: promotions.length }, null, 2))
 }
 
 // ── Lifecycles ──────────────────────────────────────────────────────────────

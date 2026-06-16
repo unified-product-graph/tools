@@ -17,6 +17,7 @@ import {
   resolveSlugCollision,
   UPG_EDGE_CATALOG,
   edgeCarriesProperties,
+  getScalarToEdgeMigrations,
 } from '@unified-product-graph/core'
 
 /**
@@ -1264,6 +1265,223 @@ export function createEdge(
   const response: { edge: UPGEdge; warning?: string } = { edge: stored }
   if (edgeWarning) response.warning = edgeWarning
   return response
+}
+
+// ── Scalar → edge promotions (P14 conformance) ───────────────────────────────
+//
+// The graph-level apply ENGINE for `UPG_SCALAR_TO_EDGE_MIGRATIONS` (declared in
+// `@unified-product-graph/core`). For each rule it walks every `from_type` node
+// carrying the scalar, find-or-creates the referenced `target_type` entity by
+// normalized title, links it with the canonical edge (orientation per `reverse`),
+// and drops the now-redundant scalar (unless it's a kept actor display-cache).
+//
+// Lossless (Path B): the scalar's value becomes/links a real node — nothing is
+// discarded. Idempotent: `addEdge` dedups on (source,target,type) and the title
+// index prevents minting a duplicate target, so re-running is a no-op. The caller
+// should snapshot the .upg first (reversible-by-snapshot).
+
+/** Normalized title key for find-or-create dedup (lowercase, trimmed, ws-collapsed). */
+function normalizeTitleKey(s: string): string {
+  return s.toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+/** Per-rule application summary. */
+export interface ScalarToEdgePerRule {
+  from_type: string
+  scalar_property: string
+  edge_type: string
+  /** Target nodes newly minted by this rule. */
+  minted: Array<{ id: string; title: string; type: string }>
+  /** Edges created or already present (source → target after orientation). */
+  linked: Array<{ source: string; target: string; type: string }>
+  /** Source node ids whose scalar was dropped. */
+  dropped_from: string[]
+  /** Values that could not be promoted, with the reason. */
+  skipped: Array<{ node_id: string; value: string; reason: string }>
+}
+
+export interface ApplyScalarToEdgeResult {
+  rules_applied: number
+  per_rule: ScalarToEdgePerRule[]
+  total_minted: number
+  total_linked: number
+  total_dropped: number
+}
+
+/**
+ * Apply every scalar→edge promotion between two versions to the store's graph.
+ * Mirrors `UPGFileStore.applyPropertyMigrations` but graph-level (mints + links).
+ *
+ * @example
+ * applyScalarToEdgeMigrations(store, '0.11.6', '0.12.0')
+ * // business_model{north_star_metric:"Weekly active editors"}
+ * //   → metric{title:"Weekly active editors", designation:"north_star"}
+ * //   + business_model_guided_by_metric edge; scalar dropped.
+ */
+export function applyScalarToEdgeMigrations(
+  store: UPGFileStore,
+  fromVersion: string,
+  toVersion: string,
+  opts: { dryRun?: boolean } = {},
+): ApplyScalarToEdgeResult {
+  return applyScalarToEdgeRules(store, getScalarToEdgeMigrations(fromVersion, toVersion), opts)
+}
+
+/**
+ * Apply an explicit list of scalar→edge rules (the version-agnostic engine that
+ * `applyScalarToEdgeMigrations` delegates to). Exposed for targeted testing of
+ * orientation / multi / find-or-create branches with synthetic rules.
+ *
+ * `dryRun` previews the full plan (what would be minted/linked/dropped) without
+ * mutating the store — the same shape the real pass returns.
+ */
+export function applyScalarToEdgeRules(
+  store: UPGFileStore,
+  rules: readonly import('@unified-product-graph/core').UPGScalarToEdgeMigration[],
+  opts: { dryRun?: boolean } = {},
+): ApplyScalarToEdgeResult {
+  const dryRun = opts.dryRun ?? false
+  const per_rule: ScalarToEdgePerRule[] = []
+
+  // Existing-edge presence (for idempotency accounting in BOTH modes).
+  const edgeKey = (s: string, t: string, ty: string) => `${s} ${t} ${ty}`
+  const existingEdges = new Set(store.getAllEdges().map((e) => edgeKey(e.source, e.target, e.type)))
+  let dryMintCounter = 0
+
+  for (const rule of rules) {
+    const summary: ScalarToEdgePerRule = {
+      from_type: rule.from_type,
+      scalar_property: rule.scalar_property,
+      edge_type: rule.edge_type,
+      minted: [],
+      linked: [],
+      dropped_from: [],
+      skipped: [],
+    }
+    const matchBy = rule.target_match ?? 'title'
+
+    // Index existing target_type nodes for find-or-create (title mode).
+    // Value is `{ id, minted }` so dry-run can type a previewed mint correctly.
+    const titleIndex = new Map<string, { id: string; minted: boolean }>()
+    if (matchBy === 'title') {
+      for (const n of store.getAllNodes()) {
+        if (n.type === rule.target_type) {
+          const key = normalizeTitleKey(n.title)
+          if (!titleIndex.has(key)) titleIndex.set(key, { id: n.id, minted: false })
+        }
+      }
+    }
+
+    // Snapshot from_type nodes up-front; we mutate the graph as we go.
+    const sources = store.getAllNodes().filter((n) => n.type === rule.from_type)
+
+    for (const src of sources) {
+      const raw = rule.top_level
+        ? (src as unknown as Record<string, unknown>)[rule.scalar_property]
+        : src.properties?.[rule.scalar_property]
+      if (raw === undefined || raw === null) continue
+      const values = rule.multi && Array.isArray(raw) ? raw : [raw]
+
+      let resolvedAll = true
+      for (const v of values) {
+        const value = typeof v === 'string' ? v : String(v)
+        if (!value.trim()) {
+          summary.skipped.push({ node_id: src.id, value, reason: 'blank' })
+          resolvedAll = false
+          continue
+        }
+
+        // Resolve target id (find-or-create). `mintedNow` lets dry-run type it.
+        let targetId: string | undefined
+        let targetType = rule.target_type
+        let mintedNow = false
+        if (matchBy === 'id') {
+          const found = store.getNode(value)
+          if (!found) {
+            summary.skipped.push({ node_id: src.id, value, reason: 'id not found' })
+            resolvedAll = false
+            continue
+          }
+          targetId = value
+          targetType = found.type
+        } else {
+          const key = normalizeTitleKey(value)
+          const hit = titleIndex.get(key)
+          if (hit) {
+            targetId = hit.id
+            mintedNow = false
+          } else if (dryRun) {
+            targetId = `dry_mint_${dryMintCounter++}`
+            titleIndex.set(key, { id: targetId, minted: true })
+            summary.minted.push({ id: targetId, title: value, type: rule.target_type })
+            mintedNow = true
+          } else {
+            const created = createNode(store, {
+              type: rule.target_type,
+              title: value,
+              properties: rule.target_defaults ? { ...rule.target_defaults } : undefined,
+            })
+            targetId = created.node.id
+            titleIndex.set(key, { id: targetId, minted: true })
+            summary.minted.push({ id: targetId, title: value, type: rule.target_type })
+            mintedNow = true
+          }
+        }
+
+        // Orientation: default from→target; reverse means target→from.
+        const edgeSource = rule.reverse ? targetId : src.id
+        const edgeTarget = rule.reverse ? src.id : targetId
+        if (edgeSource === edgeTarget) {
+          summary.skipped.push({ node_id: src.id, value, reason: 'self-loop' })
+          resolvedAll = false
+          continue
+        }
+        // Self-protect against a mis-authored rule (e.g. wrong `reverse`).
+        // Types come from known info so the check works for previewed mints too.
+        const srcType = rule.reverse ? targetType : src.type
+        const tgtType = rule.reverse ? src.type : targetType
+        const check = validateExplicitEdgeType(rule.edge_type, srcType as string, tgtType as string)
+        if (check.errors.length > 0) {
+          summary.skipped.push({ node_id: src.id, value, reason: check.errors.join(' ') })
+          resolvedAll = false
+          continue
+        }
+
+        // Link (idempotent on the triple). A previewed mint is always a new edge.
+        const k = edgeKey(edgeSource, edgeTarget, rule.edge_type)
+        if (!mintedNow && existingEdges.has(k)) continue // already linked — no-op
+        if (dryRun) {
+          summary.linked.push({ source: edgeSource, target: edgeTarget, type: rule.edge_type })
+        } else {
+          const stored = store.addEdge({ id: edgeId(), source: edgeSource, target: edgeTarget, type: rule.edge_type as UPGEdgeType })
+          summary.linked.push({ source: stored.source, target: stored.target, type: stored.type })
+        }
+        existingEdges.add(k)
+      }
+
+      // Drop the scalar once every value resolved (orphans + shadows; kept for
+      // actor display-caches). Only drop when the scalar is fully promoted.
+      if (rule.drop_scalar && resolvedAll && raw !== undefined) {
+        if (!dryRun) {
+          if (rule.top_level) {
+            delete (src as unknown as Record<string, unknown>)[rule.scalar_property]
+          } else {
+            store.unsetNodeProperties(src.id, [rule.scalar_property])
+          }
+        }
+        summary.dropped_from.push(src.id)
+      }
+    }
+    per_rule.push(summary)
+  }
+
+  return {
+    rules_applied: rules.length,
+    per_rule,
+    total_minted: per_rule.reduce((a, r) => a + r.minted.length, 0),
+    total_linked: per_rule.reduce((a, r) => a + r.linked.length, 0),
+    total_dropped: per_rule.reduce((a, r) => a + r.dropped_from.length, 0),
+  }
 }
 
 // ── Delete node ──────────────────────────────────────────────────────────────

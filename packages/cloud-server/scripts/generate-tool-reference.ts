@@ -181,6 +181,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listTypeMigrations: 'list_type_migrations',
   listEdgeMigrations: 'list_edge_migrations',
   listSplitMigrations: 'list_split_migrations',
+  listScalarToEdgeMigrations: 'list_scalar_to_edge_migrations',
   listLifecycles: 'list_lifecycles',
   getLifecycle: 'get_lifecycle',
   listStatusValues: 'list_status_values',

@@ -41,6 +41,7 @@ import {
   validateStatusAgainstLifecycle,
   migrateNodeType as migrateNodeTypeLib,
   batchCreateNodes as batchCreateNodesLib,
+  applyScalarToEdgeMigrations,
   UnknownEntityTypeError,
   type GetNodeResult,
 } from '@unified-product-graph/sdk'
@@ -1481,6 +1482,30 @@ export const migrateProperties: ToolHandler = (args, ctx): ToolResult => {
 
   const result = store.applyPropertyMigrations('0.0.0', UPG_VERSION)
   return text(JSON.stringify({ ...result, dry_run: false }, null, 2))
+}
+
+/**
+ * Apply `UPG_SCALAR_TO_EDGE_MIGRATIONS` graph-wide (P14 conformance): promote
+ * scalar properties that name a first-class entity into canonical edges. For
+ * each rule, find-or-create the referenced entity by normalized title, link it
+ * with the canonical edge, and drop the now-redundant scalar (unless the rule
+ * keeps it as an actor display-cache). Lossless — the string's value becomes a
+ * real node. Idempotent — re-running mints/links nothing new. Snapshot the .upg
+ * first (reversible-by-snapshot).
+ *
+ * Default `dry_run=true` previews the per-rule plan (minted / linked / dropped /
+ * skipped); pass `dry_run=false` to commit.
+ *
+ * @returns JSON: the `ApplyScalarToEdgeResult` plus `dry_run`.
+ * @atomicity atomic per call (one save)
+ * @see list_scalar_to_edge_migrations
+ * @see migrate_properties
+ */
+export const promoteScalarsToEdges: ToolHandler = (args, ctx): ToolResult => {
+  const { store } = ctx
+  const dryRun = (args.dry_run as boolean) ?? true
+  const result = applyScalarToEdgeMigrations(store, '0.0.0', UPG_VERSION, { dryRun })
+  return text(JSON.stringify({ ...result, dry_run: dryRun }, null, 2))
 }
 
 /**

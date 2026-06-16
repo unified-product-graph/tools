@@ -27,6 +27,7 @@ import {
   batchDeleteNodes,
   migrateType,
   migrateProperties,
+  promoteScalarsToEdges,
   deduplicateNodes,
 } from '../tools/nodes.js'
 import {
@@ -124,6 +125,7 @@ import {
   listTypeMigrations,
   listEdgeMigrations,
   listSplitMigrations,
+  listScalarToEdgeMigrations,
   listLifecycles,
   getLifecycle,
   listStatusValues,
@@ -876,6 +878,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'promote_scalars_to_edges',
+    description:
+      'Apply `UPG_SCALAR_TO_EDGE_MIGRATIONS` graph-wide (P14 conformance): promote scalar properties that name a first-class entity into canonical edges. Per rule: find-or-create the referenced entity by normalized title, link it with the canonical edge, then drop the now-redundant scalar (unless the rule keeps it as an actor display-cache). Lossless (the string becomes a real node) and idempotent (re-running mints/links nothing new). Snapshot the .upg first. Default `dry_run=true` previews the per-rule plan (minted / linked / dropped / skipped); pass `dry_run=false` to commit. The rules are listed by `list_scalar_to_edge_migrations`.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        dry_run: {
+          type: 'boolean',
+          description: 'Preview changes without applying (default true). Pass false to commit.',
+        },
+      },
+    },
+  },
+  {
     name: 'migrate_status',
     description:
       'Apply `UPG_STATUS_MIGRATIONS` graph-wide: rewrite legacy lifecycle status values to canonical phase ids. Auto-mode (no filters) selects nodes whose current status is invalid against the entity type\'s lifecycle and has a registered replacement (the same invariant that drives `validate_graph` lifecycle_drift). Surgical mode (`from_status` + `to_status`) overrides the registry and rewrites every (entity_type?, from_status) match. Nodes with invalid statuses but no registered replacement surface under `skipped_no_migration`. Default `dry_run=true`; pass `dry_run=false` to commit.',
@@ -1440,6 +1456,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     name: 'list_split_migrations',
     description:
       'List every 1→N split migration from `UPG_SPLIT_MIGRATIONS` ("one type became multiple types" rules, e.g. `experiment` → `experiment_plan` + `experiment_run`; `hypothesis` → `hypothesis_claim` + `hypothesis_evidence`). Each row: the full `UPGSplitMigration` record plus `since`. Non-paginated.',
+    inputSchema: { type: 'object' as const, properties: {} },
+  },
+  {
+    name: 'list_scalar_to_edge_migrations',
+    description:
+      'List every scalar→edge promotion from `UPG_SCALAR_TO_EDGE_MIGRATIONS` (P14 conformance: a scalar that named a first-class entity, e.g. `business_model.north_star_metric`, becomes a canonical edge). Each row: the full `UPGScalarToEdgeMigration` record plus `since`. The lossless apply is `promote_scalars_to_edges`. Non-paginated.',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
@@ -2408,6 +2430,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   update_product: updateProductTool,
   migrate_type: migrateType,
   migrate_properties: migrateProperties,
+  promote_scalars_to_edges: promoteScalarsToEdges,
   migrate_status: migrateStatus,
   deduplicate_nodes: deduplicateNodes,
   get_entity_schema: getEntitySchema,
@@ -2448,6 +2471,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   list_type_migrations: listTypeMigrations,
   list_edge_migrations: listEdgeMigrations,
   list_split_migrations: listSplitMigrations,
+  list_scalar_to_edge_migrations: listScalarToEdgeMigrations,
   list_lifecycles: listLifecycles,
   get_lifecycle: getLifecycle,
   list_status_values: listStatusValues,
