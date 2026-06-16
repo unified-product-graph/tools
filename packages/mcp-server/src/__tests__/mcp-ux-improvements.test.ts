@@ -321,7 +321,7 @@ describe('batch-6 #28: create_edge did_you_mean for a bad edge type', () => {
       ctx,
     )
     expect(await isErrorResult(result)).toBe(true)
-    const text = (result.content[0] as { text: string }).text
+    const text = ((result as { content: { text: string }[] }).content[0] as { text: string }).text
     expect(text).toContain('did_you_mean')
     expect(text).toContain('product_decided_via_decision')
   })

@@ -30,8 +30,8 @@ function makeCtx(store: UPGFileStore): ToolContext {
     sync: { readSyncState, writeSyncState, hashFile, syncFilePath },
   }
 }
-function bodyOf(result: { content: { text: string }[] }) {
-  return JSON.parse(result.content[0].text)
+function bodyOf(result: { content: { text: string }[] } | Promise<unknown>) {
+  return JSON.parse((result as { content: { text: string }[] }).content[0].text)
 }
 
 describe('A3: parent_id lateral-edge warning (0.9.14)', () => {

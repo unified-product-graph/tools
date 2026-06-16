@@ -182,11 +182,9 @@ describe('Tier-1 ceiling verbs', () => {
   })
 
   it('`link` on an incompatible pair is a policy violation (exit 2)', () => {
-    // Build a second persona so persona↔persona (no canonical edge) is testable.
-    const doc = fixtureDoc()
-    doc.nodes.push({ id: 'n_persona2', type: 'persona', title: 'Solo Cook' })
-    fs.writeFileSync(file, JSON.stringify(doc, null, 2))
-    expect(run(args(['link', 'n_persona', 'n_persona2']), tmp).status).toBe(2)
+    // job ↔ metric has no canonical edge in either direction (incompatible pair).
+    // (persona ↔ persona is now valid via persona_delegates_to_persona, 0.11.6.)
+    expect(run(args(['link', 'n_job', 'n_metric_a']), tmp).status).toBe(2)
   })
 
   // ── check: one verdict folding the four ─────────────────────────────────────

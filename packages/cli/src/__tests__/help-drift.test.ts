@@ -19,6 +19,7 @@
 
 import { describe, it, expect } from 'vitest'
 import type { Command } from 'commander'
+import { UPG_TREE_PATTERNS } from '@unified-product-graph/core'
 import { ALL_COMMANDS } from '../lib/command-registry.js'
 import { helpTopics } from '../lib/help.js'
 
@@ -92,5 +93,18 @@ describe('help is in sync with command definitions (drift guard)', () => {
       `helpTopics has entries with no matching command: ${orphans.join(', ')}. ` +
         `Remove them or register the command.`,
     ).toEqual([])
+  })
+
+  // `tree --pattern` help spells out the valid pattern ids as prose. Like the
+  // server tool descriptions, that list is hand-maintained and drifts when a
+  // pattern is added to the catalogue. Pin it to UPG_TREE_PATTERNS so a
+  // forgotten id fails here instead of shipping stale `upg tree --help`.
+  it('tree --pattern help lists every catalogue pattern id', () => {
+    const tree = helpTopics['tree']
+    expect(tree, 'no helpTopics entry for tree').toBeDefined()
+    const patternOpt = tree.options.find((o) => o.flag.startsWith('--pattern'))
+    expect(patternOpt, 'tree has no --pattern option documented').toBeDefined()
+    const missing = UPG_TREE_PATTERNS.map((p) => p.id).filter((id) => !patternOpt!.desc.includes(id))
+    expect(missing, `tree --pattern help omits pattern id(s): ${missing.join(', ')}`).toEqual([])
   })
 })

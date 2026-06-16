@@ -169,10 +169,14 @@ describe(' trace path semantics', () => {
     expect(r.trail.length).toBe(3)
   })
 
-  it('including the anchor type as path[0] halts at depth 1 (the broken convention)', async () => {
+  it('anchor-type-as-path[0] resolves for persona now that persona self-delegates (persona_delegates_to_persona, 0.11.6); the depth-1 halt only fires for self-edge-free types', async () => {
     const store = await freshStore()
     const r = executeTrace(store, 'n_persona', ['persona', 'job', 'need'])
-    expect(r.halted_at_depth).toBe(1)
+    // As of 0.11.6 `persona -> persona` is a resolvable catalog edge (delegation), so the
+    // trace no longer halts at depth 1. With no delegation instance in the fixture the trail
+    // simply does not advance past the anchor. The old "broken convention" depth-1 halt still
+    // fires for an anchor type that has no self-edge.
+    expect(r.halted_at_depth).toBeUndefined()
   })
 })
 
@@ -226,7 +230,7 @@ describe(' plan scope', () => {
 
   it('exhaustive opt-in scores the full universe', async () => {
     const store = await freshStore()
-    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(316)
+    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(318)
   })
 
   it('accepts a canonical region id AND an atomic-domain id', async () => {

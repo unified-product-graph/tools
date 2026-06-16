@@ -33,7 +33,7 @@ import {
   edgeId,
   buildPortfolioNodeIndex,
 } from '@unified-product-graph/sdk'
-import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, validateEdgeProperties, friendlyToAssessment, type UPGCrossEdgeType, type UPGEdgeType } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, validateEdgeProperties, friendlyToAssessment, type UPGCrossEdgeType, type UPGEdgeType, type UPGEntityType } from '@unified-product-graph/core'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
 import { upgHeader, success, fail, label } from '../lib/formatter.js'
 import { die, runtimeError, usageError, violation } from '../lib/errors.js'
@@ -955,7 +955,9 @@ const classifySub = new Command('classify')
         const pfDoc = (await openPortfolioStoreIfExists(cwd))?.getDocument()
         if (pfDoc) {
           const resolved = buildPortfolioNodeIndex(pfDoc).get(nodeId)?.type
-          if (resolved) sourceType = resolved
+          // Portfolio index types refs' `type` loosely as string; a resolved ref
+          // is a real entity type at runtime.
+          if (resolved) sourceType = resolved as UPGEntityType
         }
       }
       const edgeType =

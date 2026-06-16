@@ -14,7 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
-import type { UPGDocument } from '@unified-product-graph/core'
+import type { UPGDocument, UPGEntityType } from '@unified-product-graph/core'
 import {
   createSessionContext,
   createQueryCache,
@@ -44,8 +44,8 @@ function makeCtx(store: UPGFileStore): ToolContext {
   }
 }
 
-function bodyOf(result: { content: { text: string }[] }) {
-  return JSON.parse(result.content[0].text)
+function bodyOf(result: { content: { text: string }[] } | Promise<unknown>) {
+  return JSON.parse((result as { content: { text: string }[] }).content[0].text)
 }
 
 function doc(over: Partial<UPGDocument> & { product: UPGDocument['product'] }): UPGDocument {
@@ -313,7 +313,7 @@ describe('portfolio_validate (#19)', () => {
         doc({
           product: { id: 'p_beta', title: 'Beta', stage: 'build' },
           // A deprecated-alias type guarantees entity drift → structurally invalid.
-          nodes: [{ id: 'b_x', type: 'pain_point', title: 'Drifted node' }],
+          nodes: [{ id: 'b_x', type: 'pain_point' as UPGEntityType, title: 'Drifted node' }],
         }),
         null,
         2,

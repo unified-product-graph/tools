@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import type { UPGDocument, UPGBaseNode, UPGEntityType } from '@unified-product-graph/core'
+import { UPG_TREE_PATTERNS } from '@unified-product-graph/core'
 import {
   TOOL_DEFINITIONS,
   TOOL_REGISTRY,
@@ -257,5 +258,39 @@ describe('Tool registry: dispatch parity', () => {
 
   it('unknown tool name returns undefined (caller surfaces textError)', () => {
     expect(getToolHandler('not_a_tool')).toBeUndefined()
+  })
+})
+
+// The tree-pattern enum prose (the comma-separated id lists in the get_tree /
+// get_tree_pattern descriptions the model reads) is hand-maintained and was the
+// one drift seam the catalogue's structural guards did not cover: adding a
+// pattern to core works at runtime (validation derives the list from the
+// catalogue) while leaving these descriptions silently stale. This pins them to
+// the catalogue so a forgotten id fails the build instead of shipping wrong docs.
+describe('get_tree description enums stay in lockstep with UPG_TREE_PATTERNS', () => {
+  const PATTERN_IDS = UPG_TREE_PATTERNS.map((p) => p.id)
+  const def = (name: string) => {
+    const d = TOOL_DEFINITIONS.find((t) => t.name === name)
+    if (!d) throw new Error(`tool ${name} not in TOOL_DEFINITIONS`)
+    return d
+  }
+  const listsAll = (label: string, text: string) => {
+    const missing = PATTERN_IDS.filter((id) => !text.includes(id))
+    expect(missing, `${label} omits pattern id(s): ${missing.join(', ')}`).toEqual([])
+  }
+
+  it('get_tree tool description + pattern arg list every catalogue pattern', () => {
+    const t = def('get_tree')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = t.inputSchema.properties as any
+    listsAll('get_tree.description', t.description)
+    listsAll('get_tree pattern arg', props.pattern.description)
+  })
+
+  it('get_tree_pattern id arg lists every catalogue pattern', () => {
+    const t = def('get_tree_pattern')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = t.inputSchema.properties as any
+    listsAll('get_tree_pattern id arg', props.id.description)
   })
 })

@@ -229,7 +229,8 @@ describe(' E4: leaked internal strings are wrapped', () => {
   })
 
   it('an incompatible connect shows a user-facing message, not the catalog string', () => {
-    const r = run(args(['connect', 'n_persona', 'n_persona']), tmp)
+    // job -> job has no canonical edge (persona -> persona is now valid, 0.11.6).
+    const r = run(args(['connect', 'n_job', 'n_job']), tmp)
     expect(r.status).toBe(2)
     expect(r.stderr).not.toContain('UPG_EDGE_CATALOG')
     expect(r.stderr).toMatch(/cannot connect directly to/i)

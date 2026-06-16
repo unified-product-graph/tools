@@ -6,7 +6,9 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
+import { UPG_TREE_PATTERNS } from '@unified-product-graph/core'
 import { getTree } from '../tools/tree.js'
+import { TOOL_DEFINITIONS } from '../lib/tool-registry.js'
 import type { CloudContext } from '../lib/server-context.js'
 
 /** Minimal store stub exposing only what get_tree touches. */
@@ -130,5 +132,37 @@ describe('cloud get_tree (0.9.16)', () => {
     expect(noPid.content[0].text).toMatch(/Missing required parameter: product_id/i)
     const noPattern = (await getTree({ product_id: 'prod' }, ctx)) as { content: { text: string }[] }
     expect(noPattern.content[0].text).toMatch(/Missing required parameter: pattern/i)
+  })
+
+  // Mirror of the local server's guard: the hand-maintained pattern-id enum in
+  // the get_tree / get_tree_pattern descriptions must list every catalogue
+  // pattern. Cloud and local share the catalogue, so a pattern added to core
+  // must appear in BOTH servers' prose, not just whichever was hand-edited.
+  describe('get_tree description enums stay in lockstep with UPG_TREE_PATTERNS', () => {
+    const PATTERN_IDS = UPG_TREE_PATTERNS.map((p) => p.id)
+    const def = (name: string) => {
+      const d = TOOL_DEFINITIONS.find((t) => t.name === name)
+      if (!d) throw new Error(`tool ${name} not in cloud TOOL_DEFINITIONS`)
+      return d
+    }
+    const listsAll = (label: string, text: string) => {
+      const missing = PATTERN_IDS.filter((id) => !text.includes(id))
+      expect(missing, `${label} omits pattern id(s): ${missing.join(', ')}`).toEqual([])
+    }
+
+    it('get_tree tool description + pattern arg list every catalogue pattern', () => {
+      const t = def('get_tree')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const props = t.inputSchema.properties as any
+      listsAll('cloud get_tree.description', t.description)
+      listsAll('cloud get_tree pattern arg', props.pattern.description)
+    })
+
+    it('get_tree_pattern id arg lists every catalogue pattern', () => {
+      const t = def('get_tree_pattern')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const props = t.inputSchema.properties as any
+      listsAll('cloud get_tree_pattern id arg', props.id.description)
+    })
   })
 })

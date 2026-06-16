@@ -10,7 +10,7 @@ import * as path from 'node:path'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
-import type { UPGCrossEdge, UPGCrossEdgeType } from '@unified-product-graph/core'
+import type { UPGCrossEdge, UPGCrossEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties, friendlyToAssessment } from '@unified-product-graph/core'
 import { UPGPortfolioStore, UPGFileStore } from '@unified-product-graph/sdk'
 import { buildPortfolioNodeIndex } from '@unified-product-graph/sdk'
@@ -990,7 +990,9 @@ export const createClassificationEdge: ToolHandler = async (args, ctx): Promise<
     const pfDoc = (await openPortfolioStoreIfExists(process.cwd()))?.getDocument()
     if (pfDoc) {
       const resolved = buildPortfolioNodeIndex(pfDoc).get(nodeId)?.type
-      if (resolved) sourceType = resolved
+      // The portfolio index types refs' `type` loosely as string; a resolved ref
+      // is a real entity type at runtime.
+      if (resolved) sourceType = resolved as UPGEntityType
     }
   }
   const edgeType =

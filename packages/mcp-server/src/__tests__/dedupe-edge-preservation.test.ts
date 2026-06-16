@@ -10,7 +10,7 @@ import { mkdtempSync, writeFileSync, rmSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
-import type { UPGDocument } from '@unified-product-graph/core'
+import type { UPGDocument, UPGEdge } from '@unified-product-graph/core'
 import {
   createSessionContext,
   createQueryCache,
@@ -30,10 +30,10 @@ function makeCtx(store: UPGFileStore): ToolContext {
     sync: { readSyncState, writeSyncState, hashFile, syncFilePath },
   }
 }
-function bodyOf(r: { content: { text: string }[] }) {
-  return JSON.parse(r.content[0].text)
+function bodyOf(r: { content: { text: string }[] } | Promise<unknown>) {
+  return JSON.parse((r as { content: { text: string }[] }).content[0].text)
 }
-const e = (id: string, source: string, target: string, type: string) => ({ id, source, target, type })
+const e = (id: string, source: string, target: string, type: string): UPGEdge => ({ id, source, target, type }) as UPGEdge
 
 async function load(d: UPGDocument): Promise<UPGFileStore> {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'upg-dedupe-')))

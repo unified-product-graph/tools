@@ -1030,7 +1030,7 @@ describe('batchCreateNodes', () => {
  ],
  })
  expect(result.ok).toBe(true)
- if (result.ok) {
+ if (result.ok && !('validate_only' in result)) {
  expect(result.count).toBe(2)
  expect(result.edges).toHaveLength(1) // parent_ref edge
  expect(result.edges[0].source).toBe(result.created[0].id)
@@ -1051,7 +1051,7 @@ describe('batchCreateNodes', () => {
  ],
  })
  expect(result.ok).toBe(true)
- if (result.ok) {
+ if (result.ok && !('validate_only' in result)) {
  expect(result.count).toBe(3)
  expect(result.explicit_edges).toHaveLength(2)
  expect(result.explicit_edges![0].source).toBe(result.created[0].id)
@@ -1068,7 +1068,7 @@ describe('batchCreateNodes', () => {
  edges: [{ from_ref: persona.node.id, to_ref: '$0' }],
  })
  expect(result.ok).toBe(true)
- if (result.ok) {
+ if (result.ok && !('validate_only' in result)) {
  expect(result.explicit_edges).toHaveLength(1)
  expect(result.explicit_edges![0].source).toBe(persona.node.id)
  expect(result.explicit_edges![0].target).toBe(result.created[0].id)
@@ -1172,7 +1172,7 @@ describe('batchCreateNodes', () => {
  nodes: [{ type: 'jtbd', title: 'Ship' }],
  })
  expect(result.ok).toBe(true)
- if (result.ok) {
+ if (result.ok && !('validate_only' in result)) {
  expect(result.created[0].type).toBe('job')
  expect(result.warnings?.some((w) => w.match(/aliased to canonical 'job'/))).toBe(true)
  }

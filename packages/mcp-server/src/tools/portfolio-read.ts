@@ -1123,7 +1123,7 @@ export const getPortfolioTree: ToolHandler = async (args, ctx): Promise<ToolResu
     argsHint: `shape=${shape}, from_id=${fromId ?? '(all)'}`,
   })
   if (guard.kind === 'refuse') return guard.result
-  const response = result as Record<string, unknown>
+  const response = result as unknown as Record<string, unknown>
   if (guard.kind === 'warn') Object.assign(response, guard.fields)
   return text(JSON.stringify(response, null, 2))
 }
@@ -1351,7 +1351,7 @@ export const compareClassifications: ToolHandler = async (args, ctx): Promise<To
   const index = buildPortfolioNodeIndex(doc)
   await enrichIndexFromProducts(cwd, ctx.store as UPGFileStore, index, [a, b])
 
-  const result = assembleComparison(doc, { a, b, axis, node_index: index }) as Record<string, unknown>
+  const result = assembleComparison(doc, { a, b, axis, node_index: index }) as unknown as Record<string, unknown>
 
   const guard = preflightPayload({
     toolName: 'compare_classifications',
@@ -1407,7 +1407,7 @@ export const aggregateEdgePropertiesTool: ToolHandler = async (args, _ctx): Prom
   if (!doc) return textError('Portfolio document failed to load.')
 
   const index = buildPortfolioNodeIndex(doc)
-  const result = aggregateEdgeProperties(doc, { edge_type: edgeType, group_by: groupBy, property, node_index: index }) as Record<string, unknown>
+  const result = aggregateEdgeProperties(doc, { edge_type: edgeType, group_by: groupBy, property, node_index: index }) as unknown as Record<string, unknown>
 
   const guard = preflightPayload({
     toolName: 'aggregate_edge_properties',

@@ -79,8 +79,9 @@ describe('CLI contract', () => {
   })
 
   it('connect of an incompatible pair exits 2 (policy)', () => {
-    // persona -> persona has no inferable edge.
-    const r = run(['connect', 'n_persona', 'n_persona', '--file', file], tmp)
+    // persona -> feature has no inferable edge in either direction.
+    // (persona -> persona is now valid via persona_delegates_to_persona, 0.11.6.)
+    const r = run(['connect', 'n_persona', 'n_feature', '--file', file], tmp)
     expect(r.status).toBe(2)
   })
 

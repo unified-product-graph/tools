@@ -12,7 +12,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
-import type { UPGDocument, UPGBaseNode, UPGEdge, UPGEntityType } from '@unified-product-graph/core'
+import type { UPGDocument, UPGBaseNode, UPGEdge, UPGEntityType, UPGProductStage } from '@unified-product-graph/core'
 import {
   createSessionContext,
   createQueryCache,
@@ -26,7 +26,7 @@ import { validateGraph } from '../tools/validation.js'
 import { getGraphDigest } from '../tools/context.js'
 import { portfolioDigest } from '../tools/portfolio-read.js'
 
-function makeDoc(nodes: UPGBaseNode[], edges: UPGEdge[], stage = 'concept'): UPGDocument {
+function makeDoc(nodes: UPGBaseNode[], edges: UPGEdge[], stage: UPGProductStage = 'concept'): UPGDocument {
   return {
     upg_version: '0.2',
     exported_at: new Date().toISOString(),

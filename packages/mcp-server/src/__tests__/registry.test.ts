@@ -56,8 +56,8 @@ const MAIN = doc({
   ],
 })
 
-function bodyOf(result: { content: { text: string }[] }) {
-  return JSON.parse(result.content[0].text)
+function bodyOf(result: { content: { text: string }[] } | Promise<unknown>) {
+  return JSON.parse((result as { content: { text: string }[] }).content[0].text)
 }
 
 /** Raw text of a result — used for textError responses (plain text, not JSON). */

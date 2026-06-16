@@ -354,7 +354,7 @@ export const getNodes: ToolHandler = async (args, ctx): Promise<ToolResult> => {
       }
       const sub = getNodesLib(crossStore, { ids: nodeIds, compact_edges: requestedCompactEdges })
       for (const wrapper of sub.nodes) {
-        ;(wrapper as Record<string, unknown>).product_id = productId
+        ;(wrapper as unknown as Record<string, unknown>).product_id = productId
         result.nodes.push(wrapper)
       }
       for (const nf of sub.not_found ?? []) notFound.push(`${productId}/${nf}`)
