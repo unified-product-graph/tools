@@ -1966,11 +1966,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'define_canonical_entity',
     description:
-      'Define a canonical shared entity in the portfolio registry (the shared-vocabulary tier of `.upg/portfolio.upg`). Use when an archetype is shared across products (a Developer persona, a North-Star metric, a competitor) and should have ONE authoritative definition that product instances link to via `register_instance`. A canonical entity is a normal node (persona, metric, competitor, market_segment, ...) that lives in the registry rather than in a product. Creates the portfolio document if absent. Returns the canonical node and its `registry/{id}` qualified id.',
+      'Define a canonical shared entity in the portfolio registry (the shared-vocabulary tier of `.upg/portfolio.upg`). Use when an archetype is shared across products (a Developer persona, a North-Star metric, a competitor) and should have ONE authoritative definition that product instances link to via `register_instance`. A canonical entity is a normal node of any active entity type (persona, metric, competitor, market_segment, and any other active type) that lives in the registry rather than in a product. Creates the portfolio document if absent. Returns the canonical node and its `registry/{id}` qualified id.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        type: { type: 'string', description: 'Canonical UPG entity type (e.g. persona, metric, competitor, market_segment). Must be an active type.' },
+        type: { type: 'string', description: 'Any active UPG entity type, including `proposed`-maturity types. There is no canonical allowlist; persona, metric, competitor, market_segment are common examples, not the allowed set. The only gate is that the type is active (see list_entity_types).' },
         title: { type: 'string', description: 'Canonical name (e.g. "Developer").' },
         description: { type: 'string', description: 'Optional longer description of the canonical entity.' },
         properties: { type: 'object', description: 'Optional properties (e.g. a persona\'s audience_role).' },
@@ -2037,7 +2037,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              type: { type: 'string', description: 'Canonical UPG entity type.' },
+              type: { type: 'string', description: 'Any active UPG entity type (no allowlist; see define_canonical_entity).' },
               title: { type: 'string', description: 'Canonical name.' },
               canonical_id: { type: 'string', description: 'Optional explicit registry id.' },
               description: { type: 'string' },

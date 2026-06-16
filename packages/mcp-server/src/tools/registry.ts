@@ -15,14 +15,15 @@
  */
 
 import * as path from 'node:path'
+import * as fs from 'node:fs'
 import type { ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
+import { findWorkspaceUpgFiles } from './workspace.js'
 import {
   UPGFileStore,
   edgeId,
   resolvePortfolioPath,
   openPortfolioStoreIfExists,
-  findProductFileById,
 } from '@unified-product-graph/sdk'
 import { UPGPortfolioStore } from '@unified-product-graph/sdk'
 import {
@@ -141,6 +142,35 @@ export const defineCanonicalEntity: ToolHandler = async (args): Promise<ToolResu
   )
 }
 
+/**
+ * Locate a workspace product file by its `product.id`, using the same discovery
+ * as `list_local_products` / the cross-product-edge writer (`findWorkspaceUpgFiles`:
+ * root + immediate subdirs + `.upg/workspace.json`-registered paths at any depth).
+ *
+ * The SDK's `findProductFileById` only flat-scans `.upg/`, so `register_instance`
+ * could not resolve a node living in a subdir- or workspace.json-registered product
+ * even though `list_local_products` listed it (the cross-edge writer never tripped
+ * on this because it only needs the product *id*, not the node). Matching the
+ * workspace-wide discovery makes cross-product `instance_of` registration work in
+ * one batch across every graph in the workspace.
+ */
+function findWorkspaceProductFileById(
+  cwd: string,
+  productId: string,
+): { file_path: string; title: string } | null {
+  for (const abs of findWorkspaceUpgFiles(cwd)) {
+    try {
+      const doc = JSON.parse(fs.readFileSync(abs, 'utf-8')) as { product?: { id?: string; title?: string } }
+      if (doc.product?.id === productId) {
+        return { file_path: path.relative(cwd, abs), title: doc.product.title ?? path.basename(abs) }
+      }
+    } catch {
+      // malformed / unreadable .upg — skip
+    }
+  }
+  return null
+}
+
 /** Resolve a source product node's `{ product_id, node_id, type, title }`. */
 async function resolveSourceNode(
   cwd: string,
@@ -182,9 +212,9 @@ async function resolveSourceNode(
   if (activeId && productId === activeId) {
     node = activeStore.getNode(bareNodeId)
   } else {
-    const found = findProductFileById(cwd, productId)
+    const found = findWorkspaceProductFileById(cwd, productId)
     if (!found) {
-      return { ok: false, error: `Product "${productId}" not found in the workspace.` }
+      return { ok: false, error: `Product "${productId}" not found in the workspace. Check \`list_local_products\` for the available product ids.` }
     }
     const ro = new UPGFileStore()
     try {

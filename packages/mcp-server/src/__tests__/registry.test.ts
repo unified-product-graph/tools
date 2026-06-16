@@ -238,6 +238,64 @@ describe('canonical registry (0.9.6)', () => {
     expect(pf.cross_edges).toHaveLength(1)
   })
 
+  // ── cross-product register_instance (register-instance-cross-product fix) ─────
+  // register_instance must resolve a node living in ANY workspace product, not
+  // just the active/flat-.upg one. p_studio lives in a root-level subdir, so the
+  // SDK's flat-scan findProductFileById missed it ("Product not found in the
+  // workspace") even though list_local_products + the cross-edge writer resolve
+  // it. resolveSourceNode now discovers via findWorkspaceUpgFiles.
+
+  function writeStudioSubdirProduct(): void {
+    mkdirSync(join(cwd, 'studio'))
+    const studio = doc({
+      product: { id: 'p_studio', title: 'Studio', stage: 'growth' },
+      nodes: [{ id: 'n_metric', type: 'metric', title: 'Activation rate' }],
+    })
+    writeFileSync(join(cwd, 'studio', 'studio.upg'), JSON.stringify(studio, null, 2))
+  }
+
+  it('register_instance resolves a node in a non-active subdir product (qualified id)', async () => {
+    writeStudioSubdirProduct()
+    const ctx = await activeCtx() // active = p_main; p_studio is non-active + in a subdir
+    await defineCanonicalEntity({ type: 'metric', title: 'Activation' }, ctx)
+    const body = bodyOf(
+      await registerInstance({ node_id: 'p_studio/n_metric', canonical_id: 'metric_activation' }, ctx),
+    )
+    expect(body.edge.type).toBe('instance_of')
+    expect(body.edge.source).toBe('p_studio/n_metric')
+    expect(body.instance.product_id).toBe('p_studio')
+    expect(body.instance.type).toBe('metric')
+  })
+
+  it('register_instance resolves a non-active subdir product via source_product_id (bare id)', async () => {
+    writeStudioSubdirProduct()
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'metric', title: 'Activation' }, ctx)
+    const body = bodyOf(
+      await registerInstance(
+        { node_id: 'n_metric', source_product_id: 'p_studio', canonical_id: 'metric_activation' },
+        ctx,
+      ),
+    )
+    expect(body.edge.source).toBe('p_studio/n_metric')
+    expect(body.instance.product_id).toBe('p_studio')
+  })
+
+  it('batch_register_instance resolves nodes across non-active subdir products', async () => {
+    writeStudioSubdirProduct()
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'metric', title: 'Activation' }, ctx)
+    const body = bodyOf(
+      await batchRegisterInstance(
+        { instances: [{ node_id: 'p_studio/n_metric', canonical_id: 'metric_activation' }] },
+        ctx,
+      ),
+    )
+    // The cross-product instance registered cleanly (no "product not found").
+    const pf = readPortfolio() as { cross_edges?: Array<{ type: string; source: string }> }
+    expect(pf.cross_edges?.some((e) => e.type === 'instance_of' && e.source === 'p_studio/n_metric')).toBe(true)
+  })
+
   // ── list_registry ───────────────────────────────────────────────────────────
 
   it('list_registry reports canonicals, instance_count, and instances', async () => {

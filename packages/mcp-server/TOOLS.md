@@ -1667,7 +1667,7 @@ JSON: `{ edge, source, target, portfolio_file, already_existed? }`.
 
 ### `define_canonical_entity`
 
-Define a canonical shared entity in the portfolio registry (the shared-vocabulary tier of `.upg/portfolio.upg`). Use when an archetype is shared across products (a Developer persona, a North-Star metric, a competitor) and should have ONE authoritative definition that product instances link to via `register_instance`. A canonical entity is a normal node (persona, metric, competitor, market_segment, ...) that lives in the registry rather than in a product. Creates the portfolio document if absent. Returns the canonical node and its `registry/{id}` qualified id.
+Define a canonical shared entity in the portfolio registry (the shared-vocabulary tier of `.upg/portfolio.upg`). Use when an archetype is shared across products (a Developer persona, a North-Star metric, a competitor) and should have ONE authoritative definition that product instances link to via `register_instance`. A canonical entity is a normal node of any active entity type (persona, metric, competitor, market_segment, and any other active type) that lives in the registry rather than in a product. Creates the portfolio document if absent. Returns the canonical node and its `registry/{id}` qualified id.
 
 **Atomicity:** `non-atomic. Portfolio file create (if new) + registry append.`
 
@@ -1680,7 +1680,7 @@ Define a canonical shared entity in the portfolio registry (the shared-vocabular
 | `properties` | object |  | Optional properties (e.g. a persona's audience_role). |
 | `tags` | array |  | Optional tags. |
 | `title` | string | ✓ | Canonical name (e.g. "Developer"). |
-| `type` | string | ✓ | Canonical UPG entity type (e.g. persona, metric, competitor, market_segment). Must be an active type. |
+| `type` | string | ✓ | Any active UPG entity type, including `proposed`-maturity types. There is no canonical allowlist; persona, metric, competitor, market_segment are common examples, not the allowed set. The only gate is that the type is active (see list_entity_types). |
 
 **Returns:**
 
