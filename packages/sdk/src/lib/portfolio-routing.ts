@@ -403,10 +403,17 @@ export function setProductMemberKindOnPortfolio(
 }
 
 /**
- * Best-effort lookup of a product's `.upg` file and title given its product
- * id. Walks the workspace `.upg/` directory looking for a file whose
- * `product.id` matches. Returns null when not found or when the workspace
- * lookup fails.
+ * Best-effort lookup of a product's `.upg` file and title given its product id.
+ *
+ * Resolves against the workspace registry, NOT just the `.upg/` root: candidate
+ * files are the flat `.upg/*.upg` scan PLUS every subpath registered in
+ * `.upg/workspace.json` (a product created with `dir:` lives in a subfolder,
+ * e.g. `.upg/web-ecosystem/<slug>.upg`, and is invisible to a root-only scan).
+ * workspace.json is the source of truth for placement; the flat scan is the
+ * convenience fallback. This keeps every product resolver that calls it
+ * (attach/detach/assign/move + the registry tools) consistent with
+ * `list_local_products` / `findWorkspaceUpgFiles`. Returns null when no
+ * candidate's `product.id` matches.
  */
 export function findProductFileById(
   cwd: string,
@@ -414,24 +421,50 @@ export function findProductFileById(
 ): { file_path: string; title: string } | null {
   const upgDir = path.join(cwd, '.upg')
   if (!fs.existsSync(upgDir)) return null
-  let entries: fs.Dirent[]
+
+  const candidates: string[] = []
+  const seen = new Set<string>()
+  const add = (abs: string) => {
+    const resolved = path.resolve(abs)
+    if (!seen.has(resolved)) {
+      seen.add(resolved)
+      candidates.push(resolved)
+    }
+  }
+
+  // (a) Flat `.upg/*.upg` scan (the historical behaviour).
   try {
-    entries = fs.readdirSync(upgDir, { withFileTypes: true })
+    for (const entry of fs.readdirSync(upgDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.upg')) continue
+      if (entry.name === PORTFOLIO_FILENAME) continue
+      add(path.join(upgDir, entry.name))
+    }
   } catch {
     return null
   }
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.upg')) continue
-    // Skip the portfolio file itself.
-    if (entry.name === PORTFOLIO_FILENAME) continue
-    const filePath = path.join(upgDir, entry.name)
+
+  // (b) workspace.json-registered subpaths (resolved relative to `.upg/`, at any
+  // depth). Tolerant: a missing/malformed workspace.json leaves the scan alone.
+  try {
+    const ws = JSON.parse(fs.readFileSync(path.join(upgDir, 'workspace.json'), 'utf-8')) as {
+      products?: Array<{ file?: unknown }>
+    }
+    for (const p of ws.products ?? []) {
+      if (typeof p.file !== 'string') continue
+      const abs = path.resolve(upgDir, p.file)
+      if (fs.existsSync(abs)) add(abs)
+    }
+  } catch {
+    // no workspace.json / malformed — the flat scan stands alone
+  }
+
+  for (const filePath of candidates) {
     try {
-      const raw = fs.readFileSync(filePath, 'utf-8')
-      const doc = JSON.parse(raw) as { product?: { id?: string; title?: string } }
+      const doc = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as { product?: { id?: string; title?: string } }
       if (doc.product?.id === productId) {
         return {
           file_path: path.relative(cwd, filePath),
-          title: doc.product.title ?? entry.name,
+          title: doc.product.title ?? path.basename(filePath),
         }
       }
     } catch {

@@ -576,6 +576,30 @@ describe('0.8.15 · owner property + assign/attach product ( §C / §A)', () => 
     const after = readPortfolio(cwd)?.portfolios as Array<{ id: string; products?: string[] }>
     expect(after[0].products).toContain('p_test')
   })
+
+  it('§A: attach_product_to_portfolio resolves a product in a workspace.json subfolder', async () => {
+    // A product created with `dir:` lives in a subfolder and is registered in
+    // workspace.json (e.g. `web-ecosystem/<slug>.upg`) — the old root-only
+    // findProductFileById missed it ("Product not found in this workspace"),
+    // so attach/detach/assign/move all failed for subfolder products.
+    await parseHandlerResult(createNode({ type: 'portfolio', title: 'Web Ecosystem' }, ctx))
+    const portfolioId = (readPortfolio(cwd)?.portfolios as Array<{ id: string }>)[0].id
+    mkdirSync(join(cwd, '.upg', 'web-ecosystem'))
+    writeFileSync(
+      join(cwd, '.upg', 'web-ecosystem', 'studio.upg'),
+      JSON.stringify(makeDoc('p_studio', 'Studio'), null, 2),
+    )
+    writeFileSync(
+      join(cwd, '.upg', 'workspace.json'),
+      JSON.stringify({ products: [{ file: 'web-ecosystem/studio.upg', title: 'Studio' }] }, null, 2),
+    )
+    const r = await parseHandlerResult(
+      attachProductToPortfolioTool({ product_id: 'p_studio', portfolio_id: portfolioId }, ctx),
+    )
+    expect(r.isError).toBeUndefined()
+    const after = readPortfolio(cwd)?.portfolios as Array<{ id: string; products?: string[] }>
+    expect(after.find((p) => p.id === portfolioId)?.products).toContain('p_studio')
+  })
 })
 
 // ── 0.8.16 · portfolio edit / cleanup tier ─────────────────────────
