@@ -671,7 +671,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     "name": "get_tree",
-    "description": "Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial) from the product graph. Walks the pattern's type-driven child map over the live graph (drift-proof, follows whatever edge wired each parent to a child of the expected type), roots at the pattern anchor with fallback, and reports structural gaps. Returns nested data, not rendered text.",
+    "description": "Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star) from the product graph. Walks the pattern's type-driven child map over the live graph (drift-proof, follows whatever edge wired each parent to a child of the expected type), roots at the pattern anchor with fallback, and reports structural gaps. Returns nested data, not rendered text.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -681,7 +681,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         "pattern": {
           "type": "string",
-          "description": "Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial"
+          "description": "Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star"
         },
         "from_id": {
           "type": "string",
@@ -1033,7 +1033,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         id: {
           type: 'string',
-          description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial.',
+          description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star.',
         },
       },
       required: ['id'],
