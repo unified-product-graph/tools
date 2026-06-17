@@ -1,6 +1,6 @@
 {
   "name": "@unified-product-graph/cli",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "MCP server + CLI for the Unified Product Graph; drop into Claude Code or use the `upg` command.",
   "license": "MIT",
   "author": "The Product Creator <hello@theproductcreator.com>",
@@ -41,8 +41,8 @@
   "dependencies": {
     "@linear/sdk": "^5.0.0",
     "@octokit/rest": "^20.0.0",
-    "@unified-product-graph/core": "0.15.0",
-    "@unified-product-graph/sdk": "0.15.0",
+    "@unified-product-graph/core": "0.16.0",
+    "@unified-product-graph/sdk": "0.16.0",
     "chalk": "^4.1.2",
     "commander": "^13.0.0",
     "inquirer": "^12.0.0",
