@@ -20,12 +20,14 @@ import {
   UPG_EDGE_CATALOG,
   UPG_PROPERTY_SCHEMA,
   getDomainForType,
+  getEntityModifierSummary,
   getGuideForDomain,
   getLifecycleForType,
   getPropertySchema,
   resolveEntityType,
   UnknownEntityTypeError,
   type EntityTypeResolution,
+  type PropertyModifier,
   type UPGEntityType,
 } from '@unified-product-graph/core'
 
@@ -69,6 +71,14 @@ export interface EntitySchema {
   alias_of?: { from: string; to: string }
   domain: { id: string; label: string } | null
   expected_properties: Record<string, unknown>
+  /**
+   * Properties that carry a provenance/volatility modifier, grouped by kind —
+   * present only when the entity has at least one. `derived` = computed from
+   * the graph (never hand-author); `snapshot` = a stale-stamped live reading
+   * (pair with `*_as_of`); `volatile` = an environment pointer stripped on
+   * export. Lets an agent see which `expected_properties` are not plain.
+   */
+  property_modifiers?: Record<PropertyModifier, string[]>
   edges_out: EntitySchemaEdgeOut[]
   edges_in: EntitySchemaEdgeIn[]
   phases?: string[]
@@ -129,12 +139,14 @@ export function buildEntitySchema(
   }
 
   const propertySchema = getPropertySchema(entityType)
+  const modifierSummary = getEntityModifierSummary(entityType)
 
   const schema: EntitySchema = {
     type: entityType,
     ...(resolved.alias ? { alias_of: resolved.alias } : {}),
     domain: domain ? { id: domain.id, label: domain.label } : null,
     expected_properties: propertySchema ?? {},
+    ...(modifierSummary ? { property_modifiers: modifierSummary } : {}),
     edges_out: edgesOut,
     edges_in: edgesIn,
   }
