@@ -20,7 +20,7 @@ import {
   syncFilePath,
   type ToolContext,
 } from '../lib/server-context.js'
-import { portfolioQuery, portfolioDigest } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioCensus } from '../tools/portfolio-read.js'
 import { switchProduct } from '../tools/workspace.js'
 
 function doc(over: Partial<UPGDocument> & { product: UPGDocument['product'] }): UPGDocument {
@@ -44,7 +44,17 @@ const ALPHA = doc({
 })
 const BETA = doc({
   product: { id: 'p_beta', title: 'Beta', stage: 'build' },
-  nodes: [{ id: 'b_p', type: 'persona', title: 'Beta Persona' }],
+  nodes: [
+    { id: 'b_p', type: 'persona', title: 'Beta Persona' },
+    {
+      id: 'b_m',
+      type: 'metric',
+      title: 'Beta Metric',
+      description: 'A north-star metric',
+      tags: ['north-star', 'kpi'],
+      properties: { designation: 'north_star', target: 100 },
+    },
+  ],
   edges: [],
 })
 
@@ -129,6 +139,79 @@ describe('portfolio read layer', () => {
     const result = await portfolioQuery({}, ctx)
     expect(result.isError).toBe(true)
     expect(result.content[0].text).toMatch(/Provide either/)
+  })
+
+  it('portfolio_census lists nodes of a type across products (flat, default projection)', async () => {
+    const body = bodyOf(await portfolioCensus({ type: 'persona' }, ctx))
+    expect(body.total).toBe(2)
+    expect(body.returned).toBe(2)
+    expect(body.has_more).toBe(false)
+    expect(body.products_searched).toBe(2)
+    expect(body.products_with_matches).toBe(2)
+    const rows = body.rows.sort((a: { node_id: string }, b: { node_id: string }) => a.node_id.localeCompare(b.node_id))
+    expect(rows).toEqual([
+      { product_id: 'p_alpha', node_id: 'a_p', title: 'Alpha Persona' },
+      { product_id: 'p_beta', node_id: 'b_p', title: 'Beta Persona' },
+    ])
+  })
+
+  it('portfolio_census projects include + property_include and never returns edges', async () => {
+    const body = bodyOf(
+      await portfolioCensus(
+        { type: 'metric', include: ['title', 'description', 'tags', 'properties'], property_include: ['designation'] },
+        ctx,
+      ),
+    )
+    expect(body.total).toBe(1)
+    expect(body.rows[0]).toEqual({
+      product_id: 'p_beta',
+      node_id: 'b_m',
+      title: 'Beta Metric',
+      description: 'A north-star metric',
+      tags: ['north-star', 'kpi'],
+      properties: { designation: 'north_star' },
+    })
+    expect(body.rows[0].edges).toBeUndefined()
+  })
+
+  it('portfolio_census group_by product nests rows under each product', async () => {
+    const body = bodyOf(await portfolioCensus({ type: 'persona', group_by: 'product' }, ctx))
+    expect(body.rows).toBeUndefined()
+    const byId = Object.fromEntries(
+      body.products.map((p: { product_id: string }) => [p.product_id, p]),
+    )
+    expect(byId.p_alpha.count).toBe(1)
+    expect(byId.p_alpha.rows).toEqual([{ node_id: 'a_p', title: 'Alpha Persona' }])
+    expect(byId.p_beta.count).toBe(1)
+  })
+
+  it('portfolio_census honours scope, tags filter, and paging', async () => {
+    const scoped = bodyOf(await portfolioCensus({ type: 'persona', scope: ['p_beta'] }, ctx))
+    expect(scoped.products_searched).toBe(1)
+    expect(scoped.rows.map((r: { product_id: string }) => r.product_id)).toEqual(['p_beta'])
+
+    const tagged = bodyOf(await portfolioCensus({ type: 'metric', tags: ['north-star'] }, ctx))
+    expect(tagged.total).toBe(1)
+    const noTag = bodyOf(await portfolioCensus({ type: 'metric', tags: ['nonexistent'] }, ctx))
+    expect(noTag.total).toBe(0)
+
+    const page = bodyOf(await portfolioCensus({ type: 'persona', limit: 1 }, ctx))
+    expect(page.total).toBe(2)
+    expect(page.returned).toBe(1)
+    expect(page.has_more).toBe(true)
+    const page2 = bodyOf(await portfolioCensus({ type: 'persona', limit: 1, offset: 1 }, ctx))
+    expect(page2.returned).toBe(1)
+    expect(page2.has_more).toBe(false)
+  })
+
+  it('portfolio_census requires a type and reports unmatched scope', async () => {
+    const err = await portfolioCensus({}, ctx)
+    expect(err.isError).toBe(true)
+    expect(err.content[0].text).toMatch(/Provide "type"/)
+
+    const ghost = bodyOf(await portfolioCensus({ type: 'persona', scope: ['p_ghost'] }, ctx))
+    expect(ghost.products_searched).toBe(0)
+    expect(ghost.unmatched_scope).toEqual(['p_ghost'])
   })
 })
 

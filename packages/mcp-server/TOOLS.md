@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 133 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 134 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 133 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 10 tools
-- [Workspace & Portfolios](#workspace-portfolios): 36 tools
+- [Workspace & Portfolios](#workspace-portfolios): 37 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 49 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1295,6 +1295,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`list_portfolios`](#list-portfolios)
 - [`list_registry`](#list-registry)
 - [`migrate_cross_edges`](#migrate-cross-edges)
+- [`portfolio_census`](#portfolio-census)
 - [`portfolio_digest`](#portfolio-digest)
 - [`portfolio_query`](#portfolio-query)
 - [`portfolio_validate`](#portfolio-validate)
@@ -1566,7 +1567,7 @@ separate filesystem operations.`
 | `supersede` | boolean |  | Classification edges only. When a classify write moves a source to a new value on a single-select axis, retire the prior same-axis edge (default true) so the source carries one current value. Set false to keep both (additive). A multi-select axis always keeps both. |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `journey_phase_realises_operating_stage` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `journey_phase_realises_operating_stage` \| `screen_markets_product` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -1985,6 +1986,39 @@ on retry: a second `dry_run: false` after a successful migration finds zero
 inline cross-edges and reports `migrated: []`.
 
 **See also:** `create_cross_product_edge`, `list_portfolio_cross_edges`, `list_cross_edge_types`, `init_workspace`
+
+
+### `portfolio_census`
+
+List product-local nodes of ONE type ACROSS the whole portfolio with a chosen projection (the cross-product `list_nodes`). The overflow-safe answer to "every metric across all 16 graphs, with title + description": the read every canonicalisation / coverage pass needs. Unlike `portfolio_query` (which returns full nodes AND traversed edges, and overflows the payload cap past ~195 nodes), a census never traverses and never returns edges, so payload scales only with row count x projected-field size. Each row is `{ product_id, node_id, <projected> }`; `group_by: "product"` nests rows under each product instead. Read-only; never mutates active-product state.
+
+**Atomicity:** `atomic (read-only). Never mutates active-product state.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `group_by` | `none` \| `product` |  | none (one flat `rows` list, default) or product (nest rows under each product, the comparison view). |
+| `include` | array |  | Projected fields per node: "title", "status", "tags", "description", "properties" (default: ["title"]). id (as node_id) and product_id are always present. |
+| `limit` | number |  | Max rows in the returned page (default 1000, max 5000). Pages the flat sequence; `total` reports the full match count. |
+| `offset` | number |  | Skip this many rows before the page (default 0). With `limit`, pages a large census. |
+| `property_include` | array |  | When "properties" is in include, only return these property keys. |
+| `scope` | array |  | Product IDs (or files) to census. Omit to census ALL products in the workspace. Match by product id, relative file, or basename. (`products` is accepted as an alias.) |
+| `status` | string |  | Only census nodes with this lifecycle status. |
+| `tags` | array |  | Only census nodes carrying at least one of these tags. |
+| `type` | string | ✓ | Entity type to census (e.g. "metric", "persona", "primitive"). Required. |
+
+**Returns:**
+
+JSON. Flat (default): `{ type, rows: Array<{ product_id, node_id,
+<projected> }>, total, returned, offset, limit, has_more, products_searched,
+products_with_matches, errored_products?, unmatched_scope? }`. With
+`group_by: "product"`: a `products: Array<{ product_id, file, title, count,
+rows: Array<{ node_id, <projected> }> }>` nesting replaces the flat `rows`.
+`total` is the full match count across the portfolio; `rows`/`products` hold
+the requested page (`offset`/`limit`). Projection defaults to `["title"]`.
+
+**See also:** `list_nodes`, `portfolio_query`, `portfolio_digest`
 
 
 ### `portfolio_digest`

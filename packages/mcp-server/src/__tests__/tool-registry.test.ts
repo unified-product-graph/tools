@@ -86,7 +86,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 124 tools', () => {
+  it('exposes the expected 134 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -147,7 +147,11 @@ describe('Tool registry: completeness', () => {
     // + list_scalar_to_edge_migrations + promote_scalars_to_edges (0.12.0): the
     //   P14 scalar→edge promotion surface — list the rules, then losslessly apply
     //   them (find-or-create + link + drop). Local-only (migration layer). → 133.
-    expect(TOOL_DEFINITIONS).toHaveLength(133)
+    // + portfolio_census (0.12.5): the cross-product list_nodes — lists
+    //   product-local nodes of one type across the workspace with a projection,
+    //   edge-free so it stays under the payload cap. Local-only (portfolio read
+    //   layer, no single-product cloud analogue). → 134.
+    expect(TOOL_DEFINITIONS).toHaveLength(134)
   })
 })
 

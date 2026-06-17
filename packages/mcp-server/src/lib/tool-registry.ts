@@ -73,7 +73,7 @@ import {
   listPortfolioCrossEdges,
   migrateCrossEdges,
 } from '../tools/workspace.js'
-import { portfolioQuery, portfolioDigest, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification, compareClassifications, aggregateEdgePropertiesTool, auditAxisOverlap } from '../tools/portfolio-read.js'
+import { portfolioQuery, portfolioDigest, portfolioCensus, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification, compareClassifications, aggregateEdgePropertiesTool, auditAxisOverlap } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
 import {
   defineCanonicalEntity,
@@ -2165,6 +2165,46 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'portfolio_census',
+    description:
+      'List product-local nodes of ONE type ACROSS the whole portfolio with a chosen projection (the cross-product `list_nodes`). The overflow-safe answer to "every metric across all 16 graphs, with title + description": the read every canonicalisation / coverage pass needs. Unlike `portfolio_query` (which returns full nodes AND traversed edges, and overflows the payload cap past ~195 nodes), a census never traverses and never returns edges, so payload scales only with row count x projected-field size. Each row is `{ product_id, node_id, <projected> }`; `group_by: "product"` nests rows under each product instead. Read-only; never mutates active-product state.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        type: { type: 'string', description: 'Entity type to census (e.g. "metric", "persona", "primitive"). Required.' },
+        include: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Projected fields per node: "title", "status", "tags", "description", "properties" (default: ["title"]). id (as node_id) and product_id are always present.',
+        },
+        property_include: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'When "properties" is in include, only return these property keys.',
+        },
+        group_by: {
+          type: 'string',
+          enum: ['none', 'product'],
+          description: 'none (one flat `rows` list, default) or product (nest rows under each product, the comparison view).',
+        },
+        status: { type: 'string', description: 'Only census nodes with this lifecycle status.' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Only census nodes carrying at least one of these tags.',
+        },
+        scope: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Product IDs (or files) to census. Omit to census ALL products in the workspace. Match by product id, relative file, or basename. (`products` is accepted as an alias.)',
+        },
+        limit: { type: 'number', description: 'Max rows in the returned page (default 1000, max 5000). Pages the flat sequence; `total` reports the full match count.' },
+        offset: { type: 'number', description: 'Skip this many rows before the page (default 0). With `limit`, pages a large census.' },
+      },
+      required: ['type'],
+    },
+  },
+  {
     name: 'get_portfolio_tree',
     description:
       'Assemble a portfolio-grain tree from the shared classification registry and the `*_classified_as_classification_value` cross edges in `.upg/portfolio.upg` (the portfolio complement to `get_tree`, which is product-scoped). `shape: "landscape"` (default) returns classification axis to its values to the nodes classified at each value, every leaf carrying `confidence` / `assessed_on`; anchor at one axis or value with `from_id`, or omit for the whole portfolio. `shape: "competitor_profile"` returns one node (a competitor) and its position on every axis it has been graded against; `from_id` required. Titles resolve to entity names (e.g. "Directus"), not opaque ids. Values with no wired axis surface under an `unaxed` bucket. Read-only.',
@@ -2514,6 +2554,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   create_registry_edge: createRegistryEdge,
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
+  portfolio_census: portfolioCensus,
   get_portfolio_tree: getPortfolioTree,
   audit_property_coverage: auditPropertyCoverage,
   diff_classification: diffClassification,

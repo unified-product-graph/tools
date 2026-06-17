@@ -155,6 +155,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   listPortfolioCrossEdges: 'list_portfolio_cross_edges',
   portfolioQuery: 'portfolio_query',
   portfolioDigest: 'portfolio_digest',
+  portfolioCensus: 'portfolio_census',
   getPortfolioTree: 'get_portfolio_tree',
   auditPropertyCoverage: 'audit_property_coverage',
   diffClassification: 'diff_classification',

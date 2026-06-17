@@ -35,6 +35,7 @@ import {
   type PortfolioNodeRef,
 } from '@unified-product-graph/sdk'
 import { REGISTRY_PRODUCT_ID, UPG_CROSS_EDGE_TYPES, validateEdgeProperties } from '@unified-product-graph/core'
+import type { UPGBaseNode } from '@unified-product-graph/core'
 import { preflightPayload } from '../lib/payload-guard.js'
 import { traverseGraph, type GraphReader, type TraverseParams } from '../lib/graph-traverse.js'
 import { findWorkspaceUpgFiles } from './workspace.js'
@@ -1465,5 +1466,179 @@ export const auditAxisOverlap: ToolHandler = async (_args, _ctx): Promise<ToolRe
   })
   if (guard.kind === 'refuse') return guard.result
   if (guard.kind === 'warn') Object.assign(response, guard.fields)
+  return text(JSON.stringify(response, null, 2))
+}
+
+/**
+ * `portfolio_census`: list product-local nodes of one type ACROSS the whole
+ * portfolio with a chosen projection — a flat, edge-free, projection-only read.
+ * The cross-product `list_nodes`, and the overflow-safe answer to "every `metric`
+ * across all 16 graphs, with title + description, before I decide what to
+ * canonicalise". Where `portfolio_query` returns full nodes AND traversed edges
+ * (and overflows the payload cap past ~195 nodes because payload scales with
+ * edge fan-out), a census never traverses and never returns edges, so payload
+ * scales only with (row count x projected-field size). The structural difference
+ * is what keeps a wide sweep under the cap. Read-only; never mutates
+ * active-product state.
+ *
+ * Product discovery uses `findWorkspaceUpgFiles` (root + subfolders, honouring
+ * `workspace.json` registrations), so studio-style subdir products are in scope.
+ *
+ * @returns JSON. Flat (default): `{ type, rows: Array<{ product_id, node_id,
+ *   <projected> }>, total, returned, offset, limit, has_more, products_searched,
+ *   products_with_matches, errored_products?, unmatched_scope? }`. With
+ *   `group_by: "product"`: a `products: Array<{ product_id, file, title, count,
+ *   rows: Array<{ node_id, <projected> }> }>` nesting replaces the flat `rows`.
+ *   `total` is the full match count across the portfolio; `rows`/`products` hold
+ *   the requested page (`offset`/`limit`). Projection defaults to `["title"]`.
+ * @atomicity atomic (read-only). Never mutates active-product state.
+ * @see list_nodes
+ * @see portfolio_query
+ * @see portfolio_digest
+ */
+export const portfolioCensus: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const { store } = ctx
+  const type = args.type as string | undefined
+  if (!type || typeof type !== 'string') {
+    return textError('Provide "type": the entity type to census (e.g. "metric", "persona", "primitive").')
+  }
+
+  // `scope` is the portfolio-family product filter (matches portfolio_query /
+  // portfolio_digest / portfolio_validate); `products` is accepted as an alias.
+  const scope = (args.scope as string[] | undefined) ?? (args.products as string[] | undefined)
+  const cwd = process.cwd()
+  const { products, unmatched } = resolveScopedProducts(cwd, scope)
+  if (products.length === 0) {
+    return text(
+      JSON.stringify(
+        {
+          type,
+          rows: [],
+          total: 0,
+          returned: 0,
+          products_searched: 0,
+          products_with_matches: 0,
+          ...(unmatched.length > 0 ? { unmatched_scope: unmatched } : {}),
+          note:
+            scope && scope.length > 0
+              ? 'No workspace products matched the requested scope.'
+              : 'No products found in the workspace. Run from a directory with a .upg/ workspace.',
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  const groupByProduct = args.group_by === 'product'
+  const includeFields = new Set((args.include as string[] | undefined) ?? ['title'])
+  const propInclude = args.property_include as string[] | undefined
+  const propFilter = propInclude && propInclude.length > 0 ? new Set(propInclude) : null
+  const statusFilter = typeof args.status === 'string' ? (args.status as string) : undefined
+  const tagsFilter = Array.isArray(args.tags)
+    ? new Set((args.tags as unknown[]).filter((t): t is string => typeof t === 'string'))
+    : null
+  const offset = Math.max((args.offset as number) ?? 0, 0)
+  const limit = Math.min(Math.max((args.limit as number) ?? 1000, 1), 5000)
+
+  const project = (n: UPGBaseNode): Record<string, unknown> => {
+    const row: Record<string, unknown> = {}
+    if (includeFields.has('title')) row.title = n.title
+    if (includeFields.has('status')) row.status = n.status
+    if (includeFields.has('tags')) row.tags = n.tags
+    if (includeFields.has('description')) row.description = n.description
+    if (includeFields.has('properties')) {
+      if (propFilter && n.properties) {
+        const filtered: Record<string, unknown> = {}
+        for (const key of propFilter) if (key in n.properties) filtered[key] = n.properties[key]
+        row.properties = filtered
+      } else {
+        row.properties = n.properties
+      }
+    }
+    return row
+  }
+
+  // Gather every matching node across the portfolio in a stable order (product
+  // order, then node order within each product), then page the FLAT sequence so
+  // `offset`/`limit` are deterministic regardless of `group_by`.
+  interface CensusHit {
+    product: ScopedProduct
+    node: UPGBaseNode
+  }
+  const hits: CensusHit[] = []
+  const errored: Array<{ product_id: string | null; file: string; error: string }> = []
+  const productsWithMatches = new Set<string>()
+
+  for (const product of products) {
+    let reader: GraphReader
+    try {
+      ;({ reader } = await readerFor(product, store))
+    } catch (err) {
+      errored.push({ product_id: product.id, file: product.file, error: (err as Error).message })
+      continue
+    }
+    for (const node of reader.getAllNodes()) {
+      if (node.type !== type) continue
+      if (statusFilter && node.status !== statusFilter) continue
+      if (tagsFilter) {
+        const nodeTags = Array.isArray(node.tags) ? node.tags : []
+        if (!nodeTags.some((t) => tagsFilter.has(t))) continue
+      }
+      hits.push({ product, node })
+      productsWithMatches.add(product.id ?? product.file)
+    }
+  }
+
+  const total = hits.length
+  const page = hits.slice(offset, offset + limit)
+  const hasMore = offset + page.length < total
+
+  const guard = preflightPayload({
+    toolName: 'portfolio_census',
+    nodeCount: page.length,
+    edgeCount: 0,
+    compactEdges: true,
+    argsHint: `type=${type}, returned=${page.length}/${total}, include=${[...includeFields].join('+')}`,
+  })
+  if (guard.kind === 'refuse') return guard.result
+
+  const response: Record<string, unknown> = {
+    type,
+    total,
+    returned: page.length,
+    offset,
+    limit,
+    has_more: hasMore,
+    products_searched: products.length,
+    products_with_matches: productsWithMatches.size,
+  }
+  if (errored.length > 0) response.errored_products = errored
+  if (unmatched.length > 0) response.unmatched_scope = unmatched
+  if (guard.kind === 'warn') Object.assign(response, guard.fields)
+
+  if (groupByProduct) {
+    const byProduct = new Map<
+      string,
+      { product_id: string | null; file: string; title: string; count: number; rows: Array<Record<string, unknown>> }
+    >()
+    for (const { product, node } of page) {
+      let g = byProduct.get(product.file)
+      if (!g) {
+        g = { product_id: product.id, file: product.file, title: product.title, count: 0, rows: [] }
+        byProduct.set(product.file, g)
+      }
+      g.count += 1
+      g.rows.push({ node_id: node.id, ...project(node) })
+    }
+    response.products = [...byProduct.values()]
+  } else {
+    response.rows = page.map(({ product, node }) => ({
+      product_id: product.id,
+      node_id: node.id,
+      ...project(node),
+    }))
+  }
+
   return text(JSON.stringify(response, null, 2))
 }
