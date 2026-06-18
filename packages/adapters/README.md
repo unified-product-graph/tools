@@ -1,5 +1,7 @@
 # @unified-product-graph/adapters
 
+> 🚧 **Work in progress.** Adapters are an early-alpha preview. The mappings listed below are implemented, but not all are production-ready and the hosted integrations surface is not yet public. Coverage, source support, and APIs may change between versions.
+
 37 adapters that turn records from external tools into [Unified Product Graph](https://unifiedproductgraph.org) nodes and edges.
 
 ```
