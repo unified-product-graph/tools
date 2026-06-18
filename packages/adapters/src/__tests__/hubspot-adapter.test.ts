@@ -125,13 +125,14 @@ describe('HubSpotAdapter: CRITICAL deal mapping', () => {
     expect(warnText).toContain('different concepts')
   })
 
-  it('deal amount is preserved on the node', async () => {
+  it('deal amount is preserved under properties (not top-level)', async () => {
     const items: SourceItem[] = [
       makeObject('d1', 'Big Deal', 'deal', { amount: 125000 }),
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.amount).toBe(125000)
+    expect((node.properties as Record<string, unknown>).amount).toBe(125000)
+    expect(node.amount).toBeUndefined()
   })
 
   it('multiple deals each emit a warning', async () => {
@@ -198,48 +199,57 @@ describe('HubSpotAdapter: skipped types with warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('HubSpotAdapter: status normalisation', () => {
-  it("status 'new' normalises to 'draft'", async () => {
+  it("ticket status 'new' normalises to 'opened'", async () => {
     const items: SourceItem[] = [makeObject('t1', 'New ticket', 'ticket', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('opened')
   })
 
-  it("status 'open' normalises to 'active'", async () => {
+  it("ticket status 'open' normalises to 'opened'", async () => {
     const items: SourceItem[] = [makeObject('t1', 'Open ticket', 'ticket', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('opened')
   })
 
-  it("status 'in_progress' normalises to 'active'", async () => {
+  it("ticket status 'in_progress' stays 'in_progress' (valid support_ticket phase)", async () => {
     const items: SourceItem[] = [
       makeObject('t1', 'In progress ticket', 'ticket', { status: 'in_progress' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("deal_stage 'closed_won' normalises to 'complete'", async () => {
+  it("deal_stage 'closed_won' stays 'closed_won' (valid deal phase)", async () => {
     const items: SourceItem[] = [
       makeObject('d1', 'Won deal', 'deal', { deal_stage: 'closed_won' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('closed_won')
   })
 
-  it("deal_stage 'closed_lost' normalises to 'abandoned'", async () => {
+  it("deal_stage 'closed_lost' stays 'closed_lost' (valid deal phase)", async () => {
     const items: SourceItem[] = [
       makeObject('d1', 'Lost deal', 'deal', { deal_stage: 'closed_lost' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBe('closed_lost')
   })
 
-  it("status 'deferred' normalises to 'abandoned'", async () => {
+  it("ticket status 'deferred' is omitted (not a valid support_ticket phase)", async () => {
+    // 'deferred' maps to the deal phase 'closed_lost', invalid for support_ticket → dropped
     const items: SourceItem[] = [
       makeObject('t1', 'Deferred ticket', 'ticket', { status: 'deferred' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBeUndefined()
+  })
+
+  it('lifecycle-free types (account, participant) carry no status even with metadata.status set', async () => {
+    const company = makeObject('co1', 'Acme Corp', 'company', { status: 'active' })
+    const contact = makeObject('ct1', 'Jane Smith', 'contact', { status: 'open' })
+    const result = await adapter.convert([company, contact])
+    expect(result.nodes[0].status).toBeUndefined()
+    expect(result.nodes[1].status).toBeUndefined()
   })
 })
 
@@ -268,7 +278,9 @@ describe('HubSpotAdapter: tags and lifecycle stage', () => {
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
 describe('HubSpotAdapter: edge emission', () => {
-  it('account_contains_contact emitted when contact has company parent', async () => {
+  it('company->contact (account->participant) has no canonical edge, emits node_informs_node', async () => {
+    // HubSpot contact maps to UPG participant; account->participant is uncatalogued,
+    // so the resolver emits a generic node_informs_node link (source=account).
     const items: SourceItem[] = [
       makeObject('co1', 'Acme Corp', 'company'),
       makeObject('c1', 'Jane Smith', 'contact', {
@@ -277,10 +289,12 @@ describe('HubSpotAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'account_contains_contact')
-    const edge = result.edges.find((e) => e.type === 'account_contains_contact')
+    assertAllEdgesCatalogued(result.edges, 'account->participant fallback')
+    const edge = result.edges.find((e) => e.source === result.source_map['co1'])
     expect(edge).toBeDefined()
-    expect(edge?.mapping_confidence).toBe('medium')
+    expect(edge?.type).toBe('node_informs_node')
+    // The old code wrongly emitted account_contains_contact pointing at a participant.
+    expect(result.edges.find((e) => e.type === 'account_contains_contact')).toBeUndefined()
   })
 
   it('account_negotiates_deal emitted when deal has company parent', async () => {

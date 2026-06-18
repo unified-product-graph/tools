@@ -178,48 +178,52 @@ describe('CodaAdapter: unmappable table types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('CodaAdapter: status normalisation', () => {
-  it("'done' normalises to 'complete'", async () => {
+describe('CodaAdapter: status normalisation (per-type, lifecycle-validated)', () => {
+  it("'done' on a Features row is omitted (feature lifecycle has no 'done' phase)", async () => {
+    // feature lifecycle: proposed | in_progress | shipped | archived
     const items: SourceItem[] = [makeRow('r1', 'Shipped feature', 'Features', { status: 'done' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("'In Progress' normalises to 'active'", async () => {
+  it("'In Progress' on Features resolves to 'in_progress' (valid feature phase)", async () => {
     const items: SourceItem[] = [makeRow('r1', 'Active item', 'Features', { status: 'In Progress' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("'Backlog' normalises to 'draft'", async () => {
+  it("'Backlog' on Tasks resolves to 'todo' (valid task phase)", async () => {
+    // task lifecycle: todo | in_progress | in_review | done
     const items: SourceItem[] = [makeRow('r1', 'Backlog item', 'Tasks', { status: 'Backlog' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('todo')
   })
 
-  it("'Cancelled' normalises to 'abandoned'", async () => {
+  it("'Cancelled' on Opportunities is omitted (opportunity lifecycle has no terminal cancel)", async () => {
+    // opportunity lifecycle: identified | validated | deferred
     const items: SourceItem[] = [makeRow('r1', 'Dropped idea', 'Opportunities', { status: 'Cancelled' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("'Shipped' normalises to 'complete'", async () => {
-    const items: SourceItem[] = [makeRow('r1', 'Shipped', 'Releases', { status: 'Shipped' })]
+  it("'Shipped' on Releases resolves to 'shipped' (valid release phase)", async () => {
+    // release lifecycle: planned | in_progress | shipped
+    const items: SourceItem[] = [makeRow('r1', 'Shipped release', 'Releases', { status: 'Shipped' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('shipped')
   })
 
-  it('unknown status passes through unchanged', async () => {
+  it('unknown status is omitted when it does not match the type lifecycle', async () => {
     const items: SourceItem[] = [makeRow('r1', 'Item', 'Tasks', { status: 'waiting-for-design' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('waiting-for-design')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 })
 
 // ─── Metric / key_result numeric field preservation ───────────────────────────
 
 describe('CodaAdapter: metric and key_result value fields', () => {
-  it('Metrics table preserves current_value, target_value, unit', async () => {
+  it('Metrics table nests current_value, target_value, unit under properties (not top-level)', async () => {
     const items: SourceItem[] = [
       makeRow('m1', 'Activation Rate', 'Metrics', {
         current_value: 38,
@@ -230,12 +234,13 @@ describe('CodaAdapter: metric and key_result value fields', () => {
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('metric')
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(38)
-    expect(node.target_value).toBe(60)
-    expect(node.unit).toBe('%')
+    expect(node.current_value).toBeUndefined()
+    expect(node.target_value).toBeUndefined()
+    expect(node.unit).toBeUndefined()
+    expect(node.properties).toMatchObject({ current_value: 38, target_value: 60, unit: '%' })
   })
 
-  it('Key Results table also preserves numeric fields', async () => {
+  it('Key Results table nests numeric fields under properties (not top-level)', async () => {
     const items: SourceItem[] = [
       makeRow('kr1', 'NPS improvement', 'Key Results', {
         current_value: 20,
@@ -246,9 +251,10 @@ describe('CodaAdapter: metric and key_result value fields', () => {
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('key_result')
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(20)
-    expect(node.target_value).toBe(45)
-    expect(node.unit).toBe('points')
+    expect(node.current_value).toBeUndefined()
+    expect(node.target_value).toBeUndefined()
+    expect(node.unit).toBeUndefined()
+    expect(node.properties).toMatchObject({ current_value: 20, target_value: 45, unit: 'points' })
   })
 })
 
@@ -301,7 +307,8 @@ describe('CodaAdapter: lookup column edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('feature with Initiative lookup emits initiative_drives_outcome edge', async () => {
+  it('feature with Initiative lookup falls back to node_informs_node (no canonical initiative-feature edge)', async () => {
+    // resolvePairEdge(initiative, feature) is null in the catalogue → generic link.
     const items: SourceItem[] = [
       makeRow('init1', 'Onboarding revamp', 'Initiatives'),
       makeRow('feat1', 'Wizard step 1', 'Features', {
@@ -311,9 +318,12 @@ describe('CodaAdapter: lookup column edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'initiative_drives_outcome')
-    const edge = result.edges.find((e) => e.type === 'initiative_drives_outcome')
+    assertAllEdgesCatalogued(result.edges, 'initiative fallback')
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
+    expect(edge?.mapping_confidence).toBe('low')
+    // The wrong-endpoint initiative_drives_outcome must NOT appear
+    expect(result.edges.find((e) => e.type === 'initiative_drives_outcome')).toBeUndefined()
   })
 
   it('metric with Key Result lookup emits key_result_quantified_by_metric edge', async () => {
@@ -331,7 +341,10 @@ describe('CodaAdapter: lookup column edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('unknown lookup column name emits node_informs_node fallback (catalogued)', async () => {
+  it('edges are resolved by node type, not column name: Task→Feature lookup emits feature_decomposes_into_task', async () => {
+    // The resolver is catalogue-driven on the node-type pair, so the column
+    // label is irrelevant: a Tasks row pointing at a Features row resolves to
+    // the canonical feature_decomposes_into_task edge (source=feature, target=task).
     const items: SourceItem[] = [
       makeRow('r1', 'Target', 'Features'),
       makeRow('r2', 'Source', 'Tasks', {
@@ -341,10 +354,14 @@ describe('CodaAdapter: lookup column edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'unknown lookup fallback')
-    const edge = result.edges.find((e) => e.type === 'node_informs_node')
+    assertAllEdgesCatalogued(result.edges, 'task-feature catalogue edge')
+    const edge = result.edges.find((e) => e.type === 'feature_decomposes_into_task')
     expect(edge).toBeDefined()
-    expect(edge?.mapping_confidence).toBe('low')
+    expect(edge?.mapping_confidence).toBe('medium')
+    const featNode = result.nodes.find((n) => n.source_id === 'r1')
+    const taskNode = result.nodes.find((n) => n.source_id === 'r2')
+    expect(edge?.source).toBe(featNode?.id)
+    expect(edge?.target).toBe(taskNode?.id)
   })
 
   it('lookup pointing to a row not in the import set emits a warning and skips edge', async () => {
@@ -512,16 +529,16 @@ describe('CODA_TABLE_TYPE_MAP: spot checks', () => {
 
 // ─── CODA_STATUS_MAP spot-checks ─────────────────────────────────────────────
 
-describe('CODA_STATUS_MAP: spot checks', () => {
-  it("maps 'done' to 'complete'", () => {
-    expect(CODA_STATUS_MAP['done']).toBe('complete')
+describe('CODA_STATUS_MAP: spot checks (intermediate candidates, validated per-type at convert time)', () => {
+  it("maps 'done' to candidate 'done'", () => {
+    expect(CODA_STATUS_MAP['done']).toBe('done')
   })
 
-  it("maps 'backlog' to 'draft'", () => {
-    expect(CODA_STATUS_MAP['backlog']).toBe('draft')
+  it("maps 'backlog' to candidate 'todo'", () => {
+    expect(CODA_STATUS_MAP['backlog']).toBe('todo')
   })
 
-  it("maps 'cancelled' to 'abandoned'", () => {
+  it("maps 'cancelled' to candidate 'abandoned'", () => {
     expect(CODA_STATUS_MAP['cancelled']).toBe('abandoned')
   })
 })

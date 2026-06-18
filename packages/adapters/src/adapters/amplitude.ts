@@ -22,7 +22,7 @@
  * - feature_flag: belongs to LaunchDarkly/PostHog, not Amplitude
  */
 
-import { UPG_EDGE_TYPES } from '@unified-product-graph/core'
+import { UPG_EDGE_TYPES, getLifecycleForType } from '@unified-product-graph/core'
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -59,6 +59,34 @@ export const AMPLITUDE_STATUS_MAP: Record<string, string> = {
 
 function normalizeName(name: string): string {
   return name.toLowerCase().trim()
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve an Amplitude status to a status valid for the TARGET UPG type's
+ * lifecycle. Tries the raw value first, then the normalised value, and omits
+ * anything that does not fit the target lifecycle. Returns undefined for
+ * lifecycle-free types.
+ */
+function resolveAmplitudeStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = AMPLITUDE_STATUS_MAP[raw]
+  if (mapped && valid.has(mapped)) return mapped
+  return undefined
 }
 
 /** Resolve an Amplitude entity_type to a UPG entity type */
@@ -184,9 +212,9 @@ export class AmplitudeAdapter implements UPGAdapter {
       // Register in sourceMap before any continue paths
       sourceMap[item.source_id] = nodeId
 
-      // ── Status normalisation ───────────────────────────────────────────────
+      // ── Status normalisation (validated against the target lifecycle) ──────
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeAmplitudeStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveAmplitudeStatusForType(rawStatus, upgEntityType) : undefined
 
       // ── Tags ───────────────────────────────────────────────────────────────
       const tags: string[] = []
@@ -207,13 +235,15 @@ export class AmplitudeAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'amplitude',
         external_id: item.source_id,
-        // Metric-specific fields preserved for chart/funnel/retention entities
+        // Metric values belong under properties so they survive the .upg writer
         ...(upgEntityType === 'metric'
-          ? {
-              ...(meta.current_value !== undefined ? { current_value: meta.current_value as number } : {}),
-              ...(meta.target_value !== undefined ? { target_value: meta.target_value as number } : {}),
-              ...(meta.unit !== undefined ? { unit: meta.unit as string } : {}),
-            }
+          ? (() => {
+              const p: Record<string, unknown> = {}
+              if (meta.current_value !== undefined) p.current_value = meta.current_value as number
+              if (meta.target_value !== undefined) p.target_value = meta.target_value as number
+              if (meta.unit !== undefined) p.unit = meta.unit as string
+              return Object.keys(p).length > 0 ? { properties: p } : {}
+            })()
           : {}),
       }
 

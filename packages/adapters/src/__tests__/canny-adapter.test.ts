@@ -148,40 +148,40 @@ describe('CannyAdapter: skipped types + warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('CannyAdapter: status normalisation', () => {
-  it("status 'open' normalises to 'draft'", async () => {
+  it("status 'open' normalises to 'new' (feature_request lifecycle)", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Add dark mode', 'post', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('new')
   })
 
-  it("status 'under review' normalises to 'draft'", async () => {
+  it("status 'under review' normalises to 'under_review'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Add dark mode', 'post', { status: 'under review' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('under_review')
   })
 
-  it("status 'planned' normalises to 'active'", async () => {
+  it("status 'planned' normalises to 'planned'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Add dark mode', 'post', { status: 'planned' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('planned')
   })
 
-  it("status 'in progress' normalises to 'active'", async () => {
+  it("status 'in progress' normalises to 'in_progress'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Add dark mode', 'post', { status: 'in progress' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("status 'complete' normalises to 'complete'", async () => {
+  it("status 'complete' normalises to 'shipped'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Dark mode shipped', 'post', { status: 'complete' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('shipped')
   })
 
-  it("status 'closed' normalises to 'abandoned'", async () => {
+  it("status 'closed' normalises to 'wont_do'", async () => {
     const items: SourceItem[] = [makeItem('p1', 'Declined request', 'post', { status: 'closed' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBe('wont_do')
   })
 })
 
@@ -194,7 +194,8 @@ describe('CannyAdapter: vote_count and board_name', () => {
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.vote_count).toBe(247)
+    expect((node.properties as Record<string, unknown>).vote_count).toBe(247)
+    expect(node.vote_count).toBeUndefined()
   })
 
   it('vote_count is not carried onto non-feature_request nodes', async () => {

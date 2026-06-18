@@ -30,7 +30,7 @@ export const MIRO_FRAME_TYPE_MAP: Record<string, string | null> = {
   outcomes: 'outcome',
   opportunities: 'opportunity',
   solutions: 'solution',
-  hypotheses: 'hypothesis_claim',
+  hypotheses: 'hypothesis',
   assumptions: 'assumption',
   insights: 'insight',
   observations: 'observation',

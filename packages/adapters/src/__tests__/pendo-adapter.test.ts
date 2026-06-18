@@ -103,13 +103,15 @@ describe('PendoAdapter: entity type → UPG type mapping', () => {
 // ─── Feature adoption data: unique to Pendo ──────────────────────────────────
 
 describe('PendoAdapter: feature adoption data', () => {
-  it('adoption_rate is preserved on feature nodes', async () => {
+  it('adoption_rate is preserved on feature nodes under properties', async () => {
     const items: SourceItem[] = [
       makeEntity('f1', 'CSV Export Button', 'feature', { adoption_rate: 23.5 }),
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.adoption_rate).toBe(23.5)
+    const props = node.properties as Record<string, unknown> | undefined
+    expect(props?.adoption_rate).toBe(23.5)
+    expect(node.adoption_rate).toBeUndefined()
   })
 
   it('adoption_rate warning is emitted noting Pendo uniqueness', async () => {
@@ -140,13 +142,15 @@ describe('PendoAdapter: feature adoption data', () => {
     expect(node.adoption_rate).toBeUndefined()
   })
 
-  it('adoption_rate of zero is correctly preserved', async () => {
+  it('adoption_rate of zero is correctly preserved under properties', async () => {
     const items: SourceItem[] = [
       makeEntity('f1', 'Unused feature', 'feature', { adoption_rate: 0 }),
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.adoption_rate).toBe(0)
+    const props = node.properties as Record<string, unknown> | undefined
+    expect(props?.adoption_rate).toBe(0)
+    expect(node.adoption_rate).toBeUndefined()
   })
 })
 
@@ -191,26 +195,34 @@ describe('PendoAdapter: skipped types with warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('PendoAdapter: status normalisation', () => {
-  it("status 'active' normalises to 'active'", async () => {
+  // Pendo raw statuses (active/inactive/draft) are not phase ids in any emitted
+  // type's lifecycle, so resolvePendoStatusForType returns undefined.
+  it("status 'active' on feature: no valid mapping → status undefined (feature: proposed/in_progress/shipped/archived)", async () => {
     const items: SourceItem[] = [makeEntity('f1', 'Feature', 'feature', { status: 'active' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("status 'inactive' normalises to 'abandoned'", async () => {
+  it("status 'inactive' on feature: no valid mapping → status undefined", async () => {
     const items: SourceItem[] = [
       makeEntity('f1', 'Deprecated feature', 'feature', { status: 'inactive' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("status 'draft' normalises to 'draft'", async () => {
+  it("status 'draft' on feature: no valid mapping → status undefined", async () => {
     const items: SourceItem[] = [
       makeEntity('f1', 'Unreleased feature', 'feature', { status: 'draft' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBeUndefined()
+  })
+
+  it('market_segment carries no status regardless of raw value (lifecycle-free)', async () => {
+    const items: SourceItem[] = [makeEntity('seg1', 'Power Users', 'segment', { status: 'active' })]
+    const result = await adapter.convert(items)
+    expect(result.nodes[0].status).toBeUndefined()
   })
 })
 

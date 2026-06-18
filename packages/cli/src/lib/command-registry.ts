@@ -46,6 +46,7 @@ import { applyCommand } from '../commands/apply.js'
 import { scoreCommand } from '../commands/score.js'
 import { showCommand } from '../commands/show.js'
 import { specCommand } from '../commands/spec.js'
+import { templateCommand } from '../commands/template.js'
 import { queryCommand } from '../commands/query.js'
 import { registryCommand } from '../commands/registry.js'
 import { portfolioCommand } from '../commands/portfolio.js'
@@ -79,7 +80,7 @@ export const ALL_COMMANDS: Command[] = [
   // Frameworks (exercises)
   applyCommand, scoreCommand, showCommand,
   // Tool parity (CLI-next): spec browser, traversal, registry, portfolio, areas, migrations
-  specCommand, queryCommand, registryCommand, portfolioCommand, areaCommand, migrateCommand,
+  specCommand, templateCommand, queryCommand, registryCommand, portfolioCommand, areaCommand, migrateCommand,
   // Tool parity singletons
   moveCommand, disconnectCommand, dedupeCommand, cloneCommand, contextCommand,
   logCommand, prioritiseCommand, syncCommand, productCommand, batchCommand,

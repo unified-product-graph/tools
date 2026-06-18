@@ -218,40 +218,56 @@ describe('LaunchDarklyAdapter: skip cases', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('LaunchDarklyAdapter: status normalisation', () => {
-  it("status 'active' → 'active'", async () => {
+  it("status 'active' → 'on' (valid feature_flag phase)", async () => {
+    // feature_flag lifecycle: off | rollout | on
     const items: SourceItem[] = [makeItem('ff1', 'Flag A', 'feature_flag', {
       project_id: 'p1', status: 'active',
     })]
     const result = await adapter.convert(items)
     const flagNode = result.nodes.find((n) => n.type === 'feature_flag')
-    expect(flagNode?.status).toBe('active')
+    expect(flagNode?.status).toBe('on')
   })
 
-  it("status 'archived' → 'abandoned'", async () => {
+  it("status 'archived' → 'off' (valid feature_flag phase)", async () => {
     const items: SourceItem[] = [makeItem('ff1', 'Old Flag', 'feature_flag', {
       project_id: 'p1', status: 'archived',
     })]
     const result = await adapter.convert(items)
     const flagNode = result.nodes.find((n) => n.type === 'feature_flag')
-    expect(flagNode?.status).toBe('abandoned')
+    expect(flagNode?.status).toBe('off')
   })
 
-  it("status 'new' → 'draft'", async () => {
+  it("status 'new' → 'off' (valid feature_flag phase)", async () => {
     const items: SourceItem[] = [makeItem('ff1', 'New Flag', 'feature_flag', {
       project_id: 'p1', status: 'new',
     })]
     const result = await adapter.convert(items)
     const flagNode = result.nodes.find((n) => n.type === 'feature_flag')
-    expect(flagNode?.status).toBe('draft')
+    expect(flagNode?.status).toBe('off')
   })
 
-  it("status 'launched' → 'complete'", async () => {
+  it("status 'launched' → 'on' (valid feature_flag phase)", async () => {
     const items: SourceItem[] = [makeItem('ff1', 'Launched Flag', 'feature_flag', {
       project_id: 'p1', status: 'launched',
     })]
     const result = await adapter.convert(items)
     const flagNode = result.nodes.find((n) => n.type === 'feature_flag')
-    expect(flagNode?.status).toBe('complete')
+    expect(flagNode?.status).toBe('on')
+  })
+
+  it('flag_type and project_id are nested under properties, not top-level', async () => {
+    const items: SourceItem[] = [makeItem('ff1', 'Flag A', 'feature_flag', {
+      project_id: 'proj-x', flag_type: 'boolean', rollout_percentage: 50,
+    })]
+    const result = await adapter.convert(items)
+    const flagNode = result.nodes.find((n) => n.type === 'feature_flag') as Record<string, unknown>
+    expect(flagNode?.flag_type).toBeUndefined()
+    expect(flagNode?.project_id).toBeUndefined()
+    expect(flagNode?.rollout_percentage).toBeUndefined()
+    const props = flagNode?.properties as Record<string, unknown>
+    expect(props?.flag_type).toBe('boolean')
+    expect(props?.project_id).toBe('proj-x')
+    expect(props?.rollout_percentage).toBe(50)
   })
 })
 

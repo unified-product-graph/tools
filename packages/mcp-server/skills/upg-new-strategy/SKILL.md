@@ -168,7 +168,7 @@ Offer theme options based on everything in the graph:
 1. "<theme based on biggest opportunity in graph>"
 2. "<theme based on competitive gap if competitors exist>"
 3. "<theme based on persona's biggest pain point>"
-4. "<theme based on product stage; e.g., 'product-market fit' for MVP stage>"
+4. "<theme based on product stage; e.g., 'product-market fit' for the validation stage>"
 5. Something else; tell me your strategic bets
 6. Not sure yet; we can come back to this
 ```

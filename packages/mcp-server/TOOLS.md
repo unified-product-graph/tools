@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 134 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 136 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -10,7 +10,7 @@ Reference for the 134 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Areas & Change Log](#areas-change-log): 10 tools
 - [Workspace & Portfolios](#workspace-portfolios): 37 tools
 - [Schema](#schema): 1 tool
-- [Spec Introspection](#spec-introspection): 49 tools
+- [Spec Introspection](#spec-introspection): 51 tools
 - [Cloud Sync](#cloud-sync): 3 tools
 - [Validation](#validation): 3 tools
 
@@ -2272,7 +2272,7 @@ edges_in, phases?, initial_phase?, terminal_phases?, domain_guide? }`.
 
 ## Spec Introspection
 
-_Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings. All from `@unified-product-graph/core`._
+_Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings (from `@unified-product-graph/core`), plus the curated starter-template library (`list_templates` / `get_template`, from `@unified-product-graph/templates`)._
 
 - [`apply_framework`](#apply-framework)
 - [`get_anti_pattern`](#get-anti-pattern)
@@ -2289,6 +2289,7 @@ _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, reg
 - [`get_region_for_entity_type`](#get-region-for-entity-type)
 - [`get_scale`](#get-scale)
 - [`get_spec_version`](#get-spec-version)
+- [`get_template`](#get-template)
 - [`get_tree_pattern`](#get-tree-pattern)
 - [`get_type_label`](#get-type-label)
 - [`get_valid_children`](#get-valid-children)
@@ -2314,6 +2315,7 @@ _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, reg
 - [`list_scales`](#list-scales)
 - [`list_split_migrations`](#list-split-migrations)
 - [`list_status_values`](#list-status-values)
+- [`list_templates`](#list-templates)
 - [`list_tree_patterns`](#list-tree-patterns)
 - [`list_type_labels`](#list-type-labels)
 - [`list_type_migrations`](#list-type-migrations)
@@ -2674,6 +2676,23 @@ _No arguments._
 JSON: `{ upg_version, markdown_format_version, entity_count, edge_count, domain_count, region_count }`
 
 **See also:** `get_workspace_info`, `list_entity_types`, `list_edge_types`, `list_regions`
+
+
+### `get_template`
+
+Get a curated starter template in full by id: its entities (with title/description templates, default properties, tags, status), its typed edges (canonical UPG edge per pair), and its prompts (the questions to fill `{{placeholders}}`). Use to instantiate a template: walk the prompts, substitute placeholders, create the entities and typed edges.
+
+**Atomicity:** `atomic (read-only)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `id` | string | ✓ | Template id (e.g. "saas-business-model"). Run list_templates for the options. |
+
+**Returns:**
+
+`{ template: TemplateSet }`, or `{ error, available }` when the id is unknown
 
 
 ### `get_tree_pattern`
@@ -3165,6 +3184,24 @@ List the valid `status` values an entity type can hold: the pre-flight lookup so
 JSON: `{ entity_type, lifecycle_free, initial_status?, terminal_statuses?, values: [{ status, label, terminal }], note? }`.
 
 **See also:** `get_lifecycle`, `get_entity_schema`
+
+
+### `list_templates`
+
+List the curated starter templates (proven entity patterns for SaaS, marketplace, mobile, OSS, and agency). Returns summaries: id, name, description, industries, stages, entity_count, entity_types. The same library powers the /upg-new-from-template skill and the site gallery. Use with get_template to fetch a full pattern for instantiation.
+
+**Atomicity:** `atomic (read-only)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `industry` | string |  | Filter by industry (saas, marketplace, mobile, oss, agency) |
+| `stage` | string |  | Filter by stage (concept, validation, growth, mature) |
+
+**Returns:**
+
+`{ templates: TemplateSummary[] }` — id, name, description, industries, stages, entity_count, entity_types
 
 
 ### `list_tree_patterns`

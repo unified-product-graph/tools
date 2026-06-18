@@ -48,11 +48,13 @@ const adapter = new PostHogAdapter()
 // ─── Entity type mapping ──────────────────────────────────────────────────────
 
 describe('PostHogAdapter: entity_type → UPG type mapping', () => {
-  it('feature_flag maps to feature with confidence high', async () => {
+  it('feature_flag maps to feature_flag (the toggle), not feature, with confidence high', async () => {
+    // The flag is the toggle mechanism; UPG models it as its own feature_flag
+    // entity (which gates a feature), distinct from the feature itself.
     const items: SourceItem[] = [makeItem('ff1', 'new-onboarding', 'feature_flag')]
     const result = await adapter.convert(items)
     expect(result.nodes).toHaveLength(1)
-    expect(result.nodes[0].type).toBe('feature')
+    expect(result.nodes[0].type).toBe('feature_flag')
     expect(result.nodes[0].mapping_confidence).toBe('high')
     expect(result.nodes[0].external_tool).toBe('posthog')
   })

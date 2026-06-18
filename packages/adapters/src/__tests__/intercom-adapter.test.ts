@@ -149,28 +149,28 @@ describe('IntercomAdapter: skipped types + warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('IntercomAdapter: status normalisation', () => {
-  it("status 'open' normalises to 'active'", async () => {
+  it("status 'open' on conversation (support_ticket) normalises to 'opened'", async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Help request', 'conversation', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('opened')
   })
 
-  it("status 'pending' normalises to 'active'", async () => {
+  it("status 'pending' on conversation (support_ticket) normalises to 'triaged'", async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Help request', 'conversation', { status: 'pending' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('triaged')
   })
 
-  it("status 'snoozed' normalises to 'active'", async () => {
+  it("status 'snoozed' on conversation (support_ticket) normalises to 'in_progress'", async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Snoozed ticket', 'conversation', { status: 'snoozed' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("status 'closed' normalises to 'complete'", async () => {
+  it("status 'closed' on conversation (support_ticket) normalises to 'closed'", async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Resolved ticket', 'conversation', { status: 'closed' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('closed')
   })
 
   it('absent status produces no status property', async () => {
@@ -183,13 +183,16 @@ describe('IntercomAdapter: status normalisation', () => {
 // ─── Conversation rating ──────────────────────────────────────────────────────
 
 describe('IntercomAdapter: conversation_rating', () => {
-  it('conversation_rating preserved on support_ticket nodes', async () => {
+  it('conversation_rating preserved under properties on support_ticket nodes', async () => {
     const items: SourceItem[] = [
       makeItem('conv1', 'Billing issue', 'conversation', { conversation_rating: 5 }),
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.conversation_rating).toBe(5)
+    const props = node.properties as Record<string, unknown> | undefined
+    expect(props?.conversation_rating).toBe(5)
+    // Off-schema top-level field must NOT appear (silently dropped by the writer)
+    expect(node.conversation_rating).toBeUndefined()
   })
 
   it('conversation_rating not carried onto non-support_ticket nodes', async () => {
@@ -199,16 +202,20 @@ describe('IntercomAdapter: conversation_rating', () => {
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
     expect(node.conversation_rating).toBeUndefined()
+    const props = node.properties as Record<string, unknown> | undefined
+    expect(props?.conversation_rating).toBeUndefined()
   })
 })
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
 describe('IntercomAdapter: edge emission', () => {
-  it('customer_feedback_becomes_feature_request emitted when support_ticket has feature_request parent', async () => {
+  it('customer_feedback_becomes_feature_request emitted when survey (customer_feedback) references feature_request parent', async () => {
+    // The catalogue edge is customer_feedback → feature_request, so it fires for a
+    // survey (customer_feedback), NOT a conversation (support_ticket).
     const items: SourceItem[] = [
       makeItem('fr1', 'Add CSV export', 'feature_request'),
-      makeItem('conv1', 'User asked for CSV export', 'conversation', {
+      makeItem('sur1', 'Would love a bulk export', 'survey', {
         parent_id: 'fr1',
         parent_type: 'feature_request',
       }),
@@ -218,6 +225,10 @@ describe('IntercomAdapter: edge emission', () => {
     const edge = result.edges.find((e) => e.type === 'customer_feedback_becomes_feature_request')
     expect(edge).toBeDefined()
     expect(edge?.mapping_confidence).toBe('medium')
+    // Direction: source=customer_feedback (survey), target=feature_request
+    const nodeById = Object.fromEntries(result.nodes.map((n) => [n.id, n]))
+    expect((nodeById[edge!.source as string] as Record<string, unknown>)?.type).toBe('customer_feedback')
+    expect((nodeById[edge!.target as string] as Record<string, unknown>)?.type).toBe('feature_request')
   })
 
   it('node_owned_by_team emitted when parent_type is team', async () => {

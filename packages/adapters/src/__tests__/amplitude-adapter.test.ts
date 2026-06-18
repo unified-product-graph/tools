@@ -161,22 +161,22 @@ describe('AmplitudeAdapter: skipped types + warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('AmplitudeAdapter: status normalisation', () => {
-  it("status 'active' normalises to 'active'", async () => {
+  it("status 'running' is valid for experiment (in its lifecycle)", async () => {
+    const items: SourceItem[] = [makeItem('exp1', 'Onboarding A/B', 'experiment', { status: 'running' })]
+    const result = await adapter.convert(items)
+    expect(result.nodes[0].status).toBe('running')
+  })
+
+  it("status 'archived' is omitted for experiment (not in its lifecycle)", async () => {
+    const items: SourceItem[] = [makeItem('exp1', 'Old Test', 'experiment', { status: 'archived' })]
+    const result = await adapter.convert(items)
+    expect(result.nodes[0].status).toBeUndefined()
+  })
+
+  it('status is omitted for lifecycle-free types like metric (chart)', async () => {
     const items: SourceItem[] = [makeItem('c1', 'WAU', 'chart', { status: 'active' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
-  })
-
-  it("status 'archived' normalises to 'abandoned'", async () => {
-    const items: SourceItem[] = [makeItem('c1', 'Old Chart', 'chart', { status: 'archived' })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
-  })
-
-  it("status 'draft' normalises to 'draft'", async () => {
-    const items: SourceItem[] = [makeItem('c1', 'Draft Chart', 'chart', { status: 'draft' })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
   it('absent status produces no status property', async () => {
@@ -199,9 +199,8 @@ describe('AmplitudeAdapter: metric value fields', () => {
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(12500)
-    expect(node.target_value).toBe(20000)
-    expect(node.unit).toBe('users')
+    expect(node.properties).toMatchObject({ current_value: 12500, target_value: 20000, unit: 'users' })
+    expect(node.current_value).toBeUndefined()
   })
 
   it('funnel preserves metric value fields', async () => {
@@ -214,9 +213,8 @@ describe('AmplitudeAdapter: metric value fields', () => {
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(0.34)
-    expect(node.target_value).toBe(0.5)
-    expect(node.unit).toBe('%')
+    expect(node.properties).toMatchObject({ current_value: 0.34, target_value: 0.5, unit: '%' })
+    expect(node.current_value).toBeUndefined()
   })
 
   it('non-metric entities do not carry metric fields even if present in metadata', async () => {

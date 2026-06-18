@@ -52,7 +52,9 @@ const DOMAIN_SOURCE_FILES: Record<string, readonly string[]> = {
   validation: ['validation.ts', 'skills.ts'],
   // apply_framework / score_entity (0.8.4) live in their own file but belong to
   // the Spec domain section (frameworks), alongside prioritise/get_framework.
-  spec: ['spec.ts', 'frameworks.ts'],
+  // list_templates / get_template (the curated starter-template library) are
+  // canonical-reference reads and group under Spec Introspection too.
+  spec: ['spec.ts', 'frameworks.ts', 'templates.ts'],
   // portfolio_query / portfolio_digest (0.9.1 batch-3 #13) — the cross-product
   // read layer — live in their own file but belong to the Workspace section.
   workspace: ['workspace.ts', 'portfolio-read.ts', 'clone-structure.ts', 'registry.ts'],
@@ -77,7 +79,7 @@ const DOMAIN_BLURBS: Record<string, string> = {
   areas: 'Product areas, the `.upg-area.json` cwd scoper, and the session change log.',
   workspace: 'Multi-product discovery, switching, init, cross-product edges.',
   schema: 'Entity schema introspection. Same constraints the LSP enforces.',
-  spec: 'Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings. All from `@unified-product-graph/core`.',
+  spec: 'Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings (from `@unified-product-graph/core`), plus the curated starter-template library (`list_templates` / `get_template`, from `@unified-product-graph/templates`).',
   sync: 'Read sync state, pull cloud changes, push local graph.',
   validation: 'Schema-drift detection, full per-node drift reports, and source-vs-deployed integrity audits of UPG `/upg-*` skills.',
 }
@@ -97,6 +99,9 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   updateSessionContext: 'update_session_context',
   // skills
   skillAudit: 'skill_audit',
+  // templates
+  listTemplatesTool: 'list_templates',
+  getTemplateTool: 'get_template',
   // nodes
   listNodes: 'list_nodes',
   getNode: 'get_node',

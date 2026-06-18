@@ -134,10 +134,10 @@ When the graph has 10+ entities, compare against product management benchmarks f
 A benchmark is not "you have 1 persona, expected 2-4." A benchmark is a conversation about product risk:
 
 ❌ **Numeric only (don't do this):**
-> "You have 1 persona. The benchmark is 2-4 at MVP stage."
+> "You have 1 persona. The benchmark is 2-4 at the validation stage."
 
 ✅ **Conversational (do this):**
-> "You have one persona: Kai. That's a focused start, and focus is good at this stage. The reason most products at MVP have 2-4 is that building for one person can blind you to who else might need this. If Kai is your starting point, great, but before you scale, you'll want to understand who else this is for. That's when a second persona earns its place."
+> "You have one persona: Kai. That's a focused start, and focus is good at this stage. The reason most products in validation have 2-4 is that building for one person can blind you to who else might need this. If Kai is your starting point, great, but before you scale, you'll want to understand who else this is for. That's when a second persona earns its place."
 
 **The three-part pattern for surfacing benchmarks:**
 
@@ -170,8 +170,8 @@ A benchmark is not "you have 1 persona, expected 2-4." A benchmark is a conversa
 **Design (components without a system):**
 > "You have 15 components but no design system entity tying them together. That's fine while the product is small, but as it grows, you'll start finding the same button built three different ways. A design system is just saying 'these are our building blocks' and keeping them consistent."
 
-**Engineering (no architecture at MVP):**
-> "You're at MVP with 8 features but no architecture entities. You don't need a full system diagram, but knowing which parts of your code handle which features helps you make better decisions about what to change and where. Even just naming 2-3 main areas of your codebase (like 'auth', 'payments', 'onboarding') gives you a foundation."
+**Engineering (no architecture in validation):**
+> "You're in validation with 8 features but no architecture entities. You don't need a full system diagram, but knowing which parts of your code handle which features helps you make better decisions about what to change and where. Even just naming 2-3 main areas of your codebase (like 'auth', 'payments', 'onboarding') gives you a foundation."
 
 **Engineering (features without technical backing):**
 > "5 of your features aren't connected to any service or technical component. That doesn't mean they're not built; it just means the graph doesn't know HOW they're built. Connecting features to the code that powers them helps you spot when one piece of code is carrying too many features, or when a feature has no clear home."

@@ -51,7 +51,7 @@ Analyze gaps in priority order (validation > discovery > strategy > execution). 
 #### ⚗️ Validation Gaps (Highest Priority)
 
 **Hypotheses without experiments:**
-> ⚗️ You have **X** hypotheses with no 🧪 experiments. Untested assumptions are the #1 cause of product failure. Every bet you're making is currently just an opinion.
+> ⚗️ You have **X** hypotheses with no 🧪 experiments. Unvalidated assumptions are the #1 cause of product failure. Every bet you're making is currently just an opinion.
 > → `/upg-walk-region an experiment to test "<hypothesis title>"`
 
 **Experiments without learnings:**
@@ -106,7 +106,7 @@ Structural gaps tell you *what's missing right now*. This step interprets the gr
 
 | Signal | Condition | Level |
 |--------|-----------|-------|
-| Untested bets | ⚗️ hypotheses with status `drafted` (or no status), created >14 days ago — derive valid statuses via `list_status_values({ entity_type: "hypothesis" })` | 🔴 High |
+| Unvalidated bets | ⚗️ hypotheses with status `drafted` (or no status), created >14 days ago — derive valid statuses via `list_status_values({ entity_type: "hypothesis" })` | 🔴 High |
 | Assumption-based personas | 👤 personas with no connected 🔬 research_study or 💎 insight | 🟡 Medium |
 | Orphan features | 📦 features not connected to any 👤 persona (directly or via job chain) | 🔴 High |
 | Missing business model | Product at `build`, `launch`, or `growth` stage, zero 💰 business_model entities | 🔴 High |
@@ -270,7 +270,7 @@ This is informational, not a gap; frame it as "when you're ready" rather than "y
 
 Present the top 3-5 actions, ordered by impact. **Business area gaps take priority alongside validation gaps.** Use this priority order:
 
-1. **Validation gaps** (untested hypotheses); always highest
+1. **Validation gaps** (unvalidated hypotheses); always highest
 2. **Business area gaps with ✗ (zero coverage)**: blind spots are critical
 3. **Discovery gaps** (missing connections)
 4. **Business area gaps with ● (partial coverage)**: fill in the remaining types
@@ -297,7 +297,7 @@ You know your value proposition but haven't mapped the journey from awareness to
 Example full action plan:
 
 **1. [CRITICAL]** ⚗️ Test your hypotheses
-You have 4 untested hypotheses. Pick the riskiest one and design an experiment.
+You have 4 unvalidated hypotheses. Pick the riskiest one and design an experiment.
 → `/upg-new-hypothesis` to structure a new one
 
 **2. [CRITICAL]** 🏦 Define your business model
@@ -364,10 +364,10 @@ After the lens-specific gaps, show the standard gap analysis (business areas, ch
 
 ## Key Principles
 
-- **Explain WHY, not just WHAT.** "3 hypotheses have no experiments" is data. "Untested assumptions are the #1 cause of product failure" is insight.
+- **Explain WHY, not just WHAT.** "3 hypotheses have no experiments" is data. "Unvalidated assumptions are the #1 cause of product failure" is insight.
 - **Prioritize by impact.** Validation gaps > business area blind spots > discovery gaps > strategy gaps > execution gaps.
 - **Give specific prompts.** Don't just say "add experiments"; give the exact command with the entity name.
 - **Be encouraging.** Celebrate where they are, then show what's next.
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers, annotation arrows.
 - **Stage-aware scoring.** Always score against the tier that matches the product's stage. Don't overwhelm a Solo Builder with Scale-Up expectations.
-- **Business areas are non-negotiable.** Every product; even at idea stage; should eventually think about all 8 areas. Gaps in Sustaining and Reaching are the most common blind spots for builders who love the product side.
+- **Business areas are non-negotiable.** Every product; even at the concept stage; should eventually think about all 8 areas. Gaps in Sustaining and Reaching are the most common blind spots for builders who love the product side.

@@ -94,7 +94,9 @@ describe('ZendeskAdapter: entity_type → UPG entity type mapping', () => {
     expect(result.nodes[0].type).toBe('customer_feedback')
     expect(result.nodes[0].mapping_confidence).toBe('medium')
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.satisfaction_score).toBe('bad')
+    const props = node.properties as Record<string, unknown> | undefined
+    expect(props?.satisfaction_score).toBe('bad')
+    expect(node.satisfaction_score).toBeUndefined()
   })
 
   it('post maps to customer_feedback with confidence medium', async () => {
@@ -148,47 +150,47 @@ describe('ZendeskAdapter: skipped entity types', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('ZendeskAdapter: status normalisation', () => {
-  it("status 'new' normalises to 'draft'", async () => {
+  it("ticket status 'new' normalises to 'opened'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'New ticket', 'ticket', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('opened')
   })
 
-  it("status 'open' normalises to 'active'", async () => {
+  it("ticket status 'open' normalises to 'opened'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'Open ticket', 'ticket', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('opened')
   })
 
-  it("status 'pending' normalises to 'active'", async () => {
+  it("ticket status 'pending' normalises to 'triaged'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'Pending ticket', 'ticket', { status: 'pending' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('triaged')
   })
 
-  it("status 'hold' normalises to 'active'", async () => {
+  it("ticket status 'hold' normalises to 'in_progress'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'On hold', 'ticket', { status: 'hold' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("status 'solved' normalises to 'complete'", async () => {
+  it("ticket status 'solved' normalises to 'resolved'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'Solved ticket', 'ticket', { status: 'solved' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('resolved')
   })
 
-  it("status 'closed' normalises to 'complete'", async () => {
+  it("ticket status 'closed' normalises to 'closed'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'Closed ticket', 'ticket', { status: 'closed' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('closed')
   })
 })
 
 // ─── Satisfaction score preservation ─────────────────────────────────────────
 
 describe('ZendeskAdapter: satisfaction_score preservation', () => {
-  it('satisfaction_score good is preserved on customer_feedback node', async () => {
+  it('satisfaction_score good is preserved under properties on customer_feedback node', async () => {
     const items: SourceItem[] = [
       makeItem('csat1', 'CSAT rating', 'satisfaction_rating', {
         satisfaction_score: 'good',
@@ -196,10 +198,12 @@ describe('ZendeskAdapter: satisfaction_score preservation', () => {
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.satisfaction_score).toBe('good')
+    const props = node.properties as Record<string, unknown> | undefined
+    expect(props?.satisfaction_score).toBe('good')
+    expect(node.satisfaction_score).toBeUndefined()
   })
 
-  it('satisfaction_score bad is preserved on customer_feedback node', async () => {
+  it('satisfaction_score bad is preserved under properties on customer_feedback node', async () => {
     const items: SourceItem[] = [
       makeItem('csat1', 'CSAT rating', 'satisfaction_rating', {
         satisfaction_score: 'bad',
@@ -207,7 +211,9 @@ describe('ZendeskAdapter: satisfaction_score preservation', () => {
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.satisfaction_score).toBe('bad')
+    const props = node.properties as Record<string, unknown> | undefined
+    expect(props?.satisfaction_score).toBe('bad')
+    expect(node.satisfaction_score).toBeUndefined()
   })
 })
 

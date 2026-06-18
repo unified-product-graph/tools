@@ -35,6 +35,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Entity type → UPG entity type ───────────────────────────────────────────
@@ -79,19 +80,96 @@ export const AHA_TYPE_MAP: Record<string, string | null> = {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 /**
- * Maps Aha! status values to UPG status values.
+ * Per-type Aha! status → UPG status maps. Each key is a UPG entity type; the
+ * value maps raw Aha! status strings to the correct phase id for that type's
+ * lifecycle. Null means "omit rather than emit an invalid value". Types absent
+ * here are handled by resolveAhaStatusForType() returning undefined.
  */
-export const AHA_STATUS_MAP: Record<string, string> = {
-  new: 'draft',
-  'under-consideration': 'draft',
-  planned: 'active',
-  'in-progress': 'active',
-  'in progress': 'active',
-  shipped: 'complete',
-  released: 'complete',
-  'will-not-implement': 'abandoned',
-  "won't implement": 'abandoned',
-  cancelled: 'abandoned',
+export const AHA_STATUS_MAP: Record<string, Record<string, string | null>> = {
+  initiative: {
+    'new': 'proposed',
+    'under-consideration': 'proposed',
+    'planned': 'proposed',
+    'in-progress': 'in_progress',
+    'in progress': 'in_progress',
+    'shipped': 'completed',
+    'released': 'completed',
+    'will-not-implement': 'abandoned',
+    "won't implement": 'abandoned',
+    'cancelled': 'abandoned',
+  },
+  objective: {
+    'new': 'draft',
+    'under-consideration': 'draft',
+    'planned': 'active',
+    'in-progress': 'active',
+    'in progress': 'active',
+    'shipped': 'achieved',
+    'released': 'achieved',
+    'will-not-implement': 'missed',
+    "won't implement": 'missed',
+    'cancelled': 'missed',
+  },
+  key_result: {
+    'new': null,
+    'under-consideration': null,
+    'planned': 'on_track',
+    'in-progress': 'on_track',
+    'in progress': 'on_track',
+    'shipped': 'achieved',
+    'released': 'achieved',
+    'will-not-implement': null,
+    "won't implement": null,
+    'cancelled': null,
+  },
+  feature: {
+    'new': 'proposed',
+    'under-consideration': 'proposed',
+    'planned': 'proposed',
+    'in-progress': 'in_progress',
+    'in progress': 'in_progress',
+    'shipped': 'shipped',
+    'released': 'shipped',
+    'will-not-implement': 'archived',
+    "won't implement": 'archived',
+    'cancelled': 'archived',
+  },
+  epic: {
+    'new': 'todo',
+    'under-consideration': 'todo',
+    'planned': 'todo',
+    'in-progress': 'in_progress',
+    'in progress': 'in_progress',
+    'shipped': 'done',
+    'released': 'done',
+    'will-not-implement': null,
+    "won't implement": null,
+    'cancelled': null,
+  },
+  release: {
+    'new': 'planned',
+    'under-consideration': 'planned',
+    'planned': 'planned',
+    'in-progress': 'in_progress',
+    'in progress': 'in_progress',
+    'shipped': 'shipped',
+    'released': 'shipped',
+    'will-not-implement': null,
+    "won't implement": null,
+    'cancelled': null,
+  },
+  feature_request: {
+    'new': 'new',
+    'under-consideration': 'under_review',
+    'planned': 'planned',
+    'in-progress': 'in_progress',
+    'in progress': 'in_progress',
+    'shipped': 'shipped',
+    'released': 'shipped',
+    'will-not-implement': 'wont_do',
+    "won't implement": 'wont_do',
+    'cancelled': 'wont_do',
+  },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -110,10 +188,48 @@ export function resolveAhaType(entityType: string): string | null | undefined {
   return undefined
 }
 
-/** Normalize an Aha! status string to a UPG status value */
-export function normalizeAhaStatus(status: string): string {
-  const lower = normalizeName(status)
-  return AHA_STATUS_MAP[lower] ?? status
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve an Aha! raw status to one valid for the target UPG type's lifecycle.
+ * Tries the per-type map first, then the raw value as a phase id, and omits
+ * anything that does not fit rather than persisting an invalid status. Returns
+ * undefined for lifecycle-free types.
+ */
+export function resolveAhaStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const lower = normalizeName(rawStatus)
+  const typeMap = AHA_STATUS_MAP[upgType]
+  if (typeMap) {
+    const mapped = typeMap[lower]
+    if (mapped === null) return undefined
+    if (mapped && valid.has(mapped)) return mapped
+  }
+  if (valid.has(lower)) return lower
+  return undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair via
+ * the catalogue, honouring direction; null when no canonical edge exists.
+ */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 /** Get confidence for an Aha! entity type → UPG entity type mapping */
@@ -231,9 +347,9 @@ export class AhaAdapter implements UPGAdapter {
 
       sourceMap[item.source_id] = nodeId
 
-      // Normalise status
+      // Normalise status against the target type's lifecycle (omit if invalid)
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeAhaStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveAhaStatusForType(rawStatus, ugpEntityType) : undefined
 
       // Build base node
       const node: UPGBaseNode = {
@@ -247,15 +363,24 @@ export class AhaAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'aha',
         external_id: item.source_id,
-        // Key Result-specific fields
-        ...(ugpEntityType === 'key_result' && meta.key_result_current !== undefined
-          ? { current_value: meta.key_result_current as number }
-          : {}),
-        ...(ugpEntityType === 'key_result' && meta.key_result_target !== undefined
-          ? { target_value: meta.key_result_target as number }
-          : {}),
-        ...(ugpEntityType === 'key_result' && meta.key_result_unit !== undefined
-          ? { unit: meta.key_result_unit as string }
+        // Key Result fields: nested under `properties` (off-schema at top level)
+        ...(ugpEntityType === 'key_result' &&
+        (meta.key_result_current !== undefined ||
+          meta.key_result_target !== undefined ||
+          meta.key_result_unit !== undefined)
+          ? {
+              properties: {
+                ...(meta.key_result_current !== undefined
+                  ? { current_value: meta.key_result_current as number }
+                  : {}),
+                ...(meta.key_result_target !== undefined
+                  ? { target_value: meta.key_result_target as number }
+                  : {}),
+                ...(meta.key_result_unit !== undefined
+                  ? { unit: meta.key_result_unit as string }
+                  : {}),
+              },
+            }
           : {}),
       }
 
@@ -311,16 +436,32 @@ export class AhaAdapter implements UPGAdapter {
             `Aha! entity "${item.title}" references parent_id "${parentId}" which was not found in the imported set. Edge skipped.`,
           )
         } else {
-          const edgeResult = resolveAhaHierarchyEdge(parentType, entityType, item.title, warnings)
-          if (edgeResult && edgeResult !== 'warning-only') {
-            edgeCounter++
+          const childUpg = (resolveAhaType(entityType) as string | null | undefined) ?? 'document'
+          const parentUpg = (resolveAhaType(parentType) as string | null | undefined) ?? 'document'
+          const mapped = resolvePairEdge(parentUpg, childUpg)
+          edgeCounter++
+          if (mapped) {
+            const source = mapped.sourceIsChild ? nodeId : parentNodeId
+            const target = mapped.sourceIsChild ? parentNodeId : nodeId
+            edges.push({
+              id: `edge-aha-${edgeCounter}`,
+              source,
+              target,
+              type: mapped.type as UPGEdgeType,
+              mapping_confidence: 'medium',
+            })
+          } else {
             edges.push({
               id: `edge-aha-${edgeCounter}`,
               source: parentNodeId,
               target: nodeId,
-              type: edgeResult as UPGEdgeType,
-              mapping_confidence: 'medium',
+              type: 'node_informs_node' as UPGEdgeType,
+              mapping_confidence: 'low',
             })
+            warnings.push(
+              `No canonical UPG edge for Aha! ${parentType || 'parent'} -> ${entityType || 'child'} ` +
+                `(${parentUpg} -> ${childUpg}); emitted node_informs_node as a generic link.`,
+            )
           }
         }
       }
@@ -340,7 +481,8 @@ export class AhaAdapter implements UPGAdapter {
           mapping_confidence: 'medium',
         })
 
-        // stub opportunity → feature (approximation)
+        // stub opportunity → feature: no canonical opportunity→feature edge
+        // (opportunity_drives_solution requires a solution target), so link generically
         if (ideaPromotedToFeatureId) {
           const featureNodeId = sourceMap[ideaPromotedToFeatureId]
           if (featureNodeId) {
@@ -349,7 +491,7 @@ export class AhaAdapter implements UPGAdapter {
               id: `edge-aha-${edgeCounter}`,
               source: stubOpportunityId,
               target: featureNodeId,
-              type: 'opportunity_drives_solution' as UPGEdgeType,
+              type: 'node_informs_node' as UPGEdgeType,
               mapping_confidence: 'low',
             })
           }
@@ -367,70 +509,8 @@ export class AhaAdapter implements UPGAdapter {
   }
 }
 
-// ─── Edge resolution helpers ──────────────────────────────────────────────────
-
-/**
- * Resolve the canonical UPG hierarchy edge for an Aha! parent_type → child_type pair.
- *
- * Returns:
- * - A UPG edge type string
- * - 'warning-only': warns but does not emit an edge
- * - null: unknown pair or no edge needed
- */
-function resolveAhaHierarchyEdge(
-  parentType: string,
-  childType: string,
-  itemTitle: string,
-  _warnings: string[],
-): string | 'warning-only' | null {
-  const parent = normalizeName(parentType)
-  const child = normalizeName(childType)
-
-  // initiative → goal/objective
-  if (parent === 'initiative' && child === 'goal') {
-    return 'initiative_drives_outcome'
-  }
-
-  // goal → key_result
-  if (parent === 'goal' && child === 'key_result') {
-    return 'objective_achieved_through_key_result'
-  }
-
-  // goal → feature (outcome_delivered_by_feature)
-  if (parent === 'goal' && child === 'feature') {
-    return 'outcome_delivered_by_feature'
-  }
-
-  // release → feature
-  if (parent === 'release' && child === 'feature') {
-    return 'release_contains_feature'
-  }
-
-  // feature → epic (feature decomposed into epic)
-  if (parent === 'feature' && child === 'epic') {
-    return 'feature_decomposed_into_epic'
-  }
-
-  // epic → requirement (acceptance_criterion)
-  if (parent === 'epic' && child === 'requirement') {
-    return 'epic_specified_by_user_story'
-  }
-
-  // product → persona
-  if (parent === 'product' && child === 'persona') {
-    return 'product_targets_persona'
-  }
-
-  // product → initiative
-  if (parent === 'product' && child === 'initiative') {
-    return 'product_invests_in_initiative'
-  }
-
-  // key_result → metric (if metric tracked by key result)
-  if (parent === 'key_result' && child === 'metric') {
-    return 'key_result_quantified_by_metric'
-  }
-
-  void itemTitle
-  return null
-}
+// Hierarchy edges are resolved catalogue-first via resolvePairEdge() (above):
+// the canonical edge type AND direction come from the resolved UPG node types,
+// so e.g. initiative->objective and epic->acceptance_criterion (no canonical
+// edge) fall back to node_informs_node instead of being forced onto
+// initiative_drives_outcome / epic_specified_by_user_story.

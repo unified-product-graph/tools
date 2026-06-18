@@ -151,7 +151,11 @@ describe('Tool registry: completeness', () => {
     //   product-local nodes of one type across the workspace with a projection,
     //   edge-free so it stays under the payload cap. Local-only (portfolio read
     //   layer, no single-product cloud analogue). → 134.
-    expect(TOOL_DEFINITIONS).toHaveLength(134)
+    // + list_templates + get_template (0.16.x): the curated starter-template
+    //   library surface — list summaries, fetch a full pattern (entities, typed
+    //   edges, prompts). Read-only over @unified-product-graph/templates via the
+    //   SDK; mirrored on the cloud server (static data → full parity). → 136.
+    expect(TOOL_DEFINITIONS).toHaveLength(136)
   })
 })
 

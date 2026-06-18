@@ -145,6 +145,7 @@ import {
   pushToCloud,
 } from '../tools/sync.js'
 import { skillAudit } from '../tools/skills.js'
+import { listTemplatesTool, getTemplateTool } from '../tools/templates.js'
 import { UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
 
 // `ToolDefinition` lives in `@unified-product-graph/mcp-tooling`. Re-exported
@@ -1639,6 +1640,30 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'list_templates',
+    description:
+      'List the curated starter templates (proven entity patterns for SaaS, marketplace, mobile, OSS, and agency). Returns summaries: id, name, description, industries, stages, entity_count, entity_types. The same library powers the /upg-new-from-template skill and the site gallery. Use with get_template to fetch a full pattern for instantiation.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        industry: { type: 'string', description: 'Filter by industry (saas, marketplace, mobile, oss, agency)' },
+        stage: { type: 'string', description: 'Filter by stage (concept, validation, growth, mature)' },
+      },
+    },
+  },
+  {
+    name: 'get_template',
+    description:
+      'Get a curated starter template in full by id: its entities (with title/description templates, default properties, tags, status), its typed edges (canonical UPG edge per pair), and its prompts (the questions to fill `{{placeholders}}`). Use to instantiate a template: walk the prompts, substitute placeholders, create the entities and typed edges.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Template id (e.g. "saas-business-model"). Run list_templates for the options.' },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'update_session_context',
     description:
       'Update session context: register a skill invocation, record a recommendation, set focus area, switch lens, or store custom state for cross-skill coordination.',
@@ -2526,6 +2551,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_session_context: getSessionContext,
   update_session_context: updateSessionContext,
   skill_audit: skillAudit,
+  list_templates: listTemplatesTool,
+  get_template: getTemplateTool,
   get_area_context: getAreaContext,
   create_area: createArea,
   assign_product_to_area: assignProductToAreaTool,

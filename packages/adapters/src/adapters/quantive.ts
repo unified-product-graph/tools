@@ -30,6 +30,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Entity type → UPG entity type ───────────────────────────────────────────
@@ -108,10 +109,52 @@ export function resolveQuantiveEntityType(entityType: string): string | null | u
   return undefined
 }
 
-/** Normalize a Quantive status string to a UPG status value */
+/** Normalize a Quantive status string to a UPG status value (raw map lookup, exported for tests) */
 export function normalizeQuantiveStatus(status: string): string {
   const lower = normalizeName(status)
   return QUANTIVE_STATUS_MAP[lower] ?? status
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a Quantive status to a phase id valid for the target type's lifecycle.
+ * Tries the raw value first (Quantive's KR statuses on_track/at_risk/behind/achieved
+ * ARE valid key_result phases), then the QUANTIVE_STATUS_MAP fallback (for objective/
+ * initiative/task), then omits when nothing fits or the type is lifecycle-free.
+ */
+function resolveQuantiveStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = QUANTIVE_STATUS_MAP[raw]
+  return mapped && valid.has(mapped) ? mapped : undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair
+ * via the catalogue, honouring direction; null when no canonical edge exists.
+ */
+function resolvePairEdge(
+  parentUpg: string,
+  childUpg: string,
+): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 /** Resolve the confidence level for an entity_type → UPG type mapping */
@@ -228,9 +271,20 @@ export class QuantiveAdapter implements UPGAdapter {
       // Register in sourceMap now, before any continue paths below
       sourceMap[item.source_id] = nodeId
 
-      // ── Normalise status ───────────────────────────────────────────────────
+      // ── Normalise status (validated against the target type's lifecycle) ─
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeQuantiveStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveQuantiveStatusForType(rawStatus, mappedType) : undefined
+
+      // ── Key Result / Metric numeric fields → nested under properties ──────
+      // (off-schema top-level fields are silently dropped by the .upg writer).
+      const numericProperties: Record<string, unknown> = {}
+      if (mappedType === 'key_result' || mappedType === 'metric') {
+        if (meta.current_value !== undefined) numericProperties.current_value = meta.current_value as number
+        if (meta.target_value !== undefined) numericProperties.target_value = meta.target_value as number
+        if (meta.start_value !== undefined) numericProperties.start_value = meta.start_value as number
+        if (meta.unit !== undefined) numericProperties.unit = meta.unit as string
+      }
+      const hasNumericProperties = Object.keys(numericProperties).length > 0
 
       // ── Build the UPG node ─────────────────────────────────────────────────
       const node: UPGBaseNode = {
@@ -244,21 +298,7 @@ export class QuantiveAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'quantive',
         external_id: item.source_id,
-        // Key Result / Metric value fields
-        ...(mappedType === 'key_result' || mappedType === 'metric'
-          ? {
-              ...(meta.current_value !== undefined
-                ? { current_value: meta.current_value as number }
-                : {}),
-              ...(meta.target_value !== undefined
-                ? { target_value: meta.target_value as number }
-                : {}),
-              ...(meta.start_value !== undefined
-                ? { start_value: meta.start_value as number }
-                : {}),
-              ...(meta.unit !== undefined ? { unit: meta.unit as string } : {}),
-            }
-          : {}),
+        ...(hasNumericProperties ? { properties: numericProperties } : {}),
       }
 
       nodes.push(node)
@@ -279,12 +319,19 @@ export class QuantiveAdapter implements UPGAdapter {
       )
     }
 
-    // ── Emit hierarchy edges (second pass, so sourceMap is complete) ──────────
+    // ── Emit hierarchy edges (second pass, catalogue-driven) ─────────────────
+    // Resolve edges by real UPG types via UPG_EDGE_PAIR_MAP. This keeps the two
+    // canonical OKR edges (objective_achieved_through_key_result,
+    // key_result_quantified_by_metric) and replaces the previous wrong-endpoint
+    // approximations (team->objective as team_targets_team_okr [needs team_okr],
+    // objective->objective as team_okr_aligns_with_objective [needs team_okr],
+    // key_result->initiative/task as initiative_drives_outcome [needs initiative
+    // source + outcome target]) with an honest node_informs_node fallback.
+    const nodeTypeById = new Map(nodes.map((n) => [n.id, n.type as string]))
+
     for (const item of items) {
       const meta = item.metadata ?? {}
-      const entityType = (meta.entity_type as string | undefined) ?? ''
       const parentId = meta.parent_id as string | undefined
-      const parentType = (meta.parent_type as string | undefined) ?? ''
 
       // Skip entities that were not registered (e.g. skipped sessions/check-ins)
       const nodeId = sourceMap[item.source_id]
@@ -301,32 +348,21 @@ export class QuantiveAdapter implements UPGAdapter {
         continue
       }
 
-      // Resolve edge based on parent_type + entity_type pair
-      const edgeResult = resolveQuantiveEdge(parentType, entityType, item.title, warnings)
+      const parentUpg = nodeTypeById.get(parentNodeId)
+      const childUpg = nodeTypeById.get(nodeId)
+      if (!parentUpg || !childUpg) continue
 
-      if (edgeResult === 'warning-only') {
-        // Warning already emitted inside resolveQuantiveEdge: no edge to emit
-        continue
-      }
-
-      if (edgeResult === null) {
-        // Unrecognised pair: emit a generic informational edge with low confidence
-        edges.push({
-          id: `edge-quantive-${parentNodeId}-${nodeId}`,
-          source: parentNodeId,
-          target: nodeId,
-          type: 'node_informs_node' as UPGEdgeType,
-          mapping_confidence: 'low',
-        })
-        continue
-      }
+      const mapped = resolvePairEdge(parentUpg, childUpg)
+      const edgeSource = mapped?.sourceIsChild ? nodeId : parentNodeId
+      const edgeTarget = mapped?.sourceIsChild ? parentNodeId : nodeId
+      const edgeType = (mapped ? mapped.type : 'node_informs_node') as UPGEdgeType
 
       edges.push({
-        id: `edge-quantive-${parentNodeId}-${nodeId}`,
-        source: parentNodeId,
-        target: nodeId,
-        type: edgeResult as UPGEdgeType,
-        mapping_confidence: 'medium',
+        id: `edge-quantive-${edgeSource}-${edgeTarget}`,
+        source: edgeSource,
+        target: edgeTarget,
+        type: edgeType,
+        mapping_confidence: mapped ? 'medium' : 'low',
       })
     }
 
@@ -336,73 +372,4 @@ export class QuantiveAdapter implements UPGAdapter {
 
     return { nodes, edges, source_map: sourceMap, warnings }
   }
-}
-
-// ─── Edge resolution ──────────────────────────────────────────────────────────
-
-/**
- * Resolve the canonical UPG edge for a Quantive parent_type → entity_type pair.
- *
- * Returns:
- * - A UPG edge type string (most cases)
- * - 'warning-only' for gaps that warrant a warning but no edge
- * - null for unrecognised pairs (caller emits node_informs_node fallback)
- *
- * All emitted edge types are verified against the live UPG edge catalogue.
- */
-function resolveQuantiveEdge(
-  parentType: string,
-  childType: string,
-  entityTitle: string,
-  warnings: string[],
-): string | 'warning-only' | null {
-  const parent = normalizeName(parentType)
-  const child = normalizeName(childType)
-
-  // objective → key_result
-  if (parent === 'objective' && (child === 'key_result' || child === 'key-result')) {
-    return 'objective_achieved_through_key_result'
-  }
-
-  // key_result → metric / kpi
-  if ((parent === 'key_result' || parent === 'key-result') && (child === 'metric' || child === 'kpi')) {
-    return 'key_result_quantified_by_metric'
-  }
-
-  // key_result → initiative (strategic work stream approximation)
-  if ((parent === 'key_result' || parent === 'key-result') && child === 'initiative') {
-    warnings.push(
-      `Quantive Key Result→Initiative relationship for "${entityTitle}": ` +
-        `emitting \`initiative_drives_outcome\` as an approximation. ` +
-        `The Key Result acts as the outcome proxy. ` +
-        `Consider adding an explicit \`outcome\` node between them.`,
-    )
-    return 'initiative_drives_outcome'
-  }
-
-  // key_result → task (concrete action item approximation)
-  if ((parent === 'key_result' || parent === 'key-result') && child === 'task') {
-    warnings.push(
-      `Quantive Key Result→Task relationship for "${entityTitle}": ` +
-        `emitting \`initiative_drives_outcome\` as an approximation. ` +
-        `The Key Result acts as the outcome proxy. ` +
-        `Consider adding an explicit \`outcome\` node between them.`,
-    )
-    return 'initiative_drives_outcome'
-  }
-
-  // objective → objective (cascading OKR alignment: child obj aligns with parent obj)
-  // UPG models this as team_okr_aligns_with_objective:
-  //   source = child objective (team-level), target = parent objective (org-level)
-  if (parent === 'objective' && child === 'objective') {
-    return 'team_okr_aligns_with_objective'
-  }
-
-  // team → objective
-  if (parent === 'team' && child === 'objective') {
-    return 'team_targets_team_okr'
-  }
-
-  // Unrecognised pair
-  return null
 }

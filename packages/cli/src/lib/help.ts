@@ -508,6 +508,23 @@ export const helpTopics: Record<string, HelpEntry> = {
     ],
     seeAlso: 'upg list, upg health',
   },
+  template: {
+    usage: 'upg template <list|show> [options]',
+    summary:
+      'Browse the curated starter templates (the same library the /upg-new-from-template ' +
+      'skill and the site gallery use). `list [industry]` shows summaries; `show <id>` ' +
+      'prints the full pattern: entities, typed edges, and prompts.',
+    options: [
+      { flag: '--stage <stage>', desc: 'list: filter by stage (concept, validation, growth, mature)' },
+      JSON_OPT,
+    ],
+    examples: [
+      { cmd: 'upg template list', comment: 'all 17 templates, grouped by industry' },
+      { cmd: 'upg template list saas', comment: 'just the SaaS templates' },
+      { cmd: 'upg template show saas-business-model', comment: 'full pattern + prompts' },
+    ],
+    seeAlso: 'upg init, upg spec',
+  },
   query: {
     usage: 'upg query --from <type>|--from-id <id> [options]',
     summary: 'Traverse the graph following typed edges, with field projection and truncation. The BFS primitive behind tree views.',

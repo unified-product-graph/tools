@@ -20,6 +20,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Type maps ────────────────────────────────────────────────────────────────
@@ -41,14 +42,62 @@ export const LAUNCHDARKLY_TYPE_MAP: Record<string, string | null> = {
 }
 
 /**
- * Maps LaunchDarkly status values to UPG status values.
+ * Maps LaunchDarkly raw status/state strings to candidate UPG phase ids.
+ *
+ * feature_flag lifecycle phases: off | rollout | on
+ * experiment lifecycle phases:   planned | running | analysing | done
+ *
+ * Values that do not appear in the target type's lifecycle are omitted by
+ * resolveLaunchDarklyStatusForType() - this table is just the translation
+ * layer; the lifecycle guard is the final arbiter.
  */
 export const LAUNCHDARKLY_STATUS_MAP: Record<string, string> = {
-  active: 'active',
-  inactive: 'abandoned',
-  new: 'draft',
-  launched: 'complete', // feature fully rolled out
-  archived: 'abandoned',
+  // feature_flag phases
+  active: 'on',          // flag is enabled / rolled out to 100%
+  inactive: 'off',       // flag is disabled
+  new: 'off',            // freshly created, not yet enabled
+  launched: 'on',        // feature fully rolled out
+  archived: 'off',       // archived flags are effectively off
+  // experiment phases
+  draft: 'planned',
+  running: 'running',
+  analysing: 'analysing',
+  complete: 'done',
+  completed: 'done',
+  stopped: 'done',
+}
+
+// ─── Lifecycle-aware helpers ──────────────────────────────────────────────────
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/** Resolve a LaunchDarkly state to one valid for the target type's lifecycle (omit otherwise). */
+function resolveLaunchDarklyStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = rawStatus.toLowerCase().trim()
+  if (valid.has(raw)) return raw
+  const mapped = LAUNCHDARKLY_STATUS_MAP[raw]
+  return mapped !== undefined && valid.has(mapped) ? mapped : undefined
+}
+
+/** Canonical UPG edge for a parent→child type pair via catalogue, honouring direction; null if none. */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,10 +106,12 @@ function normalizeName(name: string): string {
   return name.toLowerCase().trim()
 }
 
-export function normalizeLaunchDarklyStatus(status: string | undefined): string | undefined {
+/** @deprecated Use resolveLaunchDarklyStatusForType() which validates against the target lifecycle. */
+export function normalizeLaunchDarklyStatus(status: string | undefined, upgType?: string): string | undefined {
   if (!status) return undefined
+  if (upgType) return resolveLaunchDarklyStatusForType(status, upgType)
   const lower = normalizeName(status)
-  return LAUNCHDARKLY_STATUS_MAP[lower] ?? status
+  return LAUNCHDARKLY_STATUS_MAP[lower]
 }
 
 export function getConfidenceForLDType(entityType: string): 'high' | 'medium' | 'low' {
@@ -172,12 +223,20 @@ export class LaunchDarklyAdapter implements UPGAdapter {
       }
 
       const rawStatus = meta.status as string | undefined
-      const status = normalizeLaunchDarklyStatus(rawStatus)
+      const status = rawStatus ? resolveLaunchDarklyStatusForType(rawStatus, upgType) : undefined
 
       const tags: string[] = []
       if (Array.isArray(meta.tags)) {
         tags.push(...(meta.tags as string[]))
       }
+
+      // Numeric/source-specific fields must live under `properties` (off-schema
+      // at top level - the writer silently drops them otherwise).
+      const properties: Record<string, unknown> = {}
+      if (meta.flag_type !== undefined) properties.flag_type = meta.flag_type as string
+      if (meta.project_id !== undefined) properties.project_id = meta.project_id as string
+      if (meta.rollout_percentage !== undefined) properties.rollout_percentage = meta.rollout_percentage as number
+      if (meta.variation_count !== undefined) properties.variation_count = meta.variation_count as number
 
       const node: UPGBaseNode = {
         id: nodeId,
@@ -191,8 +250,7 @@ export class LaunchDarklyAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'launchdarkly',
         external_id: item.source_id,
-        ...(meta.flag_type ? { flag_type: meta.flag_type as string } : {}),
-        ...(meta.project_id ? { project_id: meta.project_id as string } : {}),
+        ...(Object.keys(properties).length > 0 ? { properties } : {}),
       }
 
       nodes.push(node)
@@ -235,19 +293,23 @@ export class LaunchDarklyAdapter implements UPGAdapter {
         continue
       }
 
-      // experiment → experiment_run: experiment_plan_ran_as_experiment_run
-      // (parent = experiment, child = experiment_run/iteration)
-      const parentResolved = LAUNCHDARKLY_TYPE_MAP[normalizeName((meta.parent_type as string | undefined) ?? '')]
-      if (parentResolved === 'experiment' && upgType === 'experiment') {
+      // Resolve canonical edge for this parent→child type pair via the catalogue.
+      // Falls back to node_informs_node when no catalogue entry exists.
+      const parentUpgType = LAUNCHDARKLY_TYPE_MAP[normalizeName((meta.parent_type as string | undefined) ?? '')]
+      const currentUpgType = LAUNCHDARKLY_TYPE_MAP[normalizeName(entityType)]
+      if (parentUpgType && currentUpgType) {
+        const mapped = resolvePairEdge(parentUpgType, currentUpgType)
+        const edgeSrc = mapped?.sourceIsChild ? nodeId : parentNodeId
+        const edgeTgt = mapped?.sourceIsChild ? parentNodeId : nodeId
         edges.push({
-          id: `edge-ld-${parentNodeId}-${nodeId}`,
-          source: parentNodeId,
-          target: nodeId,
-          type: 'experiment_plan_ran_as_experiment_run' as UPGEdgeType,
-          mapping_confidence: 'medium',
+          id: `edge-ld-${edgeSrc}-${edgeTgt}`,
+          source: edgeSrc,
+          target: edgeTgt,
+          type: (mapped ? mapped.type : 'node_informs_node') as UPGEdgeType,
+          mapping_confidence: mapped ? 'medium' : 'low',
         })
       } else {
-        // Generic fallback
+        // Parent type unknown or not mappable — fall back
         edges.push({
           id: `edge-ld-${parentNodeId}-${nodeId}`,
           source: parentNodeId,

@@ -212,7 +212,7 @@ Mapping to existing types:
   - debugging session → investigation (exists)
   - bug → bug (exists)
   - root cause → root_cause (exists)
-  - relate to → causes, revealed_by (exist)
+  - relate to → `root_cause_causes_bug` (exists); resolve any pair via `resolve_edge_for_pair`
 
 → FULLY COVERED by existing schema. No new types needed.
 ```

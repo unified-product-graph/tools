@@ -155,7 +155,20 @@ now mechanical (proven 10×):
 
 Per-adapter scan flags (statusmap / external_url / detectable-hardcoded-edges):
 - **gitlab** (2 / 2 / 4) — ✅ RELEASED (per-type status + external_ref + catalogue-driven deferred edges; 56 unit + 3 e2e green).
-- **aha** (3 / 0 / 1), coda (4 / 1 / 0) — status + a few edges/ext_url.
+- **amplitude** — ✅ RELEASED 2026-06-18 (metric values->properties + per-type status; copy de-fictionalised; e2e green).
+- **miro** — ✅ RELEASED 2026-06-18 (only fix: hypothesis_claim->hypothesis; frame-label typing verified; e2e green).
+- **aha** — ✅ RELEASED 2026-06-18 (per-type status maps + key_result->properties + catalogue-driven edges; 3 wrong-endpoint edges dropped to node_informs_node; 46 unit + 4 e2e green).
+- **canny** — ✅ RELEASED 2026-06-18 (vote_count->properties + per-type status + catalogue-driven edge DIRECTION fix on feature_request_creates_opportunity; 27 unit + 4 e2e green).
+- **coda** — ✅ RELEASED 2026-06-18 (per-type status + numerics->properties + external_url->external_ref + catalogue-driven lookup edges; **8 reversed lookup edges fixed** — all were emitted child->parent, now resolvePairEdge gives correct type+direction; initiative->feature & feature->task now correct; 51 unit + 6 e2e green).
+- **intercom** — ✅ RELEASED 2026-06-18 (per-type status maps for support_ticket/customer_feedback/document/feature_request + conversation_rating->properties + catalogue-driven edges; node_owned_by_team direction fixed, customer_feedback_becomes_feature_request now fires from survey not conversation; 28 unit + 6 e2e green).
+- **hubspot** — ✅ RELEASED 2026-06-18 (HUBSPOT_STATUS_MAP rebuilt to real per-type phase ids — was draft/active/complete/abandoned invalid on every type; deal amount/mrr->properties; **dead resolveHubSpotEdge removed** (its feedback==feedback branch never fired) and replaced with catalogue-driven resolvePairEdge; contact->participant kept (convention) so account->participant correctly falls back to node_informs_node — the OLD code emitted account_contains_contact pointing at a participant (wrong endpoint); 33 unit + 10 e2e green).
+- **launchdarkly** — ✅ RELEASED 2026-06-18 (feature_flag lifecycle is off/rollout/on — adapter was emitting active/abandoned/draft/complete, all invalid; experiment phases planned/running/analysing/done; flag_type/project_id/rollout_percentage->properties; **experiment_plan_ran_as_experiment_run dropped** — it was emitted experiment->experiment with wrong endpoint types — now catalogue-driven; service_toggles_feature_flag synthetic-service routing kept; 22 unit + 8 e2e green).
+- **pendo** — ✅ RELEASED 2026-06-18 (root cause = `opportunity` missing from PENDO_TYPE_MAP → feedback->opportunity edge pointed at a `document` node; added it + per-type status (raw active/inactive/draft invalid for feature → omitted) + adoption_rate/visitor_count/click_count->properties; the 4 hardcoded edges were already endpoint-correct (product_contains_screen/screen_surfaces_feature/feature_request_creates_opportunity/outcome_delivered_by_feature); 32 unit + 10 e2e green).
+- **zendesk** — ✅ RELEASED 2026-06-18 (ZENDESK_STATUS_MAP rebuilt to per-type phase ids — was draft/active/complete invalid for support_ticket; satisfaction_score->properties; **Pass-2 fully converted to catalogue-driven resolvePairEdge** — fixed the reversed node_owned_by_team AND a latent reversed customer_feedback_becomes_feature_request (same caller bug, just unexercised); removed resolveZendeskEdge + safeEdgeType; barrel updated; 27 unit + 8 e2e green).
+- **salesforce** — ✅ RELEASED 2026-06-18 (Opportunity->deal mapping kept (the ecosystem's most important name collision); SALESFORCE_STATUS_MAP rebuilt to real per-type phase ids — was draft/active/complete invalid for case+opportunity; amount/close_date->properties; **3 wrong-endpoint edges fixed** — account_contains_contact (target was participant not contact), lead_becomes_account (source was participant not lead), customer_feedback_becomes_feature_request (source was support_ticket not customer_feedback) all now resolve to node_informs_node via catalogue-driven resolvePairEdge; removed resolveSalesforceEdge; only account_negotiates_deal is a real emitted typed edge; 35 unit + 12 e2e green).
+- **quantive** — ✅ RELEASED 2026-06-18 (per-type status with **raw-first resolution** so key_result keeps its native on_track/at_risk/behind/achieved phases (the flat map's active/complete/abandoned were invalid for KR); KR/metric current_value/target_value/start_value/unit->properties; **3 wrong-endpoint OKR edges fixed** — team->objective (was team_targets_team_okr, needs team_okr target), objective->objective (was team_okr_aligns_with_objective, needs team_okr source), key_result->initiative/task (was initiative_drives_outcome, needs initiative source + outcome target) all now node_informs_node; objective_achieved_through_key_result + key_result_quantified_by_metric kept; removed resolveQuantiveEdge; 39 unit + 6 e2e green).
+
+> **Phase B status: 12 of 26 released** (miro · amplitude · canny · aha · coda · intercom · hubspot · launchdarkly · pendo · zendesk · salesforce · quantive). Remaining 14: shortcut · gainsight · confluence · condens · lookback · sprig · maze · slack · lattice · storybook · airfocus · craftio · chisel · prodpad.
 - quantive·shortcut·condens·lookback·sprig·airfocus·craftio·chisel·prodpad (3 status maps each) — status-heavy.
 - amplitude·canny·intercom·hubspot·salesforce·gainsight·pendo·launchdarkly·maze·zendesk·lattice·lattice (2) — status + verify edges.
 - miro·confluence·slack·storybook (0 status maps) — lightest; verify edges only.
@@ -225,7 +238,15 @@ data/doc project reference handles both `project_id` and nested `project.id`.
 In-memory parser, no API. Catalogue-aware edges (`resolveContainmentEdge` +
 `node_informs_node` fallback), valid inferred types. Conformant out of the box.
 
-### posthog — ✅ RELEASED (convert bugs fixed)
+### posthog — ✅ RELEASED (convert bugs fixed) + feature_flag correction (2026-06-18, Captain caught)
+**Follow-up fix:** PostHog `feature_flag` was mapped to UPG `feature` ("flag = the
+capability") — wrong and inconsistent with LaunchDarkly (`feature_flag`->`feature_flag`).
+UPG has a first-class `feature_flag` entity (off/rollout/on lifecycle; `feature_flag_gates_feature`
+edge to the feature it gates). Fixed: `feature_flag`->`feature_flag` (standalone node;
+key/rollout_pct/flag_type->properties; flag-state statuses active/inactive/rollout added).
+`early_access_feature` kept as `feature` (it is a beta feature, not the flag). 30 unit + 5 e2e green.
+
+
 The conformance audit caught four real bugs, all now fixed:
 - emitted the **deprecated `hypothesis_claim`** type → now `hypothesis`;
 - the experiment→hypothesis edge used `feature_tests_hypothesis` (wrong type AND

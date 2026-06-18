@@ -302,12 +302,12 @@ Check these conditions against the current graph and surface the most relevant o
 
 | Condition | What to say | Why it matters |
 |---|---|---|
-| Hypotheses untested >14 days | "You have {N} hypotheses that have been untested for over 2 weeks. The oldest is '{title}'. Untested bets age into assumptions." | Lean Startup: hypotheses lose relevance over time |
+| Hypotheses unvalidated >14 days | "You have {N} hypotheses that have been unvalidated for over 2 weeks. The oldest is '{title}'. Unvalidated bets age into assumptions." | Lean Startup: hypotheses lose relevance over time |
 | Features without persona connection | "'{feature}' isn't connected to any persona. Who is this for?" | Teresa Torres: every feature should trace to a user need |
 | Personas without evidence | "'{persona}' has no research evidence linked. Right now this is an assumption, not a validated persona." | Discovery: personas without evidence are fiction |
 | Needs without opportunities | "{N} needs have no connected opportunity. Pain without a response is just a complaint list." | OST: needs should surface opportunities |
 | Business model missing at build/launch/growth stage | "Your product is at {stage} stage but has no business model entities. Strategy without economics is a hobby." | BMC: viability matters |
-| No hypotheses at all | "You have {N} features but zero hypotheses. Everything you're building is an untested bet." | Lean: build-measure-learn requires hypotheses |
+| No hypotheses at all | "You have {N} features but zero hypotheses. Everything you're building is an unvalidated bet." | Lean: build-measure-learn requires hypotheses |
 | Validated hypothesis → no feature | "'{hypothesis}' was validated but has no connected feature. You proved it works; now build it." | Discovery→Delivery gap |
 | High orphan rate (>30%) | "{N} of your {total} entities ({pct}%) have no connections. Isolated entities don't compound." | Graph value comes from connections |
 | Screens without flows | "You have {N} screens but no user flows. How does someone actually move through your product?" | Design: screens without flows are a sitemap, not a product |
@@ -325,7 +325,7 @@ During `/upg-walk-region feature`:
 > 💡 "Quick note: '{feature}' isn't connected to a persona yet. Want to link it to one of your existing personas?"
 
 During smart ending:
-> 💡 "Your graph has 4 untested hypotheses, the oldest from 12 days ago. The fastest win might be validating one before building more."
+> 💡 "Your graph has 4 unvalidated hypotheses, the oldest from 12 days ago. The fastest win might be validating one before building more."
 
 During session start:
 > 💡 "3 of your 5 personas have no research evidence linked. They're assumptions until validated."
@@ -511,7 +511,7 @@ When `sessionContext.lens` is set, adapt your behavior:
 - **marketing:** Prioritize messaging. `/upg-new-launch`, `/upg-walk-region marketing`
 
 **Gap framing:**
-- **product:** "Missing personas", "untested hypotheses", "no validation"
+- **product:** "Missing personas", "unvalidated hypotheses", "no validation"
 - **engineering:** "Unresolved blockers", "disconnected work items", "bugs without fixes"
 - **ux_design:** "Screens without flows", "orphan components", "no design system"
 - **growth:** "No funnels", "channels without campaigns", "no positioning"

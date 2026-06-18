@@ -18,6 +18,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Table name → UPG entity type ────────────────────────────────────────────
@@ -248,38 +249,48 @@ export const CODA_LOOKUP_EDGE_MAP: Record<string, string> = {
  * with their own naming. This map covers the most common patterns.
  */
 export const CODA_STATUS_MAP: Record<string, string> = {
-  // Draft / not started
-  new: 'draft',
-  'not started': 'draft',
-  todo: 'draft',
-  'to-do': 'draft',
-  backlog: 'draft',
-  open: 'draft',
-  planned: 'draft',
-  'not started yet': 'draft',
+  // Not started / backlog variants → maps to common initial phase candidates
+  new: 'new',
+  'not started': 'todo',
+  'not started yet': 'todo',
+  todo: 'todo',
+  'to-do': 'todo',
+  backlog: 'todo',
+  open: 'open',
+  planned: 'planned',
+  proposed: 'proposed',
+  draft: 'draft',
 
-  // Active
-  'in progress': 'active',
-  'in-progress': 'active',
+  // Active / in-progress variants
+  'in progress': 'in_progress',
+  'in-progress': 'in_progress',
+  'in_progress': 'in_progress',
   active: 'active',
-  doing: 'active',
-  ongoing: 'active',
+  doing: 'in_progress',
+  ongoing: 'in_progress',
+  started: 'in_progress',
 
-  // Complete
-  done: 'complete',
+  // Done / shipped / complete variants
+  done: 'done',
   complete: 'complete',
-  completed: 'complete',
-  shipped: 'complete',
-  released: 'complete',
-  closed: 'complete',
+  completed: 'done',
+  shipped: 'shipped',
+  released: 'shipped',
+  closed: 'done',
+  finished: 'done',
+  verified: 'verified',
+  achieved: 'achieved',
 
-  // Abandoned
+  // Cancelled / abandoned variants
   cancelled: 'abandoned',
   canceled: 'abandoned',
   dropped: 'abandoned',
   "won't do": 'abandoned',
   "wont do": 'abandoned',
-  archived: 'abandoned',
+  archived: 'archived',
+  rejected: 'abandoned',
+  'will not implement': 'abandoned',
+  "won't implement": 'abandoned',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -337,10 +348,49 @@ export function resolveLookupEdge(
   return CODA_LOOKUP_EDGE_MAP[lower] ?? null
 }
 
-/** Normalize a Coda status value to a UPG lifecycle stage */
-export function normalizeCodaStatus(status: string): string {
-  const lower = normalizeName(status)
-  return CODA_STATUS_MAP[lower] ?? status
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a Coda raw status string to a valid UPG phase id for the target
+ * entity type's lifecycle. Returns undefined when:
+ * - the type is lifecycle-free (no status should be set), or
+ * - the raw value (and its mapped candidate) is not a valid phase id for this type.
+ */
+export function resolveCodaStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined            // lifecycle-free type: no status
+  const lower = normalizeName(rawStatus)
+  // Try the raw value first (some teams already use UPG phase ids directly)
+  if (valid.has(lower)) return lower
+  // Then try the intermediate map
+  const candidate = CODA_STATUS_MAP[lower]
+  if (candidate && valid.has(candidate)) return candidate
+  return undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair
+ * via the catalogue, honouring direction; null when no canonical edge exists.
+ */
+function resolvePairEdge(
+  parentUpg: string,
+  childUpg: string,
+): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 // ─── Internal types ───────────────────────────────────────────────────────────
@@ -472,9 +522,18 @@ export class CodaAdapter implements UPGAdapter {
         tags.push(...(meta.tags as string[]))
       }
 
-      // ── Status → lifecycle stage ──────────────────────────────────────────
+      // ── Status → per-type lifecycle phase id ──────────────────────────────
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeCodaStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveCodaStatusForType(rawStatus, entityType) : undefined
+
+      // ── Numeric fields for metric / key_result → nested under properties ──
+      const numericProperties: Record<string, unknown> = {}
+      if (entityType === 'metric' || entityType === 'key_result') {
+        if (meta.current_value !== undefined) numericProperties.current_value = meta.current_value as number
+        if (meta.target_value !== undefined) numericProperties.target_value = meta.target_value as number
+        if (meta.unit !== undefined) numericProperties.unit = meta.unit as string
+      }
+      const hasNumericProperties = Object.keys(numericProperties).length > 0
 
       // ── Build node ────────────────────────────────────────────────────────
       const node: UPGBaseNode = {
@@ -489,20 +548,8 @@ export class CodaAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'coda',
         external_id: item.source_id,
-        ...(meta.external_url ? { external_url: meta.external_url as string } : {}),
-        // Metric / key_result numeric fields
-        ...(( entityType === 'metric' || entityType === 'key_result') &&
-        meta.current_value !== undefined
-          ? { current_value: meta.current_value as number }
-          : {}),
-        ...(( entityType === 'metric' || entityType === 'key_result') &&
-        meta.target_value !== undefined
-          ? { target_value: meta.target_value as number }
-          : {}),
-        ...(( entityType === 'metric' || entityType === 'key_result') &&
-        meta.unit !== undefined
-          ? { unit: meta.unit as string }
-          : {}),
+        ...(meta.external_url ? { external_ref: meta.external_url as string } : {}),
+        ...(hasNumericProperties ? { properties: numericProperties } : {}),
       }
 
       nodes.push(node)
@@ -510,20 +557,28 @@ export class CodaAdapter implements UPGAdapter {
 
     // ── Pass 2: Emit lookup edges ───────────────────────────────────────────
     // Processed after all nodes are created so sourceMap is complete.
+    //
+    // Direction model: a Coda lookup column on row A pointing to row B means
+    // "A belongs to / references B". B is the parent (source in most UPG edges),
+    // A is the child (target in most UPG edges). resolvePairEdge() provides the
+    // canonical edge type AND direction from the UPG catalogue; sourceIsChild=true
+    // means the item with the lookup column is the edge's source.
+    const nodeTypeById = new Map(nodes.map((n) => [n.id, n.type as string]))
+
     for (const item of items) {
       const nodeId = sourceMap[item.source_id]
       if (!nodeId) continue // Row was skipped in pass 1
 
       const meta = item.metadata ?? {}
-      const entityType = (nodes.find((n) => n.id === nodeId)?.type as string | undefined) ?? ''
+      const childType = nodeTypeById.get(nodeId) ?? ''
       const lookupFields = meta.lookup_fields as LookupField[] | undefined
 
       if (!lookupFields || lookupFields.length === 0) continue
 
       for (const lookup of lookupFields) {
-        const targetNodeId = sourceMap[lookup.target_row_id]
+        const parentNodeId = sourceMap[lookup.target_row_id]
 
-        if (!targetNodeId) {
+        if (!parentNodeId) {
           warnings.push(
             `Coda lookup from "${item.title}" to row "${lookup.target_row_id}" ` +
               `(column "${lookup.column_name}"). Target row not in import set. Edge skipped.`,
@@ -531,25 +586,28 @@ export class CodaAdapter implements UPGAdapter {
           continue
         }
 
-        const edgeType = resolveLookupEdge(lookup.column_name, entityType, lookup.target_table)
+        const parentType = nodeTypeById.get(parentNodeId) ?? ''
+        const mapped = resolvePairEdge(parentType, childType)
 
-        if (!edgeType) {
-          // Unresolvable lookup column: emit a low-confidence generic edge
+        if (!mapped) {
+          // No canonical edge for this parent→child type pair: emit a generic link
           edges.push({
-            id: `edge-coda-${nodeId}-${targetNodeId}-lookup`,
-            source: nodeId,
-            target: targetNodeId,
+            id: `edge-coda-${parentNodeId}-${nodeId}-lookup`,
+            source: parentNodeId,
+            target: nodeId,
             type: 'node_informs_node' as UPGEdgeType,
             mapping_confidence: 'low',
           })
           continue
         }
 
+        const source = mapped.sourceIsChild ? nodeId : parentNodeId
+        const target = mapped.sourceIsChild ? parentNodeId : nodeId
         edges.push({
-          id: `edge-coda-${nodeId}-${targetNodeId}`,
-          source: nodeId,
-          target: targetNodeId,
-          type: edgeType as UPGEdgeType,
+          id: `edge-coda-${source}-${target}`,
+          source,
+          target,
+          type: mapped.type as UPGEdgeType,
           mapping_confidence: 'medium',
         })
       }

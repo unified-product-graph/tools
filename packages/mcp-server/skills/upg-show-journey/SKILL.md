@@ -102,7 +102,7 @@ The recommendation should reference what they already have (to celebrate) and wh
 Examples:
 - "You have **2 personas** but no jobs or needs yet. Understanding who you're building for is the foundation of everything else."
 - "Your identity is strong; product, vision, and mission are all defined. Time to understand your users."
-- "You have hypotheses but no experiments. Every untested assumption is just an opinion."
+- "You have hypotheses but no experiments. Every unvalidated assumption is just an opinion."
 
 ### Step 5: User Interaction
 

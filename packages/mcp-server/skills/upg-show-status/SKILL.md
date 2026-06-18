@@ -150,7 +150,7 @@ Based on the current state, suggest 2-3 frameworks that would add the most value
 > **Opportunity Solution Tree** *(Teresa Torres, 2021)*; Your discovery chain is partially built. OST would structure outcome → opportunity → solution → experiment.
 > Try: `/upg-show-tree ost`
 
-> **Hypothesis Testing** *(Eric Ries, 2011)*; 4 untested hypotheses need experiments.
+> **Hypothesis Testing** *(Eric Ries, 2011)*; 4 unvalidated hypotheses need experiments.
 > Try: `/upg-show-tree validation`
 
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
@@ -316,7 +316,7 @@ Render as real markdown, NOT inside a code block. Use this structure exactly:
 ### Signals
 
 ```
-  🟡 3 hypotheses untested; ⚗️ "Wizard reduces drop-off", ⚗️ "Users prefer mobile", ⚗️ "Pricing tier works"
+  🟡 3 hypotheses unvalidated; ⚗️ "Wizard reduces drop-off", ⚗️ "Users prefer mobile", ⚗️ "Pricing tier works"
   🔴 2 personas have no jobs; 👤 "Jordan", 👤 "Sam" (add JTBDs with /upg-new-persona)
   🟡 5 entities below 50% complete; consider /upg-check-gaps for details
   🟢 All key chains connected
@@ -327,13 +327,13 @@ Render as real markdown, NOT inside a code block. Use this structure exactly:
 
 One short paragraph: what's the overall health, and what's the single fastest win? End with a specific command suggestion.
 
-> Your graph is healthy but has untested bets. The fastest win is running one experiment.
+> Your graph is healthy but has unvalidated bets. The fastest win is running one experiment.
 > → `/upg-new-hypothesis` to pick one and design a test
 
 ### Quick mode principles
 
 - **FAST.** 2-3 tool calls. No interaction. No questions. Just the pulse.
-- **Name entities, not just counts.** "3 untested hypotheses" < naming them.
+- **Name entities, not just counts.** "3 unvalidated hypotheses" < naming them.
 - **Signal colours:** 🟢 healthy, 🟡 attention needed, 🔴 action required.
 - **ONE recommendation.** Pick the highest-impact action and suggest it.
 - **This is NOT `--full`** (maturity score + bars + benchmarks + frameworks) or `/upg-check-gaps` (deep action plans). This is the 10-second pulse.

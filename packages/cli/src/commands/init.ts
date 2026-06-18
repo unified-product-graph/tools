@@ -8,54 +8,23 @@ import * as path from 'node:path'
 import chalk from 'chalk'
 import { input, select } from '@inquirer/prompts'
 import { UPG_VERSION, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
+import { getStarterSeeds, STARTER_KEYS, type StarterKey } from '@unified-product-graph/sdk'
 import { nodeId } from '../lib/graph.js'
 import { upgLogo } from '../lib/formatter.js'
 import { CLI_VERSION } from '../lib/version.js'
 
 // ── Template definitions ───────────────────────────────────────────────────
 
-type TemplateKey = 'blank' | 'saas' | 'marketplace' | 'mobile' | 'oss'
+// Starter graphs come from @unified-product-graph/templates via the SDK access
+// layer, so the CLI and the MCP servers share one source of truth instead of
+// each importing the package. Seeds are placeholder-free and id-less; init
+// stamps a fresh id on each at write time.
+type TemplateKey = StarterKey
 
-interface SeedNode {
-  id: string
-  type: string
-  title: string
-  description?: string
-}
+const TEMPLATE_KEYS = STARTER_KEYS
 
-function buildSeedNodes(template: TemplateKey): SeedNode[] {
-  switch (template) {
-    case 'blank':
-      return []
-
-    case 'saas':
-      return [
-        { id: nodeId(), type: 'persona', title: 'Primary User', description: 'The main user of your product' },
-        { id: nodeId(), type: 'job', title: 'Core Job to Be Done' },
-        { id: nodeId(), type: 'opportunity', title: 'Key Opportunity' },
-      ]
-
-    case 'marketplace':
-      return [
-        { id: nodeId(), type: 'persona', title: 'Supply Side (Provider)' },
-        { id: nodeId(), type: 'persona', title: 'Demand Side (Consumer)' },
-        { id: nodeId(), type: 'opportunity', title: 'Platform Value Creation' },
-      ]
-
-    case 'mobile':
-      return [
-        { id: nodeId(), type: 'persona', title: 'Mobile User' },
-        { id: nodeId(), type: 'job', title: 'Primary Mobile Job' },
-        { id: nodeId(), type: 'feature', title: 'Core Feature' },
-      ]
-
-    case 'oss':
-      return [
-        { id: nodeId(), type: 'persona', title: 'Contributor' },
-        { id: nodeId(), type: 'persona', title: 'End User' },
-        { id: nodeId(), type: 'feature', title: 'Core Feature' },
-      ]
-  }
+function buildSeedNodes(template: TemplateKey): Array<{ id: string; type: string; title: string; description?: string }> {
+  return getStarterSeeds(template).map((seed) => ({ id: nodeId(), ...seed }))
 }
 
 // ── CLI command ────────────────────────────────────────────────────────────
@@ -63,7 +32,7 @@ function buildSeedNodes(template: TemplateKey): SeedNode[] {
 export const initCommand = new Command('init')
   .description('Create a .upg file. Interactive by default.')
   .option('--title <title>', 'Product title. Skips prompt')
-  .option('--template <template>', 'blank | saas | marketplace | mobile | oss. Skips prompt')
+  .option('--template <template>', 'blank | saas | marketplace | mobile | oss | agency. Skips prompt')
   .option('--workspace', 'Create in .upg/<name>.upg with workspace.json. Skips prompt')
   .option('--single', 'Create product.upg in the current directory. Skips prompt')
   .option('--file <path>', 'Explicit output path (overrides the single/workspace default; also honours $UPG_FILE).')
@@ -109,9 +78,8 @@ export const initCommand = new Command('init')
       let template: TemplateKey
       if (opts.template) {
         const t = opts.template as string
-        const valid: TemplateKey[] = ['blank', 'saas', 'marketplace', 'mobile', 'oss']
-        if (!valid.includes(t as TemplateKey)) {
-          console.error(chalk.red(`Unknown template: ${t}. Valid options: ${valid.join(', ')}`))
+        if (!TEMPLATE_KEYS.includes(t as TemplateKey)) {
+          console.error(chalk.red(`Unknown template: ${t}. Valid options: ${TEMPLATE_KEYS.join(', ')}`))
           process.exit(1)
         }
         template = t as TemplateKey
@@ -122,10 +90,11 @@ export const initCommand = new Command('init')
           message: 'Start from a template?',
           choices: [
             { name: 'blank          · Empty graph, start fresh', value: 'blank' },
-            { name: 'saas           · SaaS: personas, jobs, opportunities, hypotheses', value: 'saas' },
+            { name: 'saas           · SaaS: primary user, core job, key opportunity', value: 'saas' },
             { name: 'marketplace    · Marketplace: two-sided personas, platform opportunity', value: 'marketplace' },
-            { name: 'mobile         · Mobile app: personas, jobs, platform features', value: 'mobile' },
-            { name: 'oss            · Open source: contributor persona, issue-to-feature chain', value: 'oss' },
+            { name: 'mobile         · Mobile app: user, job, core feature', value: 'mobile' },
+            { name: 'oss            · Open source: contributor + end user, core feature', value: 'oss' },
+            { name: 'agency         · Agency: client persona, engagement, project revenue', value: 'agency' },
           ],
         })
       }

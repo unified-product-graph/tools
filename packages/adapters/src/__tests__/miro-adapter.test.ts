@@ -90,14 +90,14 @@ describe('MiroAdapter: frame_label override for sticky notes', () => {
     expect(result.nodes[0].type).toBe('insight')
   })
 
-  it('sticky_note in "hypotheses" frame maps to hypothesis_claim', async () => {
+  it('sticky_note in "hypotheses" frame maps to hypothesis', async () => {
     const items: SourceItem[] = [
       makeItem('s1', 'Simplifying nav increases conversion', 'sticky_note', {
         frame_label: 'Hypotheses',
       }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].type).toBe('hypothesis_claim')
+    expect(result.nodes[0].type).toBe('hypothesis')
   })
 
   it('sticky_note in "risks" frame is skipped', async () => {

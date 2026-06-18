@@ -157,13 +157,14 @@ describe('SalesforceAdapter: CRITICAL Opportunity name collision', () => {
     expect(warnText).not.toContain('Salesforce Opportunity record')
   })
 
-  it('opportunity amount is preserved on deal node', async () => {
+  it('opportunity amount is preserved on deal node under properties, not top-level', async () => {
     const items: SourceItem[] = [
       makeObject('op1', 'Big Deal', 'opportunity', { amount: 250000 }),
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.amount).toBe(250000)
+    expect((node.properties as Record<string, unknown>)?.amount).toBe(250000)
+    expect(node.amount).toBeUndefined()
   })
 })
 
@@ -206,53 +207,73 @@ describe('SalesforceAdapter: skipped types with warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('SalesforceAdapter: status normalisation', () => {
-  it("case status 'new' normalises to 'draft'", async () => {
+  it("case status 'new' normalises to support_ticket phase 'opened'", async () => {
     const items: SourceItem[] = [makeObject('ca1', 'New case', 'case', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('opened')
   })
 
-  it("case status 'open' normalises to 'active'", async () => {
+  it("case status 'open' normalises to support_ticket phase 'opened'", async () => {
     const items: SourceItem[] = [makeObject('ca1', 'Open case', 'case', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('opened')
   })
 
-  it("case status 'closed' normalises to 'complete'", async () => {
+  it("case status 'closed' normalises to support_ticket phase 'closed'", async () => {
     const items: SourceItem[] = [makeObject('ca1', 'Closed case', 'case', { status: 'closed' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('closed')
   })
 
-  it("opportunity stage 'Prospecting' normalises to 'draft'", async () => {
+  it("case status 'Working' normalises to support_ticket phase 'in_progress'", async () => {
+    const items: SourceItem[] = [makeObject('ca1', 'Active case', 'case', { status: 'Working' })]
+    const result = await adapter.convert(items)
+    expect(result.nodes[0].status).toBe('in_progress')
+  })
+
+  it("opportunity stage 'Prospecting' normalises to deal phase 'qualified'", async () => {
     const items: SourceItem[] = [
       makeObject('op1', 'Early stage', 'opportunity', { stage: 'Prospecting' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('qualified')
   })
 
-  it("opportunity stage 'Closed Won' normalises to 'complete'", async () => {
+  it("opportunity stage 'Closed Won' normalises to deal phase 'closed_won'", async () => {
     const items: SourceItem[] = [
       makeObject('op1', 'Won deal', 'opportunity', { stage: 'Closed Won' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('closed_won')
   })
 
-  it("opportunity stage 'Closed Lost' normalises to 'abandoned'", async () => {
+  it("opportunity stage 'Closed Lost' normalises to deal phase 'closed_lost'", async () => {
     const items: SourceItem[] = [
       makeObject('op1', 'Lost deal', 'opportunity', { stage: 'Closed Lost' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBe('closed_lost')
+  })
+
+  it('lifecycle-free types (account, participant) carry no status even when metadata.status is set', async () => {
+    const items: SourceItem[] = [
+      makeObject('a1', 'Acme Corp', 'account', { status: 'active' }),
+      makeObject('c1', 'Jane Smith', 'contact', { status: 'open' }),
+    ]
+    const result = await adapter.convert(items)
+    for (const node of result.nodes) {
+      expect((node as Record<string, unknown>).status).toBeUndefined()
+    }
   })
 })
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
 describe('SalesforceAdapter: edge emission', () => {
-  it('account_contains_contact emitted when contact has account parent', async () => {
+  it('account -> participant (contact) has no canonical edge, falls back to node_informs_node', async () => {
+    // account_contains_contact needs target type 'contact'; the adapter maps
+    // Salesforce Contact -> participant (cross-adapter convention), so the pair
+    // account:participant is uncatalogued and falls back.
     const items: SourceItem[] = [
       makeObject('a1', 'Acme Corp', 'account'),
       makeObject('c1', 'Jane Smith', 'contact', {
@@ -261,9 +282,10 @@ describe('SalesforceAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'account_contains_contact')
-    const edge = result.edges.find((e) => e.type === 'account_contains_contact')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'account->participant fallback')
+    const edge = result.edges.find((e) => e.source === result.source_map['a1'])
+    expect(edge?.type).toBe('node_informs_node')
+    expect(result.edges.find((e) => e.type === 'account_contains_contact')).toBeUndefined()
   })
 
   it('account_negotiates_deal emitted when opportunity has account parent', async () => {
@@ -280,7 +302,9 @@ describe('SalesforceAdapter: edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('lead_becomes_account emitted when account has lead parent', async () => {
+  it('lead (as participant) -> account has no canonical edge, falls back to node_informs_node', async () => {
+    // lead_becomes_account needs source type 'lead'; the adapter maps Salesforce
+    // Lead -> participant, so participant:account is uncatalogued and falls back.
     const items: SourceItem[] = [
       makeObject('l1', 'Prospect Inc', 'lead'),
       makeObject('a1', 'Acme Corp', 'account', {
@@ -289,12 +313,17 @@ describe('SalesforceAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'lead_becomes_account')
-    const edge = result.edges.find((e) => e.type === 'lead_becomes_account')
+    assertAllEdgesCatalogued(result.edges, 'lead->account fallback')
+    expect(result.edges.find((e) => e.type === 'lead_becomes_account')).toBeUndefined()
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
+    expect(edge?.mapping_confidence).toBe('low')
   })
 
-  it('customer_feedback_becomes_feature_request emitted when idea has case parent', async () => {
+  it('support_ticket -> feature_request (case->idea) has no canonical edge, falls back to node_informs_node', async () => {
+    // customer_feedback_becomes_feature_request needs source type 'customer_feedback';
+    // the adapter maps Case -> support_ticket, so support_ticket:feature_request
+    // is uncatalogued and falls back.
     const items: SourceItem[] = [
       makeObject('ca1', 'Export bug ticket', 'case'),
       makeObject('i1', 'Add CSV export', 'idea', {
@@ -303,8 +332,9 @@ describe('SalesforceAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'customer_feedback_becomes_feature_request')
-    const edge = result.edges.find((e) => e.type === 'customer_feedback_becomes_feature_request')
+    assertAllEdgesCatalogued(result.edges, 'support_ticket->feature_request fallback')
+    expect(result.edges.find((e) => e.type === 'customer_feedback_becomes_feature_request')).toBeUndefined()
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
   })
 

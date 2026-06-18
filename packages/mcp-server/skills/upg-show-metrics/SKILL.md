@@ -18,7 +18,7 @@ You are a fast analytics dashboard. Your job: fetch metrics, render a dashboard,
 Call `get_graph_digest()` first. Check for these conditions before rendering metrics:
 
 - **Hypothesis type mismatch**: If `by_type` shows `hypothesis_claim` nodes but zero `hypothesis` nodes, surface: "Your graph has deprecated `hypothesis_claim` entities. Run `/upg-fix-types` to convert them to `hypothesis` before this analysis is accurate."
-- **Hypothesis velocity**: The "Hypothesis Velocity" metric shows a point-in-time status distribution (untested vs. tested), not a rate of change. Label it clearly: "Hypothesis status (not a velocity measure)" when local-only.
+- **Hypothesis velocity**: The "Hypothesis Velocity" metric shows a point-in-time distribution across hypothesis statuses (derive the valid phases via `list_status_values({ entity_type: "hypothesis" })`), not a rate of change. Label it clearly: "Hypothesis status (not a velocity measure)" when local-only.
 - **Stage benchmarks are canonical**: `product.stage` is a canonical `UPGProductStage` (`concept | validation | build | beta | launch | growth | mature | maintenance | sunset`), and the count/relationship benchmarks are keyed on those same canonical stages. Compare directly; do NOT translate to legacy `idea`/`mvp`/`scale` labels.
 
 ## Tools
@@ -58,7 +58,7 @@ Render as real markdown, NOT inside a code block. Use this structure:
 Show each status with its status dot and count, then a filled bar for % resolved (validated + invalidated out of total):
 
 ```
-  ⚪ Untested: 4    🟡 Testing: 2    🟢 Validated: 5    🔴 Invalidated: 1
+  🔵 Drafted: 4    🟡 Active: 2    🟢 Validated: 5    🔴 Invalidated: 1
   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░ 58% resolved
 ```
 
@@ -115,7 +115,7 @@ Show orphan rate as a filled bar:
 One short paragraph: what stands out, and what's the single fastest win? End with a specific command suggestion.
 
 Example:
-> Your hypothesis pipeline is moving: 58% resolved. But 4 are still untested. The fastest win is picking one and designing an experiment.
+> Your hypothesis pipeline is moving: 58% resolved. But 4 are still unvalidated. The fastest win is picking one and designing an experiment.
 > → `/upg-new-hypothesis` to test your riskiest assumption
 
 ## Key Principles

@@ -119,7 +119,7 @@ For each change, classify as:
 
 ## Output Format
 
-Generate a markdown changelog:
+Generate a markdown changelog by diffing live schema between the requested versions. The example below is the historical **0.2.0** release, shown for format only (the entity, edge, and property names in it reflect 0.2.0 and several have since changed, e.g. `*_status` properties collapsed to base-node `status` in 0.15.0):
 
 ```markdown
 # UPG Schema Changelog

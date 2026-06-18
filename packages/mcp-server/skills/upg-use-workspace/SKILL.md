@@ -24,9 +24,9 @@ Check if `.upg/workspace.json` exists (Bash). Call `list_local_products` for ent
 ```
 ## Your UPG Workspace
   📁 .upg/ (workspace mode)
-  1. ● My SaaS (active); 42 entities, mvp stage
-  2. ○ Client Project; 12 entities, idea stage
-  3. ○ Internal Tools; 8 entities, idea stage
+  1. ● My SaaS (active); 42 entities, build stage
+  2. ○ Client Project; 12 entities, concept stage
+  3. ○ Internal Tools; 8 entities, concept stage
   Switch: /upg-use-workspace switch <number>
   Add:    /upg-use-workspace add
 ```
@@ -35,7 +35,7 @@ Check if `.upg/workspace.json` exists (Bash). Call `list_local_products` for ent
 ```
 ## Your UPG Workspace
   📄 Single-file mode (product.upg)
-  ● My SaaS; 42 entities, mvp stage
+  ● My SaaS; 42 entities, build stage
   Want multiple products? Run /upg-use-workspace init
 ```
 If multiple loose files, number them and suggest `init`. If zero files, point to `/upg-new-graph`.
@@ -46,7 +46,7 @@ If multiple loose files, number them and suggest `init`. If zero files, point to
 
 1. Call `list_local_products`. Match by 1-indexed position (number) or case-insensitive partial title match (name). If no match, show the list.
 2. Call `switch_product` with the resolved file path.
-3. Confirm: `● Switched to **Client Project** (12 entities, idea stage)`
+3. Confirm: `● Switched to **Client Project** (12 entities, concept stage)`
 
 ---
 

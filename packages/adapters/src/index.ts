@@ -119,7 +119,7 @@ export {
   CODA_STATUS_MAP,
   inferTableType,
   resolveLookupEdge,
-  normalizeCodaStatus,
+  resolveCodaStatusForType,
 } from './adapters/coda.js'
 
 // Analytics and feedback adapters.
@@ -155,7 +155,7 @@ export {
   INTERCOM_TYPE_MAP,
   INTERCOM_STATUS_MAP,
   resolveIntercomType,
-  normalizeIntercomStatus,
+  resolveIntercomStatusForType,
   getConfidenceForIntercomType,
 } from './adapters/intercom.js'
 
@@ -322,7 +322,7 @@ export {
   AHA_TYPE_MAP,
   AHA_STATUS_MAP,
   resolveAhaType,
-  normalizeAhaStatus,
+  resolveAhaStatusForType,
   getConfidenceForAhaType,
 } from './adapters/aha.js'
 
@@ -332,7 +332,7 @@ export {
   ZENDESK_TYPE_MAP,
   ZENDESK_STATUS_MAP,
   resolveZendeskType,
-  normalizeZendeskStatus,
+  resolveZendeskStatusForType,
   getZendeskConfidence,
 } from './adapters/zendesk.js'
 

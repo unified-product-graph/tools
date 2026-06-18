@@ -15,6 +15,7 @@ import {
 } from '../tools/nodes.js'
 import { createEdge, deleteEdge, exportEdges, renameEdgeType } from '../tools/edges.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
+import { listTemplatesTool, getTemplateTool } from '../tools/templates.js'
 import { listProductAreas, getAreaGraph, createArea, getAreaContext } from '../tools/areas.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { addComment, listComments, grantAccess, listCollaborators } from '../tools/collaboration.js'
@@ -957,6 +958,30 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'list_templates',
+    description:
+      'List the curated starter templates (proven entity patterns for SaaS, marketplace, mobile, OSS, and agency). Returns summaries: id, name, description, industries, stages, entity_count, entity_types. The same library powers the /upg-new-from-template skill and the site gallery. Use with get_template to fetch a full pattern for instantiation.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        industry: { type: 'string', description: 'Filter by industry (saas, marketplace, mobile, oss, agency)' },
+        stage: { type: 'string', description: 'Filter by stage (concept, validation, growth, mature)' },
+      },
+    },
+  },
+  {
+    name: 'get_template',
+    description:
+      'Get a curated starter template in full by id: its entities (with title/description templates, default properties, tags, status), its typed edges (canonical UPG edge per pair), and its prompts (the questions to fill `{{placeholders}}`). Use to instantiate a template: walk the prompts, substitute placeholders, create the entities and typed edges.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Template id (e.g. "saas-business-model"). Run list_templates for the options.' },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'list_edge_types',
     description:
       'List every canonical edge type from UPG_EDGE_CATALOG, optionally narrowed by source_type and/or target_type. Each entry carries the edge key (type), forward/reverse verbs, classification, and endpoint types. The polymorphic wildcard "node" is preserved on registered polymorphic edges.',
@@ -1773,6 +1798,9 @@ const HANDLERS: Record<string, ToolBinding<CloudContext>['handler']> = {
   // ── Framework exercises (0.8.6 cloud parity) ────────────────────
   apply_framework: applyFramework,
   score_entity: scoreEntity,
+  // ── Templates (0.16.x cloud parity) ─────────────────────────────
+  list_templates: listTemplatesTool,
+  get_template: getTemplateTool,
   list_product_areas: listProductAreas,
   get_area_graph: getAreaGraph,
   create_area: createArea,

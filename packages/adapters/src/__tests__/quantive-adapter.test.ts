@@ -82,12 +82,14 @@ describe('QuantiveAdapter: entity_type → UPG type mapping', () => {
     expect(result.nodes[0].type).toBe('metric')
     expect(result.nodes[0].mapping_confidence).toBe('high')
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(100000)
-    expect(node.target_value).toBe(150000)
-    expect(node.unit).toBe('USD')
+    const props = node.properties as Record<string, unknown>
+    expect(props.current_value).toBe(100000)
+    expect(props.target_value).toBe(150000)
+    expect(props.unit).toBe('USD')
+    expect(node.current_value).toBeUndefined()
   })
 
-  it('kpi also maps to metric with value fields preserved', async () => {
+  it('kpi also maps to metric with value fields preserved under properties', async () => {
     const items: SourceItem[] = [
       makeEntity('kpi1', 'Activation Rate', 'kpi', {
         current_value: 42,
@@ -98,9 +100,11 @@ describe('QuantiveAdapter: entity_type → UPG type mapping', () => {
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('metric')
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(42)
-    expect(node.target_value).toBe(60)
-    expect(node.unit).toBe('%')
+    const props = node.properties as Record<string, unknown>
+    expect(props.current_value).toBe(42)
+    expect(props.target_value).toBe(60)
+    expect(props.unit).toBe('%')
+    expect(node.current_value).toBeUndefined()
   })
 
   it('initiative maps to initiative with confidence high', async () => {
@@ -128,7 +132,7 @@ describe('QuantiveAdapter: entity_type → UPG type mapping', () => {
 // ─── Key Result value fields ──────────────────────────────────────────────────
 
 describe('QuantiveAdapter: key_result value fields', () => {
-  it('current_value, target_value, start_value, and unit are preserved on key_result', async () => {
+  it('current_value, target_value, start_value, and unit are nested under properties on key_result', async () => {
     const items: SourceItem[] = [
       makeEntity('kr1', 'Activation Rate', 'key_result', {
         current_value: 45,
@@ -140,13 +144,17 @@ describe('QuantiveAdapter: key_result value fields', () => {
     const result = await adapter.convert(items)
     expect(result.nodes[0].type).toBe('key_result')
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(45)
-    expect(node.target_value).toBe(70)
-    expect(node.start_value).toBe(30)
-    expect(node.unit).toBe('%')
+    const props = node.properties as Record<string, unknown>
+    expect(props.current_value).toBe(45)
+    expect(props.target_value).toBe(70)
+    expect(props.start_value).toBe(30)
+    expect(props.unit).toBe('%')
+    // Off-schema top-level fields must NOT appear
+    expect(node.current_value).toBeUndefined()
+    expect(node.unit).toBeUndefined()
   })
 
-  it('value fields are omitted when not present', async () => {
+  it('properties is omitted when no value fields are present', async () => {
     const items: SourceItem[] = [makeEntity('kr1', 'Bare KR', 'key_result')]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
@@ -154,6 +162,7 @@ describe('QuantiveAdapter: key_result value fields', () => {
     expect(node.target_value).toBeUndefined()
     expect(node.start_value).toBeUndefined()
     expect(node.unit).toBeUndefined()
+    expect(node.properties).toBeUndefined()
   })
 
   it('value fields are NOT added to non-KR / non-metric entity types', async () => {
@@ -242,52 +251,58 @@ describe('QuantiveAdapter: status normalisation', () => {
     expect(result.nodes[0].status).toBe('draft')
   })
 
-  it("status 'on_track' normalises to 'active'", async () => {
+  it("key_result status 'on_track' stays 'on_track' (native KR phase)", async () => {
     const items: SourceItem[] = [makeEntity('kr1', 'KR on track', 'key_result', { status: 'on_track' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('on_track')
   })
 
-  it("status 'at_risk' normalises to 'active'", async () => {
+  it("key_result status 'at_risk' stays 'at_risk' (native KR phase)", async () => {
     const items: SourceItem[] = [makeEntity('kr1', 'KR at risk', 'key_result', { status: 'at_risk' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('at_risk')
   })
 
-  it("status 'behind' normalises to 'active'", async () => {
+  it("key_result status 'behind' stays 'behind' (native KR phase)", async () => {
     const items: SourceItem[] = [makeEntity('kr1', 'KR behind', 'key_result', { status: 'behind' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('behind')
   })
 
-  it("status 'in_progress' normalises to 'active'", async () => {
+  it("initiative status 'in_progress' stays 'in_progress' (native initiative phase)", async () => {
     const items: SourceItem[] = [makeEntity('init1', 'Initiative in progress', 'initiative', { status: 'in_progress' })]
     const result = await adapter.convert(items)
+    expect(result.nodes[0].status).toBe('in_progress')
+  })
+
+  it("key_result status 'achieved' stays 'achieved' (native KR phase)", async () => {
+    const items: SourceItem[] = [makeEntity('kr1', 'KR achieved', 'key_result', { status: 'achieved' })]
+    const result = await adapter.convert(items)
+    expect(result.nodes[0].status).toBe('achieved')
+  })
+
+  it("objective status 'on_track' falls back to 'active' (KR phases are invalid for objective)", async () => {
+    const items: SourceItem[] = [makeEntity('obj1', 'On track objective', 'objective', { status: 'on_track' })]
+    const result = await adapter.convert(items)
     expect(result.nodes[0].status).toBe('active')
   })
 
-  it("status 'achieved' normalises to 'complete'", async () => {
-    const items: SourceItem[] = [makeEntity('kr1', 'KR achieved', 'key_result', { status: 'achieved' })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
-  })
-
-  it("status 'closed' normalises to 'complete'", async () => {
+  it("objective status 'closed' is omitted (no closed/complete phase in the objective lifecycle)", async () => {
     const items: SourceItem[] = [makeEntity('obj1', 'Closed objective', 'objective', { status: 'closed' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("status 'abandoned' normalises to 'abandoned'", async () => {
+  it("initiative status 'abandoned' stays 'abandoned' (native initiative phase)", async () => {
     const items: SourceItem[] = [makeEntity('init1', 'Abandoned initiative', 'initiative', { status: 'abandoned' })]
     const result = await adapter.convert(items)
     expect(result.nodes[0].status).toBe('abandoned')
   })
 
-  it("status 'cancelled' normalises to 'abandoned'", async () => {
+  it("objective status 'cancelled' is omitted (no abandoned phase in the objective lifecycle)", async () => {
     const items: SourceItem[] = [makeEntity('obj1', 'Cancelled', 'objective', { status: 'cancelled' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 })
 
@@ -340,7 +355,9 @@ describe('QuantiveAdapter: edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('initiative_drives_outcome emitted for key_result→initiative with approximation warning', async () => {
+  it('key_result -> initiative has no canonical edge, falls back to node_informs_node', async () => {
+    // The old code emitted initiative_drives_outcome (source must be initiative,
+    // target must be outcome) - a double wrong-endpoint. resolvePairEdge is null here.
     const items: SourceItem[] = [
       makeEntity('kr1', 'Activation ≥ 60%', 'key_result'),
       makeEntity('init1', 'Onboarding revamp', 'initiative', {
@@ -349,15 +366,14 @@ describe('QuantiveAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'initiative_drives_outcome (kr→initiative)')
-    const edge = result.edges.find((e) => e.type === 'initiative_drives_outcome')
+    assertAllEdgesCatalogued(result.edges, 'kr->initiative fallback')
+    expect(result.edges.find((e) => e.type === 'initiative_drives_outcome')).toBeUndefined()
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
-    const warnText = result.warnings?.join(' ') ?? ''
-    expect(warnText).toContain('approximation')
-    expect(warnText).toContain('outcome proxy')
+    expect(edge?.mapping_confidence).toBe('low')
   })
 
-  it('initiative_drives_outcome emitted for key_result→task with approximation warning', async () => {
+  it('key_result -> task has no canonical edge, falls back to node_informs_node', async () => {
     const items: SourceItem[] = [
       makeEntity('kr1', 'Activation ≥ 60%', 'key_result'),
       makeEntity('task1', 'Write onboarding copy', 'task', {
@@ -366,14 +382,13 @@ describe('QuantiveAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'initiative_drives_outcome (kr→task)')
-    const edge = result.edges.find((e) => e.type === 'initiative_drives_outcome')
-    expect(edge).toBeDefined()
-    const warnText = result.warnings?.join(' ') ?? ''
-    expect(warnText).toContain('approximation')
+    assertAllEdgesCatalogued(result.edges, 'kr->task fallback')
+    expect(result.edges.find((e) => e.type === 'initiative_drives_outcome')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
-  it('team_okr_aligns_with_objective emitted for cascading objective→objective', async () => {
+  it('cascading objective -> objective has no canonical edge, falls back to node_informs_node', async () => {
+    // team_okr_aligns_with_objective requires a team_okr source, not an objective.
     const items: SourceItem[] = [
       makeEntity('obj1', 'Company: Grow retention', 'objective'),
       makeEntity('obj2', 'Team: Improve activation', 'objective', {
@@ -382,12 +397,13 @@ describe('QuantiveAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'team_okr_aligns_with_objective')
-    const edge = result.edges.find((e) => e.type === 'team_okr_aligns_with_objective')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'objective->objective fallback')
+    expect(result.edges.find((e) => e.type === 'team_okr_aligns_with_objective')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
-  it('team_targets_team_okr emitted when objective has team parent', async () => {
+  it('team -> objective has no canonical edge, falls back to node_informs_node', async () => {
+    // team_targets_team_okr requires a team_okr target, not an objective.
     const items: SourceItem[] = [
       makeEntity('team1', 'Product Growth Team', 'team'),
       makeEntity('obj1', 'Grow retention', 'objective', {
@@ -396,9 +412,9 @@ describe('QuantiveAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'team_targets_team_okr')
-    const edge = result.edges.find((e) => e.type === 'team_targets_team_okr')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'team->objective fallback')
+    expect(result.edges.find((e) => e.type === 'team_targets_team_okr')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
   it('all emitted edges are in the UPG catalogue (full OKR fixture)', async () => {

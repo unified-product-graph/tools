@@ -81,7 +81,7 @@ Format as a clear, scannable summary:
   + 🎯 Reduce time-to-value by 40%
 
 ### Modified
-  ~ ⚗️ "Wizard reduces drop-off": status: ⚪ untested → 🟡 in_progress
+  ~ ⚗️ "Wizard reduces drop-off": status: 🔵 drafted → 🟡 active
   ~ 📊 Day-7 retention: target_value: 55% → 65%
 
 ### Removed

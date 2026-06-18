@@ -81,9 +81,8 @@ describe('AhaAdapter: entity_type → UPG type mapping', () => {
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(42)
-    expect(node.target_value).toBe(65)
-    expect(node.unit).toBe('%')
+    expect(node.properties).toMatchObject({ current_value: 42, target_value: 65, unit: '%' })
+    expect(node.current_value).toBeUndefined()
   })
 
   it('vision maps to vision with confidence medium', async () => {
@@ -196,48 +195,49 @@ describe('AhaAdapter: skip and warning cases', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('AhaAdapter: status normalisation', () => {
-  it("'new' normalises to 'draft'", async () => {
+  // Status validated against the feature lifecycle: proposed / in_progress / shipped / archived.
+  it("'new' normalises to 'proposed' for a feature", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('proposed')
   })
 
-  it("'planned' normalises to 'active'", async () => {
+  it("'planned' normalises to 'proposed' for a feature", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature', { status: 'planned' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('proposed')
   })
 
-  it("'in-progress' normalises to 'active'", async () => {
+  it("'in-progress' normalises to 'in_progress' for a feature", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature', { status: 'in-progress' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("'shipped' normalises to 'complete'", async () => {
+  it("'shipped' normalises to 'shipped' for a feature", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature', { status: 'shipped' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('shipped')
   })
 
-  it("'released' normalises to 'complete'", async () => {
+  it("'released' normalises to 'shipped' for a feature", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature', { status: 'released' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('shipped')
   })
 
-  it("'will-not-implement' normalises to 'abandoned'", async () => {
+  it("'will-not-implement' normalises to 'archived' for a feature", async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Feature', 'feature', { status: 'will-not-implement' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBe('archived')
   })
 
-  it("'cancelled' normalises to 'abandoned'", async () => {
+  it("'cancelled' normalises to 'archived' for a feature", async () => {
     const items: SourceItem[] = [makeItem('f1', 'Feature', 'feature', { status: 'cancelled' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBe('archived')
   })
 })
 
@@ -271,7 +271,7 @@ describe('AhaAdapter: idea → stub opportunity pattern', () => {
     expect(edge).toBeDefined()
   })
 
-  it('opportunity_drives_solution edge is emitted from stub to the promoted feature', async () => {
+  it('stub opportunity links to the promoted feature via node_informs_node', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Calendar sync', 'feature'),
       makeItem('idea1', 'Add calendar sync', 'idea', {
@@ -279,9 +279,10 @@ describe('AhaAdapter: idea → stub opportunity pattern', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'opportunity_drives_solution')
-    const edge = result.edges.find((e) => e.type === 'opportunity_drives_solution')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'stub opportunity -> feature link')
+    // opportunity_drives_solution requires a solution target; stub->feature links generically
+    expect(result.edges.find((e) => e.type === 'opportunity_drives_solution')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
   it('a warning about filling in the problem statement is emitted', async () => {
@@ -308,7 +309,7 @@ describe('AhaAdapter: idea → stub opportunity pattern', () => {
 // ─── Hierarchy edge emission ──────────────────────────────────────────────────
 
 describe('AhaAdapter: hierarchy edge emission', () => {
-  it('initiative_drives_outcome emitted when goal has initiative parent', async () => {
+  it('initiative -> goal (objective) falls back to node_informs_node (no canonical edge)', async () => {
     const items: SourceItem[] = [
       makeItem('init1', 'Platform modernisation', 'initiative'),
       makeItem('g1', 'Reduce technical debt', 'goal', {
@@ -317,9 +318,10 @@ describe('AhaAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'initiative_drives_outcome')
-    const edge = result.edges.find((e) => e.type === 'initiative_drives_outcome')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'initiative -> goal link')
+    // initiative_drives_outcome requires an outcome target; goal maps to objective
+    expect(result.edges.find((e) => e.type === 'initiative_drives_outcome')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
   it('objective_achieved_through_key_result emitted when key_result has goal parent', async () => {
@@ -364,7 +366,7 @@ describe('AhaAdapter: hierarchy edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('epic_specified_by_user_story emitted when requirement has epic parent', async () => {
+  it('epic -> requirement (acceptance_criterion) falls back to node_informs_node', async () => {
     const items: SourceItem[] = [
       makeItem('e1', 'Step 1 wizard', 'epic'),
       makeItem('req1', 'User must confirm email before proceeding', 'requirement', {
@@ -373,12 +375,13 @@ describe('AhaAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'epic_specified_by_user_story')
-    const edge = result.edges.find((e) => e.type === 'epic_specified_by_user_story')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'epic -> requirement link')
+    // epic_specified_by_user_story requires a user_story target; requirement maps to acceptance_criterion
+    expect(result.edges.find((e) => e.type === 'epic_specified_by_user_story')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
-  it('outcome_delivered_by_feature emitted when feature has goal parent', async () => {
+  it('goal (objective) -> feature falls back to node_informs_node (no canonical edge)', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Grow retention', 'goal'),
       makeItem('f1', 'Onboarding improvements', 'feature', {
@@ -387,9 +390,10 @@ describe('AhaAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'outcome_delivered_by_feature')
-    const edge = result.edges.find((e) => e.type === 'outcome_delivered_by_feature')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'goal -> feature link')
+    // outcome_delivered_by_feature requires an outcome source; goal maps to objective
+    expect(result.edges.find((e) => e.type === 'outcome_delivered_by_feature')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
   it('product_targets_persona emitted when persona has product parent', async () => {
@@ -525,15 +529,15 @@ describe('AhaAdapter: full fixture', () => {
     ]
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'AhaAdapter full fixture')
-    // Edges expected:
+    // Edges expected (catalogue-driven; non-canonical pairs fall back to node_informs_node):
     // product_invests_in_initiative (prod1→init1)
-    // initiative_drives_outcome (init1→g1)
+    // node_informs_node (init1→g1: initiative→objective has no canonical edge)
     // objective_achieved_through_key_result (g1→kr1)
     // release_contains_feature (r1→f1)
     // feature_decomposed_into_epic (f1→e1)
-    // epic_specified_by_user_story (e1→req1)
+    // node_informs_node (e1→req1: epic→acceptance_criterion has no canonical edge)
     // feature_request_creates_opportunity (idea1→stub-opp)
-    // opportunity_drives_solution (stub-opp→f1)
+    // node_informs_node (stub-opp→f1: opportunity→feature has no canonical edge)
     // product_targets_persona (prod1→p1)
     expect(result.edges.length).toBe(9)
   })

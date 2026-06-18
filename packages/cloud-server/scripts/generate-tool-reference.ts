@@ -73,7 +73,7 @@ const DOMAIN_BLURBS: Record<string, string> = {
   collaboration: 'Comments and role-based access. Cloud-only.',
   analytics: 'Postgres-side metrics aggregator.',
   webhooks: 'Outbound event sinks.',
-  spec: 'Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regions, lenses, type labels, entity meta, anti-patterns, benchmarks, product stages.',
+  spec: 'Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regions, lenses, type labels, entity meta, anti-patterns, benchmarks, product stages, plus the curated starter-template library (`list_templates` / `get_template`).',
   portfolio: 'Cross-product edges and portfolio view.',
   batch: 'Atomic batches: nodes and edges in one Postgres transaction.',
   validation: 'Schema drift detection across entity types, edge types, and properties.',
@@ -110,6 +110,9 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   // framework exercises
   applyFramework: 'apply_framework',
   scoreEntity: 'score_entity',
+  // templates (curated starter-template library)
+  listTemplatesTool: 'list_templates',
+  getTemplateTool: 'get_template',
   // nodes (extra)
   moveNode: 'move_node',
   exportEdges: 'export_edges',
@@ -225,8 +228,9 @@ async function main(): Promise<void> {
     domainLabels: DOMAIN_LABELS,
     domainBlurbs: DOMAIN_BLURBS,
     // get_tree's handler lives in its own tree.ts; fold it into the context
-    // (Context & Traversal) domain, where query sits.
-    domainSourceFiles: { context: ['context.ts', 'tree.ts'] },
+    // (Context & Traversal) domain, where query sits. list_templates /
+    // get_template live in templates.ts but group under Spec Introspection.
+    domainSourceFiles: { context: ['context.ts', 'tree.ts'], spec: ['spec.ts', 'templates.ts'] },
     symbolToToolName: SYMBOL_TO_TOOL_NAME,
     toolDefinitions: TOOL_DEFINITIONS,
     outputs: {

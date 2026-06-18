@@ -21,6 +21,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Type map ─────────────────────────────────────────────────────────────────
@@ -58,17 +59,28 @@ export const SALESFORCE_TYPE_MAP: Record<string, string | null> = {
  * Stage names are lowercase for consistent matching.
  */
 export const SALESFORCE_STATUS_MAP: Record<string, string> = {
-  new: 'draft',
-  open: 'active',
-  working: 'active',
-  escalated: 'active',
-  closed: 'complete',
-  prospecting: 'draft',
-  qualification: 'active',
-  proposal: 'active',
-  negotiation: 'active',
-  'closed won': 'complete',
-  'closed lost': 'abandoned',
+  // Case statuses -> support_ticket phases
+  new: 'opened',
+  open: 'opened',
+  working: 'in_progress',
+  escalated: 'in_progress',
+  resolved: 'resolved',
+  closed: 'closed',
+  // Opportunity stage names -> deal phases
+  prospecting: 'qualified',
+  qualification: 'qualified',
+  'value proposition': 'qualified',
+  proposal: 'proposal',
+  'proposal/price quote': 'proposal',
+  negotiation: 'negotiation',
+  'closed won': 'closed_won',
+  'closed lost': 'closed_lost',
+  // Idea statuses -> feature_request phases
+  'new idea': 'new',
+  'under review': 'under_review',
+  accepted: 'planned',
+  delivered: 'shipped',
+  'not planned': 'wont_do',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -87,10 +99,51 @@ export function resolveSalesforceType(objectType: string): string | null | undef
   return undefined
 }
 
-/** Normalize a Salesforce status/stage string to a UPG status value */
+/** Normalize a Salesforce status/stage string to a UPG status value (raw map lookup, exported for tests) */
 export function normalizeSalesforceStatus(status: string): string {
   const lower = normalizeName(status)
   return SALESFORCE_STATUS_MAP[lower] ?? status
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a Salesforce status/stage string to a phase id valid for the target
+ * type's lifecycle. Returns undefined for lifecycle-free types or when no valid
+ * mapping exists (rather than propagating a non-phase string onto the node).
+ */
+function resolveSalesforceStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = SALESFORCE_STATUS_MAP[raw]
+  return mapped && valid.has(mapped) ? mapped : undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair
+ * via the catalogue, honouring direction; null when no canonical edge exists.
+ */
+function resolvePairEdge(
+  parentUpg: string,
+  childUpg: string,
+): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 /** Resolve mapping confidence for a Salesforce object type */
@@ -199,10 +252,10 @@ export class SalesforceAdapter implements UPGAdapter {
         opportunityCount++
       }
 
-      // ── Normalise status ─────────────────────────────────────────────────
+      // ── Normalise status (validated against the target type's lifecycle) ─
       const rawStatus =
         (meta.stage as string | undefined) ?? (meta.status as string | undefined)
-      const status = rawStatus ? normalizeSalesforceStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveSalesforceStatusForType(rawStatus, entityType) : undefined
 
       // ── Tags ─────────────────────────────────────────────────────────────
       const tags: string[] = []
@@ -227,9 +280,15 @@ export class SalesforceAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'salesforce',
         external_id: item.source_id,
-        // Deal-specific fields
-        ...(entityType === 'deal' && meta.amount !== undefined
-          ? { amount: meta.amount as number }
+        // Deal-specific numeric fields belong under properties (off-schema fields
+        // are silently dropped by the .upg writer; nesting preserves them).
+        ...(entityType === 'deal'
+          ? (() => {
+              const p: Record<string, unknown> = {}
+              if (meta.amount !== undefined) p.amount = meta.amount as number
+              if (meta.close_date !== undefined) p.close_date = meta.close_date
+              return Object.keys(p).length > 0 ? { properties: p } : {}
+            })()
           : {}),
       }
 
@@ -248,12 +307,14 @@ export class SalesforceAdapter implements UPGAdapter {
       )
     }
 
-    // ── Second pass: emit hierarchy edges ────────────────────────────────────
+    // ── Second pass: emit hierarchy edges (catalogue-driven) ─────────────────
+    // Resolve edges by real UPG types (UPG_EDGE_PAIR_MAP keys on UPG types, not
+    // on Salesforce's source vocabulary).
+    const nodeTypeById = new Map(nodes.map((n) => [n.id, n.type as string]))
+
     for (const item of items) {
       const meta = item.metadata ?? {}
-      const objectType = (meta.entity_type as string | undefined) ?? ''
       const parentId = meta.parent_id as string | undefined
-      const parentType = (meta.parent_type as string | undefined) ?? ''
 
       const nodeId = sourceMap[item.source_id]
       if (!nodeId) continue
@@ -268,26 +329,21 @@ export class SalesforceAdapter implements UPGAdapter {
         continue
       }
 
-      const edgeResult = resolveSalesforceEdge(parentType, objectType, item.title, warnings)
+      const parentUpgType = nodeTypeById.get(parentNodeId)
+      const childUpgType = nodeTypeById.get(nodeId)
+      if (!parentUpgType || !childUpgType) continue
 
-      if (edgeResult === null) {
-        // Unrecognised pair: emit generic informational edge with low confidence
-        edges.push({
-          id: `edge-salesforce-${parentNodeId}-${nodeId}`,
-          source: parentNodeId,
-          target: nodeId,
-          type: 'node_informs_node' as UPGEdgeType,
-          mapping_confidence: 'low',
-        })
-        continue
-      }
+      const mapped = resolvePairEdge(parentUpgType, childUpgType)
+      const edgeSource = mapped?.sourceIsChild ? nodeId : parentNodeId
+      const edgeTarget = mapped?.sourceIsChild ? parentNodeId : nodeId
+      const edgeType = (mapped ? mapped.type : 'node_informs_node') as UPGEdgeType
 
       edges.push({
-        id: `edge-salesforce-${parentNodeId}-${nodeId}`,
-        source: parentNodeId,
-        target: nodeId,
-        type: edgeResult as UPGEdgeType,
-        mapping_confidence: 'medium',
+        id: `edge-salesforce-${edgeSource}-${edgeTarget}`,
+        source: edgeSource,
+        target: edgeTarget,
+        type: edgeType,
+        mapping_confidence: mapped ? 'medium' : 'low',
       })
     }
 
@@ -297,53 +353,4 @@ export class SalesforceAdapter implements UPGAdapter {
 
     return { nodes, edges, source_map: sourceMap, warnings }
   }
-}
-
-// ─── Edge resolution ──────────────────────────────────────────────────────────
-
-/**
- * Resolve the canonical UPG edge for a Salesforce parent_type → object_type pair.
- *
- * Returns a UPG edge type string, or null for unrecognised pairs
- * (caller emits node_informs_node fallback).
- *
- * All emitted edge types are verified against the live UPG edge catalogue.
- */
-function resolveSalesforceEdge(
-  parentType: string,
-  childType: string,
-  _itemTitle: string,
-  _warnings: string[],
-): string | null {
-  const parent = normalizeName(parentType)
-  const child = normalizeName(childType)
-
-  // account → contact
-  if (parent === 'account' && child === 'contact') {
-    return 'account_contains_contact'
-  }
-
-  // account → opportunity (deal)
-  if (parent === 'account' && child === 'opportunity') {
-    return 'account_negotiates_deal'
-  }
-
-  // lead → account (after conversion)
-  if (parent === 'lead' && child === 'account') {
-    return 'lead_becomes_account'
-  }
-
-  // case → feature request context (when a Case generates a feature request)
-  if (parent === 'case' && child === 'idea') {
-    return 'customer_feedback_becomes_feature_request'
-  }
-
-  // account → case (support ticket belongs to account)
-  // UPG edge: support_ticket_reveals_need: applicable when case reveals a product need
-  // Here we use the structural relationship: support ticket under account
-  if (parent === 'account' && child === 'case') {
-    return null // no exact structural edge for account→support_ticket; use fallback
-  }
-
-  return null
 }

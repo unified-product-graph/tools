@@ -20,7 +20,7 @@
  * - messenger_app: platform app, not product knowledge
  */
 
-import { UPG_EDGE_TYPES } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -43,15 +43,43 @@ export const INTERCOM_TYPE_MAP: Record<string, string | null> = {
   segment: 'market_segment',      // named contact segment
   survey: 'customer_feedback',    // survey submission
   messenger_app: null,             // platform app: skip
+  team: 'team',                    // Intercom team; needed as node_owned_by_team target
+  feature_request: 'feature_request', // pass-through for edge resolution (pre-seeded)
 }
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-export const INTERCOM_STATUS_MAP: Record<string, string> = {
-  open: 'active',
-  pending: 'active',
-  snoozed: 'active',
-  closed: 'complete',
+/**
+ * Maps raw Intercom status strings to candidate UPG phase ids, keyed by
+ * target UPG type. Entries are tried AFTER the raw value is checked against
+ * the type's own lifecycle, so only values that are NOT direct phase ids need
+ * to appear here.
+ */
+export const INTERCOM_STATUS_MAP: Record<string, Record<string, string>> = {
+  support_ticket: {
+    open: 'opened',
+    pending: 'triaged',
+    snoozed: 'in_progress',
+    closed: 'closed',
+  },
+  customer_feedback: {
+    open: 'received',
+    pending: 'triaged',
+    snoozed: 'triaged',
+    closed: 'acknowledged',
+  },
+  document: {
+    open: 'draft',
+    pending: 'draft',
+    snoozed: 'draft',
+    closed: 'archived',
+  },
+  feature_request: {
+    open: 'new',
+    pending: 'under_review',
+    snoozed: 'under_review',
+    closed: 'wont_do',
+  },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -69,10 +97,40 @@ export function resolveIntercomType(entityType: string): string | null | undefin
   return undefined
 }
 
-/** Normalize an Intercom status string to a UPG status value */
-export function normalizeIntercomStatus(status: string): string {
-  const lower = normalizeName(status)
-  return INTERCOM_STATUS_MAP[lower] ?? status
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve an Intercom status string to a phase id valid for the target type's
+ * lifecycle. Returns undefined for lifecycle-free types or when no mapping exists.
+ */
+export function resolveIntercomStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const typeMap = INTERCOM_STATUS_MAP[upgType] ?? {}
+  const mapped = typeMap[raw]
+  return mapped && valid.has(mapped) ? mapped : undefined
+}
+
+/** Canonical UPG edge for a parent UPG type → child UPG type pair via catalogue,
+ *  honouring direction; null when no canonical edge exists. */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 /** Resolve confidence for an Intercom entity_type → UPG type mapping */
@@ -90,20 +148,6 @@ export function getConfidenceForIntercomType(entityType: string): 'high' | 'medi
     default:
       return 'low'
   }
-}
-
-/** Check if an edge type is in the UPG catalogue; fall back to node_informs_node if not */
-function safeEdgeType(
-  candidate: string,
-  fallbackWarning: string,
-  warnings: string[],
-): UPGEdgeType {
-  const edgeSet = new Set(UPG_EDGE_TYPES)
-  if (edgeSet.has(candidate as UPGEdgeType)) {
-    return candidate as UPGEdgeType
-  }
-  warnings.push(fallbackWarning)
-  return 'node_informs_node' as UPGEdgeType
 }
 
 // ─── Intercom Adapter ─────────────────────────────────────────────────────────
@@ -173,9 +217,9 @@ export class IntercomAdapter implements UPGAdapter {
       // Register in sourceMap before any continue paths
       sourceMap[item.source_id] = nodeId
 
-      // ── Status normalisation ───────────────────────────────────────────────
+      // ── Status normalisation (validated against target type's lifecycle) ──
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeIntercomStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveIntercomStatusForType(rawStatus, upgEntityType) : undefined
 
       // ── Tags ───────────────────────────────────────────────────────────────
       const tags: string[] = []
@@ -196,9 +240,9 @@ export class IntercomAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'intercom',
         external_id: item.source_id,
-        // Preserve conversation_rating on support_ticket nodes
+        // Preserve conversation_rating under properties so it survives the .upg writer
         ...(upgEntityType === 'support_ticket' && meta.conversation_rating !== undefined
-          ? { conversation_rating: meta.conversation_rating as number }
+          ? { properties: { conversation_rating: meta.conversation_rating as number } }
           : {}),
       }
 
@@ -222,13 +266,12 @@ export class IntercomAdapter implements UPGAdapter {
       const nodeId = sourceMap[item.source_id]
       if (!nodeId) continue
 
-      // ── Team ownership edge ────────────────────────────────────────────────
-      // Emit node_owned_by_team when a contact_company_id or team reference is present
+      // ── Company membership edge (contact_company_id) ───────────────────────
+      // participant → account via company membership; node_informs_node (polymorphic)
       const contactCompanyId = meta.contact_company_id as string | undefined
       if (contactCompanyId) {
         const companyNodeId = sourceMap[contactCompanyId]
         if (companyNodeId) {
-          // contact → account (ownership relationship via company membership)
           edges.push({
             id: `edge-intercom-ownership-${nodeId}-${companyNodeId}`,
             source: nodeId,
@@ -256,37 +299,41 @@ export class IntercomAdapter implements UPGAdapter {
 
       const upgEntityType = resolved
 
-      // Determine edge type based on parent entity type
       const parentItem = items.find((i) => i.source_id === parentId)
       if (!parentItem) continue
 
       const parentEntityType = (parentItem.metadata?.entity_type as string | undefined) ?? ''
       const parentResolved = resolveIntercomType(parentEntityType)
+      const parentUpg = (parentResolved as string | null | undefined) ?? 'document'
+      const childUpg = upgEntityType
 
-      let edgeType: UPGEdgeType | null = null
-
-      // support_ticket → feature_request when parent is a feature_request
-      if (upgEntityType === 'support_ticket') {
-        if (parentResolved === 'feature_request' || parentEntityType === 'feature_request') {
-          edgeType = safeEdgeType(
-            'customer_feedback_becomes_feature_request',
-            `Intercom: customer_feedback_becomes_feature_request not in catalog. Falling back to node_informs_node for "${item.title}".`,
-            warnings,
-          )
-        }
+      // ── Team ownership: node_owned_by_team (polymorphic pair, explicit) ────
+      // UPG_EDGE_PAIR_MAP has 'node:team' but not typed source:team pairs.
+      // Direction: source = owned entity (child), target = team (parent).
+      if (parentUpg === 'team') {
+        edges.push({
+          id: `edge-intercom-${nodeId}-${parentNodeId}`,
+          source: nodeId,        // owned entity
+          target: parentNodeId,  // team
+          type: 'node_owned_by_team' as UPGEdgeType,
+          mapping_confidence: 'medium',
+        })
+        continue
       }
 
-      // node_owned_by_team for team ownership
-      const parentType = meta.parent_type as string | undefined
-      if (parentType === 'team' || parentEntityType === 'team') {
-        edgeType = safeEdgeType(
-          'node_owned_by_team',
-          `Intercom: node_owned_by_team not in catalog. Falling back to node_informs_node for "${item.title}".`,
-          warnings,
-        )
-      }
-
-      if (edgeType === null) {
+      // ── Catalogue-driven resolution for all other parent→child pairs ───────
+      const mapped = resolvePairEdge(parentUpg, childUpg)
+      if (mapped) {
+        const source = mapped.sourceIsChild ? nodeId : parentNodeId
+        const target = mapped.sourceIsChild ? parentNodeId : nodeId
+        edges.push({
+          id: `edge-intercom-${parentNodeId}-${nodeId}`,
+          source,
+          target,
+          type: mapped.type as UPGEdgeType,
+          mapping_confidence: 'medium',
+        })
+      } else {
         edges.push({
           id: `edge-intercom-${parentNodeId}-${nodeId}`,
           source: parentNodeId,
@@ -294,16 +341,11 @@ export class IntercomAdapter implements UPGAdapter {
           type: 'node_informs_node' as UPGEdgeType,
           mapping_confidence: 'low',
         })
-        continue
+        warnings.push(
+          `No canonical UPG edge for Intercom ${parentEntityType || 'parent'} -> ${entityType || 'child'} ` +
+            `(${parentUpg} -> ${childUpg}); emitted node_informs_node as a generic link.`,
+        )
       }
-
-      edges.push({
-        id: `edge-intercom-${parentNodeId}-${nodeId}`,
-        source: parentNodeId,
-        target: nodeId,
-        type: edgeType,
-        mapping_confidence: 'medium',
-      })
     }
 
     if (nodes.length === 0 && skippedOutbound === 0) {

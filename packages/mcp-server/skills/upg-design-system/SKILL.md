@@ -123,7 +123,7 @@ Use colored emoji dots for entity state. One dot, inline or right-aligned:
 | shipped / validated / achieved | 🟢 |
 | in_progress / active / testing | 🟡 |
 | planned / proposed / drafted | 🔵 |
-| untested / backlog | ⚪ |
+| untested | ⚪ |
 | blocked / invalidated | 🔴 |
 | deferred / deprecated / archived | ⚫ |
 

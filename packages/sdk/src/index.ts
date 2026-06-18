@@ -100,3 +100,6 @@ export {
   getValidChildren,
   getRegionForEntityType,
 } from '@unified-product-graph/core'
+
+// ── Templates (access layer over @unified-product-graph/templates) ───────────
+export * from './templates.js'

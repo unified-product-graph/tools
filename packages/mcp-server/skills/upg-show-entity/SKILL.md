@@ -121,7 +121,7 @@ Check for common gaps on this entity:
 **Missing connections:**
 - Use type-based heuristics:
   - `persona` without `job` connections -> "This persona has no Jobs-to-be-Done"
-  - `hypothesis` without `experiment` -> "This hypothesis is untested"
+  - `hypothesis` without `experiment` -> "This hypothesis is unvalidated"
   - `feature` without `user_story` -> "This feature has no user stories"
   - `outcome` without `metric` -> "This outcome has no KPI / metric"
   - `opportunity` without `solution` -> "This opportunity has no solutions"

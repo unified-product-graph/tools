@@ -37,7 +37,7 @@ import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../typ
  * with a warning.
  */
 export const POSTHOG_TYPE_MAP: Record<string, string | null> = {
-  feature_flag: 'feature',         // a feature flag represents the capability being toggled
+  feature_flag: 'feature_flag',    // a PostHog flag IS a UPG feature_flag (the toggle), distinct from the feature it gates
   experiment: 'experiment',        // A/B test with hypothesis field
   insight: 'metric',               // a named analytics insight/chart = tracked metric
   dashboard: null,                 // view config: skip
@@ -48,16 +48,23 @@ export const POSTHOG_TYPE_MAP: Record<string, string | null> = {
   person: null,                    // individual person: not product knowledge
   event: null,                     // raw events: skip with warning
   recording: null,                 // session recording: skip
-  early_access_feature: 'feature', // early access variant of feature flag
+  early_access_feature: 'feature', // a beta feature opted into via an early-access program → the feature itself
 }
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 export const POSTHOG_STATUS_MAP: Record<string, string> = {
+  // Experiment statuses
   draft: 'draft',
   running: 'active',
   complete: 'complete',
   archived: 'abandoned',
+  // Feature flag states → feature_flag phases (off | rollout | on)
+  active: 'on',
+  enabled: 'on',
+  inactive: 'off',
+  disabled: 'off',
+  rollout: 'rollout',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -229,14 +236,22 @@ export class PostHogAdapter implements UPGAdapter {
         tags.push(...(meta.tags as string[]))
       }
 
-      // ── Metric values belong under properties (canonical) so they persist ──
-      let metricProps: Record<string, unknown> | undefined
+      // ── Off-schema source fields → properties (canonical) so they persist ──
+      let nodeProps: Record<string, unknown> | undefined
       if (upgEntityType === 'metric') {
         const p: Record<string, unknown> = {}
         if (meta.current_value !== undefined) p.current_value = meta.current_value as number
         if (meta.target_value !== undefined) p.target_value = meta.target_value as number
         if (meta.unit !== undefined) p.unit = meta.unit as string
-        if (Object.keys(p).length > 0) metricProps = p
+        if (Object.keys(p).length > 0) nodeProps = p
+      } else if (upgEntityType === 'feature_flag') {
+        // Preserve the flag's own identity: key, rollout %, and lifecycle classification.
+        const p: Record<string, unknown> = {}
+        if (meta.key !== undefined) p.key = meta.key as string
+        if (meta.rollout_pct !== undefined) p.rollout_pct = meta.rollout_pct as number
+        if (meta.rollout_percentage !== undefined) p.rollout_pct = meta.rollout_percentage as number
+        if (meta.flag_type !== undefined) p.flag_type = meta.flag_type as string
+        if (Object.keys(p).length > 0) nodeProps = p
       }
 
       // ── Build the UPG node ─────────────────────────────────────────────────
@@ -252,7 +267,7 @@ export class PostHogAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'posthog',
         external_id: item.source_id,
-        ...(metricProps ? { properties: metricProps } : {}),
+        ...(nodeProps ? { properties: nodeProps } : {}),
       }
 
       nodes.push(node)

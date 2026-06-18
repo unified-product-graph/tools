@@ -21,7 +21,7 @@
  * - tag       : metadata; preserved as tags on nodes
  */
 
-import { UPG_EDGE_TYPES } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -42,17 +42,18 @@ export const CANNY_TYPE_MAP: Record<string, string | null> = {
   company: 'account',       // company the submitter belongs to
   tag: null,                // metadata
   vote: null,               // behavioral signal: preserve as vote_count property
+  opportunity: 'opportunity', // UPG opportunity from a pre-seeded graph; pass-through for edge resolution
 }
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 export const CANNY_STATUS_MAP: Record<string, string> = {
-  'open': 'draft',
-  'under review': 'draft',
-  'planned': 'active',
-  'in progress': 'active',
-  'complete': 'complete',
-  'closed': 'abandoned',
+  'open': 'new',
+  'under review': 'under_review',
+  'planned': 'planned',
+  'in progress': 'in_progress',
+  'complete': 'shipped',
+  'closed': 'wont_do',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,18 +89,43 @@ export function getConfidenceForCannyType(entityType: string): 'high' | 'medium'
   }
 }
 
-/** Check if an edge type is in the UPG catalogue; fall back to node_informs_node if not */
-function safeEdgeType(
-  candidate: string,
-  fallbackWarning: string,
-  warnings: string[],
-): UPGEdgeType {
-  const edgeSet = new Set(UPG_EDGE_TYPES)
-  if (edgeSet.has(candidate as UPGEdgeType)) {
-    return candidate as UPGEdgeType
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
   }
-  warnings.push(fallbackWarning)
-  return 'node_informs_node' as UPGEdgeType
+  return set
+}
+
+/**
+ * Resolve a Canny status to one valid for the TARGET type's lifecycle. Tries the
+ * raw value first, then the mapped value; omits anything that does not fit rather
+ * than persisting an invalid status. Returns undefined for lifecycle-free types.
+ */
+function resolveCannyStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = CANNY_STATUS_MAP[raw]
+  if (mapped && valid.has(mapped)) return mapped
+  return undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair via
+ * the catalogue, honouring direction; null when no canonical edge exists.
+ */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 // ─── Canny Adapter ────────────────────────────────────────────────────────────
@@ -173,9 +199,9 @@ export class CannyAdapter implements UPGAdapter {
       // Register in sourceMap before any continue paths
       sourceMap[item.source_id] = nodeId
 
-      // ── Status normalisation ───────────────────────────────────────────────
+      // ── Status normalisation (validated against the target lifecycle) ──────
       const rawStatus = (meta.status as string | undefined) ?? ''
-      const status = rawStatus ? normalizeCannyStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveCannyStatusForType(rawStatus, upgEntityType) : undefined
 
       // ── Tags ───────────────────────────────────────────────────────────────
       const tags: string[] = []
@@ -201,9 +227,9 @@ export class CannyAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'canny',
         external_id: item.source_id,
-        // Preserve vote_count on feature_request nodes
+        // Preserve vote_count on feature_request nodes (under properties to stay on-schema)
         ...(upgEntityType === 'feature_request' && meta.vote_count !== undefined
-          ? { vote_count: meta.vote_count as number }
+          ? { properties: { vote_count: meta.vote_count as number } }
           : {}),
       }
 
@@ -243,26 +269,27 @@ export class CannyAdapter implements UPGAdapter {
 
       const upgEntityType = resolved
 
-      // Determine edge type based on parent entity type
+      // Determine edge type from the resolved node types (catalogue-driven)
       const parentItem = items.find((i) => i.source_id === parentId)
       if (!parentItem) continue
 
       const parentEntityType = (parentItem.metadata?.entity_type as string | undefined) ?? ''
       const parentResolved = resolveCannyType(parentEntityType)
+      const childUpg = upgEntityType
+      const parentUpg = (parentResolved as string | null | undefined) ?? 'document'
 
-      let edgeType: UPGEdgeType | null = null
-
-      if (upgEntityType === 'feature_request') {
-        if (parentResolved === 'opportunity' || parentEntityType === 'opportunity') {
-          edgeType = safeEdgeType(
-            'feature_request_creates_opportunity',
-            `Canny: feature_request_creates_opportunity not in catalog. Falling back to node_informs_node for "${item.title}".`,
-            warnings,
-          )
-        }
-      }
-
-      if (edgeType === null) {
+      const mapped = resolvePairEdge(parentUpg, childUpg)
+      if (mapped) {
+        const source = mapped.sourceIsChild ? nodeId : parentNodeId
+        const target = mapped.sourceIsChild ? parentNodeId : nodeId
+        edges.push({
+          id: `edge-canny-${parentNodeId}-${nodeId}`,
+          source,
+          target,
+          type: mapped.type as UPGEdgeType,
+          mapping_confidence: 'medium',
+        })
+      } else {
         edges.push({
           id: `edge-canny-${parentNodeId}-${nodeId}`,
           source: parentNodeId,
@@ -270,16 +297,11 @@ export class CannyAdapter implements UPGAdapter {
           type: 'node_informs_node' as UPGEdgeType,
           mapping_confidence: 'low',
         })
-        continue
+        warnings.push(
+          `No canonical UPG edge for Canny ${parentEntityType || 'parent'} -> ${entityType || 'child'} ` +
+            `(${parentUpg} -> ${childUpg}); emitted node_informs_node as a generic link.`,
+        )
       }
-
-      edges.push({
-        id: `edge-canny-${parentNodeId}-${nodeId}`,
-        source: parentNodeId,
-        target: nodeId,
-        type: edgeType,
-        mapping_confidence: 'medium',
-      })
     }
 
     if (nodes.length === 0 && skippedChangelogs === 0) {

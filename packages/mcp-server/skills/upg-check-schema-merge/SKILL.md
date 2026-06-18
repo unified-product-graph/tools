@@ -208,7 +208,7 @@ Then deep-dive into any pair the user wants to investigate.
 
 ## Known Consolidation Precedents
 
-These consolidations have already happened in UPG and can be referenced as patterns:
+These consolidations have already happened in UPG and can be referenced as patterns. The table below is an **illustrative subset frozen at 0.2.0**; for the authoritative, complete, version-current migration map, call `list_type_migrations()`:
 
 | Old Types | Unified As | Discriminator | Version |
 |-----------|-----------|---------------|---------|

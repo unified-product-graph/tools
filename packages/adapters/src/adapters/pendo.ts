@@ -18,6 +18,7 @@
  * - feature → outcome (parent):   outcome_delivered_by_feature
  */
 
+import { getLifecycleForType } from '@unified-product-graph/core'
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -41,6 +42,7 @@ export const PENDO_TYPE_MAP: Record<string, string | null> = {
   path: null, // usage path analysis: skip
   report: null, // analytics report: skip
   app: 'product', // Pendo app = product
+  opportunity: 'opportunity', // UPG opportunity passed through (enables feature_request_creates_opportunity edge)
 }
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
@@ -74,6 +76,33 @@ export function resolvePendoType(entityType: string): string | null | undefined 
 export function normalizePendoStatus(status: string): string {
   const lower = normalizeName(status)
   return PENDO_STATUS_MAP[lower] ?? status
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a Pendo status to a status valid for the TARGET UPG type's lifecycle.
+ * Tries the raw value first, then the normalised value from PENDO_STATUS_MAP.
+ * Returns undefined for lifecycle-free types or when no mapping fits.
+ */
+function resolvePendoStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = PENDO_STATUS_MAP[raw]
+  if (mapped && valid.has(mapped)) return mapped
+  return undefined
 }
 
 /** Resolve mapping confidence for a Pendo entity type */
@@ -190,9 +219,9 @@ export class PendoAdapter implements UPGAdapter {
         )
       }
 
-      // ── Normalise status ─────────────────────────────────────────────────
+      // ── Normalise status (validated against the target type's lifecycle) ─
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizePendoStatus(rawStatus) : undefined
+      const status = rawStatus ? resolvePendoStatusForType(rawStatus, upgEntityType) : undefined
 
       // ── Tags ─────────────────────────────────────────────────────────────
       const tags: string[] = []
@@ -217,9 +246,16 @@ export class PendoAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'pendo',
         external_id: item.source_id,
-        // Feature adoption data: unique to Pendo
-        ...(upgEntityType === 'feature' && meta.adoption_rate !== undefined
-          ? { adoption_rate: meta.adoption_rate as number }
+        // Feature adoption data: unique to Pendo - nested under properties so the
+        // value survives the .upg writer (top-level off-schema fields are dropped).
+        ...(upgEntityType === 'feature'
+          ? (() => {
+              const p: Record<string, unknown> = {}
+              if (meta.adoption_rate !== undefined) p.adoption_rate = meta.adoption_rate as number
+              if (meta.visitor_count !== undefined) p.visitor_count = meta.visitor_count as number
+              if (meta.click_count !== undefined) p.click_count = meta.click_count as number
+              return Object.keys(p).length > 0 ? { properties: p } : {}
+            })()
           : {}),
       }
 

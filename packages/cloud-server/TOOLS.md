@@ -1,6 +1,6 @@
 # UPG MCP Cloud Server Tool Reference
 
-Reference for the 98 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
+Reference for the 100 tools exposed by `@unified-product-graph/cloud-server`. Generated from JSDoc on `src/tools/*.ts`; do not edit by hand.
 
 ## Contents
 
@@ -14,7 +14,7 @@ Reference for the 98 tools exposed by `@unified-product-graph/cloud-server`. Gen
 - [Collaboration](#collaboration): 4 tools
 - [Analytics](#analytics): 1 tool
 - [Webhooks](#webhooks): 3 tools
-- [Spec Introspection](#spec-introspection): 47 tools
+- [Spec Introspection](#spec-introspection): 49 tools
 - [Portfolio](#portfolio): 4 tools
 - [Atomic Batches](#atomic-batches): 6 tools
 - [Validation](#validation): 1 tool
@@ -1213,7 +1213,7 @@ JSON: `{ removed: <webhook_id> }`.
 
 ## Spec Introspection
 
-_Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regions, lenses, type labels, entity meta, anti-patterns, benchmarks, product stages._
+_Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regions, lenses, type labels, entity meta, anti-patterns, benchmarks, product stages, plus the curated starter-template library (`list_templates` / `get_template`)._
 
 - [`get_anti_pattern`](#get-anti-pattern)
 - [`get_approach`](#get-approach)
@@ -1229,6 +1229,7 @@ _Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regi
 - [`get_region_for_entity_type`](#get-region-for-entity-type)
 - [`get_scale`](#get-scale)
 - [`get_spec_version`](#get-spec-version)
+- [`get_template`](#get-template)
 - [`get_tree_pattern`](#get-tree-pattern)
 - [`get_type_label`](#get-type-label)
 - [`get_valid_children`](#get-valid-children)
@@ -1254,6 +1255,7 @@ _Spec snapshot: playbooks, approaches, domains, frameworks, edge catalogue, regi
 - [`list_scales`](#list-scales)
 - [`list_split_migrations`](#list-split-migrations)
 - [`list_status_values`](#list-status-values)
+- [`list_templates`](#list-templates)
 - [`list_tree_patterns`](#list-tree-patterns)
 - [`list_type_labels`](#list-type-labels)
 - [`list_type_migrations`](#list-type-migrations)
@@ -1576,6 +1578,25 @@ _No arguments._
 JSON: `{ upg_version, markdown_format_version, entity_count, edge_count, domain_count, region_count }`
 
 **See also:** `list_entity_types`, `list_edge_types`, `list_regions`
+
+
+### `get_template`
+
+Get a curated starter template in full by id: its entities (with title/description templates, default properties, tags, status), its typed edges (canonical UPG edge per pair), and its prompts (the questions to fill `{{placeholders}}`). Use to instantiate a template: walk the prompts, substitute placeholders, create the entities and typed edges.
+
+**Atomicity:** `atomic (read-only)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `id` | string | ✓ | Template id (e.g. "saas-business-model"). Run list_templates for the options. |
+
+**Returns:**
+
+JSON: `{ template: TemplateSet }`, or `{ error, available }` when the id is unknown.
+
+**See also:** `list_templates`
 
 
 ### `get_tree_pattern`
@@ -2051,6 +2072,26 @@ List the valid `status` values an entity type can hold: the pre-flight lookup so
 JSON: `{ entity_type, lifecycle_free, initial_status?, terminal_statuses?, values: [{ status, label, terminal }], note? }`.
 
 **See also:** `get_lifecycle`, `get_entity_schema`
+
+
+### `list_templates`
+
+List the curated starter templates (proven entity patterns for SaaS, marketplace, mobile, OSS, and agency). Returns summaries: id, name, description, industries, stages, entity_count, entity_types. The same library powers the /upg-new-from-template skill and the site gallery. Use with get_template to fetch a full pattern for instantiation.
+
+**Atomicity:** `atomic (read-only)`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `industry` | string |  | Filter by industry (saas, marketplace, mobile, oss, agency) |
+| `stage` | string |  | Filter by stage (concept, validation, growth, mature) |
+
+**Returns:**
+
+JSON: `{ templates: TemplateSummary[] }` — id, name, description, industries, stages, entity_count, entity_types.
+
+**See also:** `get_template`
 
 
 ### `list_tree_patterns`
