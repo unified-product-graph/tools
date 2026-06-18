@@ -30,7 +30,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolveContainmentEdge } from '@unified-product-graph/core'
+import { resolveContainmentEdge, getLifecycleForType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Issue label sets ─────────────────────────────────────────────────────────
@@ -91,7 +91,10 @@ const TASK_LABELS = new Set([
  */
 const GITHUB_ENTITY_TYPE_MAP: Record<string, string | null> = {
   repository: 'code_repository',
-  milestone: 'milestone',
+  // A GitHub Milestone is a versioned target that CONTAINS issues — UPG has no
+  // milestone->feature edge, but release_contains_feature/bug exist, so a GitHub
+  // milestone maps to UPG `release` (this also matches the site copy).
+  milestone: 'release',
   release: 'release',
   project: 'project',        // GitHub ProjectV2
   discussion: 'document',
@@ -125,16 +128,42 @@ export function inferIssueType(labels: string[]): string {
   return 'task' // default: unlabelled issues are delivery tasks
 }
 
-/** Map GitHub issue open/closed state to UPG status */
+/** Map GitHub issue open/closed state to a candidate UPG phase id. */
 function mapGitHubState(state: string): string {
   switch (state.toLowerCase()) {
     case 'open':
-      return 'active'
+      return 'in_progress'
     case 'closed':
-      return 'complete'
+      return 'done'
     default:
       return state.toLowerCase()
   }
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a GitHub state to a status valid for the target type's lifecycle.
+ * Tries the raw state (a bug's `open` is a real bug phase), then the mapped
+ * phase id, and omits anything that does not fit.
+ */
+function resolveGitHubStatusForType(rawState: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = rawState.toLowerCase().trim()
+  if (valid.has(raw)) return raw
+  const mapped = mapGitHubState(rawState)
+  return valid.has(mapped) ? mapped : undefined
 }
 
 // ─── GitHub Adapter ───────────────────────────────────────────────────────────
@@ -288,7 +317,7 @@ export class GitHubAdapter implements UPGAdapter {
         mapping_confidence: 'high',
         external_tool: 'github',
         external_id: item.source_id,
-        ...(meta.url ? { external_url: meta.url as string } : {}),
+        ...(meta.url ? { external_ref: meta.url as string } : {}),
         properties: {
           ...(meta.due_on ? { due_date: meta.due_on } : {}),
           ...(meta.state ? { state: meta.state } : {}),
@@ -297,16 +326,6 @@ export class GitHubAdapter implements UPGAdapter {
       }
 
       nodes.push(node)
-
-      // milestone → release edge (when a release references a milestone)
-      const releaseMilestoneId = meta.milestone_id as string | undefined
-      if (ugpType === 'release' && releaseMilestoneId) {
-        deferredEdges.push({
-          fromSourceId: releaseMilestoneId,
-          toSourceId: item.source_id,
-          edgeType: 'milestone_gates_release' as UPGEdgeType,
-        })
-      }
     }
 
     // ── Pass 2: all remaining items ───────────────────────────────────────────
@@ -355,7 +374,9 @@ export class GitHubAdapter implements UPGAdapter {
       // ── Issue-specific processing ─────────────────────────────────────────
       const isIssue = entityType === 'issue'
       const labels = isIssue ? ((meta.labels as string[] | undefined) ?? []) : []
-      const status = isIssue ? mapGitHubState((meta.state as string) ?? 'open') : undefined
+      const status = isIssue
+        ? resolveGitHubStatusForType((meta.state as string) ?? 'open', resolvedType)
+        : undefined
 
       // Filter type-indicator labels from tags: they're captured in entity type
       const tags = isIssue
@@ -392,7 +413,7 @@ export class GitHubAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'github',
         external_id: item.source_id,
-        ...(meta.url ? { external_url: meta.url as string } : {}),
+        ...(meta.url ? { external_ref: meta.url as string } : {}),
         ...(Object.keys(properties).length > 0 ? { properties } : {}),
       }
 

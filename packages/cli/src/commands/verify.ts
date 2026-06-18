@@ -43,7 +43,12 @@ export const verifyCommand = new Command('verify')
         })
       }
 
-      if (opts.noOrphans === false && orphans.length > 0) {
+      // Commander 13 stores a `--no-X` negation under `opts.x` (default true,
+      // false when the flag is passed), NOT `opts.noX`. Reading `opts.noOrphans`
+      // here always saw `undefined`, so `--no-orphans` — the documented CI gate —
+      // was a silently dead flag (a 100%-orphan graph still exited 0). Match the
+      // working `opts.contentDepth` pattern below. (UPG / adopt-qa P0-1)
+      if (opts.orphans === false && orphans.length > 0) {
         violations.push({
           rule: 'no-orphans',
           message: `${orphans.length} orphan entities found (${Math.round(orphanRate * 100)}% of graph)`,
@@ -57,7 +62,9 @@ export const verifyCommand = new Command('verify')
         })
       }
 
-      if (opts.noBrokenChains === false) {
+      // Same Commander 13 negation bug as --no-orphans above: read opts.brokenChains,
+      // not opts.noBrokenChains, or this CI gate is silently dead. (adopt-qa P0-2)
+      if (opts.brokenChains === false) {
         const chainPairs: Array<[string, number, number]> = [
           ['persona → job', digest.chains.persona_with_job, digest.chains.persona_total],
           ['job → need', digest.chains.job_with_need, digest.chains.job_total],

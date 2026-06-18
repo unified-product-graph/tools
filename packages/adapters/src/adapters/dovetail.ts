@@ -142,69 +142,81 @@ export class DovetailAdapter implements UPGAdapter {
     const apiKey = config.api_key as string
     if (!apiKey) throw new Error('Dovetail adapter requires config.api_key (DOVETAIL_API_KEY)')
 
-    const headers = {
-      Authorization: `Bearer ${apiKey}`,
-      Accept: 'application/json',
-    }
-    const baseUrl = 'https://dovetail.com/api/v1'
+    const headers = { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }
+    const baseUrl = (config.base_url as string) || 'https://dovetail.com/api/v1'
     const items: SourceItem[] = []
 
-    // Projects
-    const projectsRes = await fetch(`${baseUrl}/projects`, { headers })
-    if (!projectsRes.ok) throw new Error(`Dovetail projects fetch failed: ${projectsRes.status}`)
-    const projects = await projectsRes.json() as { data: Array<{ id: string; title: string; created_at: string }> }
+    // Dovetail's real API (developers.dovetail.com): resources are GLOBAL list
+    // endpoints (not project-scoped), cursor-paginated as
+    // { data: [...], page: { has_more, next_cursor } }.
+    interface DTRecord {
+      id: string
+      title?: string
+      name?: string
+      text?: string
+      summary?: string
+      note_id?: string
+      start_time?: number
+      end_time?: number
+      project_id?: string
+      project?: { id?: string }
+    }
+    async function fetchAll(pathName: string): Promise<DTRecord[]> {
+      const out: DTRecord[] = []
+      let cursor: string | undefined
+      let guard = 0
+      do {
+        const sep = pathName.includes('?') ? '&' : '?'
+        const url = `${baseUrl}${pathName}${cursor ? `${sep}page[after]=${encodeURIComponent(cursor)}` : ''}`
+        const res = await fetch(url, { headers })
+        if (!res.ok) throw new Error(`Dovetail ${pathName} fetch failed: ${res.status}`)
+        const body = (await res.json()) as { data?: DTRecord[]; page?: { has_more?: boolean; next_cursor?: string } }
+        out.push(...(body.data ?? []))
+        cursor = body.page?.has_more ? body.page?.next_cursor : undefined
+      } while (cursor && ++guard < 100)
+      return out
+    }
+    // A data/doc record's project reference: `project_id` or nested `project.id`.
+    const projectRef = (r: DTRecord): string | undefined => r.project_id ?? r.project?.id
 
-    for (const project of projects.data) {
+    // Projects → research_study (root nodes)
+    for (const p of await fetchAll('/projects')) {
+      items.push({ source_id: p.id, source_type: 'project', title: p.title ?? 'Untitled project', metadata: { entity_type: 'project' } })
+    }
+    // Data (global) → observation. Content body is not in the list response.
+    for (const d of await fetchAll('/data')) {
       items.push({
-        source_id: project.id,
-        source_type: 'project',
-        title: project.title,
-        metadata: { entity_kind: 'project', entity_type: 'project' },
+        source_id: d.id,
+        source_type: 'data',
+        title: d.title ?? 'Untitled data',
+        metadata: { entity_type: 'data', project_id: projectRef(d) },
       })
-
-      // Data items (notes/transcripts)
-      const dataRes = await fetch(`${baseUrl}/projects/${project.id}/data`, { headers })
-      if (dataRes.ok) {
-        const data = await dataRes.json() as { data: Array<{ id: string; title: string; type: string; content?: string }> }
-        for (const item of data.data) {
-          items.push({
-            source_id: item.id,
-            source_type: item.type ?? 'note',
-            title: item.title,
-            content: item.content,
-            metadata: { entity_type: item.type ?? 'note', parent_id: project.id, parent_type: 'project' },
-          })
-        }
-      }
-
-      // Highlights
-      const highlightsRes = await fetch(`${baseUrl}/projects/${project.id}/highlights`, { headers })
-      if (highlightsRes.ok) {
-        const highlights = await highlightsRes.json() as { data: Array<{ id: string; content: string; data_id: string }> }
-        for (const h of highlights.data) {
-          items.push({
-            source_id: h.id,
-            source_type: 'highlight',
-            title: h.content.slice(0, 80),
-            content: h.content,
-            metadata: { entity_type: 'highlight', parent_id: h.data_id, parent_type: 'note' },
-          })
-        }
-      }
-
-      // Themes
-      const themesRes = await fetch(`${baseUrl}/projects/${project.id}/themes`, { headers })
-      if (themesRes.ok) {
-        const themes = await themesRes.json() as { data: Array<{ id: string; name: string; description?: string }> }
-        for (const t of themes.data) {
-          items.push({
-            source_id: t.id,
-            source_type: 'theme',
-            title: t.name,
-            content: t.description,
-            metadata: { entity_type: 'theme', parent_id: project.id, parent_type: 'project' },
-          })
-        }
+    }
+    // Highlights (global) → quote. Parent reference is `note_id` (the data entry).
+    for (const h of await fetchAll('/highlights')) {
+      const isClip = h.start_time !== undefined && h.end_time !== undefined
+      items.push({
+        source_id: h.id,
+        source_type: 'highlight',
+        title: h.text ? h.text.slice(0, 80) : `Highlight ${h.id}`,
+        content: h.text,
+        metadata: { entity_type: 'highlight', datum_id: h.note_id, is_video_clip: isClip, start_s: h.start_time, end_s: h.end_time },
+      })
+    }
+    // Docs / insights (global) → insight
+    for (const d of await fetchAll('/docs')) {
+      items.push({ source_id: d.id, source_type: 'doc', title: d.title ?? 'Untitled doc', metadata: { entity_type: 'doc', project_id: projectRef(d) } })
+    }
+    // Contacts (global) → participant
+    for (const c of await fetchAll('/contacts')) {
+      items.push({ source_id: c.id, source_type: 'contact', title: c.name ?? c.title ?? 'Unnamed contact', metadata: { entity_type: 'contact' } })
+    }
+    // Channels → feedback_program, with their themes → affinity_cluster.
+    // (Dovetail themes live under channels, not projects.)
+    for (const ch of await fetchAll('/channels')) {
+      items.push({ source_id: ch.id, source_type: 'channel', title: ch.title ?? ch.name ?? 'Channel', metadata: { entity_type: 'channel' } })
+      for (const t of await fetchAll(`/channels/${ch.id}/themes`)) {
+        items.push({ source_id: t.id, source_type: 'theme', title: t.title ?? 'Theme', content: t.summary, metadata: { entity_type: 'theme', channel_id: ch.id } })
       }
     }
 

@@ -177,47 +177,48 @@ describe('ProductboardAdapter: skip and warning cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('ProductboardAdapter: status normalisation', () => {
-  it("'new' normalises to 'draft'", async () => {
+describe('ProductboardAdapter: status normalisation (validated against feature lifecycle)', () => {
+  // feature lifecycle: proposed → in_progress → shipped → archived
+  it("'new' maps to 'proposed'", async () => {
     const items: SourceItem[] = [makeFeature('f1', 'Feature', 'feature', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('proposed')
   })
 
-  it("'under-consideration' normalises to 'draft'", async () => {
+  it("'under-consideration' maps to 'proposed'", async () => {
     const items: SourceItem[] = [
       makeFeature('f1', 'Feature', 'feature', { status: 'under-consideration' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBe('proposed')
   })
 
-  it("'planned' normalises to 'active'", async () => {
+  it("'planned' maps to 'proposed' for a feature", async () => {
     const items: SourceItem[] = [makeFeature('f1', 'Feature', 'feature', { status: 'planned' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('proposed')
   })
 
-  it("'in-progress' normalises to 'active'", async () => {
+  it("'in-progress' maps to 'in_progress'", async () => {
     const items: SourceItem[] = [
       makeFeature('f1', 'Feature', 'feature', { status: 'in-progress' }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("'released' normalises to 'complete'", async () => {
+  it("'released' maps to 'shipped'", async () => {
     const items: SourceItem[] = [makeFeature('f1', 'Feature', 'feature', { status: 'released' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('shipped')
   })
 
-  it("\"won't do\" normalises to 'abandoned'", async () => {
+  it("\"won't do\" maps to 'archived'", async () => {
     const items: SourceItem[] = [
       makeFeature('f1', 'Feature', 'feature', { status: "won't do" }),
     ]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBe('archived')
   })
 })
 
@@ -295,7 +296,7 @@ describe('ProductboardAdapter: hierarchy edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('customer_feedback_becomes_feature_request emitted from Note linked to feature', async () => {
+  it('note linked to a feature emits a generic link (no canonical customer_feedback->feature edge)', async () => {
     const items: SourceItem[] = [
       makeFeature('f1', 'Dark mode', 'feature'),
       makeFeature('n1', 'User wants dark mode', 'note', {
@@ -303,16 +304,19 @@ describe('ProductboardAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'customer_feedback_becomes_feature_request')
-    const edge = result.edges.find((e) => e.type === 'customer_feedback_becomes_feature_request')
+    assertAllEdgesCatalogued(result.edges, 'note->feature link')
+    // The canonical path is customer_feedback -> feature_request -> feature; with
+    // no feature_request stub, an honest node_informs_node is emitted (not a
+    // mis-typed customer_feedback_becomes_feature_request whose target must be a
+    // feature_request).
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
-    // Warning about missing feature_request stub
     const warnText = result.warnings?.join(' ') ?? ''
     expect(warnText).toContain('feature_request')
     expect(warnText).toContain('evidence chain')
   })
 
-  it('outcome_delivered_by_feature emitted when feature has objective parent', async () => {
+  it('feature under an objective falls back to a generic link (no canonical objective->feature edge)', async () => {
     const items: SourceItem[] = [
       makeFeature('obj1', 'Grow retention', 'objective'),
       makeFeature('f1', 'Improve onboarding', 'feature', {
@@ -321,8 +325,8 @@ describe('ProductboardAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'outcome_delivered_by_feature')
-    const edge = result.edges.find((e) => e.type === 'outcome_delivered_by_feature')
+    assertAllEdgesCatalogued(result.edges, 'objective->feature link')
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
   })
 })

@@ -82,7 +82,7 @@ export {
 export {
   VistalyAdapter,
   VISTALY_TYPE_MAP,
-  VISTALY_STATUS_MAP,
+  VISTALY_STATUS_BY_TYPE,
   resolveCardType,
   normalizeVistalyStatus,
   getConfidenceForCardType,

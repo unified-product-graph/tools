@@ -20,6 +20,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Type maps ────────────────────────────────────────────────────────────────
@@ -76,13 +77,47 @@ export function getConfidenceForFigmaType(entityType: string): 'high' | 'medium'
   }
 }
 
-/** Map Figma status to UPG status */
+/** Map Figma status to a candidate UPG status (pre-lifecycle-validation).
+ *  `archived` → `deprecated` (a real phase for screen/design_component). `active`
+ *  has no clean UPG target across the design lifecycles, so it is dropped. */
 export function normalizeFigmaStatus(status: string | undefined): string | undefined {
   if (!status) return undefined
   const lower = normalizeName(status)
-  if (lower === 'active') return 'active'
-  if (lower === 'archived') return 'abandoned'
+  if (lower === 'archived') return 'deprecated'
   return undefined
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/** Resolve a Figma status to one valid for the target type's lifecycle (omit otherwise). */
+function resolveFigmaStatusForType(rawStatus: string | undefined, upgType: string): string | undefined {
+  const mapped = normalizeFigmaStatus(rawStatus)
+  if (!mapped) return undefined
+  const valid = validStatusesForType(upgType)
+  return valid && valid.has(mapped) ? mapped : undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair via
+ * the catalogue, honouring direction. Returns the edge type + whether the child
+ * is the source, or null when no canonical edge exists.
+ */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 // ─── Figma Adapter ────────────────────────────────────────────────────────────
@@ -153,7 +188,14 @@ export class FigmaAdapter implements UPGAdapter {
       sourceMap[item.source_id] = nodeId
 
       const rawStatus = meta.status as string | undefined
-      const status = normalizeFigmaStatus(rawStatus)
+      const status = resolveFigmaStatusForType(rawStatus, upgType)
+
+      // Figma-specific identifiers belong under properties (canonical), not as
+      // top-level node fields, so they survive the .upg round-trip.
+      const figmaProps: Record<string, unknown> = {}
+      if (meta.file_key) figmaProps.file_key = meta.file_key as string
+      if (meta.node_id) figmaProps.node_id = meta.node_id as string
+      if (meta.thumbnail_url) figmaProps.thumbnail_url = meta.thumbnail_url as string
 
       const node: UPGBaseNode = {
         id: nodeId,
@@ -169,9 +211,7 @@ export class FigmaAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'figma',
         external_id: item.source_id,
-        ...(meta.file_key ? { file_key: meta.file_key as string } : {}),
-        ...(meta.node_id ? { node_id: meta.node_id as string } : {}),
-        ...(meta.thumbnail_url ? { thumbnail_url: meta.thumbnail_url as string } : {}),
+        ...(Object.keys(figmaProps).length > 0 ? { properties: figmaProps } : {}),
       }
 
       nodes.push(node)
@@ -205,9 +245,25 @@ export class FigmaAdapter implements UPGAdapter {
         continue
       }
 
-      const edgeType = resolveFigmaEdge(parentType, entityType, item.title, warnings)
-
-      if (edgeType === null) {
+      // Catalogue-driven: resolve the parent/child UPG-type pair to its canonical
+      // edge (correct type + direction), or fall back to a generic link. This
+      // fixes file→frame / file→component, which previously emitted
+      // product_contains_screen / design_system_contains_design_component from a
+      // `document` node (a Figma file maps to document, not product/design_system).
+      const childUpg = (resolveFigmaType(entityType) as string | null | undefined) ?? 'document'
+      const parentUpg = (resolveFigmaType(parentType) as string | null | undefined) ?? 'document'
+      const mapped = resolvePairEdge(parentUpg, childUpg)
+      if (mapped) {
+        const source = mapped.sourceIsChild ? nodeId : parentNodeId
+        const target = mapped.sourceIsChild ? parentNodeId : nodeId
+        edges.push({
+          id: `edge-figma-${parentNodeId}-${nodeId}`,
+          source,
+          target,
+          type: mapped.type as UPGEdgeType,
+          mapping_confidence: 'medium',
+        })
+      } else {
         edges.push({
           id: `edge-figma-${parentNodeId}-${nodeId}`,
           source: parentNodeId,
@@ -215,16 +271,11 @@ export class FigmaAdapter implements UPGAdapter {
           type: 'node_informs_node' as UPGEdgeType,
           mapping_confidence: 'low',
         })
-        continue
+        warnings.push(
+          `No canonical UPG edge for Figma ${parentType || 'parent'} -> ${entityType || 'child'} ` +
+            `(${parentUpg} -> ${childUpg}); emitted node_informs_node.`,
+        )
       }
-
-      edges.push({
-        id: `edge-figma-${parentNodeId}-${nodeId}`,
-        source: parentNodeId,
-        target: nodeId,
-        type: edgeType as UPGEdgeType,
-        mapping_confidence: 'medium',
-      })
     }
 
     if (nodes.length === 0 && skippedVariables === 0) {
@@ -235,66 +286,6 @@ export class FigmaAdapter implements UPGAdapter {
   }
 }
 
-// ─── Edge resolution ──────────────────────────────────────────────────────────
-
-/**
- * Resolve the UPG edge for a Figma parent_type → entity_type pair.
- *
- * Note: `feature_expressed_by_screen` is NOT in the UPG catalog.
- * Using `product_contains_screen` (verified in catalog) for file→frame hierarchy.
- * `screen_surfaces_feature` is in the catalog but requires PM confirmation: not
- * auto-emitted here.
- *
- * Returns null for unknown pairs (caller emits node_informs_node fallback).
- */
-function resolveFigmaEdge(
-  parentType: string,
-  childType: string,
-  itemTitle: string,
-  warnings: string[],
-): string | null {
-  const parent = normalizeName(parentType)
-  const child = normalizeName(childType)
-
-  // file → frame: product_contains_screen
-  if (parent === 'file' && child === 'frame') {
-    return 'product_contains_screen'
-  }
-
-  // file → component / component_set: design_system_contains_design_component
-  if (parent === 'file' && (child === 'component' || child === 'component_set')) {
-    return 'design_system_contains_design_component'
-  }
-
-  // page → frame: product_contains_screen (frames are screens within a page)
-  if (parent === 'page' && child === 'frame') {
-    return 'product_contains_screen'
-  }
-
-  // frame → frame: screen_navigates_to_screen (prototype navigation)
-  if (parent === 'frame' && child === 'frame') {
-    return 'screen_navigates_to_screen'
-  }
-
-  // frame → component instance → design component: screen_renders_design_component
-  if (parent === 'frame' && (child === 'component' || child === 'component_set')) {
-    return 'screen_renders_design_component'
-  }
-
-  // component_set → component: design_component_composes_design_component
-  if (parent === 'component_set' && child === 'component') {
-    return 'design_component_composes_design_component'
-  }
-
-  // prototype → frame: prototype_simulates_screen
-  if (parent === 'prototype' && child === 'frame') {
-    return 'prototype_simulates_screen'
-  }
-
-  // Unknown parent/child pair: warn + fall back
-  warnings.push(
-    `Figma item "${itemTitle}": unrecognised parent_type "${parentType}" → entity_type ` +
-      `"${childType}" pair. Emitting node_informs_node with low confidence.`,
-  )
-  return null
-}
+// Edge resolution is catalogue-driven via resolvePairEdge(): every emitted edge
+// type and direction comes from UPG_EDGE_PAIR_MAP, with a node_informs_node
+// fallback when no canonical edge exists for the (parent, child) UPG-type pair.

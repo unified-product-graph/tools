@@ -187,47 +187,39 @@ describe('LinearAdapter: cycle skipping', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('LinearAdapter: status normalisation', () => {
-  it('"Done" state normalises to complete', async () => {
+describe('LinearAdapter: status normalisation (validated against the target lifecycle)', () => {
+  // makeIssue with no issue_type resolves to `task` (lifecycle: todo, in_progress, in_review, done).
+  it('"Done" on a task → done', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Done thing', undefined, { state: 'Done' })])
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('done')
   })
 
-  it('"Completed" state normalises to complete', async () => {
-    const result = await adapter.convert([makeIssue('i-1', 'Completed', undefined, { state: 'Completed' })])
-    expect(result.nodes[0].status).toBe('complete')
-  })
-
-  it('"Backlog" normalises to draft', async () => {
-    const result = await adapter.convert([makeIssue('i-1', 'Backlog', undefined, { state: 'Backlog' })])
-    expect(result.nodes[0].status).toBe('draft')
-  })
-
-  it('"Triage" normalises to draft', async () => {
-    const result = await adapter.convert([makeIssue('i-1', 'Triage', undefined, { state: 'Triage' })])
-    expect(result.nodes[0].status).toBe('draft')
-  })
-
-  it('"In Progress" normalises to active', async () => {
+  it('"In Progress" on a task → in_progress', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'WIP', undefined, { state: 'In Progress' })])
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it('"Todo" normalises to active', async () => {
+  it('"Todo" on a task → todo', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Todo', undefined, { state: 'Todo' })])
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('todo')
   })
 
-  it('"Cancelled" normalises to abandoned', async () => {
+  it('"Backlog" on a task is omitted (proposed is not a task phase)', async () => {
+    const result = await adapter.convert([makeIssue('i-1', 'Backlog', undefined, { state: 'Backlog' })])
+    expect(result.nodes[0].status).toBeUndefined()
+  })
+
+  it('"Cancelled" on a task is omitted (archived is not a task phase)', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Cancelled', undefined, { state: 'Cancelled' })])
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it('normalizeLinearStatus is exported and callable directly', () => {
-    expect(normalizeLinearStatus('Done')).toBe('complete')
-    expect(normalizeLinearStatus('Backlog')).toBe('draft')
-    expect(normalizeLinearStatus('In Progress')).toBe('active')
-    expect(normalizeLinearStatus('Cancelled')).toBe('abandoned')
+  it('normalizeLinearStatus maps to UPG delivery phase ids', () => {
+    expect(normalizeLinearStatus('Done')).toBe('done')
+    expect(normalizeLinearStatus('Backlog')).toBe('proposed')
+    expect(normalizeLinearStatus('In Progress')).toBe('in_progress')
+    expect(normalizeLinearStatus('Cancelled')).toBe('archived')
+    expect(normalizeLinearStatus('Todo')).toBe('todo')
   })
 })
 

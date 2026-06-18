@@ -204,35 +204,31 @@ describe('JiraAdapter: structural entity types', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('JiraAdapter: status normalisation', () => {
-  it("'To Do' normalises to 'draft'", async () => {
-    const items: SourceItem[] = [makeIssue('i1', 'Story', 'Story', { status: 'To Do' })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+describe('JiraAdapter: status normalisation (validated against target lifecycle)', () => {
+  // Task lifecycle: todo, in_progress, in_review, done.
+  it("'To Do' on a Task -> todo", async () => {
+    const result = await adapter.convert([makeIssue('i1', 'A task', 'Task', { status: 'To Do' })])
+    expect(result.nodes[0].status).toBe('todo')
   })
 
-  it("'In Progress' normalises to 'active'", async () => {
-    const items: SourceItem[] = [makeIssue('i1', 'Story', 'Story', { status: 'In Progress' })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+  it("'In Progress' on a Task -> in_progress", async () => {
+    const result = await adapter.convert([makeIssue('i1', 'A task', 'Task', { status: 'In Progress' })])
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("'Done' normalises to 'complete'", async () => {
-    const items: SourceItem[] = [makeIssue('i1', 'Story', 'Story', { status: 'Done' })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+  it("'Done' on a Task -> done", async () => {
+    const result = await adapter.convert([makeIssue('i1', 'A task', 'Task', { status: 'Done' })])
+    expect(result.nodes[0].status).toBe('done')
   })
 
-  it("\"Won't Do\" normalises to 'abandoned'", async () => {
-    const items: SourceItem[] = [makeIssue('i1', 'Story', 'Story', { status: "Won't Do" })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+  it("a Bug's 'Open' survives as the real bug phase", async () => {
+    const result = await adapter.convert([makeIssue('i1', 'A bug', 'Bug', { status: 'Open' })])
+    expect(result.nodes[0].status).toBe('open')
   })
 
-  it("'Cancelled' normalises to 'abandoned'", async () => {
-    const items: SourceItem[] = [makeIssue('i1', 'Story', 'Story', { status: 'Cancelled' })]
-    const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+  it('a Story (user_story) is lifecycle-free -> no status emitted', async () => {
+    const result = await adapter.convert([makeIssue('i1', 'A story', 'Story', { status: 'In Progress' })])
+    expect(result.nodes[0].status).toBeUndefined()
   })
 })
 
@@ -281,7 +277,7 @@ describe('JiraAdapter: hierarchy edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('feature_area_contains_feature emitted when story lists a component_id', async () => {
+  it('a component link emits a generic node_informs_node (no feature_area->user_story edge)', async () => {
     const items: SourceItem[] = [
       makeStructural('c1', 'Auth Component', 'component'),
       makeIssue('s1', 'User can log in', 'Story', {
@@ -289,12 +285,13 @@ describe('JiraAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'feature_area_contains_feature')
-    const edge = result.edges.find((e) => e.type === 'feature_area_contains_feature')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'component link')
+    // feature_area_contains_feature requires a `feature` target; a Story is a
+    // user_story, so an honest generic link is emitted instead.
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
-  it('release_contains_feature emitted when story lists a version_id', async () => {
+  it('a story under a version emits a generic node_informs_node (no release->user_story edge)', async () => {
     const items: SourceItem[] = [
       makeStructural('v1', 'v2.0.0', 'version'),
       makeIssue('s1', 'New login screen', 'Story', {
@@ -302,9 +299,8 @@ describe('JiraAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'release_contains_feature')
-    const edge = result.edges.find((e) => e.type === 'release_contains_feature')
-    expect(edge).toBeDefined()
+    assertAllEdgesCatalogued(result.edges, 'version link')
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
   it('release_contains_bug emitted when bug lists a version_id', async () => {

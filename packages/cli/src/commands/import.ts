@@ -116,8 +116,8 @@ function printPreview(
 
 // ── .upg writer ────────────────────────────────────────────────────────────
 
-async function writeToUPGFile(
-  importedNodes: Array<{ id: string; type: string; title: string; description?: string; tags?: string[]; status?: string; properties?: Record<string, unknown>; source_id?: string; source_type?: string; mapping_confidence?: string }>,
+export async function writeToUPGFile(
+  importedNodes: Array<{ id: string; type: string; title: string; description?: string; tags?: string[]; status?: string; properties?: Record<string, unknown>; source_id?: string; source_type?: string; mapping_confidence?: string; external_tool?: string; external_ref?: string; external_id?: string }>,
   importedEdges: Array<{ id: string; source: string; target: string; type: string; mapping_confidence?: string }>,
   outputPath: string,
 ): Promise<{ created: boolean }> {
@@ -150,6 +150,10 @@ async function writeToUPGFile(
         ...(n.source_id ? { source_id: n.source_id } : {}),
         ...(n.source_type ? { source_type: n.source_type } : {}),
         ...(n.mapping_confidence ? { mapping_confidence: n.mapping_confidence } : {}),
+        // Canonical provenance fields (UPGBaseNode) — preserve, don't drop.
+        ...(n.external_tool ? { external_tool: n.external_tool } : {}),
+        ...(n.external_ref ? { external_ref: n.external_ref } : {}),
+        ...(n.external_id ? { external_id: n.external_id } : {}),
       } as Parameters<typeof store.addNode>[0])
 
       // Update the import ID → local ID mapping for edge resolution
@@ -198,6 +202,10 @@ async function writeToUPGFile(
         ...(n.source_id ? { source_id: n.source_id } : {}),
         ...(n.source_type ? { source_type: n.source_type } : {}),
         ...(n.mapping_confidence ? { mapping_confidence: n.mapping_confidence } : {}),
+        // Canonical provenance fields (UPGBaseNode) — preserve, don't drop.
+        ...(n.external_tool ? { external_tool: n.external_tool } : {}),
+        ...(n.external_ref ? { external_ref: n.external_ref } : {}),
+        ...(n.external_id ? { external_id: n.external_id } : {}),
       }
     })
 

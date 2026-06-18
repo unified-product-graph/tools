@@ -27,6 +27,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Issue type → UPG entity type ────────────────────────────────────────────
@@ -97,22 +98,25 @@ export const JIRA_LINK_EDGE_MAP: Record<string, string | null> = {
 /**
  * Maps Jira status names (lowercased) to UPG status values.
  */
+// Jira workflow statuses mapped to UPG delivery-lifecycle phase ids.
+// resolveJiraStatusForType() tries the raw status first (a bug's "Open" is a real
+// bug phase) then this map, keeping only what is valid for the target type.
 export const JIRA_STATUS_MAP: Record<string, string> = {
-  backlog: 'draft',
-  triage: 'draft',
-  todo: 'draft',
-  'to do': 'draft',
-  open: 'draft',
-  new: 'draft',
-  'in progress': 'active',
-  'in development': 'active',
-  'in review': 'active',
-  'in testing': 'active',
-  done: 'complete',
-  closed: 'complete',
-  resolved: 'complete',
-  completed: 'complete',
-  released: 'complete',
+  backlog: 'todo',
+  triage: 'todo',
+  todo: 'todo',
+  'to do': 'todo',
+  open: 'todo',
+  new: 'todo',
+  'in progress': 'in_progress',
+  'in development': 'in_progress',
+  'in review': 'in_progress',
+  'in testing': 'in_progress',
+  done: 'done',
+  closed: 'done',
+  resolved: 'done',
+  completed: 'done',
+  released: 'done',
   cancelled: 'abandoned',
   "won't do": 'abandoned',
   'wont do': 'abandoned',
@@ -138,6 +142,41 @@ export function resolveIssueType(issueType: string): string | null | undefined {
 export function normalizeJiraStatus(status: string): string {
   const lower = normalizeName(status)
   return JIRA_STATUS_MAP[lower] ?? status
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/** Resolve a Jira status to one valid for the target type's lifecycle (omit otherwise). */
+function resolveJiraStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = JIRA_STATUS_MAP[raw]
+  return mapped && valid.has(mapped) ? mapped : undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair via
+ * the catalogue, honouring direction. Returns the edge type + whether the child
+ * is the source, or null when no canonical edge exists.
+ */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 /** Get confidence for a Jira issue type → UPG entity type mapping */
@@ -323,38 +362,36 @@ export class JiraAdapter implements UPGAdapter {
       const entityKind = meta.entity_kind as string | undefined
       const issueType = (meta.issue_type as string | undefined) ?? ''
 
-      // Structural (non-issue) entities
-      if (entityKind) {
-        const lower = normalizeName(entityKind)
-        if (lower in JIRA_STRUCTURAL_TYPE_MAP) {
-          const structuralType = JIRA_STRUCTURAL_TYPE_MAP[lower]
-          if (structuralType === null) {
-            warnings.push(
-              `Jira structural entity "${item.title}" has kind "${entityKind}" which has no UPG equivalent. Entity skipped.`,
-            )
-            continue
-          }
-          sourceMap[item.source_id] = nodeId
-          const rawStatus = meta.status as string | undefined
-          const status = rawStatus ? normalizeJiraStatus(rawStatus) : undefined
-          const node: UPGBaseNode = {
-            id: nodeId,
-            type: structuralType as UPGEntityType,
-            title: item.title,
-            ...(item.content ? { description: item.content } : {}),
-            ...(status ? { status } : {}),
-            source_id: item.source_id,
-            source_type: item.source_type,
-            mapping_confidence: 'high',
-            external_tool: 'jira',
-            external_id: item.source_id,
-          }
-          nodes.push(node)
+      // Structural (non-issue) entities: ONLY the structural kinds
+      // (project/component/version/board/sprint) are handled here. Issues carry
+      // entity_kind 'issue' (and a source_type 'issue') and must fall through to
+      // issue-type discrimination below — previously a non-structural entity_kind
+      // was treated as "unknown" and the issue was skipped entirely.
+      const entityKindLower = entityKind ? normalizeName(entityKind) : ''
+      if (entityKindLower && entityKindLower in JIRA_STRUCTURAL_TYPE_MAP) {
+        const structuralType = JIRA_STRUCTURAL_TYPE_MAP[entityKindLower]
+        if (structuralType === null) {
+          warnings.push(
+            `Jira structural entity "${item.title}" has kind "${entityKind}" which has no UPG equivalent. Entity skipped.`,
+          )
           continue
         }
-        warnings.push(
-          `Jira structural entity "${item.title}" has unknown kind "${entityKind}". Entity skipped.`,
-        )
+        sourceMap[item.source_id] = nodeId
+        const rawStatus = meta.status as string | undefined
+        const status = rawStatus ? resolveJiraStatusForType(rawStatus, structuralType) : undefined
+        const node: UPGBaseNode = {
+          id: nodeId,
+          type: structuralType as UPGEntityType,
+          title: item.title,
+          ...(item.content ? { description: item.content } : {}),
+          ...(status ? { status } : {}),
+          source_id: item.source_id,
+          source_type: item.source_type,
+          mapping_confidence: 'high',
+          external_tool: 'jira',
+          external_id: item.source_id,
+        }
+        nodes.push(node)
         continue
       }
 
@@ -403,9 +440,9 @@ export class JiraAdapter implements UPGAdapter {
         )
       }
 
-      // Normalise status
+      // Normalise status against the resolved type's lifecycle (omit if invalid)
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeJiraStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveJiraStatusForType(rawStatus, entityType) : undefined
 
       // Build node
       const node: UPGBaseNode = {
@@ -433,21 +470,33 @@ export class JiraAdapter implements UPGAdapter {
     }
 
     // ── Pass 2: Emit edges ─────────────────────────────────────────────────────
+    const nodeTypeById = new Map(nodes.map((n) => [n.id, n.type as string]))
     let edgeCounter = 0
+    // Emit the canonical edge for a parent->child pair (correct type + direction),
+    // or an honest node_informs_node when no catalogued edge exists for the pair.
+    const emitPairEdge = (parentNodeId: string, childNodeId: string): void => {
+      const pUpg = nodeTypeById.get(parentNodeId)
+      const cUpg = nodeTypeById.get(childNodeId)
+      if (!pUpg || !cUpg) return
+      const mapped = resolvePairEdge(pUpg, cUpg)
+      edgeCounter++
+      if (mapped) {
+        const source = mapped.sourceIsChild ? childNodeId : parentNodeId
+        const target = mapped.sourceIsChild ? parentNodeId : childNodeId
+        edges.push({ id: `edge-jira-${edgeCounter}`, source, target, type: mapped.type as UPGEdgeType, mapping_confidence: 'medium' })
+      } else {
+        edges.push({ id: `edge-jira-${edgeCounter}`, source: parentNodeId, target: childNodeId, type: 'node_informs_node' as UPGEdgeType, mapping_confidence: 'low' })
+      }
+    }
 
     for (const item of items) {
       const meta = item.metadata ?? {}
-      const issueType = (meta.issue_type as string | undefined) ?? ''
-      const entityKind = meta.entity_kind as string | undefined
       const parentId = meta.parent_id as string | undefined
-      const parentType = (meta.parent_type as string | undefined) ?? ''
 
       const nodeId = sourceMap[item.source_id]
       if (!nodeId) continue
 
-      const resolvedEntityType = resolveEntityTypeForItem(item)
-
-      // ── Parent hierarchy edge ──────────────────────────────────────────────
+      // ── Parent hierarchy edge (catalogue-driven) ───────────────────────────
       if (parentId) {
         const parentNodeId = sourceMap[parentId]
         if (!parentNodeId) {
@@ -455,61 +504,27 @@ export class JiraAdapter implements UPGAdapter {
             `Jira item "${item.title}" references parent_id "${parentId}" which was not found in the imported set. Edge skipped.`,
           )
         } else {
-          const edgeResult = resolveJiraHierarchyEdge(
-            parentType,
-            entityKind ?? issueType,
-            item.title,
-            warnings,
-          )
-          if (edgeResult && edgeResult !== 'warning-only') {
-            edgeCounter++
-            edges.push({
-              id: `edge-jira-${edgeCounter}`,
-              source: parentNodeId,
-              target: nodeId,
-              type: edgeResult as UPGEdgeType,
-              mapping_confidence: 'medium',
-            })
-          }
+          emitPairEdge(parentNodeId, nodeId)
         }
       }
 
-      // ── Component membership edges ─────────────────────────────────────────
+      // ── Component membership edges (component=feature_area → issue) ────────
       const componentIds = meta.component_ids as string[] | undefined
       if (Array.isArray(componentIds)) {
         for (const componentId of componentIds) {
           const componentNodeId = sourceMap[componentId]
           if (!componentNodeId) continue
-          // feature_area_contains_feature: component → issue
-          // For bug issues, still use feature_area_contains_feature (best available)
-          edgeCounter++
-          edges.push({
-            id: `edge-jira-${edgeCounter}`,
-            source: componentNodeId,
-            target: nodeId,
-            type: 'feature_area_contains_feature' as UPGEdgeType,
-            mapping_confidence: 'medium',
-          })
+          emitPairEdge(componentNodeId, nodeId)
         }
       }
 
-      // ── Version (release) membership edges ────────────────────────────────
+      // ── Version (release) membership edges (version=release → issue) ───────
       const versionIds = meta.version_ids as string[] | undefined
       if (Array.isArray(versionIds)) {
         for (const versionId of versionIds) {
           const releaseNodeId = sourceMap[versionId]
           if (!releaseNodeId) continue
-          // release_contains_bug for bugs, release_contains_feature for everything else
-          const edgeType =
-            resolvedEntityType === 'bug' ? 'release_contains_bug' : 'release_contains_feature'
-          edgeCounter++
-          edges.push({
-            id: `edge-jira-${edgeCounter}`,
-            source: releaseNodeId,
-            target: nodeId,
-            type: edgeType as UPGEdgeType,
-            mapping_confidence: 'high',
-          })
+          emitPairEdge(releaseNodeId, nodeId)
         }
       }
 
@@ -603,85 +618,7 @@ export class JiraAdapter implements UPGAdapter {
   }
 }
 
-// ─── Edge resolution helpers ──────────────────────────────────────────────────
-
-/**
- * Resolve the UPG entity type for an item based on its issue_type or entity_kind.
- * Used in pass 2 to determine which release edge to emit.
- */
-function resolveEntityTypeForItem(item: SourceItem): string | null {
-  const meta = item.metadata ?? {}
-  const entityKind = meta.entity_kind as string | undefined
-  if (entityKind) {
-    const lower = normalizeName(entityKind)
-    return JIRA_STRUCTURAL_TYPE_MAP[lower] ?? null
-  }
-  const issueType = (meta.issue_type as string | undefined) ?? ''
-  const resolved = resolveIssueType(issueType)
-  return resolved ?? null
-}
-
-/**
- * Resolve the canonical UPG hierarchy edge for a Jira parent_type → child_type pair.
- *
- * Returns:
- * - A UPG edge type string
- * - 'warning-only': warns but does not emit an edge
- * - null: unknown pair, no edge emitted
- */
-function resolveJiraHierarchyEdge(
-  parentType: string,
-  childType: string,
-  itemTitle: string,
-  warnings: string[],
-): string | 'warning-only' | null {
-  const parent = normalizeName(parentType)
-  const child = normalizeName(childType)
-
-  // project → epic
-  if (parent === 'project' && child === 'epic') {
-    return 'project_delivers_epic'
-  }
-
-  // epic → story / user story / task / chore / spike / design
-  if (parent === 'epic') {
-    if (child === 'story' || child === 'user story') {
-      return 'epic_specified_by_user_story'
-    }
-    if (child === 'task' || child === 'sub-task' || child === 'subtask' || child === 'chore' || child === 'spike' || child === 'design' || child === 'change') {
-      return 'epic_specified_by_user_story' // best available for task-under-epic
-    }
-    if (child === 'bug' || child === 'defect' || child === 'problem') {
-      return null // no canonical epic→bug hierarchy edge: skip
-    }
-  }
-
-  // story → sub-task
-  if ((parent === 'story' || parent === 'user story') && (child === 'sub-task' || child === 'subtask')) {
-    return 'task_implements_user_story'
-  }
-
-  // task → sub-task (generic)
-  if (parent === 'task' && (child === 'sub-task' || child === 'subtask')) {
-    return 'task_implements_user_story'
-  }
-
-  // component → feature/story/epic (structural entity → issue)
-  if (parent === 'component') {
-    return 'feature_area_contains_feature'
-  }
-
-  // version → feature/bug (handled separately via version_ids)
-  if (parent === 'version') {
-    return null // handled by version_ids loop
-  }
-
-  // initiative (Jira Align) → epic
-  if (parent === 'initiative' && child === 'epic') {
-    return null // no direct initiative→epic edge in UPG catalog
-  }
-
-  void itemTitle
-  void warnings
-  return null
-}
+// Hierarchy, component, and version edges are all catalogue-driven via
+// resolvePairEdge() (UPG_EDGE_PAIR_MAP) inside convert(): the emitted edge type
+// and direction come from the catalogue for the resolved (parent, child) UPG-type
+// pair, with a node_informs_node fallback when no canonical edge exists.

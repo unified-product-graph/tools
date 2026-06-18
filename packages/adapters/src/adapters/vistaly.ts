@@ -1,77 +1,150 @@
 /**
  * Vistaly Adapter
  *
- * Imports cards from Vistaly: a continuous discovery tool that organises
- * product work as a tree from Vision/Mission → Objective → Outcome →
- * Opportunity → Solution → Experiment.
+ * Imports the discovery tree from Vistaly, a continuous-discovery tool that
+ * organises product work as a tree of typed "cards".
  *
- * Vistaly calls every entity a "Card" typed by a `card_type` field. This
- * adapter discriminates by card_type and maps to the closest UPG entity type.
+ * Grounded in Vistaly's live OpenAPI spec (api.vistaly.com/v1/swagger.json,
+ * spec version 2025-06-21). The real card model and endpoints — captured in
+ * packages/upg-cli/src/__tests__/fixtures/vistaly/SCHEMA.md — are:
  *
+ *   Enumerate:  GET /beta/cards/{rootCardId}/context?direction=descendants
+ *               → { context: EnrichedCardContext[], metadata }
+ *   Card type:  `cardType` ∈ assumption | experiment | kpi | objective |
+ *               opportunity | outcome | problem | product | solution
+ *   Hierarchy:  each card lists its child cardIds in `children[]`
  *
- * Hierarchy edges:
- * - outcome ← metric/kpi        → outcome_measured_by_metric
- * - outcome → opportunity        → opportunity_pursues_outcome
- * - opportunity → solution       → opportunity_drives_solution
- * - solution → experiment        → solution_proposes_hypothesis (via hypothesis)
- * - assumption → experiment      → assumption_becomes_hypothesis
- * - interview → opportunity      → insight_informs_opportunity (via insight bridge)
- * - feedback → opportunity       → customer_feedback_becomes_feature_request +
- *                                  feature_request_creates_opportunity
+ * (There is NO /v1/workspaces or list-all-cards endpoint — enumeration walks
+ * the context tree from a known root card.)
  *
- * Gap (no canonical edge):
- * - objective → outcome: UPG connects via key_result. Emits a WARNING, not an edge.
+ * Card type → UPG entity type:
+ *   outcome→outcome · objective→objective · opportunity→opportunity ·
+ *   solution→solution · assumption→assumption · experiment→experiment ·
+ *   kpi→metric · product→product · problem→need
+ *
+ * Hierarchy edges (all verified against the canonical catalogue):
+ *   objective → outcome      → objective_advances_outcome
+ *   outcome   → kpi/metric   → outcome_measured_by_metric
+ *   outcome   → opportunity  → opportunity_pursues_outcome   (opportunity is source)
+ *   outcome   → product      → product_pursues_outcome       (product is source)
+ *   opportunity → solution   → opportunity_drives_solution
+ *   opportunity → problem    → opportunity_addresses_need
+ *   problem   → solution     → solution_addresses_need        (solution is source)
+ * Pairs with no direct edge (e.g. solution/assumption → experiment, which UPG
+ * routes through a hypothesis) fall back to a generic node_informs_node link
+ * with a warning.
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
+const VISTALY_API_BASE = 'https://api.vistaly.com'
+
 // ─── Card type → UPG entity type ─────────────────────────────────────────────
 
 /**
- * Maps Vistaly card_type values to UPG entity types.
- *
- * Null values mean the card type has no UPG equivalent and will be skipped
- * with a warning.
- *
- * All UPG entity types verified against the live catalog.
+ * Maps Vistaly `cardType` values to UPG entity types. Keys are exactly the
+ * values in Vistaly's `CardType` enum; nothing else is a real card type.
  */
-export const VISTALY_TYPE_MAP: Record<string, string | null> = {
-  // Strategy Space
-  vision: 'vision',
-  mission: 'mission',
-  objective: 'objective',
+export const VISTALY_TYPE_MAP: Record<string, string> = {
   outcome: 'outcome',
-  kpi: 'metric',
-  metric: 'metric',
-  assumption: 'assumption',
-  initiative: 'initiative',
-  // Discovery Space
+  objective: 'objective',
   opportunity: 'opportunity',
   solution: 'solution',
+  assumption: 'assumption',
   experiment: 'experiment',
-  assumption_test: 'experiment', // Vistaly "Assumption Test" = experiment
-  // Feedback / Research
-  interview: 'research_study',
-  feedback: 'customer_feedback',
-  // No UPG equivalent
-  sprint: null,
+  kpi: 'metric',
+  product: 'product',
+  problem: 'need', // Vistaly problems are user problems → UPG need
 }
 
-// ─── Status normalisation ─────────────────────────────────────────────────────
+// ─── Status normalisation (per target entity type) ───────────────────────────
 
 /**
- * Maps Vistaly card statuses to UPG status values.
- *
- * Vistaly statuses: 'new' | 'under-consideration' | 'planned' | 'in-progress' | 'released' | "won't-do"
+ * Maps Vistaly card statuses to UPG statuses, keyed by the RESOLVED UPG entity
+ * type. UPG statuses are per-type lifecycle phases, so a single global map is
+ * wrong: a status is normalised against the target type's lifecycle, and any
+ * status that does not map to a valid phase is omitted rather than emitted
+ * invalid. Types with no entry (metric is lifecycle-free, product carries a
+ * `stage` property not a status) never emit a status.
  */
-export const VISTALY_STATUS_MAP: Record<string, string> = {
-  new: 'draft',
-  'under-consideration': 'draft',
-  planned: 'active',
-  'in-progress': 'active',
-  released: 'complete',
-  "won't-do": 'abandoned',
+export const VISTALY_STATUS_BY_TYPE: Record<string, Record<string, string>> = {
+  opportunity: {
+    identified: 'identified',
+    next: 'identified',
+    now: 'validated',
+    addressed: 'validated',
+    later: 'deferred',
+    'not now': 'deferred',
+  },
+  need: {
+    identified: 'raw',
+    next: 'raw',
+    later: 'raw',
+    'not now': 'raw',
+    now: 'validated',
+    addressed: 'validated',
+    validated: 'validated',
+    prioritized: 'prioritized',
+  },
+  solution: {
+    idea: 'proposed',
+    next: 'proposed',
+    now: 'in_progress',
+    done: 'shipped',
+    later: 'deferred',
+    'not now': 'deferred',
+  },
+  outcome: {
+    uncommitted: 'identified',
+    'at risk': 'measuring',
+    progressing: 'measuring',
+    'on track': 'measuring',
+  },
+  experiment: {
+    developing: 'planned',
+    pending: 'planned',
+    running: 'running',
+    failed: 'done',
+    passed: 'done',
+  },
+  objective: {
+    draft: 'draft',
+    active: 'active',
+    now: 'active',
+    achieved: 'achieved',
+    missed: 'missed',
+    'not now': 'deferred',
+  },
+  assumption: {
+    untested: 'untested',
+    testing: 'testing',
+    pending: 'testing',
+    validated: 'validated',
+    passed: 'validated',
+    failed: 'invalidated',
+    invalidated: 'invalidated',
+  },
+}
+
+// ─── Hierarchy edges (parentUpg → childUpg) ──────────────────────────────────
+
+/**
+ * Canonical UPG edge for a Vistaly parent→child pair, keyed by
+ * `${parentUpgType}__${childUpgType}`. `sourceIsChild` flips the edge so the
+ * emitted source/target match the catalogue's declared direction (e.g.
+ * opportunity_pursues_outcome has the opportunity as source even though the
+ * opportunity is the child in Vistaly's tree). Every edge type here is in the
+ * UPG catalogue.
+ */
+const VISTALY_EDGE_MAP: Record<string, { type: string; sourceIsChild: boolean }> = {
+  objective__outcome: { type: 'objective_advances_outcome', sourceIsChild: false },
+  outcome__metric: { type: 'outcome_measured_by_metric', sourceIsChild: false },
+  outcome__opportunity: { type: 'opportunity_pursues_outcome', sourceIsChild: true },
+  outcome__product: { type: 'product_pursues_outcome', sourceIsChild: true },
+  opportunity__solution: { type: 'opportunity_drives_solution', sourceIsChild: false },
+  opportunity__need: { type: 'opportunity_addresses_need', sourceIsChild: false },
+  need__solution: { type: 'solution_addresses_need', sourceIsChild: true },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -81,47 +154,62 @@ function normalizeName(name: string): string {
   return name.toLowerCase().trim()
 }
 
-/** Resolve a Vistaly card_type to a UPG entity type. Returns null if explicitly unmappable. */
-export function resolveCardType(cardType: string): string | null | undefined {
-  const lower = normalizeName(cardType)
-  // Returns undefined if not in map (unknown), null if in map but unmappable, string if mapped
-  if (lower in VISTALY_TYPE_MAP) {
-    return VISTALY_TYPE_MAP[lower]
-  }
-  return undefined
+/** Resolve a Vistaly card_type to a UPG entity type. undefined if unknown. */
+export function resolveCardType(cardType: string): string | undefined {
+  return VISTALY_TYPE_MAP[normalizeName(cardType)]
 }
 
-/** Normalize a Vistaly status string to a UPG status value */
-export function normalizeVistalyStatus(status: string): string {
-  const lower = normalizeName(status)
-  return VISTALY_STATUS_MAP[lower] ?? status
+/**
+ * Normalise a Vistaly status to a UPG status for the given UPG entity type.
+ * Returns undefined when the type has no lifecycle (metric/product) or the
+ * status has no valid mapping — callers then omit status rather than persist
+ * an out-of-lifecycle value.
+ */
+export function normalizeVistalyStatus(status: string, upgType: string): string | undefined {
+  return VISTALY_STATUS_BY_TYPE[upgType]?.[normalizeName(status)]
 }
 
 /** Resolve the confidence level for a card_type → entity type mapping */
 export function getConfidenceForCardType(cardType: string): 'high' | 'medium' | 'low' {
-  const lower = normalizeName(cardType)
-  switch (lower) {
-    // Direct 1:1 canonical matches
-    case 'vision':
-    case 'mission':
-    case 'objective':
+  switch (normalizeName(cardType)) {
     case 'outcome':
-    case 'kpi':
-    case 'metric':
+    case 'objective':
     case 'opportunity':
     case 'solution':
     case 'assumption':
-    case 'initiative':
-      return 'high'
-    // Conflated or structurally approximate
     case 'experiment':
-    case 'assumption_test':
-    case 'feedback':
-    case 'interview':
+    case 'kpi':
+      return 'high'
+    // Semantic shift: Vistaly product/problem → UPG product/need
+    case 'product':
+    case 'problem':
       return 'medium'
     default:
       return 'low'
   }
+}
+
+// ─── Real Vistaly API shapes (from the OpenAPI spec) ──────────────────────────
+
+interface VistalyEnrichedCard {
+  cardId: string
+  cardTitle: string
+  cardType: string
+  cardStatus?: string
+  cardDetails?: string
+  cardUrl?: string
+  level?: number
+  children?: string[]
+  organizationId?: string
+  workspaceId?: string
+  metricCurrent?: number
+  metricTarget?: number
+  metricUnit?: string
+}
+
+interface VistalyContextResponse {
+  context?: VistalyEnrichedCard[]
+  metadata?: { direction?: string; cardCount?: number; maxLevel?: number }
 }
 
 // ─── Vistaly Adapter ──────────────────────────────────────────────────────────
@@ -129,89 +217,88 @@ export function getConfidenceForCardType(cardType: string): 'high' | 'medium' | 
 export class VistalyAdapter implements UPGAdapter {
   name = 'vistaly'
   label = 'Vistaly'
-  description = 'Import the Vision, Objective, Outcome, Opportunity, Solution, and Experiment hierarchy from Vistaly (a continuous discovery tool).'
+  description =
+    'Import the Vision/Objective → Outcome → Opportunity → Solution → Experiment discovery tree from Vistaly (a continuous discovery tool).'
 
   /**
-   * List available Vistaly cards.
+   * List Vistaly cards by walking the context tree from a root card.
    *
-   * Requires Vistaly API access. This adapter is designed to be called from
-   * within a skill that has access to a Vistaly API connection.
+   * Vistaly has no list-all-cards endpoint; enumeration uses
+   * GET /beta/cards/{rootCardId}/context?direction=descendants. Parent→child
+   * links are reconstructed from each card's `children[]`.
    *
-   * Config options:
-   * - `cards`: SourceItem[]: pre-fetched Vistaly cards
-   * - `workspace_id` (string): specific workspace to import
+   * Config:
+   * - `api_key` (string, required): Vistaly API key (VISTALY_API_KEY)
+   * - `root_card_id` (string, required): the card to walk from (e.g. the
+   *   workspace root or a top outcome)
+   * - `base_url` (string, optional): override the API base (default
+   *   https://api.vistaly.com)
    */
   async list(config: AdapterConfig): Promise<SourceItem[]> {
     const apiKey = config.api_key as string
-    const workspaceId = config.workspace_id as string
+    const rootCardId = config.root_card_id as string
+    const baseUrl = (config.base_url as string) || VISTALY_API_BASE
+
     if (!apiKey) throw new Error('Vistaly adapter requires config.api_key (VISTALY_API_KEY)')
-
-    const headers = {
-      Authorization: `Bearer ${apiKey}`,
-      Accept: 'application/json',
+    if (!rootCardId) {
+      throw new Error(
+        'Vistaly adapter requires config.root_card_id. The Vistaly API has no ' +
+          'list-all-cards endpoint; enumeration walks GET /beta/cards/{id}/context ' +
+          'from a known root card (e.g. the workspace root or a top outcome).',
+      )
     }
 
-    const items: SourceItem[] = []
+    const params = new URLSearchParams({
+      direction: 'descendants',
+      maxLevels: '10',
+      includeDescriptions: 'true',
+    })
+    const url = `${baseUrl}/beta/cards/${encodeURIComponent(rootCardId)}/context?${params.toString()}`
 
-    // If workspace_id not provided, list workspaces first
-    let wsId = workspaceId
-    if (!wsId) {
-      const wsRes = await fetch('https://api.vistaly.com/v1/workspaces', { headers })
-      if (!wsRes.ok) throw new Error(`Vistaly workspaces fetch failed: ${wsRes.status}`)
-      const wsData = await wsRes.json() as { data: Array<{ id: string; name: string }> }
-      if (wsData.data.length === 0) throw new Error('No Vistaly workspaces found')
-      wsId = wsData.data[0].id
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    })
+    if (!res.ok) throw new Error(`Vistaly card context fetch failed: ${res.status}`)
+
+    const body = (await res.json()) as VistalyContextResponse
+    const cards = body.context ?? []
+
+    // Reconstruct child → parent from each card's children[].
+    const parentOf = new Map<string, { id: string; type: string }>()
+    for (const card of cards) {
+      for (const childId of card.children ?? []) {
+        parentOf.set(childId, { id: card.cardId, type: card.cardType })
+      }
     }
 
-    // Cards
-    const cardsRes = await fetch(`https://api.vistaly.com/v1/workspaces/${wsId}/cards`, { headers })
-    if (!cardsRes.ok) throw new Error(`Vistaly cards fetch failed: ${cardsRes.status}`)
-    const cards = await cardsRes.json() as {
-      data: Array<{
-        id: string; title: string; description?: string; card_type: string
-        status?: string; parent_id?: string; parent_type?: string
-        metric_current_value?: number; metric_target_value?: number; metric_unit?: string
-        tags?: string[]; labels?: string[]
-      }>
-    }
-
-    for (const card of cards.data) {
-      items.push({
-        source_id: card.id,
+    return cards.map((card) => {
+      const parent = parentOf.get(card.cardId)
+      return {
+        source_id: card.cardId,
         source_type: 'card',
-        title: card.title,
-        content: card.description,
+        title: card.cardTitle,
+        ...(card.cardDetails ? { content: card.cardDetails } : {}),
         metadata: {
-          card_type: card.card_type,
-          status: card.status,
-          parent_id: card.parent_id,
-          parent_type: card.parent_type,
-          metric_current_value: card.metric_current_value,
-          metric_target_value: card.metric_target_value,
-          metric_unit: card.metric_unit,
-          tags: card.tags,
-          labels: card.labels,
+          card_type: card.cardType,
+          status: card.cardStatus,
+          parent_id: parent?.id,
+          parent_type: parent?.type,
+          metric_current_value: card.metricCurrent,
+          metric_target_value: card.metricTarget,
+          metric_unit: card.metricUnit,
+          card_url: card.cardUrl,
         },
-      })
-    }
-
-    return items
+      }
+    })
   }
 
   /**
    * Convert Vistaly source items to UPG entities.
    *
-   * Mapping logic:
-   * - card_type discriminates the UPG entity type (via VISTALY_TYPE_MAP)
-   * - metadata.parent_id + metadata.parent_type → hierarchy edges
-   * - metadata.status → normalised UPG status (via VISTALY_STATUS_MAP)
-   * - metadata.tags + metadata.labels → node tags
-   * - metadata.metric_current_value / target_value / unit → metric node fields
-   * - Sprint cards → skipped with warning (no UPG equivalent)
-   * - Unknown card_types → warning + default to 'document'
-   * - objective → outcome gap → WARNING (no direct UPG edge, must go via key_result)
-   * - experiment / assumption_test → WARNING (conflates hypothesis + experiment)
-   * - interview → WARNING (flat structure; recommend Dovetail for richer research)
+   * - card_type → UPG entity type (VISTALY_TYPE_MAP)
+   * - status → per-type normalised UPG status (omitted when unmappable)
+   * - metric values → node.properties.{current_value,target_value,unit}
+   * - parent_id/parent_type + children → typed hierarchy edges
    */
   async convert(items: SourceItem[], _config?: AdapterConfig): Promise<ImportResult> {
     const nodes: UPGBaseNode[] = []
@@ -220,159 +307,107 @@ export class VistalyAdapter implements UPGAdapter {
     const warnings: string[] = []
 
     let counter = 0
-
     for (const item of items) {
       counter++
-      const nodeId = `vistaly-import-${Date.now()}-${counter}`
       const meta = item.metadata ?? {}
       const cardType = (meta.card_type as string | undefined) ?? ''
 
-      // ── Resolve entity type ────────────────────────────────────────────────
       const resolved = resolveCardType(cardType)
-
-      // Explicitly unmappable card types (e.g. sprint): skip entirely
-      if (resolved === null) {
-        warnings.push(
-          `Vistaly card "${item.title}" has card_type "${cardType}" which has no UPG equivalent ` +
-            `(sprints are delivery-layer constructs not tracked in UPG). Card skipped.`,
-        )
-        continue
-      }
-
-      // Unknown card_type: warn and default
       let entityType: string
-      let mappingConfidence: 'high' | 'medium' | 'low'
-
+      let confidence: 'high' | 'medium' | 'low'
       if (resolved === undefined) {
         warnings.push(
           `Vistaly card "${item.title}" has unknown card_type "${cardType}". ` +
-            `Defaulting to "document". Update the adapter if this type should be mapped.`,
+            `Defaulting to "document". Update VISTALY_TYPE_MAP if this should be mapped.`,
         )
         entityType = 'document'
-        mappingConfidence = 'low'
+        confidence = 'low'
       } else {
         entityType = resolved
-        mappingConfidence = getConfidenceForCardType(cardType)
+        confidence = getConfidenceForCardType(cardType)
       }
 
-      // Register in sourceMap now, before any continue paths below
+      const nodeId = `vistaly-import-${counter}`
       sourceMap[item.source_id] = nodeId
 
-      // ── Type-specific warnings ─────────────────────────────────────────────
-
-      if (cardType === 'experiment' || cardType === 'assumption_test') {
-        warnings.push(
-          `Vistaly Experiment cards contain both the hypothesis and the experiment. ` +
-            `Consider splitting into hypothesis + experiment nodes for richer UPG traceability.`,
-        )
-      }
-
-      if (cardType === 'interview') {
-        warnings.push(
-          `Vistaly Interview cards are mapped as research_study nodes. ` +
-            `For richer research structure (observations, quotes, insights), ` +
-            `consider also importing into Dovetail.`,
-        )
-      }
-
-      // ── Normalise status ───────────────────────────────────────────────────
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeVistalyStatus(rawStatus) : undefined
+      const status = rawStatus ? normalizeVistalyStatus(rawStatus, entityType) : undefined
 
-      // ── Tags ───────────────────────────────────────────────────────────────
-      const tags: string[] = []
-      if (Array.isArray(meta.tags)) {
-        tags.push(...(meta.tags as string[]))
-      }
-      if (Array.isArray(meta.labels)) {
-        tags.push(...(meta.labels as string[]))
+      // Metric values belong under properties (canonical), not as top-level
+      // node fields, so the .upg writer persists them.
+      let properties: Record<string, unknown> | undefined
+      if (entityType === 'metric') {
+        const p: Record<string, unknown> = {}
+        if (meta.metric_current_value !== undefined) p.current_value = meta.metric_current_value
+        if (meta.metric_target_value !== undefined) p.target_value = meta.metric_target_value
+        if (meta.metric_unit !== undefined) p.unit = meta.metric_unit
+        if (Object.keys(p).length > 0) properties = p
       }
 
-      // ── Build the UPG node ─────────────────────────────────────────────────
       const node: UPGBaseNode = {
         id: nodeId,
         type: entityType as UPGEntityType,
         title: item.title,
         ...(item.content ? { description: item.content } : {}),
-        ...(tags.length > 0 ? { tags } : {}),
         ...(status ? { status } : {}),
         source_id: item.source_id,
         source_type: item.source_type,
-        mapping_confidence: mappingConfidence,
+        mapping_confidence: confidence,
         external_tool: 'vistaly',
         external_id: item.source_id,
-        // Metric-specific fields
-        ...(entityType === 'metric' && meta.metric_current_value !== undefined
-          ? { current_value: meta.metric_current_value as number }
-          : {}),
-        ...(entityType === 'metric' && meta.metric_target_value !== undefined
-          ? { target_value: meta.metric_target_value as number }
-          : {}),
-        ...(entityType === 'metric' && meta.metric_unit !== undefined
-          ? { unit: meta.metric_unit as string }
-          : {}),
+        ...(meta.card_url ? { external_ref: meta.card_url as string } : {}),
+        ...(properties ? { properties } : {}),
       }
-
       nodes.push(node)
     }
 
-    // ── Emit hierarchy edges (second pass, so sourceMap is complete) ──────────
-    // Process items again to resolve parent_id → edge
+    // Hierarchy edges (second pass, so sourceMap is complete).
     for (const item of items) {
       const meta = item.metadata ?? {}
-      const cardType = (meta.card_type as string | undefined) ?? ''
+      const childType = (meta.card_type as string | undefined) ?? ''
       const parentId = meta.parent_id as string | undefined
-      const parentType = (meta.parent_type as string | undefined) ?? ''
 
-      // Skip cards that were not registered (e.g. skipped sprint cards)
-      const nodeId = sourceMap[item.source_id]
-      if (!nodeId) continue
-
-      if (!parentId) continue
+      const childNodeId = sourceMap[item.source_id]
+      if (!childNodeId || !parentId) continue
 
       const parentNodeId = sourceMap[parentId]
       if (!parentNodeId) {
         warnings.push(
-          `Vistaly card "${item.title}" references parent_id "${parentId}" which was not found ` +
+          `Vistaly card "${item.title}" references parent_id "${parentId}" which was not ` +
             `in the imported set. Edge skipped.`,
         )
         continue
       }
 
-      // Resolve edge based on parent_type + card_type pair
-      const edgeResult = resolveVistalyEdge(parentType, cardType, item.title, warnings)
+      const parentType = (meta.parent_type as string | undefined) ?? ''
+      const childUpg = resolveCardType(childType) ?? 'document'
+      const parentUpg = resolveCardType(parentType) ?? 'document'
 
-      if (edgeResult === 'warning-only') {
-        // Warning already emitted inside resolveVistalyEdge: no edge to emit
-        continue
-      }
-
-      if (edgeResult === null) {
-        // Unrecognised pair: emit a generic informational edge with low confidence
+      const mapped = VISTALY_EDGE_MAP[`${parentUpg}__${childUpg}`]
+      if (mapped) {
+        const source = mapped.sourceIsChild ? childNodeId : parentNodeId
+        const target = mapped.sourceIsChild ? parentNodeId : childNodeId
         edges.push({
-          id: `edge-vistaly-${parentNodeId}-${nodeId}`,
+          id: `edge-vistaly-${source}-${target}`,
+          source,
+          target,
+          type: mapped.type as UPGEdgeType,
+          mapping_confidence: 'high',
+        })
+      } else {
+        // No canonical edge for this pair (e.g. solution/assumption → experiment,
+        // which UPG routes through a hypothesis). Emit a generic link + warning.
+        edges.push({
+          id: `edge-vistaly-${parentNodeId}-${childNodeId}`,
           source: parentNodeId,
-          target: nodeId,
+          target: childNodeId,
           type: 'node_informs_node' as UPGEdgeType,
           mapping_confidence: 'low',
         })
-        continue
-      }
-
-      // For multi-edge chains (feedback → feature_request → opportunity),
-      // edgeResult may be an array of edge descriptors
-      if (Array.isArray(edgeResult)) {
-        for (const edgeDescriptor of edgeResult) {
-          edges.push(edgeDescriptor)
-        }
-      } else {
-        edges.push({
-          id: `edge-vistaly-${parentNodeId}-${nodeId}`,
-          source: parentNodeId,
-          target: nodeId,
-          type: edgeResult as UPGEdgeType,
-          mapping_confidence: 'medium',
-        })
+        warnings.push(
+          `No canonical UPG edge for Vistaly ${parentType || 'card'} → ${childType || 'card'} ` +
+            `(${parentUpg} → ${childUpg}); emitted node_informs_node as a generic link.`,
+        )
       }
     }
 
@@ -382,108 +417,4 @@ export class VistalyAdapter implements UPGAdapter {
 
     return { nodes, edges, source_map: sourceMap, warnings }
   }
-}
-
-// ─── Edge resolution ──────────────────────────────────────────────────────────
-
-/**
- * Resolve the canonical UPG edge for a Vistaly parent_type → card_type pair.
- *
- * Returns:
- * - A UPG edge type string (most cases)
- * - An array of UPGEdge objects (multi-hop chains like feedback → opportunity)
- * - 'warning-only' for the objective→outcome gap (warns but does NOT emit an edge)
- * - null for unrecognised pairs (caller emits node_informs_node fallback)
- *
- * All emitted edge types are verified against the live UPG edge catalogue.
- */
-function resolveVistalyEdge(
-  parentType: string,
-  childType: string,
-  cardTitle: string,
-  warnings: string[],
-): string | UPGEdge[] | 'warning-only' | null {
-  const parent = normalizeName(parentType)
-  const child = normalizeName(childType)
-
-  // outcome ← metric / kpi: edge direction is outcome → metric (source: outcome, target: metric)
-  // But in Vistaly, parent=outcome, child=kpi|metric → emit outcome_measured_by_metric
-  if ((parent === 'outcome') && (child === 'kpi' || child === 'metric')) {
-    return 'outcome_measured_by_metric'
-  }
-
-  // outcome → opportunity (Vistaly: parent=outcome, child=opportunity)
-  // UPG edge: opportunity_pursues_outcome (source=opportunity, target=outcome)
-  // Note: the edge direction in UPG is opportunity→outcome; here child=opportunity, parent=outcome
-  // so we need source=child node, target=parent node: handled by returning a descriptor
-  if (parent === 'outcome' && child === 'opportunity') {
-    // opportunity_pursues_outcome: source=opportunity, target=outcome
-    // We'll encode this as an array with explicit source/target
-    return 'opportunity_pursues_outcome'
-  }
-
-  // opportunity → solution
-  if (parent === 'opportunity' && child === 'solution') {
-    return 'opportunity_drives_solution'
-  }
-
-  // solution → experiment / assumption_test
-  // solution_proposes_hypothesis: source=solution, target=hypothesis
-  // Since we map experiment to 'experiment' not 'hypothesis', this is an approximation.
-  // We emit the canonical edge noting hypothesis is the correct intermediate.
-  if (parent === 'solution' && (child === 'experiment' || child === 'assumption_test')) {
-    return 'solution_proposes_hypothesis'
-  }
-
-  // assumption → experiment / assumption_test
-  if (parent === 'assumption' && (child === 'experiment' || child === 'assumption_test')) {
-    return 'assumption_becomes_hypothesis'
-  }
-
-  // interview (research_study) → opportunity
-  // Canonical path: insight_informs_opportunity (source=insight, target=opportunity)
-  // Interview is mapped to research_study. The bridge from research_study to opportunity
-  // goes via insight: research_study_produces_insight → insight_informs_opportunity.
-  // Since we do not create intermediate insight nodes, we emit insight_informs_opportunity
-  // as an approximation and note the bridge.
-  if (parent === 'interview' && child === 'opportunity') {
-    warnings.push(
-      `Vistaly Interview→Opportunity hierarchy for "${cardTitle}": ` +
-        `UPG canonical path goes via insight (research_study → insight → opportunity). ` +
-        `Emitting insight_informs_opportunity as an approximation. ` +
-        `Consider adding an insight node to complete the chain.`,
-    )
-    return 'insight_informs_opportunity'
-  }
-
-  // feedback (customer_feedback) → opportunity
-  // Canonical chain: customer_feedback_becomes_feature_request → feature_request_creates_opportunity
-  // Both edges are in the catalogue. We cannot create an intermediate feature_request node
-  // here, so we emit a warning and use customer_feedback_becomes_feature_request as the
-  // closest available edge; the opportunity edge is not emitted (no intermediate node exists).
-  if (parent === 'feedback' && child === 'opportunity') {
-    warnings.push(
-      `Vistaly Feedback→Opportunity hierarchy for "${cardTitle}": ` +
-        `UPG canonical path is customer_feedback → feature_request → opportunity ` +
-        `(customer_feedback_becomes_feature_request + feature_request_creates_opportunity). ` +
-        `No intermediate feature_request node was created. ` +
-        `Consider importing as a feature_request to complete the chain.`,
-    )
-    return null
-  }
-
-  // objective → outcome: THE GAP
-  // No direct objective→outcome edge exists in the UPG catalogue.
-  // The canonical path goes through key_result.
-  if (parent === 'objective' && child === 'outcome') {
-    warnings.push(
-      `Vistaly Objective→Outcome hierarchy: UPG connects these via key_result. ` +
-        `The direct edge was not emitted. ` +
-        `Consider creating a key_result node to bridge the two.`,
-    )
-    return 'warning-only'
-  }
-
-  // Unrecognised pair
-  return null
 }

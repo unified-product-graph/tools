@@ -105,6 +105,7 @@ function printHelp() {
   console.log(chalk.bold('  Frameworks'))
   console.log(cmd('apply', '<framework> [ids...]', 'Run a framework over entities (creates an exercise)'))
   console.log(cmd('score', '<exercise> <entity>', "Record a framework's result on the includes edge"))
+  console.log(cmd('show', '<exercise>', 'Show an exercise: included entities + their scores'))
   console.log()
 
   console.log(chalk.bold('  Global flags'))

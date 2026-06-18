@@ -24,7 +24,7 @@
  * node is created and a feature_tests_hypothesis edge is emitted.
  */
 
-import { UPG_EDGE_TYPES } from '@unified-product-graph/core'
+import { UPG_EDGE_TYPES, getLifecycleForType } from '@unified-product-graph/core'
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -79,6 +79,35 @@ export function resolvePostHogType(entityType: string): string | null | undefine
 export function normalizePostHogStatus(status: string): string {
   const lower = normalizeName(status)
   return POSTHOG_STATUS_MAP[lower] ?? status
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a PostHog status to a status valid for the TARGET UPG type's
+ * lifecycle. Tries the raw value first (e.g. an experiment's `running` is a real
+ * experiment phase), then the normalised value, and omits anything that does not
+ * fit the target lifecycle rather than persisting an invalid status. Returns
+ * undefined for lifecycle-free types.
+ */
+function resolvePostHogStatus(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = POSTHOG_STATUS_MAP[raw]
+  if (mapped && valid.has(mapped)) return mapped
+  return undefined
 }
 
 /** Resolve confidence for a PostHog entity_type → UPG type mapping */
@@ -190,14 +219,24 @@ export class PostHogAdapter implements UPGAdapter {
       // Register in sourceMap before any continue paths
       sourceMap[item.source_id] = nodeId
 
-      // ── Status normalisation ───────────────────────────────────────────────
+      // ── Status normalisation (validated against the target lifecycle) ──────
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizePostHogStatus(rawStatus) : undefined
+      const status = rawStatus ? resolvePostHogStatus(rawStatus, upgEntityType) : undefined
 
       // ── Tags ───────────────────────────────────────────────────────────────
       const tags: string[] = []
       if (Array.isArray(meta.tags)) {
         tags.push(...(meta.tags as string[]))
+      }
+
+      // ── Metric values belong under properties (canonical) so they persist ──
+      let metricProps: Record<string, unknown> | undefined
+      if (upgEntityType === 'metric') {
+        const p: Record<string, unknown> = {}
+        if (meta.current_value !== undefined) p.current_value = meta.current_value as number
+        if (meta.target_value !== undefined) p.target_value = meta.target_value as number
+        if (meta.unit !== undefined) p.unit = meta.unit as string
+        if (Object.keys(p).length > 0) metricProps = p
       }
 
       // ── Build the UPG node ─────────────────────────────────────────────────
@@ -213,14 +252,7 @@ export class PostHogAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'posthog',
         external_id: item.source_id,
-        // Metric-specific fields for insight/action entities
-        ...(upgEntityType === 'metric'
-          ? {
-              ...(meta.current_value !== undefined ? { current_value: meta.current_value as number } : {}),
-              ...(meta.target_value !== undefined ? { target_value: meta.target_value as number } : {}),
-              ...(meta.unit !== undefined ? { unit: meta.unit as string } : {}),
-            }
-          : {}),
+        ...(metricProps ? { properties: metricProps } : {}),
       }
 
       nodes.push(node)
@@ -234,7 +266,7 @@ export class PostHogAdapter implements UPGAdapter {
           const hypId = `posthog-hyp-${Date.now()}-${counter}`
           const hypNode: UPGBaseNode = {
             id: hypId,
-            type: 'hypothesis_claim' as UPGEntityType,
+            type: 'hypothesis' as UPGEntityType,
             title: hypothesisText.slice(0, 120),
             external_tool: 'posthog',
             external_id: `${item.source_id}-hypothesis`,
@@ -245,7 +277,7 @@ export class PostHogAdapter implements UPGAdapter {
           nodes.push(hypNode)
           hypothesisMap[item.source_id] = hypId
           warnings.push(
-            `PostHog Experiment "${item.title}": hypothesis field found and captured as a hypothesis_claim node. Link it to outcomes and experiments to complete the validation chain.`,
+            `PostHog Experiment "${item.title}": hypothesis field found and captured as a hypothesis node. Link it to outcomes and experiments to complete the validation chain.`,
           )
         }
       }
@@ -271,15 +303,17 @@ export class PostHogAdapter implements UPGAdapter {
       // ── Experiment → hypothesis_claim edge ────────────────────────────────
       const hypNodeId = hypothesisMap[item.source_id]
       if (hypNodeId) {
+        // Canonical direction: hypothesis → experiment (the experiment tests the
+        // hypothesis). hypothesis_tested_by_experiment, source = hypothesis.
         const edgeType = safeEdgeType(
-          'feature_tests_hypothesis',
-          `PostHog: feature_tests_hypothesis not in catalog. Falling back to node_informs_node for experiment "${item.title}" → hypothesis.`,
+          'hypothesis_tested_by_experiment',
+          `PostHog: hypothesis_tested_by_experiment not in catalog. Falling back to node_informs_node for hypothesis → experiment "${item.title}".`,
           warnings,
         )
         edges.push({
-          id: `edge-posthog-hyp-${nodeId}-${hypNodeId}`,
-          source: nodeId,
-          target: hypNodeId,
+          id: `edge-posthog-hyp-${hypNodeId}-${nodeId}`,
+          source: hypNodeId,
+          target: nodeId,
           type: edgeType,
           mapping_confidence: 'high',
         })

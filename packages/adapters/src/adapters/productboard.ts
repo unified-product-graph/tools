@@ -28,6 +28,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Entity type → UPG entity type ───────────────────────────────────────────
@@ -69,13 +70,17 @@ export const PRODUCTBOARD_TYPE_MAP: Record<string, string | null> = {
 /**
  * Maps Productboard status values to UPG status values.
  */
+// Productboard's feature-workflow statuses, mapped to UPG delivery-lifecycle
+// phases. resolveProductboardStatus() validates the result against the TARGET
+// type's lifecycle and passes raw values through first, so e.g. a release keeps
+// its own `planned` phase while a feature's `planned` maps to `proposed`.
 export const PRODUCTBOARD_STATUS_MAP: Record<string, string> = {
-  new: 'draft',
-  'under-consideration': 'draft',
-  planned: 'active',
-  'in-progress': 'active',
-  released: 'complete',
-  "won't do": 'abandoned',
+  new: 'proposed',
+  'under-consideration': 'proposed',
+  planned: 'proposed',
+  'in-progress': 'in_progress',
+  released: 'shipped',
+  "won't do": 'archived',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -98,6 +103,48 @@ export function resolveProductboardType(entityType: string): string | null | und
 export function normalizeProductboardStatus(status: string): string {
   const lower = normalizeName(status)
   return PRODUCTBOARD_STATUS_MAP[lower] ?? status
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a Productboard status to one valid for the TARGET type's lifecycle.
+ * Tries the raw value, then the mapped value, and omits anything that does not
+ * fit the lifecycle rather than persisting an invalid status. Returns undefined
+ * for lifecycle-free types.
+ */
+function resolveProductboardStatus(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = PRODUCTBOARD_STATUS_MAP[raw]
+  if (mapped && valid.has(mapped)) return mapped
+  return undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair via
+ * the edge catalogue, honouring the catalogue's declared direction. Returns the
+ * edge type plus whether the CHILD is the edge source (so callers orient
+ * source/target correctly), or null when no canonical edge exists.
+ */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 /** Get confidence for a Productboard entity type → UPG entity type mapping */
@@ -227,9 +274,9 @@ export class ProductboardAdapter implements UPGAdapter {
 
       sourceMap[item.source_id] = nodeId
 
-      // Normalise status
+      // Normalise status against the target type's lifecycle (omit if invalid)
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeProductboardStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveProductboardStatus(rawStatus, ugpEntityType) : undefined
 
       // Build node
       const node: UPGBaseNode = {
@@ -263,7 +310,7 @@ export class ProductboardAdapter implements UPGAdapter {
 
       const effectiveType = entityType === 'feature' && featureType ? featureType : entityType
 
-      // ── Parent hierarchy edge ──────────────────────────────────────────────
+      // ── Parent hierarchy edge (catalogue-driven: correct type + direction) ──
       if (parentId) {
         const parentNodeId = sourceMap[parentId]
         if (!parentNodeId) {
@@ -271,21 +318,32 @@ export class ProductboardAdapter implements UPGAdapter {
             `Productboard entity "${item.title}" references parent_id "${parentId}" which was not found in the imported set. Edge skipped.`,
           )
         } else {
-          const edgeResult = resolveProductboardHierarchyEdge(
-            parentType,
-            effectiveType,
-            item.title,
-            warnings,
-          )
-          if (edgeResult && edgeResult !== 'warning-only') {
-            edgeCounter++
+          const childUpg = (resolveProductboardType(effectiveType) as string | null | undefined) ?? 'document'
+          const parentUpg = (resolveProductboardType(parentType) as string | null | undefined) ?? 'document'
+          const mapped = resolvePairEdge(parentUpg, childUpg)
+          edgeCounter++
+          if (mapped) {
+            const source = mapped.sourceIsChild ? nodeId : parentNodeId
+            const target = mapped.sourceIsChild ? parentNodeId : nodeId
+            edges.push({
+              id: `edge-pb-${edgeCounter}`,
+              source,
+              target,
+              type: mapped.type as UPGEdgeType,
+              mapping_confidence: 'medium',
+            })
+          } else {
             edges.push({
               id: `edge-pb-${edgeCounter}`,
               source: parentNodeId,
               target: nodeId,
-              type: edgeResult as UPGEdgeType,
-              mapping_confidence: 'medium',
+              type: 'node_informs_node' as UPGEdgeType,
+              mapping_confidence: 'low',
             })
+            warnings.push(
+              `No canonical UPG edge for Productboard ${parentType || 'parent'} -> ${effectiveType || 'child'} ` +
+                `(${parentUpg} -> ${childUpg}); emitted node_informs_node as a generic link.`,
+            )
           }
         }
       }
@@ -303,11 +361,16 @@ export class ProductboardAdapter implements UPGAdapter {
             const featureNodeId = sourceMap[featureId]
             if (!featureNodeId) continue
             edgeCounter++
+            // customer_feedback → feature has no canonical edge (the real path is
+            // customer_feedback → feature_request → feature, and no feature_request
+            // stub was created), so emit an honest generic link, not a mis-typed
+            // customer_feedback_becomes_feature_request whose target must be a
+            // feature_request.
             edges.push({
               id: `edge-pb-${edgeCounter}`,
               source: nodeId,
               target: featureNodeId,
-              type: 'customer_feedback_becomes_feature_request' as UPGEdgeType,
+              type: 'node_informs_node' as UPGEdgeType,
               mapping_confidence: 'low',
             })
           }
@@ -323,70 +386,6 @@ export class ProductboardAdapter implements UPGAdapter {
   }
 }
 
-// ─── Edge resolution helpers ──────────────────────────────────────────────────
-
-/**
- * Resolve the canonical UPG hierarchy edge for a Productboard parent_type → child_type pair.
- *
- * Returns:
- * - A UPG edge type string
- * - 'warning-only': warns but does not emit an edge
- * - null: unknown pair or no edge needed
- */
-function resolveProductboardHierarchyEdge(
-  parentType: string,
-  childType: string,
-  itemTitle: string,
-  warnings: string[],
-): string | 'warning-only' | null {
-  const parent = normalizeName(parentType)
-  const child = normalizeName(childType)
-
-  // component → feature/bug/chore
-  if (parent === 'component') {
-    if (child === 'feature' || child === 'bug' || child === 'chore' || child === 'sub_feature') {
-      return 'feature_area_contains_feature'
-    }
-  }
-
-  // product → component
-  if (parent === 'product' && child === 'component') {
-    return 'product_organises_into_feature_area'
-  }
-
-  // feature → sub_feature (feature decomposed into epic)
-  if (parent === 'feature' && child === 'sub_feature') {
-    return 'feature_decomposed_into_epic'
-  }
-
-  // release → feature/bug/chore/sub_feature
-  if (parent === 'release') {
-    if (child === 'feature' || child === 'chore' || child === 'sub_feature') {
-      return 'release_contains_feature'
-    }
-    if (child === 'bug') {
-      return 'release_contains_bug'
-    }
-  }
-
-  // initiative → objective
-  if (parent === 'initiative' && child === 'objective') {
-    warnings.push(
-      `Productboard Initiative→Objective relationship for "${itemTitle}": ` +
-        `mapped as initiative_drives_outcome (approximation). ` +
-        `UPG connects Initiative to Outcome, not directly to Objective. ` +
-        `Consider adding an outcome node to complete the chain.`,
-    )
-    return 'initiative_drives_outcome'
-  }
-
-  // objective → feature (outcome_delivered_by_feature)
-  if (parent === 'objective') {
-    if (child === 'feature' || child === 'bug' || child === 'chore') {
-      return 'outcome_delivered_by_feature'
-    }
-  }
-
-  void itemTitle
-  return null
-}
+// Edge resolution is catalogue-driven via resolvePairEdge() above: every emitted
+// hierarchy edge type and direction comes from UPG_EDGE_PAIR_MAP, with a
+// node_informs_node fallback when no canonical edge exists for the pair.

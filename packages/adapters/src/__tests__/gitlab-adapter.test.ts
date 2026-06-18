@@ -369,42 +369,43 @@ describe('GitLabAdapter: pipeline skipping', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('GitLabAdapter: status normalisation', () => {
-  it('opened issue maps to active status', async () => {
+describe('GitLabAdapter: status normalisation (validated against target lifecycle)', () => {
+  // Unlabelled issues resolve to `task` (todo, in_progress, in_review, done).
+  it('opened issue maps to in_progress', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Open issue', [], { state: 'opened' })])
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it('closed issue maps to complete status', async () => {
+  it('closed issue maps to done', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Done issue', [], { state: 'closed' })])
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('done')
   })
 
-  it('reopened issue maps to active status', async () => {
+  it('reopened issue maps to in_progress', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Reopened', [], { state: 'reopened' })])
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it('closed epic maps to complete status', async () => {
+  it('closed epic maps to done', async () => {
     const result = await adapter.convert([makeEpic('ep-1', 'Done epic', { state: 'closed' })])
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('done')
   })
 })
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
 describe('GitLabAdapter: edge emission', () => {
-  it('release_contains_feature emitted when issue with feature label has milestone_id', async () => {
+  it('a feature-labelled issue under a milestone falls back to a generic link (release->user_story has no edge)', async () => {
     const items: SourceItem[] = [
       makeMilestone('ms-1', 'v1.0'),
       makeIssue('i-1', 'Dark mode', ['feature'], { milestone_id: 'ms-1' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'release_contains_feature')
-    const edge = result.edges.find((e) => e.type === 'release_contains_feature')
-    expect(edge).toBeDefined()
-    expect(edge?.source).toBe(result.source_map['ms-1'])
-    expect(edge?.target).toBe(result.source_map['i-1'])
+    // A feature label resolves to user_story; release_contains_feature requires a
+    // feature target, so an honest node_informs_node is emitted instead.
+    assertAllEdgesCatalogued(result.edges, 'milestone->user_story link')
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
+    expect(result.edges.find((e) => e.type === 'release_contains_feature')).toBeUndefined()
   })
 
   it('release_contains_bug emitted when bug issue has milestone_id', async () => {
@@ -433,17 +434,17 @@ describe('GitLabAdapter: edge emission', () => {
     expect(edge?.target).toBe(result.source_map['i-1'])
   })
 
-  it('feature_decomposed_into_epic emitted for child epic with parent_id', async () => {
+  it('a child epic under a parent epic falls back to a generic link (epic->epic has no edge)', async () => {
     const items: SourceItem[] = [
       makeEpic('ep-parent', 'Platform epic'),
       makeEpic('ep-child', 'Auth sub-epic', { parent_id: 'ep-parent' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'feature_decomposed_into_epic')
-    const edge = result.edges.find((e) => e.type === 'feature_decomposed_into_epic')
-    expect(edge).toBeDefined()
-    expect(edge?.source).toBe(result.source_map['ep-parent'])
-    expect(edge?.target).toBe(result.source_map['ep-child'])
+    // feature_decomposed_into_epic requires a feature source; a parent epic is an
+    // epic, so an honest node_informs_node is emitted instead.
+    assertAllEdgesCatalogued(result.edges, 'epic->epic link')
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
+    expect(result.edges.find((e) => e.type === 'feature_decomposed_into_epic')).toBeUndefined()
   })
 
   it('project_delivers_epic emitted when epic has project_id', async () => {
@@ -472,15 +473,16 @@ describe('GitLabAdapter: edge emission', () => {
     expect(edge?.target).toBe(result.source_map['sg-1'])
   })
 
-  it('product_organises_into_feature_area emitted for project with group_id', async () => {
+  it('a project under a group falls back to a generic link (product->project has no edge)', async () => {
     const items: SourceItem[] = [
       makeGroup('g-1', 'my-org'),
       makeProject('p-1', 'main-app', 'g-1'),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'product_organises_into_feature_area')
-    const edge = result.edges.find((e) => e.type === 'product_organises_into_feature_area')
-    expect(edge).toBeDefined()
+    // product_organises_into_feature_area requires a feature_area target; a project
+    // is a project, so an honest node_informs_node is emitted instead.
+    assertAllEdgesCatalogued(result.edges, 'group->project link')
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
   it('edges NOT emitted when referenced source_ids are outside the import batch', async () => {
@@ -574,12 +576,12 @@ describe('GitLabAdapter: exported constants', () => {
     expect(GITLAB_ENTITY_TYPE_MAP['project']).toBe('project')
   })
 
-  it('GITLAB_STATUS_MAP normalises GitLab states correctly', () => {
-    expect(GITLAB_STATUS_MAP['opened']).toBe('active')
-    expect(GITLAB_STATUS_MAP['closed']).toBe('complete')
-    expect(GITLAB_STATUS_MAP['merged']).toBe('complete')
-    expect(GITLAB_STATUS_MAP['active']).toBe('active')
-    expect(GITLAB_STATUS_MAP['upcoming']).toBe('draft')
+  it('GITLAB_STATUS_MAP maps GitLab states to UPG delivery phase ids', () => {
+    expect(GITLAB_STATUS_MAP['opened']).toBe('in_progress')
+    expect(GITLAB_STATUS_MAP['closed']).toBe('done')
+    expect(GITLAB_STATUS_MAP['merged']).toBe('done')
+    expect(GITLAB_STATUS_MAP['active']).toBe('in_progress')
+    expect(GITLAB_STATUS_MAP['upcoming']).toBe('todo')
   })
 })
 

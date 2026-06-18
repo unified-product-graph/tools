@@ -28,6 +28,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Issue label → UPG entity type ───────────────────────────────────────────
@@ -87,14 +88,17 @@ export const GITLAB_ENTITY_TYPE_MAP: Record<string, string | null> = {
  * GitLab issue/epic states: opened | closed | reopened
  * GitLab milestone states: active | closed
  */
+// GitLab states mapped to UPG delivery-lifecycle phase ids. resolveGitLabStatusForType()
+// tries the raw value first (a bug's `open` is a real phase) then this map, keeping
+// only what is valid for the target type's lifecycle.
 export const GITLAB_STATUS_MAP: Record<string, string> = {
-  opened: 'active',
-  open: 'active',
-  reopened: 'active',
-  closed: 'complete',
-  merged: 'complete',
-  active: 'active',     // milestone state
-  upcoming: 'draft',
+  opened: 'in_progress',
+  open: 'in_progress',
+  reopened: 'in_progress',
+  closed: 'done',
+  merged: 'done',
+  active: 'in_progress',
+  upcoming: 'todo',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -133,9 +137,43 @@ export function inferIssueType(labels: string[], issueType?: string): string {
   return 'task' // default: unlabelled issues are delivery tasks
 }
 
-/** Map GitLab state string to UPG status */
+/** Map GitLab state string to a candidate UPG phase id. */
 function mapGitLabState(state: string): string {
   return GITLAB_STATUS_MAP[state.toLowerCase()] ?? state.toLowerCase()
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/** Resolve a GitLab state to a status valid for the target type's lifecycle (omit otherwise). */
+function resolveGitLabStatusForType(rawState: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = rawState.toLowerCase().trim()
+  if (valid.has(raw)) return raw
+  const mapped = mapGitLabState(rawState)
+  return valid.has(mapped) ? mapped : undefined
+}
+
+/**
+ * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair via
+ * the catalogue, honouring direction; null when no canonical edge exists.
+ */
+function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
+  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
+  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
+  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
+  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
+  return null
 }
 
 // ─── GitLab Adapter ───────────────────────────────────────────────────────────
@@ -236,7 +274,7 @@ export class GitLabAdapter implements UPGAdapter {
         mapping_confidence: 'high',
         external_tool: 'gitlab',
         external_id: item.source_id,
-        ...(meta.web_url ? { external_url: meta.web_url as string } : {}),
+        ...(meta.web_url ? { external_ref: meta.web_url as string } : {}),
         properties: {
           ...(meta.due_date ? { due_date: meta.due_date } : {}),
           ...(meta.start_date ? { start_date: meta.start_date } : {}),
@@ -363,7 +401,7 @@ export class GitLabAdapter implements UPGAdapter {
       const labels = isIssue ? ((meta.labels as string[] | undefined) ?? []) : []
       const status =
         isIssue || isEpic
-          ? mapGitLabState((meta.status as string) ?? (meta.state as string) ?? 'opened')
+          ? resolveGitLabStatusForType((meta.status as string) ?? (meta.state as string) ?? 'opened', resolvedType)
           : undefined
 
       // Filter type-indicator labels from tags
@@ -404,7 +442,7 @@ export class GitLabAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'gitlab',
         external_id: item.source_id,
-        ...(meta.web_url ? { external_url: meta.web_url as string } : {}),
+        ...(meta.web_url ? { external_ref: meta.web_url as string } : {}),
         ...(Object.keys(properties).length > 0 ? { properties } : {}),
       }
 
@@ -481,23 +519,31 @@ export class GitLabAdapter implements UPGAdapter {
       }
     }
 
-    // ── Pass 3: resolve deferred cross-domain edges ───────────────────────────
-    for (const { fromSourceId, toSourceId, edgeType } of deferredEdges) {
+    // ── Pass 3: resolve deferred cross-domain edges (catalogue-driven) ─────────
+    // The canonical edge type AND direction come from the resolved node types, not
+    // the optimistic edgeType stored when the relation was discovered (which forced
+    // e.g. release_contains_feature onto user_story/task targets, or
+    // feature_decomposed_into_epic from an epic source).
+    const nodeTypeById = new Map(nodes.map((n) => [n.id, n.type as string]))
+    for (const { fromSourceId, toSourceId } of deferredEdges) {
       const fromNodeId = sourceMap[fromSourceId]
       const toNodeId = sourceMap[toSourceId]
-
-      // Skip if either end is outside the import batch
       if (!fromNodeId || !toNodeId) continue
-
-      const edgeId = `edge-xdomain-${fromNodeId}-${toNodeId}-${edgeType}`
+      const fromType = nodeTypeById.get(fromNodeId)
+      const toType = nodeTypeById.get(toNodeId)
+      if (!fromType || !toType) continue
+      const mapped = resolvePairEdge(fromType, toType)
+      const source = mapped && mapped.sourceIsChild ? toNodeId : fromNodeId
+      const target = mapped && mapped.sourceIsChild ? fromNodeId : toNodeId
+      const resolvedEdgeType = (mapped ? mapped.type : 'node_informs_node') as UPGEdgeType
+      const edgeId = `edge-xdomain-${source}-${target}-${resolvedEdgeType}`
       if (edges.some((e) => e.id === edgeId)) continue
-
       edges.push({
         id: edgeId,
-        source: fromNodeId,
-        target: toNodeId,
-        type: edgeType,
-        mapping_confidence: 'medium',
+        source,
+        target,
+        type: resolvedEdgeType,
+        mapping_confidence: mapped ? 'medium' : 'low',
       })
     }
 

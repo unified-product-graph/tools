@@ -195,9 +195,9 @@ describe('GitHubAdapter: pull request skipping', () => {
 // ─── Non-issue entity types ───────────────────────────────────────────────────
 
 describe('GitHubAdapter: non-issue entity type mapping', () => {
-  it('milestone maps to milestone', async () => {
+  it('milestone maps to release (a versioned target that contains issues)', async () => {
     const result = await adapter.convert([makeMilestone('ms-1', 'v1.0')])
-    expect(result.nodes[0].type).toBe('milestone')
+    expect(result.nodes[0].type).toBe('release')
     expect(result.nodes[0].mapping_confidence).toBe('high')
   })
 
@@ -265,27 +265,9 @@ describe('GitHubAdapter: non-issue entity type mapping', () => {
 // ─── Cross-domain edge emission ───────────────────────────────────────────────
 
 describe('GitHubAdapter: cross-domain edge emission', () => {
-  it('milestone_gates_release edge emitted when release has milestone_id', async () => {
-    const items: SourceItem[] = [
-      makeMilestone('ms-1', 'v1.0 milestone'),
-      makeRelease('rel-1', 'v1.0 release', { milestone_id: 'ms-1' }),
-    ]
-    const result = await adapter.convert(items)
-    const edge = result.edges.find((e) => e.type === 'milestone_gates_release')
-    expect(edge).toBeDefined()
-    const milestoneNodeId = result.source_map['ms-1']
-    const releaseNodeId = result.source_map['rel-1']
-    expect(edge?.source).toBe(milestoneNodeId)
-    expect(edge?.target).toBe(releaseNodeId)
-  })
-
-  it('milestone_gates_release NOT emitted when milestone is not in batch', async () => {
-    const items: SourceItem[] = [
-      makeRelease('rel-1', 'v1.0', { milestone_id: 'ms-external' }),
-    ]
-    const result = await adapter.convert(items)
-    expect(result.edges.find((e) => e.type === 'milestone_gates_release')).toBeUndefined()
-  })
+  // milestone_gates_release removed: GitHub milestones now map to UPG `release`,
+  // so their issues connect via release_contains_feature/bug (below) with the
+  // release as the (correct) edge source.
 
   it('release_contains_feature emitted when feature has milestone_id linking to a milestone', async () => {
     const items: SourceItem[] = [
@@ -337,15 +319,22 @@ describe('GitHubAdapter: cross-domain edge emission', () => {
 
 // ─── Status mapping ───────────────────────────────────────────────────────────
 
-describe('GitHubAdapter: issue state mapping', () => {
-  it('open issue maps to active status', async () => {
+describe('GitHubAdapter: issue state mapping (validated against target lifecycle)', () => {
+  // Unlabelled issues resolve to `task` (lifecycle: todo, in_progress, in_review, done).
+  it('open issue maps to in_progress', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Open issue', [], { state: 'open' })])
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it('closed issue maps to complete status', async () => {
+  it('closed issue maps to done', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Closed issue', [], { state: 'closed' })])
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBe('done')
+  })
+
+  it("a bug's open state survives as the real bug phase `open`", async () => {
+    const result = await adapter.convert([makeIssue('b-1', 'Crash', ['bug'], { state: 'open' })])
+    expect(result.nodes[0].type).toBe('bug')
+    expect(result.nodes[0].status).toBe('open')
   })
 })
 

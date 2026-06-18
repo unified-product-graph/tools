@@ -127,15 +127,15 @@ describe('PostHogAdapter: hypothesis field on experiments', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    // Should have 2 nodes: experiment + hypothesis_claim
+    // Should have 2 nodes: experiment + hypothesis (canonical; hypothesis_claim is deprecated)
     expect(result.nodes).toHaveLength(2)
-    const hyp = result.nodes.find((n) => n.type === 'hypothesis_claim')
+    const hyp = result.nodes.find((n) => n.type === 'hypothesis')
     expect(hyp).toBeDefined()
     expect(hyp?.title).toContain('Users who see the wizard')
     expect(hyp?.external_tool).toBe('posthog')
   })
 
-  it('hypothesis_claim title is truncated to 120 characters', async () => {
+  it('hypothesis title is truncated to 120 characters', async () => {
     const longText = 'A'.repeat(200)
     const items: SourceItem[] = [
       makeItem('exp1', 'Long Hypothesis Experiment', 'experiment', {
@@ -143,21 +143,26 @@ describe('PostHogAdapter: hypothesis field on experiments', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    const hyp = result.nodes.find((n) => n.type === 'hypothesis_claim')
+    const hyp = result.nodes.find((n) => n.type === 'hypothesis')
     expect(hyp?.title.length).toBe(120)
   })
 
-  it('feature_tests_hypothesis edge emitted between experiment and hypothesis_claim', async () => {
+  it('hypothesis_tested_by_experiment edge emitted (hypothesis → experiment direction)', async () => {
     const items: SourceItem[] = [
       makeItem('exp1', 'Wizard A/B', 'experiment', {
         hypothesis: 'Wizard improves activation',
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'feature_tests_hypothesis')
-    const edge = result.edges.find((e) => e.type === 'feature_tests_hypothesis')
+    assertAllEdgesCatalogued(result.edges, 'hypothesis_tested_by_experiment')
+    const edge = result.edges.find((e) => e.type === 'hypothesis_tested_by_experiment')
     expect(edge).toBeDefined()
     expect(edge?.mapping_confidence).toBe('high')
+    // Canonical direction: source is the hypothesis, target is the experiment.
+    const exp = result.nodes.find((n) => n.type === 'experiment')
+    const hyp = result.nodes.find((n) => n.type === 'hypothesis')
+    expect(edge?.source).toBe(hyp?.id)
+    expect(edge?.target).toBe(exp?.id)
   })
 
   it('experiment without hypothesis creates only one node and no hypothesis edge', async () => {
@@ -167,7 +172,7 @@ describe('PostHogAdapter: hypothesis field on experiments', () => {
     const result = await adapter.convert(items)
     expect(result.nodes).toHaveLength(1)
     expect(result.nodes[0].type).toBe('experiment')
-    const hypEdge = result.edges.find((e) => e.type === 'feature_tests_hypothesis')
+    const hypEdge = result.edges.find((e) => e.type === 'hypothesis_tested_by_experiment')
     expect(hypEdge).toBeUndefined()
   })
 
@@ -178,7 +183,7 @@ describe('PostHogAdapter: hypothesis field on experiments', () => {
     const result = await adapter.convert(items)
     const warnText = result.warnings?.join(' ') ?? ''
     expect(warnText).toContain('hypothesis field found')
-    expect(warnText).toContain('hypothesis_claim node')
+    expect(warnText).toContain('hypothesis node')
   })
 })
 
@@ -232,36 +237,36 @@ describe('PostHogAdapter: skipped types + warnings', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('PostHogAdapter: status normalisation', () => {
-  it("status 'running' normalises to 'active'", async () => {
+describe('PostHogAdapter: status normalisation (validated against target lifecycle)', () => {
+  it("experiment 'running' passes through (a real experiment phase)", async () => {
     const items: SourceItem[] = [makeItem('exp1', 'Test', 'experiment', { status: 'running' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBe('running')
   })
 
-  it("status 'complete' normalises to 'complete'", async () => {
+  it("experiment 'complete' is omitted (not an experiment phase; terminal is 'done')", async () => {
     const items: SourceItem[] = [makeItem('exp1', 'Done Test', 'experiment', { status: 'complete' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('complete')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("status 'draft' normalises to 'draft'", async () => {
-    const items: SourceItem[] = [makeItem('ff1', 'Flag', 'feature_flag', { status: 'draft' })]
+  it("a feature_flag status with no matching feature phase is omitted (never persisted invalid)", async () => {
+    const items: SourceItem[] = [makeItem('ff1', 'Flag', 'feature_flag', { status: 'running' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('draft')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("status 'archived' normalises to 'abandoned'", async () => {
+  it("metric (insight) is lifecycle-free → no status emitted", async () => {
     const items: SourceItem[] = [makeItem('ins1', 'Old Insight', 'insight', { status: 'archived' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 })
 
 // ─── Metric value fields ──────────────────────────────────────────────────────
 
-describe('PostHogAdapter: metric value fields', () => {
-  it('insight with metric value fields preserved on node', async () => {
+describe('PostHogAdapter: metric values under properties', () => {
+  it('insight metric values are nested under properties (survive the round-trip)', async () => {
     const items: SourceItem[] = [
       makeItem('ins1', 'WAU', 'insight', {
         current_value: 8500,
@@ -271,9 +276,8 @@ describe('PostHogAdapter: metric value fields', () => {
     ]
     const result = await adapter.convert(items)
     const node = result.nodes[0] as Record<string, unknown>
-    expect(node.current_value).toBe(8500)
-    expect(node.target_value).toBe(12000)
-    expect(node.unit).toBe('users')
+    expect(node.properties).toEqual({ current_value: 8500, target_value: 12000, unit: 'users' })
+    expect(node.current_value).toBeUndefined()
   })
 })
 

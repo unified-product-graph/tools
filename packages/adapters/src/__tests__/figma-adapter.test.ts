@@ -130,42 +130,44 @@ describe('FigmaAdapter: skip cases', () => {
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
-describe('FigmaAdapter: status normalisation', () => {
-  it("status 'active' normalises to 'active'", async () => {
+describe('FigmaAdapter: status normalisation (validated against target lifecycle)', () => {
+  it("status 'active' is omitted (no clean target in the design lifecycles)", async () => {
     const items: SourceItem[] = [makeItem('fr1', 'Active Screen', 'frame', { status: 'active' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('active')
+    expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it("status 'archived' normalises to 'abandoned'", async () => {
+  it("status 'archived' maps to 'deprecated' for a design_component", async () => {
     const items: SourceItem[] = [makeItem('c1', 'Old Button', 'component', { status: 'archived' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('abandoned')
+    expect(result.nodes[0].status).toBe('deprecated')
   })
 })
 
 // ─── Edge emission ────────────────────────────────────────────────────────────
 
 describe('FigmaAdapter: edge emission', () => {
-  it('product_contains_screen emitted for file → frame', async () => {
+  it('file → frame falls back to a generic link (a Figma file maps to document, not product)', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Product Screens', 'file'),
       makeItem('fr1', 'Onboarding', 'frame', { parent_id: 'f1', parent_type: 'file' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'product_contains_screen')
-    const edge = result.edges.find((e) => e.type === 'product_contains_screen')
+    assertAllEdgesCatalogued(result.edges, 'file->frame link')
+    // No document -> screen edge exists, so an honest node_informs_node is emitted
+    // instead of a product_contains_screen sourced from a document node.
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
   })
 
-  it('design_system_contains_design_component emitted for file → component', async () => {
+  it('file → component falls back to a generic link (no document -> design_component edge)', async () => {
     const items: SourceItem[] = [
       makeItem('f1', 'Design System', 'file'),
       makeItem('c1', 'Button', 'component', { parent_id: 'f1', parent_type: 'file' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'design_system_contains_design_component')
-    const edge = result.edges.find((e) => e.type === 'design_system_contains_design_component')
+    assertAllEdgesCatalogued(result.edges, 'file->component link')
+    const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
   })
 

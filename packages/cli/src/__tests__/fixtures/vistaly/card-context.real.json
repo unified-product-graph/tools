@@ -1,0 +1,133 @@
+{
+  "_note": "Realistic GET /beta/cards/{rootId}/context response in Vistaly's REAL shape (spec 2025-06-21). Field names verbatim from the OpenAPI EnrichedCardContext schema. This is what actually comes over the wire.",
+  "context": [
+    {
+      "cardId": "card_out_activation",
+      "cardTitle": "Increase new-user activation rate",
+      "cardType": "outcome",
+      "cardStatus": "on track",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_out_activation",
+      "level": 0,
+      "children": ["card_kpi_activation", "card_opp_abandon", "card_prod_mobile"],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "metricCurrent": 42,
+      "metricTarget": 60,
+      "metricUnit": "%",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_kpi_activation",
+      "cardTitle": "Activation rate (7-day)",
+      "cardType": "kpi",
+      "cardStatus": "within limits",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_kpi_activation",
+      "level": 1,
+      "children": [],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "metricCurrent": 42,
+      "metricTarget": 60,
+      "metricUnit": "%",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_opp_abandon",
+      "cardTitle": "New users abandon setup before first value",
+      "cardType": "opportunity",
+      "cardStatus": "now",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_opp_abandon",
+      "level": 1,
+      "children": ["card_sol_wizard", "card_asm_threestep", "card_prb_apikeys"],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_sol_wizard",
+      "cardTitle": "Guided setup wizard",
+      "cardType": "solution",
+      "cardStatus": "idea",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_sol_wizard",
+      "level": 2,
+      "children": ["card_exp_wizardab"],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_exp_wizardab",
+      "cardTitle": "Wizard vs checklist A/B test",
+      "cardType": "experiment",
+      "cardStatus": "running",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_exp_wizardab",
+      "level": 3,
+      "children": [],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_asm_threestep",
+      "cardTitle": "Users will complete a 3-step wizard",
+      "cardType": "assumption",
+      "cardStatus": "pending",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_asm_threestep",
+      "level": 2,
+      "children": [],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_prb_apikeys",
+      "cardTitle": "Setup requires manually pasting API keys",
+      "cardType": "problem",
+      "cardStatus": "identified",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_prb_apikeys",
+      "level": 2,
+      "children": [],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_prod_mobile",
+      "cardTitle": "Mobile companion app",
+      "cardType": "product",
+      "cardStatus": "now",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_prod_mobile",
+      "level": 1,
+      "children": [],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "insights": [],
+      "comments": []
+    },
+    {
+      "cardId": "card_obj_smb",
+      "cardTitle": "Win the SMB segment",
+      "cardType": "objective",
+      "cardStatus": "progressing",
+      "cardUrl": "https://app.vistaly.com/ws_demo01/cards/card_obj_smb",
+      "level": 1,
+      "children": ["card_out_activation"],
+      "organizationId": "org_AbC123XyZ",
+      "workspaceId": "ws_demo01",
+      "insights": [],
+      "comments": []
+    }
+  ],
+  "metadata": {
+    "direction": "both",
+    "cardCount": 9,
+    "maxLevel": 3
+  }
+}

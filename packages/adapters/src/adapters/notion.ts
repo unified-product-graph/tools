@@ -17,7 +17,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolveContainmentEdge } from '@unified-product-graph/core'
+import { resolveContainmentEdge, getLifecycleForType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Database name → UPG entity type ─────────────────────────────────────────
@@ -531,6 +531,33 @@ export function resolveRelationEdge(propertyName: string): string | null {
   return RELATION_EDGE_MAP[lower] ?? null
 }
 
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a Notion status to one valid for the TARGET type's lifecycle. Tries the
+ * raw value (a feature's `shipped` is a real feature phase) then the normalised
+ * lifecycle stage, and omits anything that does not fit rather than persisting an
+ * invalid status. Returns undefined for lifecycle-free types.
+ */
+function resolveNotionStatusForType(rawStatus: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = normalizeName(rawStatus)
+  if (valid.has(raw)) return raw
+  const mapped = LIFECYCLE_STATUS_MAP[raw]
+  return mapped && valid.has(mapped) ? mapped : undefined
+}
+
 /** Normalize a Notion status string to a UPG lifecycle stage */
 export function normalizeStatus(status: string): string {
   const lower = normalizeName(status)
@@ -649,9 +676,9 @@ export class NotionAdapter implements UPGAdapter {
         tags.push(...(meta.multi_select as string[]))
       }
 
-      // ── Normalise status → lifecycle stage ───────────────────────────────
+      // ── Normalise status → lifecycle stage (validated against the type) ───
       const rawStatus = meta.status as string | undefined
-      const status = rawStatus ? normalizeStatus(rawStatus) : undefined
+      const status = rawStatus ? resolveNotionStatusForType(rawStatus, entityType) : undefined
 
       // ── Extract unique_id as the sync anchor ─────────────────────────────
       // Notion's unique_id is auto-incrementing and stable: preferred over source_id
@@ -687,7 +714,7 @@ export class NotionAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'notion',
         external_id: externalId,
-        ...(meta.url ? { external_url: meta.url as string } : {}),
+        ...(meta.url ? { external_ref: meta.url as string } : {}),
       }
 
       nodes.push(node)

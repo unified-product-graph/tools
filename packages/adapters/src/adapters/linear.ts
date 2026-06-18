@@ -27,7 +27,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolveContainmentEdge } from '@unified-product-graph/core'
+import { resolveContainmentEdge, getLifecycleForType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Issue type map (discriminated by issueType.name from Linear API) ─────────
@@ -74,16 +74,40 @@ const LINEAR_ENTITY_TYPE_MAP: Record<string, string | null> = {
  */
 export function normalizeLinearStatus(state: string): string {
   const lower = state.toLowerCase().trim()
-  if (lower === 'backlog' || lower === 'triage') return 'draft'
-  if (lower === 'todo' || lower === 'in progress' || lower === 'started') return 'active'
-  if (lower === 'done' || lower === 'completed') return 'complete'
-  if (lower === 'cancelled' || lower === 'canceled') return 'abandoned'
-  // Substring fallbacks for variant state names
-  if (lower.includes('backlog') || lower.includes('triage')) return 'draft'
-  if (lower.includes('todo') || lower.includes('progress') || lower.includes('started')) return 'active'
-  if (lower.includes('done') || lower.includes('complet')) return 'complete'
-  if (lower.includes('cancel')) return 'abandoned'
+  // Map to real UPG delivery-lifecycle phase ids; resolveLinearStatusForType()
+  // then keeps only those valid for the target type's lifecycle.
+  if (lower === 'backlog' || lower === 'triage' || lower.includes('backlog') || lower.includes('triage')) return 'proposed'
+  if (lower === 'in progress' || lower === 'started' || lower.includes('progress') || lower.includes('started')) return 'in_progress'
+  if (lower === 'done' || lower === 'completed' || lower.includes('done') || lower.includes('complet')) return 'done'
+  if (lower === 'cancelled' || lower === 'canceled' || lower.includes('cancel')) return 'archived'
+  if (lower === 'todo' || lower === 'to do' || lower.includes('todo')) return 'todo'
   return lower
+}
+
+/** Valid status values for a UPG entity type, or null when lifecycle-free. */
+function validStatusesForType(type: string): ReadonlySet<string> | null {
+  const lc = getLifecycleForType(type)
+  if (!lc) return null
+  const set = new Set<string>()
+  for (const p of lc.phases) {
+    set.add(p.id)
+    for (const s of p.core_states ?? []) set.add(s.id)
+  }
+  return set
+}
+
+/**
+ * Resolve a Linear workflow state to a status valid for the target type's
+ * lifecycle. Tries the raw state, then the generic normalisation, and omits
+ * anything that does not fit rather than persisting an invalid status.
+ */
+function resolveLinearStatusForType(rawState: string, upgType: string): string | undefined {
+  const valid = validStatusesForType(upgType)
+  if (!valid) return undefined
+  const raw = rawState.toLowerCase().trim()
+  if (valid.has(raw)) return raw
+  const normalised = normalizeLinearStatus(rawState)
+  return valid.has(normalised) ? normalised : undefined
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -293,9 +317,11 @@ export class LinearAdapter implements UPGAdapter {
         }
       }
 
-      // ── Status normalisation ─────────────────────────────────────────────
-      const rawState = meta.state as string | undefined
-      const status = rawState ? normalizeLinearStatus(rawState) : undefined
+      // ── Status normalisation (validated against the target lifecycle) ─────
+      // list() populates metadata.status (the workflow state name); accept
+      // metadata.state too for callers that use it.
+      const rawState = (meta.status ?? meta.state) as string | undefined
+      const status = rawState ? resolveLinearStatusForType(rawState, resolvedType) : undefined
 
       // ── Tags from labels ─────────────────────────────────────────────────
       const labels = (meta.labels as string[] | undefined) ?? []
@@ -321,7 +347,7 @@ export class LinearAdapter implements UPGAdapter {
         mapping_confidence: mappingConfidence,
         external_tool: 'linear',
         external_id: item.source_id,
-        ...(meta.url ? { external_url: meta.url as string } : {}),
+        ...(meta.url ? { external_ref: meta.url as string } : {}),
         ...(Object.keys(properties).length > 0 ? { properties } : {}),
       }
 
