@@ -13,7 +13,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
-import { updateProductTool, listLocalProducts } from '../tools/workspace.js'
+import { updateProductTool, listLocalProducts, getWorkspaceInfo } from '../tools/workspace.js'
 import { getProductContext } from '../tools/context.js'
 import {
   createSessionContext,
@@ -50,7 +50,7 @@ function readJson(p: string) {
   return JSON.parse(readFileSync(p, 'utf-8'))
 }
 
-describe('update_product member_kind (0.10.1)', () => {
+describe('update_product cache reconcile (member_kind 0.10.1 + title 0.17.0)', () => {
   let cwd: string
   let originalCwd: string
   let store: UPGFileStore
@@ -139,5 +139,26 @@ describe('update_product member_kind (0.10.1)', () => {
     expect(ws.products.find((p: { file: string }) => p.file === 'root.upg').member_kind).toBeUndefined()
     const portfolio = readJson(join(cwd, '.upg', 'portfolio.upg'))
     expect(portfolio.products.find((p: { id: string }) => p.id === 'p_root').member_kind).toBeUndefined()
+  })
+
+  it('renaming the title reconciles the workspace.json + portfolio.upg caches (0.17.0)', async () => {
+    const ctx = makeCtx(store)
+    const res = await parse(updateProductTool({ title: 'Renamed Root' }, ctx))
+    expect(res.isError).toBeFalsy()
+    expect((res.body?.updated as string[]) ?? []).toContain('title')
+
+    // 1. the graph file header (source of truth, integrity resealed by the flush)
+    expect(readJson(join(cwd, '.upg', 'root.upg')).product.title).toBe('Renamed Root')
+
+    // 2. workspace.json cache → get_workspace_info reads this (the stale-title regression)
+    const ws = readJson(join(cwd, '.upg', 'workspace.json'))
+    expect(ws.products.find((p: { file: string }) => p.file === 'root.upg').title).toBe('Renamed Root')
+    const info = await parse(getWorkspaceInfo({}, ctx))
+    const infoProducts = (info.body?.products as Array<{ file: string; title: string }>) ?? []
+    expect(infoProducts.find((p) => p.file === 'root.upg')?.title).toBe('Renamed Root')
+
+    // 3. portfolio.upg registry → portfolio_census / digest / findProductFileById read this
+    const portfolio = readJson(join(cwd, '.upg', 'portfolio.upg'))
+    expect(portfolio.products.find((p: { id: string }) => p.id === 'p_root').title).toBe('Renamed Root')
   })
 })

@@ -36,6 +36,10 @@ export function collectAntiPatternInputs(
   // ── Counts by type + counts by type and status ─────────────────────────────
   const countsByType: Record<string, number> = {}
   const countsByTypeAndStatus: Record<string, Record<string, number>> = {}
+  // type → property key → property value → count (0.17.0): lets an anti-pattern
+  // filter an entity_count on a property value, e.g. metric where designation ==
+  // 'north_star'. Built for every string-valued property; bounded by the data.
+  const countsByTypeAndProperty: Record<string, Record<string, Record<string, number>>> = {}
   // Per-type → set of domain ids; collapsed to domainPopulation/domainCount.
   const domainsWithEntities = new Set<string>()
   const domainPopulation: Record<string, boolean> = {}
@@ -51,6 +55,24 @@ export function collectAntiPatternInputs(
         countsByTypeAndStatus[type] = byStatus
       }
       byStatus[node.status] = (byStatus[node.status] ?? 0) + 1
+    }
+
+    const props = (node as { properties?: Record<string, unknown> }).properties
+    if (props) {
+      for (const [k, val] of Object.entries(props)) {
+        if (typeof val !== 'string' || val.length === 0) continue
+        let byProp = countsByTypeAndProperty[type]
+        if (!byProp) {
+          byProp = {}
+          countsByTypeAndProperty[type] = byProp
+        }
+        let byVal = byProp[k]
+        if (!byVal) {
+          byVal = {}
+          byProp[k] = byVal
+        }
+        byVal[val] = (byVal[val] ?? 0) + 1
+      }
     }
 
     const domain = getDomainForType(type)
@@ -90,6 +112,7 @@ export function collectAntiPatternInputs(
   return {
     countsByType,
     countsByTypeAndStatus,
+    countsByTypeAndProperty,
     edgePresence,
     domainPopulation,
     totalEntityCount: nodes.length,

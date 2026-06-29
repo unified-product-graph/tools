@@ -260,6 +260,11 @@ export interface ValidateGraphAntiPatternViolation {
   anti_pattern_id: string
   name: string
   severity: 'high' | 'medium' | 'low'
+  /** Concern family (0.17.0): product_spine | universal | operating. */
+  concern?: 'product_spine' | 'universal' | 'operating'
+  /** Whether this fired violation gates `valid` under the graph's member-kind
+   *  validation profile (0.17.0). false = reported but advisory. */
+  gating?: boolean
   target_entities: string[]
   description: string
   why_it_matters: string
@@ -304,6 +309,13 @@ export interface ValidateGraphResult {
    * not `valid`, for a CI gate that asks "is this graph spec-shaped?".
    */
   structurally_valid?: boolean
+  /**
+   * Set when the graph's member-kind validation profile demoted at least one
+   * fired anti-pattern to advisory (0.17.0): the member kind whose profile applied
+   * (`watched` / `org_rollup` / `operating_function`). Absent for a plain product
+   * graph. `watched_intelligence_graph` is retained alongside for back-compat.
+   */
+  advisory_profile?: string
   summary: ValidateGraphSummary
   entity_drift?: ValidateGraphEntityDrift[]
   edge_drift?: ValidateGraphEdgeDrift[]

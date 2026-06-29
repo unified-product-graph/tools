@@ -947,9 +947,9 @@ export class UPGFileStore {
    * graph). Read from the in-memory doc, where `normalizeDocument` lifts
    * `$upg.member_kind` to a top-level field (absent = product).
    */
-  getMemberKind(): 'product' | 'org_rollup' | 'watched' {
+  getMemberKind(): 'product' | 'org_rollup' | 'watched' | 'operating_function' {
     const k = (this.doc as { member_kind?: string }).member_kind
-    return k === 'org_rollup' || k === 'watched' ? k : 'product'
+    return k === 'org_rollup' || k === 'watched' || k === 'operating_function' ? k : 'product'
   }
 
   /**
@@ -959,9 +959,12 @@ export class UPGFileStore {
    * graph can be re-kinded back to a product. No-op (and not dirtied) when the
    * value is unchanged. (spec #44, UPG 0.10.1)
    */
-  setMemberKind(kind: 'product' | 'org_rollup' | 'watched'): void {
+  setMemberKind(kind: 'product' | 'org_rollup' | 'watched' | 'operating_function'): void {
     const doc = this.doc as { member_kind?: string }
-    const current = doc.member_kind === 'org_rollup' || doc.member_kind === 'watched' ? doc.member_kind : 'product'
+    const current =
+      doc.member_kind === 'org_rollup' || doc.member_kind === 'watched' || doc.member_kind === 'operating_function'
+        ? doc.member_kind
+        : 'product'
     if (current === kind) return
     if (kind === 'product') delete doc.member_kind
     else doc.member_kind = kind

@@ -426,7 +426,7 @@ export const createProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
       portfolio_id: args.portfolio_id as string | undefined,
       area_id: args.area_id as string | undefined,
       dir: args.dir as string | undefined,
-      member_kind: args.member_kind as 'product' | 'org_rollup' | 'watched' | undefined,
+      member_kind: args.member_kind as 'product' | 'org_rollup' | 'watched' | 'operating_function' | undefined,
     })
     return text(
       JSON.stringify({ message: `Created product: ${result.title}`, ...result }, null, 2),
@@ -466,7 +466,7 @@ export const updateProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
       description: args.description as string | undefined,
       health_status: args.health_status as string | undefined,
       url: args.url as string | undefined,
-      member_kind: args.member_kind as 'product' | 'org_rollup' | 'watched' | undefined,
+      member_kind: args.member_kind as 'product' | 'org_rollup' | 'watched' | 'operating_function' | undefined,
       cwd: process.cwd(),
     })
     if (result.updated.length === 0) {

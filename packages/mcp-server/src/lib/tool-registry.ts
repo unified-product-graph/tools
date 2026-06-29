@@ -821,9 +821,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         member_kind: {
           type: 'string',
-          enum: ['product', 'org_rollup', 'watched'],
+          enum: ['product', 'org_rollup', 'watched', 'operating_function'],
           description:
-            'Workspace member kind. product (default) = a product under management; org_rollup = the company umbrella graph; watched = a monitored intelligence graph (e.g. a competitor). Stamped into $upg.member_kind and cached in workspace.json; watched and rollup members are excluded from counts.products and product-spine expectations.',
+            'Workspace member kind. product (default) = a product under management; org_rollup = the company umbrella graph; watched = a monitored intelligence graph (e.g. a competitor); operating_function = a function a team operates (revenue/success/finance/people/marketing), not a product it ships. Stamped into $upg.member_kind and cached in workspace.json; non-product kinds are excluded from counts.products and graded on their own validation profile (product-spine anti-patterns are suppressed).',
         },
       },
       required: ['name'],
@@ -832,7 +832,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'update_product',
     description:
-      "Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. Re-kinding to watched / org_rollup also reconciles the workspace.json cache and the portfolio.upg registry so list_local_products, counts.products, and the watched anti-pattern scoping all reflect it.",
+      "Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. A title rename or a re-kind also reconciles the workspace.json cache and the portfolio.upg registry, so list_local_products, get_workspace_info, portfolio_census, counts.products, and the watched anti-pattern scoping all show the current value.",
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -843,8 +843,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         url: { type: 'string', description: 'Product URL.' },
         member_kind: {
           type: 'string',
-          enum: ['product', 'org_rollup', 'watched'],
-          description: 'Workspace member kind. product (default, an owned product), org_rollup (company umbrella graph), or watched (a monitored intelligence graph, e.g. a competitor, excluded from product coverage / counts).',
+          enum: ['product', 'org_rollup', 'watched', 'operating_function'],
+          description: 'Workspace member kind. product (default, an owned product), org_rollup (company umbrella graph), watched (a monitored intelligence graph, e.g. a competitor), or operating_function (a function a team operates, across revenue/success/finance/people/marketing, not a product it ships). Non-product kinds are excluded from product coverage / counts and graded on their own validation profile.',
         },
       },
     },

@@ -704,14 +704,25 @@ async function portfolioAntiPatternReport(
     primitiveProductsByTitle.set(key, entry)
     localPrimitiveCount++
   }
+  // 0.17.0: operating_function members, for the org-link portfolio check below.
+  const operatingFunctionMembers: Array<{ id: string; title: string }> = []
   for (const absPath of findWorkspaceUpgFiles(cwd)) {
     try {
       const doc = JSON.parse(fs.readFileSync(absPath, 'utf-8')) as {
-        product?: { id?: string }
+        $upg?: { member_kind?: string; product?: { id?: string; title?: string } }
+        product?: { id?: string; title?: string }
+        member_kind?: string
         nodes?: Array<{ type?: string; title?: string }>
       }
-      const productId = doc.product?.id
+      const productId = doc.product?.id ?? doc.$upg?.product?.id
       if (!productId) continue // skip portfolio.upg / non-product docs
+      const memberKind = doc.$upg?.member_kind ?? doc.member_kind
+      if (memberKind === 'operating_function') {
+        operatingFunctionMembers.push({
+          id: productId,
+          title: doc.product?.title ?? doc.$upg?.product?.title ?? productId,
+        })
+      }
       const nodes =
         activeId && productId === activeId
           ? (activeStore.getDocument()?.nodes ?? [])
@@ -729,7 +740,9 @@ async function portfolioAntiPatternReport(
     registryPrimitiveTitles.size > 0 ||
     localPrimitiveCount > 0 ||
     crossEdges.some((e) => FOUNDATIONS_CROSS_EDGES.has(e.type))
-  if (!foundationsPresent) return undefined
+  // The org-link check (0.17.0) also makes this report relevant for an
+  // operating-layer portfolio that has no foundations usage.
+  if (!foundationsPresent && operatingFunctionMembers.length === 0) return undefined
 
   const violations: Array<Record<string, unknown>> = []
 
@@ -787,12 +800,35 @@ async function portfolioAntiPatternReport(
     })
   }
 
+  // 4 · operating-function-without-org-link (0.17.0)
+  // An operating_function member should reference the org unit it operates under
+  // via a cross-product node_owned_by_department / node_owned_by_team edge to the
+  // rollup's team_org map.
+  const orgLinkedProducts = new Set<string>()
+  for (const e of crossEdges) {
+    if (e.type !== 'node_owned_by_department' && e.type !== 'node_owned_by_team') continue
+    const product = e.source_product_id ?? e.source.split('/')[0]
+    if (product) orgLinkedProducts.add(product)
+  }
+  const unlinkedFunctions = operatingFunctionMembers
+    .filter((m) => !orgLinkedProducts.has(m.id))
+    .map((m) => ({ operating_function: m.id, title: m.title }))
+  if (unlinkedFunctions.length > 0) {
+    violations.push({
+      anti_pattern_id: 'operating-function-without-org-link',
+      severity: 'medium',
+      count: unlinkedFunctions.length,
+      instances: unlinkedFunctions.slice(0, limit),
+    })
+  }
+
   const issuesTotal = violations.reduce((sum, v) => sum + (v.count as number), 0)
   return {
     evaluated: [
       'specification-without-implementer',
       'primitive-scattered-without-canonical',
       'product-reimplements-specification',
+      'operating-function-without-org-link',
     ],
     specifications: specs.length,
     violations,

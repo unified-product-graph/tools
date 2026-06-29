@@ -738,4 +738,45 @@ describe('canonical registry (0.9.6)', () => {
     expect(body.portfolio_anti_patterns.clean).toBe(true)
     expect(body.portfolio_anti_patterns.violations).toHaveLength(0)
   })
+
+  // ── portfolio_validate org-link anti-pattern (0.17.0, scope:'portfolio') ──
+
+  const fieldFn = {
+    upg_version: '0.17.0',
+    exported_at: '2026-06-29T00:00:00Z',
+    source: { tool: 'test' },
+    product: { id: 'p_field', title: 'Field Operations', stage: 'growth' },
+    member_kind: 'operating_function',
+    nodes: [{ id: 'p_field_prod', type: 'product', title: 'Field Operations' }],
+    edges: [],
+  }
+
+  it('portfolio_validate fires operating-function-without-org-link for a function with no org link', async () => {
+    writeFileSync(join(cwd, '.upg', 'field.upg'), JSON.stringify(fieldFn, null, 2))
+    writePortfolioDoc({ cross_edges: [] })
+    const ctx = await activeCtx()
+    const block = bodyOf(await portfolioValidate({}, ctx)).portfolio_anti_patterns
+    expect(block).toBeDefined()
+    expect(block.evaluated).toContain('operating-function-without-org-link')
+    const byId = Object.fromEntries(block.violations.map((v: { anti_pattern_id: string }) => [v.anti_pattern_id, v]))
+    expect(byId['operating-function-without-org-link'].count).toBe(1)
+    expect(byId['operating-function-without-org-link'].instances[0].operating_function).toBe('p_field')
+  })
+
+  it('portfolio_validate clears the org-link once the function links to a department in the rollup', async () => {
+    writeFileSync(join(cwd, '.upg', 'field.upg'), JSON.stringify(fieldFn, null, 2))
+    writePortfolioDoc({
+      cross_edges: [
+        {
+          id: 'ce_org', source: 'p_field/p_field_prod', target: 'rollup/dept_field',
+          type: 'node_owned_by_department', source_product_id: 'p_field', target_product_id: 'rollup',
+        },
+      ],
+    })
+    const ctx = await activeCtx()
+    const block = bodyOf(await portfolioValidate({}, ctx)).portfolio_anti_patterns
+    expect(block).toBeDefined()
+    const byId = Object.fromEntries(block.violations.map((v: { anti_pattern_id: string }) => [v.anti_pattern_id, v]))
+    expect(byId['operating-function-without-org-link']).toBeUndefined()
+  })
 })

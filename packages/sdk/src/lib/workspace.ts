@@ -31,6 +31,7 @@ import {
   openPortfolioStoreIfExists,
   registerProductOnPortfolio,
   setProductMemberKindOnPortfolio,
+  setProductTitleOnPortfolio,
   addProductToArea,
   addProductToPortfolio,
 } from './portfolio-routing.js'
@@ -43,7 +44,7 @@ export interface WorkspaceProduct {
    * `$upg.member_kind` for fast enumeration. `product` (default / absent),
    * `org_rollup` (company umbrella), or `watched` (monitored intelligence graph).
    */
-  member_kind?: 'product' | 'org_rollup' | 'watched'
+  member_kind?: 'product' | 'org_rollup' | 'watched' | 'operating_function'
 }
 
 export interface InitWorkspaceArgs {
@@ -96,7 +97,7 @@ export class InvalidProductStageError extends Error {
 }
 
 /** Canonical workspace member kinds (spec #44/#45). `product` is the default. */
-export const UPG_MEMBER_KINDS = ['product', 'org_rollup', 'watched'] as const
+export const UPG_MEMBER_KINDS = ['product', 'org_rollup', 'watched', 'operating_function'] as const
 export type UPGMemberKind = (typeof UPG_MEMBER_KINDS)[number]
 
 /**
@@ -286,7 +287,7 @@ export interface CreateProductArgs {
    * portfolio registry. Absent / `product` = an ordinary product; watched and
    * rollup members are excluded from `counts.products`.
    */
-  member_kind?: 'product' | 'org_rollup' | 'watched'
+  member_kind?: 'product' | 'org_rollup' | 'watched' | 'operating_function'
 }
 
 export interface CreateProductResult {
@@ -398,7 +399,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
     },
     nodes: [productNode],
     edges: [],
-    ...(member_kind === 'org_rollup' || member_kind === 'watched' ? { member_kind } : {}),
+    ...(member_kind === 'org_rollup' || member_kind === 'watched' || member_kind === 'operating_function' ? { member_kind } : {}),
   }
   newDoc._integrity = {
     checksum: computeIntegrityChecksum(newDoc),
@@ -427,7 +428,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
   }
   workspace.products = [
     ...workspace.products,
-    { file: workspaceFile, title: trimmedName, ...(member_kind === 'org_rollup' || member_kind === 'watched' ? { member_kind } : {}) },
+    { file: workspaceFile, title: trimmedName, ...(member_kind === 'org_rollup' || member_kind === 'watched' || member_kind === 'operating_function' ? { member_kind } : {}) },
   ]
   await fsp.writeFile(
     workspacePath,
@@ -452,7 +453,7 @@ export async function createProduct(args: CreateProductArgs): Promise<CreateProd
         id: newProductId,
         file_path: `.upg/${workspaceFile}`,
         title: trimmedName,
-        ...(member_kind === 'org_rollup' || member_kind === 'watched' ? { member_kind } : {}),
+        ...(member_kind === 'org_rollup' || member_kind === 'watched' || member_kind === 'operating_function' ? { member_kind } : {}),
       })
       if (area_id) {
         const a = addProductToArea(portfolioDoc, area_id, newProductId)
@@ -547,12 +548,14 @@ export interface UpdateProductResult {
  * stage / member_kind validation mirrors createProduct. Mutates the header in
  * place + marks the store dirty; the caller flushes the product file.
  *
- * A `member_kind` change is the full re-kind: it sets `$upg.member_kind` on the
- * graph (the caller's flush reseals integrity) AND — when `cwd` is given —
- * reconciles the `workspace.json` cache (so `list_local_products` reflects it)
- * and the `portfolio.upg` registry (so `$upg.counts.products` and the watched
- * anti-pattern scoping reflect it). Closes the gap where the only way to set
- * stage or kind was to hand-edit the integrity-hashed file (spec #44).
+ * When `cwd` is given, the denormalised workspace caches are reconciled so reads
+ * never go stale: a `title` rename and a `member_kind` re-kind both update the
+ * `workspace.json` cache (so `list_local_products` / `get_workspace_info` reflect
+ * it) and the `portfolio.upg` registry (so `portfolio_census` / `portfolio_digest`
+ * show the current title, and `$upg.counts.products` + the watched anti-pattern
+ * scoping reflect the kind). Closes the gap where the only way to set stage or kind
+ * was to hand-edit the integrity-hashed file (spec #44), and the 0.10.1 gap where a
+ * rename updated the header but left the title caches stale (0.17.0).
  */
 export async function updateProduct(args: UpdateProductArgs): Promise<UpdateProductResult> {
   const { store, stage, title, description, health_status, url, member_kind, cwd } = args
@@ -588,28 +591,51 @@ export async function updateProduct(args: UpdateProductArgs): Promise<UpdateProd
     product.url = url
     updated.push('url')
   }
+  // The product also lives as a `type:'product'` node sharing the product id; on
+  // serialize the canonical form reconciles the summary against that node and the
+  // NODE's title/description win (canonical.ts `effectiveRootProduct`). So a rename
+  // must update the node too, or the flush overrides the summary back to the node's
+  // stale value — the half of the rename that never landed pre-0.17.0. (stage is
+  // unaffected: the product node carries no `status`, so the summary stage wins.)
+  if (title !== undefined || description !== undefined) {
+    const pid = typeof product.id === 'string' ? product.id : undefined
+    const productNode = pid ? store.getNode(pid) : undefined
+    if (productNode && (productNode as { type?: string }).type === 'product') {
+      if (title !== undefined) (productNode as { title?: string }).title = title
+      if (description !== undefined) (productNode as { description?: string }).description = description
+    }
+  }
   if (member_kind !== undefined) {
     const before = store.getMemberKind()
     store.setMemberKind(member_kind) // marks dirty only when changed
     if (store.getMemberKind() !== before) updated.push('member_kind')
-    // Reconcile the workspace.json cache + portfolio.upg registry even when the
-    // graph value was already correct, so a partially-applied prior re-kind heals.
-    if (cwd) await syncMemberKindCaches(cwd, store, member_kind)
   }
   if (updated.length > 0) store.markDirty()
+  // Reconcile the denormalised workspace caches (title + member_kind) so
+  // list_local_products / get_workspace_info and the portfolio reads don't show a
+  // stale value after a rename or re-kind. Runs even when the graph value was
+  // already correct, so a partially-applied prior write heals. (0.17.0 generalised
+  // the 0.10.1 re-kind-only reconcile to also cover title.)
+  if (cwd && (title !== undefined || member_kind !== undefined)) {
+    await syncProductCaches(cwd, store, {
+      ...(member_kind !== undefined ? { member_kind } : {}),
+      ...(title !== undefined ? { title } : {}),
+    })
+  }
   return { product, updated, ...(member_kind !== undefined ? { member_kind } : {}) }
 }
 
 /**
- * Keep the workspace.json cache and portfolio.upg registry member_kind in sync
- * with a graph's `$upg.member_kind` after a re-kind. Best-effort: the graph file
- * is the source of truth, so a missing workspace.json / portfolio.upg is not an
- * error. (spec #44, UPG 0.10.1)
+ * Keep the `workspace.json` cache and `portfolio.upg` registry in sync with a
+ * graph's header after a `title` rename or `member_kind` re-kind. Reconciles only
+ * the fields supplied. Best-effort: the graph file is the source of truth, so a
+ * missing `workspace.json` / `portfolio.upg` is not an error. (spec #44, UPG
+ * 0.10.1; title reconcile added 0.17.0.)
  */
-async function syncMemberKindCaches(
+async function syncProductCaches(
   cwd: string,
   store: UPGFileStore,
-  kind: UPGMemberKind,
+  fields: { member_kind?: UPGMemberKind; title?: string },
 ): Promise<void> {
   const filePath = store.getFilePath()
   // 1. workspace.json cache — keyed by the product's workspace-relative path
@@ -622,22 +648,47 @@ async function syncMemberKindCaches(
     const ws = JSON.parse(await fsp.readFile(workspacePath, 'utf-8')) as { products?: WorkspaceProduct[] }
     const entry = ws.products?.find((p) => p.file === rel || p.file === base)
     if (entry) {
-      if (kind === 'product') delete entry.member_kind
-      else entry.member_kind = kind
-      await fsp.writeFile(workspacePath, JSON.stringify(ws, null, 2) + '\n', 'utf-8')
+      let changed = false
+      if (fields.member_kind !== undefined) {
+        if (fields.member_kind === 'product') {
+          if (entry.member_kind !== undefined) {
+            delete entry.member_kind
+            changed = true
+          }
+        } else if (entry.member_kind !== fields.member_kind) {
+          entry.member_kind = fields.member_kind
+          changed = true
+        }
+      }
+      if (fields.title !== undefined && entry.title !== fields.title) {
+        entry.title = fields.title
+        changed = true
+      }
+      if (changed) {
+        await fsp.writeFile(workspacePath, JSON.stringify(ws, null, 2) + '\n', 'utf-8')
+      }
     }
   } catch {
-    // No workspace.json (single-file mode): the graph's $upg.member_kind stands.
+    // No workspace.json (single-file mode): the graph's $upg.product header stands.
   }
-  // 2. portfolio.upg registry — drives $upg.counts.products and the watched
-  //    anti-pattern scoping (buildProductKindMap reads products[].member_kind).
+  // 2. portfolio.upg registry — title drives the portfolio reads (portfolio_census
+  //    / portfolio_digest / findProductFileById); member_kind drives
+  //    $upg.counts.products and the watched anti-pattern scoping
+  //    (buildProductKindMap reads products[].member_kind).
   try {
     const portfolioStore = await openPortfolioStoreIfExists(cwd)
     if (portfolioStore) {
       const doc = portfolioStore.getDocument()
       const pid = (store.getProduct() as { id?: string } | undefined)?.id
-      if (doc && pid && setProductMemberKindOnPortfolio(doc, pid, kind, portfolioStore)) {
-        await portfolioStore.flush()
+      if (doc && pid) {
+        let changed = false
+        if (fields.member_kind !== undefined) {
+          changed = setProductMemberKindOnPortfolio(doc, pid, fields.member_kind, portfolioStore) || changed
+        }
+        if (fields.title !== undefined) {
+          changed = setProductTitleOnPortfolio(doc, pid, fields.title, portfolioStore) || changed
+        }
+        if (changed) await portfolioStore.flush()
       }
     }
   } catch {

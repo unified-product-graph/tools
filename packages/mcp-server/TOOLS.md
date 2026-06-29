@@ -1567,7 +1567,7 @@ separate filesystem operations.`
 | `supersede` | boolean |  | Classification edges only. When a classify write moves a source to a new value on a single-select axis, retire the prior same-axis edge (default true) so the source carries one current value. Set false to keep both (additive). A multi-select axis always keeps both. |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `journey_phase_realises_operating_stage` \| `screen_markets_product` \| `screen_renders_design_component` \| `product_expresses_brand_identity` \| `shares_job` \| `shares_need` \| `persona_delegates_to_persona` \| `screen_targets_competitor` \| `feature_surfaces_product` \| `feature_uses_design_component` \| `product_implements_design_system` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `journey_phase_realises_operating_stage` \| `screen_markets_product` \| `screen_renders_design_component` \| `product_expresses_brand_identity` \| `shares_job` \| `shares_need` \| `persona_delegates_to_persona` \| `screen_targets_competitor` \| `feature_surfaces_product` \| `feature_uses_design_component` \| `product_implements_design_system` \| `node_owned_by_team` \| `node_owned_by_department` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -1625,7 +1625,7 @@ portfolio edge are separate mutations.`
 | `area_id` | string |  | Optional product_area id (resolved against portfolio.upg) to place the new product under. |
 | `description` | string |  | Optional product description |
 | `dir` | string |  | Optional subfolder under .upg/ to write the graph into (e.g. "competitors"). The file lands at .upg/<dir>/<slug>.upg and is registered in workspace.json with that subpath, so a watched portfolio can keep its intelligence graphs in competitors/. Absent writes flat at .upg/<slug>.upg. No leading slash or "..". |
-| `member_kind` | `product` \| `org_rollup` \| `watched` |  | Workspace member kind. product (default) = a product under management; org_rollup = the company umbrella graph; watched = a monitored intelligence graph (e.g. a competitor). Stamped into $upg.member_kind and cached in workspace.json; watched and rollup members are excluded from counts.products and product-spine expectations. |
+| `member_kind` | `product` \| `org_rollup` \| `watched` \| `operating_function` |  | Workspace member kind. product (default) = a product under management; org_rollup = the company umbrella graph; watched = a monitored intelligence graph (e.g. a competitor); operating_function = a function a team operates (revenue/success/finance/people/marketing), not a product it ships. Stamped into $upg.member_kind and cached in workspace.json; non-product kinds are excluded from counts.products and graded on their own validation profile (product-spine anti-patterns are suppressed). |
 | `name` | string | ✓ | Product display title (required, non-empty). |
 | `portfolio_id` | string |  | Optional portfolio id (resolved against portfolio.upg) to place the new product under. A portfolio id that resolves only in the active graph still attaches via an in-graph edge (DEPRECATED; prefer attach_product_to_portfolio). |
 | `slug` | string |  | Optional slug for the .upg filename. Defaults to a slug derived from `name`. Collisions append `-2`, `-3`, … |
@@ -2213,7 +2213,7 @@ JSON: `{ canonical, qualified_id, instance_count, portfolio_file }`.
 
 ### `update_product`
 
-Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. Re-kinding to watched / org_rollup also reconciles the workspace.json cache and the portfolio.upg registry so list_local_products, counts.products, and the watched anti-pattern scoping all reflect it.
+Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. A title rename or a re-kind also reconciles the workspace.json cache and the portfolio.upg registry, so list_local_products, get_workspace_info, portfolio_census, counts.products, and the watched anti-pattern scoping all show the current value.
 
 **Atomicity:** `atomic (single flush).`
 
@@ -2223,7 +2223,7 @@ Update the product header (`$upg.product`): stage, title, description, health_st
 | ---- | ---- | -------- | ----------- |
 | `description` | string |  | Product description. |
 | `health_status` | string |  | Product health (free-form, e.g. on_track / at_risk). |
-| `member_kind` | `product` \| `org_rollup` \| `watched` |  | Workspace member kind. product (default, an owned product), org_rollup (company umbrella graph), or watched (a monitored intelligence graph, e.g. a competitor, excluded from product coverage / counts). |
+| `member_kind` | `product` \| `org_rollup` \| `watched` \| `operating_function` |  | Workspace member kind. product (default, an owned product), org_rollup (company umbrella graph), watched (a monitored intelligence graph, e.g. a competitor), or operating_function (a function a team operates, across revenue/success/finance/people/marketing, not a product it ships). Non-product kinds are excluded from product coverage / counts and graded on their own validation profile. |
 | `stage` | string |  | Product lifecycle stage (canonical UPGProductStage). |
 | `title` | string |  | Product display title. |
 | `url` | string |  | Product URL. |

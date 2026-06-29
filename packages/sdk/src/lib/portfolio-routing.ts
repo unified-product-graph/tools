@@ -333,7 +333,7 @@ export interface PortfolioProductReference {
    * `$upg.member_kind`. `watched` / `org_rollup` members are registered for
    * reference but excluded from `counts.products`. Absent = `product`.
    */
-  member_kind?: 'product' | 'org_rollup' | 'watched'
+  member_kind?: 'product' | 'org_rollup' | 'watched' | 'operating_function'
 }
 
 /**
@@ -367,7 +367,7 @@ export function registerProductOnPortfolio(
   const entry: PortfolioProductReference = { id: ref.id }
   if (ref.file_path) entry.file_path = ref.file_path
   if (ref.title) entry.title = ref.title
-  if (ref.member_kind === 'org_rollup' || ref.member_kind === 'watched') entry.member_kind = ref.member_kind
+  if (ref.member_kind === 'org_rollup' || ref.member_kind === 'watched' || ref.member_kind === 'operating_function') entry.member_kind = ref.member_kind
   products.push(entry)
   //: flag the store dirty so the in-memory append survives flush().
   store?.markDirty()
@@ -387,17 +387,45 @@ export function registerProductOnPortfolio(
 export function setProductMemberKindOnPortfolio(
   doc: UPGPortfolioDocument,
   productId: string,
-  kind: 'product' | 'org_rollup' | 'watched',
+  kind: 'product' | 'org_rollup' | 'watched' | 'operating_function',
   store?: { markDirty: () => void },
 ): boolean {
   if (!productId) return false
   const products = doc.products as unknown as PortfolioProductReference[]
   const entry = products.find((p) => p.id === productId)
   if (!entry) return false
-  const current = entry.member_kind === 'org_rollup' || entry.member_kind === 'watched' ? entry.member_kind : 'product'
+  const current =
+    entry.member_kind === 'org_rollup' || entry.member_kind === 'watched' || entry.member_kind === 'operating_function'
+      ? entry.member_kind
+      : 'product'
   if (current === kind) return false
   if (kind === 'product') delete entry.member_kind
   else entry.member_kind = kind
+  store?.markDirty()
+  return true
+}
+
+/**
+ * Update an EXISTING portfolio registry entry's cached `title` (0.17.0). The
+ * `products[].title` slot is denormalised from the product graph's own
+ * `product.title`; renaming a product via `update_product({title})` must
+ * reconcile this cache so portfolio reads (`portfolio_census` / `portfolio_digest`
+ * / `findProductFileById`) show the current name rather than the title cached at
+ * create time. Returns true when the entry was found and the title changed; the
+ * caller flushes.
+ */
+export function setProductTitleOnPortfolio(
+  doc: UPGPortfolioDocument,
+  productId: string,
+  title: string,
+  store?: { markDirty: () => void },
+): boolean {
+  if (!productId) return false
+  const products = doc.products as unknown as PortfolioProductReference[]
+  const entry = products.find((p) => p.id === productId)
+  if (!entry) return false
+  if (entry.title === title) return false
+  entry.title = title
   store?.markDirty()
   return true
 }

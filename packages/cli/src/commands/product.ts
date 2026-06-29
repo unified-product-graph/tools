@@ -80,7 +80,7 @@ const updateCmd = new Command('update')
           stage: opts.stage as never,
           health_status: opts.healthStatus,
           url: opts.url,
-          member_kind: opts.memberKind as 'product' | 'org_rollup' | 'watched' | undefined,
+          member_kind: opts.memberKind as 'product' | 'org_rollup' | 'watched' | 'operating_function' | undefined,
           cwd: process.cwd(),
         })
       } catch (innerErr) {
