@@ -155,7 +155,8 @@ describe('Tool registry: completeness', () => {
     //   library surface — list summaries, fetch a full pattern (entities, typed
     //   edges, prompts). Read-only over @unified-product-graph/templates via the
     //   SDK; mirrored on the cloud server (static data → full parity). → 136.
-    expect(TOOL_DEFINITIONS).toHaveLength(136)
+    // + create_portfolio (0.17.x, gap G2): first-class portfolio creation. → 137.
+    expect(TOOL_DEFINITIONS).toHaveLength(137)
   })
 })
 

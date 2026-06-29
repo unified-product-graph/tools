@@ -1,13 +1,13 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 136 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 137 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
 - [Context & Session](#context-session): 5 tools
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
-- [Areas & Change Log](#areas-change-log): 10 tools
+- [Areas & Change Log](#areas-change-log): 11 tools
 - [Workspace & Portfolios](#workspace-portfolios): 37 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 51 tools
@@ -1009,6 +1009,7 @@ _Product areas, the `.upg-area.json` cwd scoper, and the session change log._
 
 - [`assign_product_to_area`](#assign-product-to-area)
 - [`create_area`](#create-area)
+- [`create_portfolio`](#create-portfolio)
 - [`delete_area`](#delete-area)
 - [`get_area_context`](#get-area-context)
 - [`get_area_graph`](#get-area-graph)
@@ -1072,6 +1073,34 @@ JSON: `{ node, portfolio_file, written_to }`. `node` is the typed
 fails.
 
 **See also:** `list_product_areas`
+
+
+### `create_portfolio`
+
+Create a portfolio entity in the portfolio document (`.upg/portfolio.upg`): the investment / grouping container products and operating functions belong to. A first-class wrapper over `create_node({type:"portfolio"})` (closes gap G2 / #39). `kind` sets the posture: owned (default), watched (the only kind that relaxes product grading), or the owned-side groupings strategic / internal / gtm (e.g. a Go-to-Market portfolio of revenue operating_functions). The portfolio document is created on demand.
+
+**Atomicity:** `atomic per write.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `description` | string |  | The portfolio's strategic focus |
+| `hierarchy_model` | `flat` \| `nested` \| `matrix` |  | How products are structured within this portfolio |
+| `kind` | `owned` \| `watched` \| `strategic` \| `internal` \| `gtm` |  | Investment posture / grouping (default owned). Only watched relaxes product grading. |
+| `parent_portfolio_id` | string |  | Parent portfolio id for nesting (a sub-portfolio) |
+| `title` | string | ✓ | Portfolio name (e.g. "Go-to-Market", "Internal Functions") |
+
+**Returns:**
+
+JSON: `{ node, portfolio_file, written_to }`. `node` is the typed
+`UPGPortfolio` record persisted to `portfolios[]`.
+
+**Throws:**
+
+- textError when `title` is missing, `kind` is invalid, or the write fails.
+
+**See also:** `list_portfolios`, `create_area`
 
 
 ### `delete_area`

@@ -32,7 +32,7 @@ const updateCmd = new Command('update')
   .option('--stage <stage>', 'New product stage (e.g. concept, discovery, build, launch, growth, maturity, sunset)')
   .option('--health-status <status>', 'New health status (e.g. on_track, at_risk, off_track)')
   .option('--url <url>', 'Product URL')
-  .option('--member-kind <kind>', 'Workspace member kind: product | org_rollup | watched')
+  .option('--member-kind <kind>', 'Workspace member kind: product | org_rollup | watched | operating_function')
   .option('--json', 'Machine-readable JSON output')
   .action(async (opts: {
     file?: string

@@ -398,7 +398,7 @@ export const helpTopics: Record<string, HelpEntry> = {
     usage: 'upg workspace [action] [items...]',
     summary: 'Workspace actions: list (default), switch <name>, rekind --kind <kind> <file...>.',
     options: [
-      { flag: '--kind <kind>', desc: 'For rekind: product | org_rollup | watched' },
+      { flag: '--kind <kind>', desc: 'For rekind: product | org_rollup | watched | operating_function' },
       { flag: '--json', desc: 'Machine-readable JSON output (rekind)' },
     ],
     examples: [
@@ -671,7 +671,7 @@ export const helpTopics: Record<string, HelpEntry> = {
       JSON_OPT,
       { flag: '--title <t>', desc: 'New title' },
       { flag: '--stage <s>', desc: 'Product stage' },
-      { flag: '--member-kind <kind>', desc: 'Workspace member kind: product | org_rollup | watched' },
+      { flag: '--member-kind <kind>', desc: 'Workspace member kind: product | org_rollup | watched | operating_function' },
     ],
     examples: [
       { cmd: 'upg product update --stage growth' },

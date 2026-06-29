@@ -46,6 +46,7 @@ import {
   getAreaGraph,
   getAreaContext,
   createArea,
+  createPortfolio,
   assignProductToAreaTool,
   updateAreaTool,
   removeProductFromAreaTool,
@@ -1709,6 +1710,30 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'create_portfolio',
+    description:
+      'Create a portfolio entity in the portfolio document (`.upg/portfolio.upg`): the investment / grouping container products and operating functions belong to. A first-class wrapper over `create_node({type:"portfolio"})` (closes gap G2 / #39). `kind` sets the posture: owned (default), watched (the only kind that relaxes product grading), or the owned-side groupings strategic / internal / gtm (e.g. a Go-to-Market portfolio of revenue operating_functions). The portfolio document is created on demand.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Portfolio name (e.g. "Go-to-Market", "Internal Functions")' },
+        description: { type: 'string', description: "The portfolio's strategic focus" },
+        kind: {
+          type: 'string',
+          enum: ['owned', 'watched', 'strategic', 'internal', 'gtm'],
+          description: 'Investment posture / grouping (default owned). Only watched relaxes product grading.',
+        },
+        parent_portfolio_id: { type: 'string', description: 'Parent portfolio id for nesting (a sub-portfolio)' },
+        hierarchy_model: {
+          type: 'string',
+          enum: ['flat', 'nested', 'matrix'],
+          description: 'How products are structured within this portfolio',
+        },
+      },
+      required: ['title'],
+    },
+  },
+  {
     name: 'assign_product_to_area',
     description:
       "Place an existing product under a product area (adds it to the area's `products[]` in `.upg/portfolio.upg`). Resolves the area against the portfolio document and auto-registers the product on the portfolio registry. Use after `create_product`, or pass `area_id` to `create_product` directly.",
@@ -2555,6 +2580,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_template: getTemplateTool,
   get_area_context: getAreaContext,
   create_area: createArea,
+  create_portfolio: createPortfolio,
   assign_product_to_area: assignProductToAreaTool,
   update_area: updateAreaTool,
   remove_product_from_area: removeProductFromAreaTool,

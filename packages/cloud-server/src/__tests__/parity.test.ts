@@ -110,6 +110,11 @@ const CLOUD_NA = new Set([
   'detach_product_from_portfolio',
   'delete_cross_product_edge',
   'batch_create_cross_product_edges',
+  // create_portfolio (0.17.x, gap G2 / #39): first-class portfolio creation in
+  // portfolio.upg. Local-only for the same reason as the rest of the portfolio
+  // write surface (portfolio.upg is a .upg-file workspace concept); cloud parity
+  // is a tracked follow-up.
+  'create_portfolio',
   // cross-product read layer (0.9.1, batch-3 #13): read node content / digests
   // ACROSS products in one call. Local-only — they sweep the .upg-file workspace
   // (multiple .upg files in a folder), which has no cloud analogue (the cloud

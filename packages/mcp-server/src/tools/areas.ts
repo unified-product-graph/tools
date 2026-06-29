@@ -7,6 +7,7 @@ import * as fsp from 'node:fs/promises'
 import * as path from 'node:path'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
+import { UPG_PORTFOLIO_KINDS } from '@unified-product-graph/core'
 import { preflightPayload, getSoftLimit } from '../lib/payload-guard.js'
 import { degradeProgressively } from '../lib/payload-degrader.js'
 import {
@@ -305,6 +306,58 @@ export const createArea: ToolHandler = async (args, _ctx): Promise<ToolResult> =
   try {
     const result = await writePortfolioScopedNode(process.cwd(), {
       type: 'product_area',
+      title: args.title as string,
+      description: args.description as string | undefined,
+      properties,
+    })
+    const payload: Record<string, unknown> = {
+      node: result.entity,
+      portfolio_file: result.portfolio_file,
+      written_to: result.written_to,
+    }
+    if (result.warning) payload.warning = result.warning
+    return text(JSON.stringify(payload, null, 2))
+  } catch (err) {
+    if (err instanceof PortfolioRoutingError) return textError(err.message)
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Create a portfolio entity in the portfolio document (`.upg/portfolio.upg`). A
+ * portfolio is the investment / grouping container that products and operating
+ * functions belong to. A first-class wrapper over `create_node({type:
+ * "portfolio"})` (0.17.x, closing gap G2 / #39), so the kind and nesting are
+ * obvious at the call site.
+ *
+ * `kind` is the portfolio's posture / grouping: `owned` (default), `watched` (an
+ * externally-monitored landscape, the only kind that relaxes product grading),
+ * or one of the owned-side groupings `strategic` / `internal` / `gtm` (e.g. a
+ * Go-to-Market portfolio of revenue operating_functions). The portfolio document
+ * is created on demand.
+ *
+ * @returns JSON: `{ node, portfolio_file, written_to }`. `node` is the typed
+ *   `UPGPortfolio` record persisted to `portfolios[]`.
+ * @throws textError when `title` is missing, `kind` is invalid, or the write fails.
+ * @atomicity atomic per write.
+ * @see list_portfolios
+ * @see create_area
+ */
+export const createPortfolio: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  if (!args.title) return textError('Missing required parameter: title')
+  const kind = args.kind as string | undefined
+  if (kind !== undefined && !(UPG_PORTFOLIO_KINDS as readonly string[]).includes(kind)) {
+    return textError(`Invalid kind: "${kind}". Valid: ${UPG_PORTFOLIO_KINDS.join(', ')}.`)
+  }
+
+  const properties: Record<string, unknown> = {}
+  if (kind) properties.kind = kind
+  if (args.parent_portfolio_id) properties.parent_portfolio_id = args.parent_portfolio_id
+  if (args.hierarchy_model) properties.hierarchy_model = args.hierarchy_model
+
+  try {
+    const result = await writePortfolioScopedNode(process.cwd(), {
+      type: 'portfolio',
       title: args.title as string,
       description: args.description as string | undefined,
       properties,

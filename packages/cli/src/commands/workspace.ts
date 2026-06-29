@@ -8,9 +8,13 @@ import { updateProduct, UPG_MEMBER_KINDS } from '@unified-product-graph/sdk'
 export const workspaceCommand = new Command('workspace')
   .arguments('[action] [items...]')
   .description('Workspace actions: list (default), switch <name>, rekind --kind <kind> <file...>.')
-  .option('--kind <kind>', 'For rekind: product | org_rollup | watched')
+  .option('--kind <kind>', `For rekind: ${UPG_MEMBER_KINDS.join(' | ')}`)
   .option('--json', 'Machine-readable JSON output (rekind)')
-  .action(async (action: string | undefined, items: string[] | undefined, cmd: Command) => {
+  // Commander passes (…args, options, command). With two declared arguments
+  // ([action] [items...]) the third callback parameter is the parsed options
+  // object, not the Command — reading options directly avoids the historical
+  // `cmd.opts is not a function` crash.
+  .action(async (action: string | undefined, items: string[] | undefined, options: { kind?: string; json?: boolean }) => {
     try {
       const cwd = process.cwd()
       const workspacePath = path.join(cwd, '.upg', 'workspace.json')
@@ -66,10 +70,10 @@ export const workspaceCommand = new Command('workspace')
       // Each file's $upg.member_kind is set (integrity resealed) and the
       // workspace.json cache + portfolio.upg registry are reconciled.
       if (action === 'rekind') {
-        const kind = (cmd.opts() as { kind?: string }).kind
-        const json = (cmd.opts() as { json?: boolean }).json === true
+        const kind = options.kind
+        const json = options.json === true
         if (!kind) {
-          die(usageError('Usage: upg workspace rekind --kind <product|org_rollup|watched> <file...>'))
+          die(usageError(`Usage: upg workspace rekind --kind <${UPG_MEMBER_KINDS.join('|')}> <file...>`))
         }
         if (!(UPG_MEMBER_KINDS as readonly string[]).includes(kind)) {
           die(violation(`Invalid --kind "${kind}". Valid: ${UPG_MEMBER_KINDS.join(', ')}.`))

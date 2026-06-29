@@ -30,6 +30,7 @@ import type {
   UPGOrganization,
   UPGCrossEdge,
 } from '@unified-product-graph/core'
+import { UPG_PORTFOLIO_KINDS } from '@unified-product-graph/core'
 
 /** Entity types that live in `.upg/portfolio.upg` instead of a product graph. */
 export const PORTFOLIO_SCOPED_TYPES: ReadonlySet<string> = new Set([
@@ -187,8 +188,15 @@ function appendPortfolio(
     title: args.title,
   }
   if (args.description) entity.description = args.description
+  let warning: string | undefined
   if (typeof props.parent_portfolio_id === 'string' || props.parent_portfolio_id === null) {
     entity.parent_portfolio_id = props.parent_portfolio_id as string | null
+    if (
+      typeof props.parent_portfolio_id === 'string' &&
+      !doc.portfolios.some((p) => p.id === props.parent_portfolio_id)
+    ) {
+      warning = `parent_portfolio_id "${props.parent_portfolio_id}" does not match an existing portfolio; stored as a forward reference.`
+    }
   }
   if (
     props.hierarchy_model === 'flat' ||
@@ -197,14 +205,14 @@ function appendPortfolio(
   ) {
     entity.hierarchy_model = props.hierarchy_model
   }
-  if (props.kind === 'owned' || props.kind === 'watched') {
-    entity.kind = props.kind
+  if (typeof props.kind === 'string' && (UPG_PORTFOLIO_KINDS as readonly string[]).includes(props.kind)) {
+    entity.kind = props.kind as (typeof UPG_PORTFOLIO_KINDS)[number]
   }
   if (Array.isArray(props.products)) {
     entity.products = props.products.filter((p): p is string => typeof p === 'string')
   }
   doc.portfolios.push(entity)
-  return { entity, written_to: 'portfolios', portfolio_file: portfolioPath }
+  return { entity, written_to: 'portfolios', portfolio_file: portfolioPath, ...(warning ? { warning } : {}) }
 }
 
 function appendProductArea(

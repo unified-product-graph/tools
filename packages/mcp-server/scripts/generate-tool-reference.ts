@@ -134,6 +134,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getAreaGraph: 'get_area_graph',
   getAreaContext: 'get_area_context',
   createArea: 'create_area',
+  createPortfolio: 'create_portfolio',
   assignProductToAreaTool: 'assign_product_to_area',
   updateAreaTool: 'update_area',
   removeProductFromAreaTool: 'remove_product_from_area',

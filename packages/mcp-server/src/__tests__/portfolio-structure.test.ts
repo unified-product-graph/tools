@@ -19,6 +19,7 @@ import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createNode } from '../tools/nodes.js'
 import {
   createArea,
+  createPortfolio,
   listProductAreas,
   assignProductToAreaTool,
   updateAreaTool,
@@ -265,6 +266,37 @@ describe(' · create_node routes portfolio-scoped types to portfolio.upg', () =>
     expect(areas[0].title).toBe('Search')
     expect(areas[0].strategic_priority).toBe('medium')
     expect(store.getAllNodes()).toHaveLength(0)
+  })
+
+  it('create_portfolio routes to portfolio.upg.portfolios[] with the kind (0.17.x, gap G2)', async () => {
+    const result = await parseHandlerResult(
+      createPortfolio({ title: 'Go-to-Market', kind: 'gtm' }, ctx),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(result.body?.written_to).toBe('portfolios')
+
+    const portfolio = readPortfolio(cwd)
+    const portfolios = portfolio?.portfolios as Array<{ title: string; kind?: string }>
+    expect(portfolios).toHaveLength(1)
+    expect(portfolios[0].title).toBe('Go-to-Market')
+    expect(portfolios[0].kind).toBe('gtm')
+    expect(store.getAllNodes()).toHaveLength(0)
+  })
+
+  it('create_portfolio rejects an invalid kind', async () => {
+    const result = await parseHandlerResult(
+      createPortfolio({ title: 'Bad', kind: 'bogus' }, ctx),
+    )
+    expect(result.isError).toBe(true)
+  })
+
+  it('create_portfolio warns (not silent) on a non-existent parent_portfolio_id', async () => {
+    const result = await parseHandlerResult(
+      createPortfolio({ title: 'Orphan', parent_portfolio_id: 'pf_does_not_exist' }, ctx),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(result.body?.written_to).toBe('portfolios')
+    expect(result.body?.warning).toMatch(/forward reference|does not match/)
   })
 })
 
