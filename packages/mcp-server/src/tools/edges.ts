@@ -57,6 +57,39 @@ function resolveProductHeaderId(store: ToolContext['store'], id: string | undefi
 }
 
 /**
+ * Same-department advisory for a `team_contains_team` nesting (0.17.2, team_org).
+ * A sub-team should sit in the same department as its parent team. We warn only
+ * on a GENUINE cross-department nesting: both teams have a department parent (an
+ * incoming `department_contains_team` edge) and those department sets are
+ * disjoint. If either team has no department parent yet (an org map still being
+ * built), we stay silent rather than nag. Never blocks the write; this mirrors
+ * the forward-ref-warning precedent (a non-blocking advisory in the response).
+ */
+function crossDepartmentTeamWarning(
+  store: ToolContext['store'],
+  edge: { source: string; target: string; type: string },
+): string | undefined {
+  if (edge.type !== 'team_contains_team') return undefined
+  const departmentsOf = (teamId: string): Set<string> => {
+    const out = new Set<string>()
+    for (const e of store.getEdgesForNode(teamId)) {
+      if (e.type === 'department_contains_team' && e.target === teamId) out.add(e.source)
+    }
+    return out
+  }
+  const parentDepts = departmentsOf(edge.source)
+  const subDepts = departmentsOf(edge.target)
+  if (parentDepts.size === 0 || subDepts.size === 0) return undefined
+  for (const d of subDepts) if (parentDepts.has(d)) return undefined
+  return (
+    `Cross-department team nesting: the sub-team and its parent team are in different departments, so this ` +
+    `team_contains_team nesting crosses a department boundary. A sub-team is normally part of the same ` +
+    `department as its parent team; if this is a reporting line across departments, model it at the ` +
+    `individual level with person_reports_to_person instead. The edge was written; this is advisory.`
+  )
+}
+
+/**
  * Batch-6 #36: pairing a hypothesis with an experiment_plan activates it.
  * Auto-promote a `drafted` hypothesis to `active` when it gains a
  * `hypothesis_requires_experiment_plan` edge, so the documented
@@ -262,7 +295,9 @@ export const createEdge: ToolHandler = (args, ctx): ToolResult => {
   }
 
   promoteHypothesisOnPlanEdge(store, result.edge)
-  return text(JSON.stringify(result, null, 2))
+  const warning = crossDepartmentTeamWarning(store, result.edge)
+  const payload = warning ? { ...result, warning } : result
+  return text(JSON.stringify(payload, null, 2))
 }
 
 /**
@@ -504,7 +539,15 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
   // #36: activate a drafted hypothesis paired with an experiment_plan.
   for (const edge of createdEdges) promoteHypothesisOnPlanEdge(store, edge)
 
-  return text(JSON.stringify({ created: createdEdges, count: createdEdges.length }, null, 2))
+  // 0.17.2: non-blocking same-department advisory for any team_contains_team nesting.
+  const warnings: string[] = []
+  for (const edge of createdEdges) {
+    const w = crossDepartmentTeamWarning(store, edge)
+    if (w) warnings.push(w)
+  }
+  const payload: Record<string, unknown> = { created: createdEdges, count: createdEdges.length }
+  if (warnings.length > 0) payload.warnings = warnings
+  return text(JSON.stringify(payload, null, 2))
 }
 
 /**

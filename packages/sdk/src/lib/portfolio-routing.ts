@@ -439,6 +439,30 @@ export function setProductTitleOnPortfolio(
 }
 
 /**
+ * Update an EXISTING portfolio registry entry's cached `file_path` (0.17.2). The
+ * `products[].file_path` slot is workspace-relative and points at the product's
+ * `.upg` file; renaming the file via `update_product({rename_file})` must
+ * reconcile it so portfolio reads and `findProductFileById` resolve the new path
+ * rather than a path that no longer exists. Returns true when the entry was found
+ * and the path changed; the caller flushes.
+ */
+export function setProductFilePathOnPortfolio(
+  doc: UPGPortfolioDocument,
+  productId: string,
+  filePath: string,
+  store?: { markDirty: () => void },
+): boolean {
+  if (!productId) return false
+  const products = doc.products as unknown as PortfolioProductReference[]
+  const entry = products.find((p) => p.id === productId)
+  if (!entry) return false
+  if (entry.file_path === filePath) return false
+  entry.file_path = filePath
+  store?.markDirty()
+  return true
+}
+
+/**
  * Best-effort lookup of a product's `.upg` file and title given its product id.
  *
  * Resolves against the workspace registry, NOT just the `.upg/` root: candidate

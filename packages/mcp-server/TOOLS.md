@@ -321,7 +321,7 @@ properties are present, or when the underlying store rejects the write.
 
 ### `deduplicate_nodes`
 
-Find duplicate entities (same title + type) and return them grouped. `dry_run` previews; otherwise keeps one per group and redirects edges from the others.
+Find duplicate entities and return them grouped. `match: "exact"` (default) groups by identical title + type and can merge (dry_run previews; otherwise keeps one per group and redirects edges from the others). `match: "similar"` is a read-only SUGGESTION pass that surfaces near-duplicates exact matching misses: entities of the same type whose titles are fuzzy-similar (token overlap above `similarity_threshold`), plus metrics that share a `statistical_function` and an area with overlapping titles. It never merges; review the candidates and align them by hand (rename then run an exact pass, or `update_node` / `batch_delete_nodes`).
 
 **Atomicity:** `non-atomic. Merges are applied group-by-group; a mid-flight
 error leaves earlier groups merged.`
@@ -330,8 +330,10 @@ error leaves earlier groups merged.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `dry_run` | boolean |  | Preview duplicates without merging (default true) |
+| `dry_run` | boolean |  | For match: "exact" only. Preview duplicates without merging (default true). Ignored for "similar", which never mutates. |
 | `keep` | string |  | Which duplicate to keep when merging: "newest" (default) or "oldest". |
+| `match` | string |  | "exact" (default) groups by identical title + type and can merge. "similar" is a read-only pass that surfaces fuzzy-title and same-statistical_function near-duplicates; it never merges. |
+| `similarity_threshold` | number |  | For match: "similar" only. Title token-overlap (Jaccard) above which two same-type entities are flagged. 0 to 1, default 0.6. |
 | `type` | string |  | Only check this entity type. Omit to check all types. |
 
 **Returns:**
@@ -1596,7 +1598,7 @@ separate filesystem operations.`
 | `supersede` | boolean |  | Classification edges only. When a classify write moves a source to a new value on a single-select axis, retire the prior same-axis edge (default true) so the source carries one current value. Set false to keep both (additive). A multi-select axis always keeps both. |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `journey_phase_realises_operating_stage` \| `screen_markets_product` \| `screen_renders_design_component` \| `product_expresses_brand_identity` \| `shares_job` \| `shares_need` \| `persona_delegates_to_persona` \| `screen_targets_competitor` \| `feature_surfaces_product` \| `feature_uses_design_component` \| `product_implements_design_system` \| `node_owned_by_team` \| `node_owned_by_department` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `journey_phase_realises_operating_stage` \| `screen_markets_product` \| `screen_renders_design_component` \| `product_expresses_brand_identity` \| `shares_job` \| `shares_need` \| `persona_delegates_to_persona` \| `screen_targets_competitor` \| `feature_surfaces_product` \| `feature_uses_design_component` \| `product_implements_design_system` \| `node_owned_by_team` \| `node_owned_by_department` \| `strategic_theme_contains_objective` \| `objective_achieved_through_key_result` \| `key_result_quantified_by_metric` \| `objective_measured_by_metric` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -2242,7 +2244,7 @@ JSON: `{ canonical, qualified_id, instance_count, portfolio_file }`.
 
 ### `update_product`
 
-Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. A title rename or a re-kind also reconciles the workspace.json cache and the portfolio.upg registry, so list_local_products, get_workspace_info, portfolio_census, counts.products, and the watched anti-pattern scoping all show the current value.
+Update the product header (`$upg.product`): stage, title, description, health_status, url, and the workspace member_kind. The supported way to advance a product's lifecycle stage or re-kind a graph; it writes the value get_graph_digest reads, without hand-editing the integrity-hashed .upg file. A title rename or a re-kind also reconciles the workspace.json cache and the portfolio.upg registry, so list_local_products, get_workspace_info, portfolio_census, counts.products, and the watched anti-pattern scoping all show the current value. Set rename_file (or pass an explicit slug) to also rename the .upg file to match the title: it moves the file, repoints the open handle so the rest of the session writes to the new path, and updates the workspace.json file path and the portfolio.upg file_path. The rename is opt-in; a plain title change leaves the filename alone.
 
 **Atomicity:** `atomic (single flush).`
 
@@ -2253,6 +2255,8 @@ Update the product header (`$upg.product`): stage, title, description, health_st
 | `description` | string |  | Product description. |
 | `health_status` | string |  | Product health (free-form, e.g. on_track / at_risk). |
 | `member_kind` | `product` \| `org_rollup` \| `watched` \| `operating_function` |  | Workspace member kind. product (default, an owned product), org_rollup (company umbrella graph), watched (a monitored intelligence graph, e.g. a competitor), or operating_function (a function a team operates, across revenue/success/finance/people/marketing, not a product it ships). Non-product kinds are excluded from product coverage / counts and graded on their own validation profile. |
+| `rename_file` | boolean |  | Rename the .upg file to match the title slug. Opt-in; moves the file and reconciles the open handle, workspace.json path, and portfolio.upg file_path. |
+| `slug` | string |  | Explicit slug for the file rename (implies rename_file). Slugified and collision-resolved so a sibling file is never clobbered. |
 | `stage` | string |  | Product lifecycle stage (canonical UPGProductStage). |
 | `title` | string |  | Product display title. |
 | `url` | string |  | Product URL. |

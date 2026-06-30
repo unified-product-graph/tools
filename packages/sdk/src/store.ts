@@ -878,6 +878,23 @@ export class UPGFileStore {
     this.watcher = null
   }
 
+  /**
+   * Repoint this store at a new file path (0.17.2). Used by a product file
+   * rename: once the `.upg` file is moved on disk, the open handle must target
+   * the new path so the next flush()/lock writes there, not back to the old
+   * name. Re-arms the file watcher on the new path when one was active. Does NOT
+   * move any file itself; the caller moves the file, then calls this. A no-op
+   * when the path is unchanged.
+   */
+  async rebindFilePath(newPath: string): Promise<void> {
+    const resolved = path.resolve(newPath)
+    if (resolved === this.filePath) return
+    const wasWatching = this.watcher !== null
+    this.stopWatching()
+    this.filePath = resolved
+    if (wasWatching) await this.startWatching()
+  }
+
   // ── Index Management ─────────────────────────────────────────────────────
 
   private rebuildIndexes(): void {

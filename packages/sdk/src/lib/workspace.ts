@@ -32,6 +32,7 @@ import {
   registerProductOnPortfolio,
   setProductMemberKindOnPortfolio,
   setProductTitleOnPortfolio,
+  setProductFilePathOnPortfolio,
   addProductToArea,
   addProductToPortfolio,
 } from './portfolio-routing.js'
@@ -531,14 +532,28 @@ export interface UpdateProductArgs {
    * only the graph's own `$upg.member_kind` is updated (still the source of truth).
    */
   cwd?: string
+  /**
+   * Rename the product's `.upg` file to match the (new or current) title's slug
+   * (0.17.2). Opt-in: a plain `title` change never moves the file unless this is
+   * set or `slug` is given. Requires `cwd`.
+   */
+  rename_file?: boolean
+  /**
+   * Explicit slug for the file rename; implies `rename_file`. Slugified and
+   * collision-resolved against the directory (so an existing sibling never gets
+   * clobbered). Requires `cwd`.
+   */
+  slug?: string
 }
 
 export interface UpdateProductResult {
   product: Record<string, unknown>
-  /** Which header fields were changed. */
+  /** Which header fields were changed (includes `'file'` when the file was renamed). */
   updated: string[]
   /** The graph's member kind after the update (when member_kind was supplied). */
   member_kind?: UPGMemberKind
+  /** The file rename that was applied, when one was (workspace-relative paths). */
+  renamed?: { from: string; to: string; slug: string }
 }
 
 /**
@@ -622,7 +637,106 @@ export async function updateProduct(args: UpdateProductArgs): Promise<UpdateProd
       ...(title !== undefined ? { title } : {}),
     })
   }
-  return { product, updated, ...(member_kind !== undefined ? { member_kind } : {}) }
+  // Opt-in file rename (0.17.2, A-bonus). A plain title change never moves the
+  // file; renaming requires rename_file or an explicit slug, plus cwd. Runs after
+  // the title cache reconcile so the workspace.json entry is found by its current
+  // path before the path itself is repointed.
+  let renamed: { from: string; to: string; slug: string } | undefined
+  const wantsRename = args.rename_file === true || (args.slug !== undefined && args.slug.trim().length > 0)
+  if (wantsRename && cwd) {
+    renamed = await renameProductFile(cwd, store, args.slug)
+    if (renamed) updated.push('file')
+  }
+  return {
+    product,
+    updated,
+    ...(member_kind !== undefined ? { member_kind } : {}),
+    ...(renamed ? { renamed } : {}),
+  }
+}
+
+/**
+ * Rename a product's `.upg` file to match a slug (0.17.2, A-bonus). Reconciles
+ * the file on disk, the OPEN STORE HANDLE (so the next flush targets the new
+ * path), the `workspace.json` `file` cache, and the `portfolio.upg` `file_path`.
+ *
+ * The careful part is the open handle: the store is flushed to the OLD path, the
+ * file is moved atomically, then the store is rebound to the new path. A rename
+ * mid-session therefore cannot leave a stale handle writing back to the old name.
+ * Collision is resolved against the directory (never clobbers a sibling); the
+ * slug actually used is returned. Returns undefined when the slug is unchanged.
+ */
+async function renameProductFile(
+  cwd: string,
+  store: UPGFileStore,
+  explicitSlug: string | undefined,
+): Promise<{ from: string; to: string; slug: string } | undefined> {
+  const oldPath = store.getFilePath()
+  const dir = path.dirname(oldPath)
+  const oldSlug = path.basename(oldPath, '.upg')
+  const product = store.getProduct() as { title?: string; id?: string } | undefined
+  const slugSource =
+    explicitSlug && explicitSlug.trim().length > 0
+      ? explicitSlug
+      : product?.title && product.title.trim().length > 0
+        ? product.title
+        : oldSlug
+  const dirEntries = await fsp.readdir(dir, { withFileTypes: true })
+  const existingSlugs = new Set(
+    dirEntries.filter((e) => e.isFile() && e.name.endsWith('.upg')).map((e) => path.basename(e.name, '.upg')),
+  )
+  existingSlugs.delete(oldSlug) // never collide with our own current file
+  const slug = resolveSlugCollision(generateSlug(slugSource), existingSlugs)
+  const newPath = path.join(dir, `${slug}.upg`)
+  if (path.resolve(newPath) === path.resolve(oldPath)) return undefined // slug unchanged
+
+  // Open-handle-safe move: flush the latest header to the OLD path, move the file
+  // atomically, then repoint the store so the next flush targets the new path.
+  await store.flush()
+  await fsp.rename(oldPath, newPath)
+  await store.rebindFilePath(newPath)
+
+  // Workspace-relative path derived from the path's own `.upg` segment, not from
+  // cwd: process.cwd() and the store path can canonicalize symlinks differently
+  // (e.g. macOS /var vs /private/var), which would corrupt a cwd-based relative.
+  const relFromUpgDir = (absPath: string): string => {
+    const parts = path.resolve(absPath).split(path.sep)
+    const idx = parts.lastIndexOf('.upg')
+    return idx >= 0 ? parts.slice(idx + 1).join('/') : path.basename(absPath)
+  }
+  const oldRel = relFromUpgDir(oldPath)
+  const newRel = relFromUpgDir(newPath)
+
+  // workspace.json: repoint the entry's `file` (tolerate a legacy basename key).
+  try {
+    const workspacePath = path.join(cwd, '.upg', 'workspace.json')
+    const ws = JSON.parse(await fsp.readFile(workspacePath, 'utf-8')) as { products?: WorkspaceProduct[] }
+    const entry = ws.products?.find((p) => p.file === oldRel || p.file === path.basename(oldPath))
+    if (entry && entry.file !== newRel) {
+      entry.file = newRel
+      await fsp.writeFile(workspacePath, JSON.stringify(ws, null, 2) + '\n', 'utf-8')
+    }
+  } catch {
+    // single-file mode / no workspace.json: nothing to reconcile.
+  }
+
+  // portfolio.upg: repoint the registry entry's cwd-relative file_path.
+  try {
+    const portfolioStore = await openPortfolioStoreIfExists(cwd)
+    const doc = portfolioStore?.getDocument()
+    const pid = product?.id
+    if (portfolioStore && doc && pid) {
+      // cwd-relative form, matching how createProduct registers it (`.upg/<file>`).
+      const newFilePath = `.upg/${newRel}`
+      if (setProductFilePathOnPortfolio(doc, pid, newFilePath, portfolioStore)) {
+        await portfolioStore.flush()
+      }
+    }
+  } catch {
+    // No portfolio.upg yet.
+  }
+
+  return { from: oldRel, to: newRel, slug }
 }
 
 /**

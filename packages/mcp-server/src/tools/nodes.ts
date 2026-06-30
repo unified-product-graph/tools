@@ -1508,11 +1508,179 @@ export const promoteScalarsToEdges: ToolHandler = (args, ctx): ToolResult => {
   return text(JSON.stringify({ ...result, dry_run: dryRun }, null, 2))
 }
 
+/** Normalise a title to comparable lowercase word tokens (0.17.2, similar dedup).
+ *  Keeps `%` so "reuse rate %" and "reuse %" share a token; drops other punctuation. */
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9%]+/g, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length > 0),
+  )
+}
+
+/** Jaccard overlap of two token sets: |A∩B| / |A∪B|. Two empty sets score 0. */
+function tokenJaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0
+  let inter = 0
+  for (const t of a) if (b.has(t)) inter++
+  const union = a.size + b.size - inter
+  return union === 0 ? 0 : inter / union
+}
+
+/** A node's containment "area" scope: the sources of its incoming hierarchy
+ *  (containment) edges. Two metrics under the same outcome / area / product share
+ *  a scope. Used to keep the same-statistical_function rule from clumping every
+ *  "rate" metric in the graph together. */
+function scopeOf(store: ToolContext['store'], nodeId: string): Set<string> {
+  const out = new Set<string>()
+  for (const e of store.getEdgesForNode(nodeId)) {
+    if (e.target !== nodeId) continue
+    if (UPG_EDGE_CATALOG[e.type]?.classification === 'hierarchy') out.add(e.source)
+  }
+  return out
+}
+
+const statFn = (n: UPGBaseNode): string | undefined => {
+  const v = (n.properties as Record<string, unknown> | undefined)?.statistical_function
+  return typeof v === 'string' && v.length > 0 ? v : undefined
+}
+
+/** Read-only near-duplicate detection (0.17.2, brief item G). Surfaces candidate
+ *  merges that exact title matching misses, without ever mutating: same-type
+ *  entities whose titles are fuzzy-similar, plus metrics that share a
+ *  statistical_function and an area with some title overlap. Returns grouped
+ *  candidates for human review; the caller aligns and merges by hand. */
+function suggestSimilar(
+  store: ToolContext['store'],
+  nodes: UPGBaseNode[],
+  threshold: number,
+): ToolResult {
+  // Bucket by type first: only ever compare like with like, which also bounds the
+  // pairwise scan to within-type sets.
+  const byType = new Map<string, UPGBaseNode[]>()
+  for (const n of nodes) {
+    const arr = byType.get(n.type) ?? []
+    arr.push(n)
+    byType.set(n.type, arr)
+  }
+
+  // Union-find over candidate pairs so transitive near-duplicates land in one group.
+  const parent = new Map<string, string>()
+  const find = (x: string): string => {
+    let r = x
+    while (parent.get(r) !== undefined && parent.get(r) !== r) r = parent.get(r)!
+    return r
+  }
+  const union = (a: string, b: string) => {
+    parent.set(a, parent.get(a) ?? a)
+    parent.set(b, parent.get(b) ?? b)
+    parent.set(find(a), find(b))
+  }
+  const pairReason = new Map<string, { reason: string; similarity: number; shared_scope: boolean }>()
+  const reasonKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`)
+
+  for (const group of byType.values()) {
+    if (group.length < 2) continue
+    const tokens = new Map<string, Set<string>>()
+    for (const n of group) tokens.set(n.id, titleTokens(n.title))
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i], b = group[j]
+        // Skip exact-title pairs; those are deduplicate_nodes' "exact" job.
+        if (a.title.toLowerCase().trim() === b.title.toLowerCase().trim()) continue
+        const jac = tokenJaccard(tokens.get(a.id)!, tokens.get(b.id)!)
+        const sameFn = a.type === 'metric' && statFn(a) !== undefined && statFn(a) === statFn(b)
+        const sharedScope = (() => {
+          const sa = scopeOf(store, a.id), sb = scopeOf(store, b.id)
+          for (const s of sa) if (sb.has(s)) return true
+          return false
+        })()
+        // Fuzzy title (any type), or a metric sharing a statistical_function with
+        // a real title overlap (avoids grouping unrelated same-function metrics).
+        const titleMatch = jac >= threshold
+        const fnMatch = sameFn && jac >= 0.34
+        if (!titleMatch && !fnMatch) continue
+        const reason = titleMatch
+          ? 'similar_title'
+          : sharedScope ? 'same_statistical_function_and_area' : 'same_statistical_function'
+        union(a.id, b.id)
+        pairReason.set(reasonKey(a.id, b.id), { reason, similarity: Math.round(jac * 100) / 100, shared_scope: sharedScope })
+      }
+    }
+  }
+
+  // Assemble groups from the union-find roots.
+  const byRoot = new Map<string, UPGBaseNode[]>()
+  const nodeById = new Map(nodes.map((n) => [n.id, n]))
+  for (const id of parent.keys()) {
+    const root = find(id)
+    const arr = byRoot.get(root) ?? []
+    const n = nodeById.get(id)
+    if (n) arr.push(n)
+    byRoot.set(root, arr)
+  }
+
+  const candidates = [...byRoot.values()]
+    .filter((g) => g.length >= 2)
+    .map((g) => {
+      // Best (max) pairwise similarity and a representative reason for the group.
+      let similarity = 0
+      let reason = 'similar_title'
+      let sharedScope = false
+      for (let i = 0; i < g.length; i++) {
+        for (let j = i + 1; j < g.length; j++) {
+          const pr = pairReason.get(reasonKey(g[i].id, g[j].id))
+          if (!pr) continue
+          if (pr.similarity > similarity) similarity = pr.similarity
+          if (pr.reason !== 'similar_title') reason = pr.reason
+          if (pr.shared_scope) sharedScope = true
+        }
+      }
+      const fn = g[0].type === 'metric' ? statFn(g[0]) : undefined
+      return {
+        type: g[0].type,
+        reason,
+        similarity,
+        shared_scope: sharedScope,
+        ...(fn ? { statistical_function: fn } : {}),
+        members: g.map((n) => ({
+          id: n.id,
+          title: n.title,
+          ...(n.type === 'metric' && statFn(n) ? { statistical_function: statFn(n) } : {}),
+        })),
+      }
+    })
+    .sort((a, b) => b.similarity - a.similarity)
+
+  return text(
+    JSON.stringify(
+      {
+        match: 'similar',
+        dry_run: true,
+        similar_candidates: candidates,
+        total_groups: candidates.length,
+        message:
+          candidates.length === 0
+            ? 'No near-duplicate candidates found.'
+            : `Found ${candidates.length} near-duplicate candidate group(s). These are advisory only and were NOT merged. Review each, then align by hand: rename the survivors and run deduplicate_nodes with match: "exact", or merge with update_node / batch_delete_nodes.`,
+      },
+      null,
+      2,
+    ),
+  )
+}
+
 /**
  * Find and resolve duplicate entities (same title + type, case-insensitive).
  * Returns groups of duplicates. Use `dry_run` to preview, or pass
  * `dry_run: false` to keep one per group and redirect the others' edges to
  * the keeper. `keep` selects `"newest"` (default) or `"oldest"`.
+ *
+ * `match: "similar"` switches to a read-only near-duplicate suggestion pass
+ * (fuzzy title, or metrics sharing a statistical_function and area); it never
+ * merges. See `suggestSimilar`.
  *
  * @returns JSON: with `dry_run: true`, `{ duplicates, total_groups,
  *   total_duplicate_nodes, dry_run, message }`. With `dry_run: false`,
@@ -1535,9 +1703,24 @@ export const deduplicateNodes: ToolHandler = (args, ctx): ToolResult => {
   const filterType = args.type as string | undefined
   const dryRun = (args.dry_run as boolean) ?? true
   const keepStrategy = (args.keep as string) ?? 'newest'
+  const match = (args.match as string) ?? 'exact'
+  if (match !== 'exact' && match !== 'similar') {
+    return textError(`Invalid match: "${match}". Valid: "exact" (default) or "similar".`)
+  }
 
   let nodes = store.getAllNodes()
   if (filterType) nodes = nodes.filter((n) => n.type === filterType)
+
+  // Read-only near-duplicate suggestion pass (0.17.2, brief item G). Never mutates,
+  // regardless of dry_run; surfaces fuzzy-title / same-statistical_function candidates.
+  if (match === 'similar') {
+    const rawThreshold = args.similarity_threshold
+    const threshold = typeof rawThreshold === 'number' ? rawThreshold : 0.6
+    if (threshold < 0 || threshold > 1) {
+      return textError(`Invalid similarity_threshold: ${threshold}. Must be between 0 and 1.`)
+    }
+    return suggestSimilar(store, nodes, threshold)
+  }
 
   const groups = new Map<string, UPGBaseNode[]>()
   for (const n of nodes) {
