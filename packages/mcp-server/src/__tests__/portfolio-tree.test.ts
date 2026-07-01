@@ -153,6 +153,16 @@ describe('get_portfolio_tree + list_portfolio_cross_edges (0.10.7)', () => {
     expect(labels).toEqual(['Agentic', 'Developer'])
   })
 
+  it('structure renders the org chart from document fields; an unassigned product surfaces at the root', async () => {
+    const b = bodyOf(await getPortfolioTree({ shape: 'structure' }, ctx))
+    expect(b.shape).toBe('structure')
+    expect(b.root).toMatchObject({ id: 'org1', title: 'Co', kind: 'organization' })
+    // p_rival is registered but in no area/portfolio, so it hangs off the org root.
+    const rival = (b.root.children ?? []).find((c: { id: string }) => c.id === 'p_rival')
+    expect(rival).toMatchObject({ kind: 'product', title: 'Rival Watch' })
+    expect(b.stats).toMatchObject({ areas: 0, portfolios: 0, products: 1, unassigned_products: 1 })
+  })
+
   it('rejects an invalid shape', async () => {
     const r = await getPortfolioTree({ shape: 'bogus' }, ctx)
     expect(r.isError).toBe(true)

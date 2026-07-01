@@ -69,6 +69,7 @@ import {
   linkAreaToAudience,
   batchCreateCrossProductEdges,
   deleteCrossProductEdgeTool,
+  batchDeleteCrossProductEdgesTool,
   attachProductToPortfolioTool,
   detachProductFromPortfolioTool,
   listPortfolioCrossEdges,
@@ -323,11 +324,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_tree',
     description:
-      'Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.',
+      'Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, org) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        pattern: { type: 'string', description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, or north_star.' },
+        pattern: { type: 'string', description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, or org.' },
         from_id: { type: 'string', description: 'Explicit root node id; otherwise the pattern canonical anchor.' },
         depth: { type: 'number', description: 'Max levels (default = the pattern natural depth; max 12).' },
         include_properties: { type: 'array', items: { type: 'string' }, description: 'Node property keys to inline on each tree node.' },
@@ -1227,7 +1228,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         id: {
           type: 'string',
-          description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star.',
+          description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, org.',
         },
       },
       required: ['id'],
@@ -1999,6 +2000,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'batch_delete_cross_product_edges',
+    description:
+      'Delete up to 50 cross-product edges from `.upg/portfolio.upg` by id in one atomic write (the inverse of batch_create_cross_product_edges). All ids are removed, then a single portfolio flush persists the batch, so retiring a wave of superseded edges costs one write instead of one per id. A missing id is reported deleted: false, not an error, so the call is idempotent. Get ids from list_portfolio_cross_edges.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        edge_ids: {
+          type: 'array',
+          description: 'Cross-product edge ids to delete (max 50, from list_portfolio_cross_edges).',
+          items: { type: 'string' },
+        },
+      },
+      required: ['edge_ids'],
+    },
+  },
+  {
     name: 'list_portfolio_cross_edges',
     description:
       'List cross-product edges stored in the portfolio document (`.upg/portfolio.upg`), optionally filtered, grouped, title-resolved, property-projected, freshness-filtered, and paginated. Empty list when the portfolio document is absent. Use `type` + `group_by` to read a focused comparison matrix; `resolve_titles` (default on) names entities ("Sitecore") instead of opaque ids; `property_include` trims heavy edge properties; `older_than_days` / `assessed_before` return the stale set (edges whose assessed_on is old or absent); `limit` / `offset` page the flat list. For the nested axis to value to members view use `get_portfolio_tree`.',
@@ -2261,11 +2278,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_portfolio_tree',
     description:
-      'Assemble a portfolio-grain tree from the shared classification registry and the `*_classified_as_classification_value` cross edges in `.upg/portfolio.upg` (the portfolio complement to `get_tree`, which is product-scoped). `shape: "landscape"` (default) returns classification axis to its values to the nodes classified at each value, every leaf carrying `confidence` / `assessed_on`; anchor at one axis or value with `from_id`, or omit for the whole portfolio. `shape: "competitor_profile"` returns one node (a competitor) and its position on every axis it has been graded against; `from_id` required. Titles resolve to entity names (e.g. "Directus"), not opaque ids. Values with no wired axis surface under an `unaxed` bucket. Read-only.',
+      'Assemble a portfolio-grain tree from `.upg/portfolio.upg` (the portfolio complement to `get_tree`, which is product-scoped). `shape: "landscape"` (default) walks the shared classification registry and the `*_classified_as_classification_value` cross edges: classification axis to its values to the nodes classified at each value, every leaf carrying `confidence` / `assessed_on`; anchor at one axis or value with `from_id`, or omit for the whole portfolio. `shape: "competitor_profile"` returns one node (a competitor) and its position on every axis it has been graded against; `from_id` required. `shape: "structure"` returns the org chart from the portfolio DOCUMENT FIELDS (organisation to product areas / portfolios to their member products, nested), no graph traversal; areas are the ownership axis and portfolios the strategic axis, so a product can appear under both. Titles resolve to entity names (e.g. "Directus"), not opaque ids. Values with no wired axis surface under an `unaxed` bucket. Read-only.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        shape: { type: 'string', enum: ['landscape', 'competitor_profile'], description: 'landscape (axis to value to classified members, default) or competitor_profile (one node to its per-axis positions).' },
+        shape: { type: 'string', enum: ['landscape', 'competitor_profile', 'structure'], description: 'landscape (axis to value to classified members, default), competitor_profile (one node to its per-axis positions), or structure (org to areas / portfolios to products, from document fields).' },
         from_id: { type: 'string', description: 'Anchor node id (qualified or bare). Optional for landscape (a classification axis or value); required for competitor_profile (the node to profile).' },
         include_properties: { type: 'array', items: { type: 'string' }, description: 'Classification-edge property keys to inline on each leaf, in addition to the always-included confidence / assessed_on.' },
         include_members: { type: 'boolean', description: 'Landscape only. Force classified members to inline on the whole-portfolio overview (counts-only by default). Subject to the payload guard.' },
@@ -2598,6 +2615,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   link_area_to_audience: linkAreaToAudience,
   delete_cross_product_edge: deleteCrossProductEdgeTool,
   batch_create_cross_product_edges: batchCreateCrossProductEdges,
+  batch_delete_cross_product_edges: batchDeleteCrossProductEdgesTool,
   attach_product_to_portfolio: attachProductToPortfolioTool,
   detach_product_from_portfolio: detachProductFromPortfolioTool,
   list_portfolio_cross_edges: listPortfolioCrossEdges,

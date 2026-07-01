@@ -914,6 +914,45 @@ export async function deleteCrossProductEdge(
   return { edge_id: edgeId, deleted: removed !== null, ...(removed ? { edge: removed } : {}) }
 }
 
+export interface BatchDeleteCrossEdgesResult {
+  message: string
+  /** Per-id disposition, in the order the ids were supplied. */
+  deleted: DeleteCrossEdgeResult[]
+  count: number
+  counts: { deleted: number; not_found: number }
+}
+
+/**
+ * Delete many cross-product edges from `portfolio.upg` by id in one atomic write
+ * (the portfolio-tier mirror of `batch_create_cross_product_edges`). Each id is
+ * removed in memory, then a SINGLE flush persists the batch, so retiring a wave of
+ * superseded edges costs one write instead of one per id. A missing id yields
+ * `deleted: false` (not an error), so the call is idempotent and a partial retry
+ * is safe.
+ */
+export async function batchDeleteCrossProductEdges(
+  cwd: string,
+  edgeIds: string[],
+): Promise<BatchDeleteCrossEdgesResult> {
+  const store = await openPortfolioStoreIfExists(cwd)
+  if (!store) throw new PortfolioRoutingError('No portfolio document in this workspace.')
+  const results: DeleteCrossEdgeResult[] = []
+  let anyRemoved = false
+  for (const id of edgeIds) {
+    const removed = store.removeCrossEdge(id)
+    if (removed) anyRemoved = true
+    results.push({ edge_id: id, deleted: removed !== null, ...(removed ? { edge: removed } : {}) })
+  }
+  if (anyRemoved) await store.flush()
+  const deletedCount = results.filter((r) => r.deleted).length
+  return {
+    message: `Deleted ${deletedCount}/${results.length} cross-product edge(s)`,
+    deleted: results,
+    count: results.length,
+    counts: { deleted: deletedCount, not_found: results.length - deletedCount },
+  }
+}
+
 export interface MoveProductResult {
   product_id: string
   to_area_id: string

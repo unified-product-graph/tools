@@ -1,7 +1,7 @@
 /**
  * get_tree: server-side tree assembly (0.9.15). Assembles a canonical tree
  * pattern (OST, OKR, user, product, validation, strategy, feature_areas,
- * delivery, architecture, journey, design_system, commercial, north_star) from the active product graph
+ * delivery, architecture, journey, design_system, commercial, north_star, org) from the active product graph
  * and returns NESTED data plus structural gaps. Rendering (emoji, score dots,
  * ASCII) stays in the client.
  */

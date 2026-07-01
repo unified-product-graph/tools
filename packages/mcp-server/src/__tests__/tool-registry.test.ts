@@ -156,7 +156,11 @@ describe('Tool registry: completeness', () => {
     //   edges, prompts). Read-only over @unified-product-graph/templates via the
     //   SDK; mirrored on the cloud server (static data → full parity). → 136.
     // + create_portfolio (0.17.x, gap G2): first-class portfolio creation. → 137.
-    expect(TOOL_DEFINITIONS).toHaveLength(137)
+    // + batch_delete_cross_product_edges (0.17.3, brief H): the atomic batch
+    //   inverse of batch_create_cross_product_edges — retire a wave of superseded
+    //   portfolio cross-edges in one flush instead of one delete per id. Local-only
+    //   (portfolio.upg write surface). → 138.
+    expect(TOOL_DEFINITIONS).toHaveLength(138)
   })
 })
 

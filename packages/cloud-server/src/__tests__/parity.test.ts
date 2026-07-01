@@ -110,6 +110,11 @@ const CLOUD_NA = new Set([
   'detach_product_from_portfolio',
   'delete_cross_product_edge',
   'batch_create_cross_product_edges',
+  // batch_delete_cross_product_edges (0.17.3, brief H): the atomic batch inverse of
+  // batch_create_cross_product_edges. Local-only for the same reason as the rest of
+  // the portfolio write surface (portfolio.upg is a .upg-file workspace concept);
+  // cloud parity is a tracked follow-up.
+  'batch_delete_cross_product_edges',
   // create_portfolio (0.17.x, gap G2 / #39): first-class portfolio creation in
   // portfolio.upg. Local-only for the same reason as the rest of the portfolio
   // write surface (portfolio.upg is a .upg-file workspace concept); cloud parity

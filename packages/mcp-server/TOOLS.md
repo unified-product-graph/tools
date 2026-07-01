@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 137 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 138 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 137 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 11 tools
-- [Workspace & Portfolios](#workspace-portfolios): 37 tools
+- [Workspace & Portfolios](#workspace-portfolios): 38 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 51 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -446,7 +446,7 @@ Surfaced as `degraded.applied[]` on the response.
 
 ### `get_tree`
 
-Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.
+Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, org) from the active product graph, server-side. Returns NESTED data (roots with children) plus structural `gaps` (nodes whose pattern expects children the graph lacks). Walks the pattern type-driven child map over the live graph, so it follows whatever edge wired a parent to a child of the expected type (no hardcoded edge names to drift). Roots at the pattern anchor, falling back through fallback anchors when the anchor has no nodes or reaches nothing, and reports the substitution in `anchor_resolved_from`/`anchor_used`. Rendering stays in the client. Composes with `query`.
 
 **Atomicity:** `atomic (read-only). Reads the active product only.`
 
@@ -458,7 +458,7 @@ Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy
 | `from_id` | string |  | Explicit root node id; otherwise the pattern canonical anchor. |
 | `include_properties` | array |  | Node property keys to inline on each tree node. |
 | `max_nodes` | number |  | Cap on nodes; the tree is summarised (stats.truncated) rather than silently cut (default 400, max 2000). |
-| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, or north_star. |
+| `pattern` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, or org. |
 
 **Returns:**
 
@@ -1304,6 +1304,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`audit_property_coverage`](#audit-property-coverage)
 - [`batch_create_cross_product_edges`](#batch-create-cross-product-edges)
 - [`batch_define_canonical_entity`](#batch-define-canonical-entity)
+- [`batch_delete_cross_product_edges`](#batch-delete-cross-product-edges)
 - [`batch_register_instance`](#batch-register-instance)
 - [`clone_structure`](#clone-structure)
 - [`compare_classifications`](#compare-classifications)
@@ -1475,6 +1476,29 @@ JSON: `{ defined: [{ canonical_id, qualified_id, type, title }], count, portfoli
 **See also:** `define_canonical_entity`
 
 
+### `batch_delete_cross_product_edges`
+
+Delete up to 50 cross-product edges from `.upg/portfolio.upg` by id in one atomic write (the inverse of batch_create_cross_product_edges). All ids are removed, then a single portfolio flush persists the batch, so retiring a wave of superseded edges costs one write instead of one per id. A missing id is reported deleted: false, not an error, so the call is idempotent. Get ids from list_portfolio_cross_edges.
+
+**Atomicity:** `atomic (single portfolio.upg flush).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `edge_ids` | array | ✓ | Cross-product edge ids to delete (max 50, from list_portfolio_cross_edges). |
+
+**Returns:**
+
+JSON: `{ message, deleted: [{ edge_id, deleted, edge? }], count, counts }`.
+
+**Throws:**
+
+- textError when `edge_ids` is missing/empty/oversized or no portfolio exists.
+
+**See also:** `delete_cross_product_edge`, `batch_create_cross_product_edges`
+
+
 ### `batch_register_instance`
 
 Batch-register product instances against canonical entities in one atomic call (the migration counterpart to `register_instance`). Validates every instance up front (canonical exists, same-type) then writes all `instance_of` edges and flushes once. Per-instance idempotent; `alias` honoured per instance.
@@ -1598,7 +1622,7 @@ separate filesystem operations.`
 | `supersede` | boolean |  | Classification edges only. When a classify write moves a source to a new value on a single-select axis, retire the prior same-axis edge (default true) so the source carries one current value. Set false to keep both (additive). A multi-select axis always keeps both. |
 | `target_id` | string | ✓ | Target node ID |
 | `target_product_id` | string |  | Product ID of the target node |
-| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `journey_phase_realises_operating_stage` \| `screen_markets_product` \| `screen_renders_design_component` \| `product_expresses_brand_identity` \| `shares_job` \| `shares_need` \| `persona_delegates_to_persona` \| `screen_targets_competitor` \| `feature_surfaces_product` \| `feature_uses_design_component` \| `product_implements_design_system` \| `node_owned_by_team` \| `node_owned_by_department` \| `strategic_theme_contains_objective` \| `objective_achieved_through_key_result` \| `key_result_quantified_by_metric` \| `objective_measured_by_metric` | ✓ | Cross-product relationship type |
+| `type` | `shares_persona` \| `shares_competitor` \| `shares_metric` \| `shares_job` \| `shares_need` \| `depends_on_product` \| `cannibalises` \| `succeeds` \| `hosts` \| `contributes_to` \| `rolls_up_to` \| `product_implements_specification` \| `product_exposes_specification` \| `feature_conforms_to_specification` \| `api_contract_speaks_specification` \| `product_exposes_primitive` \| `feature_manipulates_primitive` \| `primitive_stored_as_data_type` \| `persona_delegates_to_persona` \| `feature_rivals_competitor_feature` \| `competitor_signal_maps_to_feature` \| `competitor_signal_surfaces_opportunity` \| `competitor_classified_as_classification_value` \| `node_classified_as_classification_value` \| `product_pursues_outcome` \| `product_targets_objective` \| `product_guided_by_vision` \| `product_fulfils_mission` \| `product_organises_around_strategic_theme` \| `product_stands_on_strategic_pillar` \| `product_invests_in_initiative` \| `product_measures_with_metric` \| `outcome_measured_by_metric` \| `objective_achieved_through_key_result` \| `objective_measured_by_metric` \| `key_result_quantified_by_metric` \| `strategic_theme_pursues_initiative` \| `strategic_theme_delivers_outcome` \| `strategic_theme_measured_by_key_result` \| `strategic_theme_contains_objective` \| `initiative_drives_outcome` \| `product_expresses_brand_identity` \| `screen_renders_design_component` \| `screen_markets_product` \| `screen_targets_competitor` \| `feature_surfaces_product` \| `feature_uses_design_component` \| `product_implements_design_system` \| `node_owned_by_team` \| `node_owned_by_department` \| `objective_advances_outcome` \| `journey_phase_realises_operating_stage` | ✓ | Cross-product relationship type |
 
 **Returns:**
 
@@ -1811,7 +1835,7 @@ Returns `{ organization: null }` when no portfolio document exists yet.
 
 ### `get_portfolio_tree`
 
-Assemble a portfolio-grain tree from the shared classification registry and the `*_classified_as_classification_value` cross edges in `.upg/portfolio.upg` (the portfolio complement to `get_tree`, which is product-scoped). `shape: "landscape"` (default) returns classification axis to its values to the nodes classified at each value, every leaf carrying `confidence` / `assessed_on`; anchor at one axis or value with `from_id`, or omit for the whole portfolio. `shape: "competitor_profile"` returns one node (a competitor) and its position on every axis it has been graded against; `from_id` required. Titles resolve to entity names (e.g. "Directus"), not opaque ids. Values with no wired axis surface under an `unaxed` bucket. Read-only.
+Assemble a portfolio-grain tree from `.upg/portfolio.upg` (the portfolio complement to `get_tree`, which is product-scoped). `shape: "landscape"` (default) walks the shared classification registry and the `*_classified_as_classification_value` cross edges: classification axis to its values to the nodes classified at each value, every leaf carrying `confidence` / `assessed_on`; anchor at one axis or value with `from_id`, or omit for the whole portfolio. `shape: "competitor_profile"` returns one node (a competitor) and its position on every axis it has been graded against; `from_id` required. `shape: "structure"` returns the org chart from the portfolio DOCUMENT FIELDS (organisation to product areas / portfolios to their member products, nested), no graph traversal; areas are the ownership axis and portfolios the strategic axis, so a product can appear under both. Titles resolve to entity names (e.g. "Directus"), not opaque ids. Values with no wired axis surface under an `unaxed` bucket. Read-only.
 
 **Atomicity:** `atomic (read-only). Reads the portfolio document and, for title
 resolution, referenced product files read-only; never mutates active state.`
@@ -1823,7 +1847,7 @@ resolution, referenced product files read-only; never mutates active state.`
 | `from_id` | string |  | Anchor node id (qualified or bare). Optional for landscape (a classification axis or value); required for competitor_profile (the node to profile). |
 | `include_members` | boolean |  | Landscape only. Force classified members to inline on the whole-portfolio overview (counts-only by default). Subject to the payload guard. |
 | `include_properties` | array |  | Classification-edge property keys to inline on each leaf, in addition to the always-included confidence / assessed_on. |
-| `shape` | `landscape` \| `competitor_profile` |  | landscape (axis to value to classified members, default) or competitor_profile (one node to its per-axis positions). |
+| `shape` | `landscape` \| `competitor_profile` \| `structure` |  | landscape (axis to value to classified members, default), competitor_profile (one node to its per-axis positions), or structure (org to areas / portfolios to products, from document fields). |
 
 **Returns:**
 
@@ -2738,7 +2762,7 @@ Return the full declarative record for one get_tree pattern: its region, anchor_
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star. |
+| `id` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, org. |
 
 **Returns:**
 

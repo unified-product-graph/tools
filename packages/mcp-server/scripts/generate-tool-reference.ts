@@ -156,6 +156,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   linkAreaToAudience: 'link_area_to_audience',
   deleteCrossProductEdgeTool: 'delete_cross_product_edge',
   batchCreateCrossProductEdges: 'batch_create_cross_product_edges',
+  batchDeleteCrossProductEdgesTool: 'batch_delete_cross_product_edges',
   attachProductToPortfolioTool: 'attach_product_to_portfolio',
   detachProductFromPortfolioTool: 'detach_product_from_portfolio',
   listPortfolioCrossEdges: 'list_portfolio_cross_edges',

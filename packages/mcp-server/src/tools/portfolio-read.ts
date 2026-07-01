@@ -27,6 +27,7 @@ import {
   assembleLandscape,
   assembleCompetitorProfile,
   assembleComparison,
+  assembleStructure,
   aggregateEdgeProperties,
   findSingleSelectOverlaps,
   buildPortfolioNodeIndex,
@@ -1071,8 +1072,12 @@ async function enrichIndexFromProducts(
  * `get_portfolio_tree`: assemble a portfolio-grain tree from the shared
  * classification registry and the `*_classified_as_classification_value` cross
  * edges in `.upg/portfolio.upg`. The portfolio-grain complement to `get_tree`
- * (which is product-scoped): two shapes a human or downstream actually consumes.
+ * (which is product-scoped): three shapes a human or downstream actually consumes.
  *
+ * - `shape: "structure"`: the org chart from the portfolio DOCUMENT FIELDS
+ *   (organisation -> product areas / portfolios -> member products, nested), no
+ *   graph traversal. Areas are the ownership axis and portfolios the strategic
+ *   axis, so a product can appear under both. See `assembleStructure`.
  * - `shape: "landscape"` (default): classification axis -> its values -> the
  *   nodes classified at each value, every leaf carrying the edge's `confidence`
  *   / `assessed_on`. Anchor at one axis or value with `from_id`
@@ -1108,8 +1113,8 @@ async function enrichIndexFromProducts(
  */
 export const getPortfolioTree: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const shape = (args.shape as string | undefined) ?? 'landscape'
-  if (shape !== 'landscape' && shape !== 'competitor_profile') {
-    return textError(`Invalid shape: "${shape}". Valid: landscape, competitor_profile.`)
+  if (shape !== 'landscape' && shape !== 'competitor_profile' && shape !== 'structure') {
+    return textError(`Invalid shape: "${shape}". Valid: landscape, competitor_profile, structure.`)
   }
   const fromId = args.from_id as string | undefined
   const includeProperties = Array.isArray(args.include_properties)
@@ -1129,6 +1134,23 @@ export const getPortfolioTree: ToolHandler = async (args, ctx): Promise<ToolResu
   }
   const doc = portfolioStore.getDocument()
   if (!doc) return textError('Portfolio document failed to load.')
+
+  // Structure shape (0.17.3): a pure document-field org chart. No classification
+  // index or product-file loads — titles come straight from the portfolio document.
+  if (shape === 'structure') {
+    const structure = assembleStructure(doc)
+    const guard = preflightPayload({
+      toolName: 'get_portfolio_tree',
+      nodeCount: structure.stats.areas + structure.stats.portfolios + structure.stats.products,
+      edgeCount: 0,
+      compactEdges: false,
+      argsHint: 'shape=structure',
+    })
+    if (guard.kind === 'refuse') return guard.result
+    const structResponse = structure as unknown as Record<string, unknown>
+    if (guard.kind === 'warn') Object.assign(structResponse, guard.fields)
+    return text(JSON.stringify(structResponse, null, 2))
+  }
 
   // Resolve titles: registry + instance_of from the document, then enrich any
   // remaining classified-node sources from their product files.

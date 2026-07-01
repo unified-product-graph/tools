@@ -67,6 +67,7 @@ export * from './lib/property-type-validator.js'
 export * from './lib/length-caps.js'
 export * from './lib/tree-assemble.js'
 export * from './lib/portfolio-landscape.js'
+export * from './lib/portfolio-structure.js'
 
 // ── Expression + resolver hints ─────────────────────────────────────────────
 export * from './lib/expression.js'

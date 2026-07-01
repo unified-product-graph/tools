@@ -1,7 +1,7 @@
 /**
  * get_tree (cloud, 0.9.16): server-side tree assembly. Assembles a canonical
  * tree pattern (OST, OKR, user, product, validation, strategy, feature_areas,
- * delivery, architecture, journey, design_system, commercial, north_star) from a product graph and
+ * delivery, architecture, journey, design_system, commercial, north_star, org) from a product graph and
  * returns NESTED data plus structural gaps. Rendering
  * (emoji, score dots, ASCII) stays in the client.
  *
@@ -31,7 +31,7 @@ import { type ToolHandler, text, textError } from '../lib/server-context.js'
  * - `product_id` (required): the product whose graph to assemble.
  * - `pattern` (required): one of `ost`, `okr`, `user`, `product`, `validation`,
  *   `strategy`, `feature_areas`, `delivery`, `architecture`, `journey`,
- *   `design_system`, `commercial`, `north_star` (see `UPG_TREE_PATTERNS`).
+ *   `design_system`, `commercial`, `north_star`, `org` (see `UPG_TREE_PATTERNS`).
  * - `from_id`: explicit root node id; else the pattern's canonical anchor.
  * - `depth`: max levels (default = the pattern's natural depth).
  * - `include_properties`: node property keys to inline on each tree node.

@@ -23,6 +23,7 @@ import {
   attachProductToPortfolio,
   detachProductFromPortfolio,
   deleteCrossProductEdge,
+  batchDeleteCrossProductEdges,
 } from '@unified-product-graph/sdk'
 import {
   createProduct,
@@ -1515,6 +1516,38 @@ export const deleteCrossProductEdgeTool: ToolHandler = async (args, _ctx): Promi
   if (!edgeIdArg) return textError('Missing required parameter: edge_id')
   try {
     const result = await deleteCrossProductEdge(process.cwd(), edgeIdArg)
+    return text(JSON.stringify(result, null, 2))
+  } catch (err) {
+    return textError((err as Error).message)
+  }
+}
+
+/**
+ * Delete up to 50 cross-product edges from `.upg/portfolio.upg` by id in one atomic
+ * write (the inverse of `batch_create_cross_product_edges`). All ids are removed in
+ * memory, then a single portfolio.upg flush persists the batch, so retiring a wave
+ * of superseded edges costs one write. A missing id is `deleted: false` (not an
+ * error), so the call is idempotent.
+ *
+ * @returns JSON: `{ message, deleted: [{ edge_id, deleted, edge? }], count, counts }`.
+ * @throws textError when `edge_ids` is missing/empty/oversized or no portfolio exists.
+ * @atomicity atomic (single portfolio.upg flush).
+ * @see delete_cross_product_edge
+ * @see batch_create_cross_product_edges
+ */
+export const batchDeleteCrossProductEdgesTool: ToolHandler = async (args, _ctx): Promise<ToolResult> => {
+  const edgeIdsArg = args.edge_ids as unknown
+  if (!Array.isArray(edgeIdsArg) || edgeIdsArg.length === 0) {
+    return textError('Missing required parameter: edge_ids (a non-empty array).')
+  }
+  if (edgeIdsArg.length > 50) {
+    return textError(`Too many edges: ${edgeIdsArg.length}. Max 50 per batch_delete_cross_product_edges call.`)
+  }
+  for (let i = 0; i < edgeIdsArg.length; i++) {
+    if (typeof edgeIdsArg[i] !== 'string' || !edgeIdsArg[i]) return textError(`edge_ids[${i}]: must be a non-empty string`)
+  }
+  try {
+    const result = await batchDeleteCrossProductEdges(process.cwd(), edgeIdsArg as string[])
     return text(JSON.stringify(result, null, 2))
   } catch (err) {
     return textError((err as Error).message)

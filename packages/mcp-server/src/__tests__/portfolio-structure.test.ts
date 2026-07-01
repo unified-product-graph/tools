@@ -35,6 +35,7 @@ import {
   detachProductFromPortfolioTool,
   deleteCrossProductEdgeTool,
   batchCreateCrossProductEdges,
+  batchDeleteCrossProductEdgesTool,
   createProductTool,
   listLocalProducts,
   listPortfolioCrossEdges,
@@ -787,6 +788,51 @@ describe('0.8.16 · portfolio edit/cleanup tier', () => {
     expect((del.body as { deleted?: boolean }).deleted).toBe(true)
     const after = await parseHandlerResult(listPortfolioCrossEdges({}, ctx))
     expect((after.body as { cross_edges: unknown[] }).cross_edges).toHaveLength(1)
+  })
+
+  // H (0.17.3) batch_delete_cross_product_edges
+  it('H batch_delete_cross_product_edges removes many by id atomically and is idempotent on missing ids', async () => {
+    await parseHandlerResult(
+      batchCreateCrossProductEdges(
+        {
+          auto_create_portfolio: true,
+          edges: [
+            { source_id: 'p_a/n1', target_id: 'p_b/n2', type: 'hosts' },
+            { source_id: 'p_a/n3', target_id: 'p_c/n4', type: 'depends_on_product' },
+            { source_id: 'p_a/n5', target_id: 'p_c/n6', type: 'depends_on_product' },
+          ],
+        },
+        ctx,
+      ),
+    )
+    const list = await parseHandlerResult(listPortfolioCrossEdges({}, ctx))
+    const ids = (list.body as { cross_edges: Array<{ id: string }> }).cross_edges.map((e) => e.id)
+    expect(ids).toHaveLength(3)
+    // Delete two real ids plus one that does not exist: the missing id is reported
+    // deleted: false (not an error), the two real ones land in one flush.
+    const del = await parseHandlerResult(
+      batchDeleteCrossProductEdgesTool({ edge_ids: [ids[0], ids[1], 'xpe_missing'] }, ctx),
+    )
+    expect(del.isError).toBeUndefined()
+    const body = del.body as { count: number; counts: { deleted: number; not_found: number }; deleted: Array<{ edge_id: string; deleted: boolean }> }
+    expect(body.count).toBe(3)
+    expect(body.counts).toEqual({ deleted: 2, not_found: 1 })
+    expect(body.deleted.find((d) => d.edge_id === 'xpe_missing')?.deleted).toBe(false)
+    const after = await parseHandlerResult(listPortfolioCrossEdges({}, ctx))
+    const remaining = (after.body as { cross_edges: Array<{ id: string }> }).cross_edges
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].id).toBe(ids[2])
+  })
+
+  it('H batch_delete_cross_product_edges rejects an empty or oversized id list', async () => {
+    const empty = await parseHandlerResult(batchDeleteCrossProductEdgesTool({ edge_ids: [] }, ctx))
+    expect(empty.isError).toBe(true)
+    expect(empty.error).toMatch(/non-empty array/i)
+    const oversized = await parseHandlerResult(
+      batchDeleteCrossProductEdgesTool({ edge_ids: Array.from({ length: 51 }, (_, i) => `xpe_${i}`) }, ctx),
+    )
+    expect(oversized.isError).toBe(true)
+    expect(oversized.error).toMatch(/max 50/i)
   })
 
   it('#10 batch_create_cross_product_edges rejects the whole batch on one invalid edge (atomic)', async () => {
