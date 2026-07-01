@@ -230,7 +230,7 @@ describe(' plan scope', () => {
 
   it('exhaustive opt-in scores the full universe', async () => {
     const store = await freshStore()
-    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(318)
+    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(319)
   })
 
   it('accepts a canonical region id AND an atomic-domain id', async () => {
@@ -474,5 +474,42 @@ describe(' §B product stage write surface', () => {
     createNode(store, { type: 'product', title: 'P', properties: { stage: 'growth' } })
     const digest = computeGraphDigest(store)
     expect(digest.product.stage).toBe('growth')
+  })
+})
+
+// ── 0.17.4 keystone: deliberate-only defer edges are never auto-nested ────────
+//
+// The write-path defect Ro-Laren found: createNode auto-materialised
+// objective_defers_feature/capability for an ordinary feature/capability-under-
+// objective nesting via the unfiltered inferEdgeTypeWithTier. Now the auto-nest
+// paths pass { forAutoNest: true }, so they decline (node lands, no parent edge,
+// warning). Explicit create_edge still authors the edge on request.
+
+describe('0.17.4 deliberate-only defer edges are never auto-nested', () => {
+  it('createNode: objective ⊃ feature lands the node but declines the parent defer edge', async () => {
+    const store = await freshStore()
+    const obj = createNode(store, { type: 'objective', title: 'Grow retention' })
+    const res = createNode(store, { type: 'feature', title: 'Onboarding wizard', parent_id: obj.node.id })
+    expect(res.node).toBeTruthy()
+    expect(res.edge).toBeNull()
+    expect(res.warning ?? '').toMatch(/deliberate-only|no canonical edge/i)
+    expect(store.getAllEdges().some((e) => e.type === 'objective_defers_feature')).toBe(false)
+  })
+
+  it('createNode: objective ⊃ capability declines the parent defer edge likewise', async () => {
+    const store = await freshStore()
+    const obj = createNode(store, { type: 'objective', title: 'Grow retention' })
+    const res = createNode(store, { type: 'capability', title: 'Realtime sync', parent_id: obj.node.id })
+    expect(res.edge).toBeNull()
+    expect(store.getAllEdges().some((e) => e.type === 'objective_defers_capability')).toBe(false)
+  })
+
+  it('explicit createEdge STILL materialises the defer edge (author on request)', async () => {
+    const store = await freshStore()
+    const obj = createNode(store, { type: 'objective', title: 'Grow retention' })
+    const feat = createNode(store, { type: 'feature', title: 'Onboarding wizard' })
+    const res = createEdge(store, { source_id: obj.node.id, target_id: feat.node.id })
+    expect('edge' in res).toBe(true)
+    if ('edge' in res) expect(res.edge.type).toBe('objective_defers_feature')
   })
 })

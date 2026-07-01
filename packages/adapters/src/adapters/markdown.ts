@@ -15,7 +15,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEntityType } from '@unified-product-graph/core'
-import { resolveContainmentEdge } from '@unified-product-graph/core'
+import { resolveContainmentEdgeInferrable } from './resolve-pair-edge.js'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Type inference ───────────────────────────────────────────────────────────
@@ -295,7 +295,7 @@ function convertItemToNodes(
   // node_informs_node edge when the exact parent→child pair is absent.
   if (parentId) {
     const parentType = nodes.find((n) => n.id === parentId)?.type ?? 'product'
-    const edgeType = resolveContainmentEdge(parentType, entityType)
+    const edgeType = resolveContainmentEdgeInferrable(parentType, entityType)
       ?? 'node_informs_node'
     const edge: UPGEdge = {
       id: `edge-${parentId}-${nodeId}`,

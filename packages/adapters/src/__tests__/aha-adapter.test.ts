@@ -381,7 +381,7 @@ describe('AhaAdapter: hierarchy edge emission', () => {
     expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 
-  it('goal (objective) -> feature falls back to node_informs_node (no canonical edge)', async () => {
+  it('goal (objective) -> feature falls back to node_informs_node (objective_defers_feature is deliberate-only)', async () => {
     const items: SourceItem[] = [
       makeItem('g1', 'Grow retention', 'goal'),
       makeItem('f1', 'Onboarding improvements', 'feature', {
@@ -393,6 +393,10 @@ describe('AhaAdapter: hierarchy edge emission', () => {
     assertAllEdgesCatalogued(result.edges, 'goal -> feature link')
     // outcome_delivered_by_feature requires an outcome source; goal maps to objective
     expect(result.edges.find((e) => e.type === 'outcome_delivered_by_feature')).toBeUndefined()
+    // objective_defers_feature exists in the catalog (0.17.4) but is deliberate-only:
+    // it means an objective PARKS a feature out of scope, so it must never be
+    // inferred from a goal -> feature parentage. The link stays node_informs_node.
+    expect(result.edges.find((e) => e.type === 'objective_defers_feature')).toBeUndefined()
     expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 

@@ -15,7 +15,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { UPG_EDGE_TYPES, resolveContainmentEdge } from '@unified-product-graph/core'
+import { UPG_EDGE_TYPES, resolveContainmentEdge, UPG_DELIBERATE_ONLY_EDGE_TYPES } from '@unified-product-graph/core'
+import { resolveContainmentEdgeInferrable } from '../adapters/resolve-pair-edge.js'
 import { MarkdownAdapter } from '../adapters/markdown.js'
 import { NotionAdapter } from '../adapters/notion.js'
 import { LinearAdapter } from '../adapters/linear.js'
@@ -64,6 +65,34 @@ describe('resolveContainmentEdge', () => {
   it('returns null for entirely unknown types', () => {
     expect(resolveContainmentEdge('widget', 'gadget')).toBeNull()
     expect(resolveContainmentEdge('user_story', 'task')).toBeNull()
+  })
+})
+
+// ─── resolveContainmentEdgeInferrable (deliberate-only filter) ────────────────
+//
+// The second generic-parentage entry point. It wraps the spec resolver and drops
+// deliberate-only edges (objective_defers_*) so they are never inferred from a
+// parentage, while leaving the spec resolver — and explicit resolve_edge_for_pair
+// — untouched.
+
+describe('resolveContainmentEdgeInferrable', () => {
+  it('drops deliberate-only defer edges (objective -> feature / capability) to null', () => {
+    // Single-candidate pairs the spec resolver short-circuits to the defer edge.
+    expect(resolveContainmentEdge('objective', 'feature')).toBe('objective_defers_feature')
+    expect(resolveContainmentEdge('objective', 'capability')).toBe('objective_defers_capability')
+    // The adapter-side filter returns null so callers fall back to node_informs_node.
+    expect(resolveContainmentEdgeInferrable('objective', 'feature')).toBeNull()
+    expect(resolveContainmentEdgeInferrable('objective', 'capability')).toBeNull()
+  })
+
+  it('passes ordinary containment edges through unchanged', () => {
+    expect(resolveContainmentEdgeInferrable('feature_area', 'feature')).toBe('feature_area_contains_feature')
+    expect(resolveContainmentEdgeInferrable('release', 'feature')).toBe('release_contains_feature')
+    expect(resolveContainmentEdgeInferrable('widget', 'gadget')).toBeNull()
+  })
+
+  it('the adapters read core UPG_DELIBERATE_ONLY_EDGE_TYPES (single source of truth, no local copy)', () => {
+    expect([...UPG_DELIBERATE_ONLY_EDGE_TYPES].sort()).toEqual(['objective_defers_capability', 'objective_defers_feature'])
   })
 })
 
@@ -140,6 +169,31 @@ describe('MarkdownAdapter: edges are all catalogued', () => {
     expect(experimentNodes.length).toBeGreaterThan(0)
     assertAllEdgesCatalogued(result.edges, 'MarkdownAdapter experiment')
   })
+
+  // Regression (0.17.4 P0): markdown resolves parentage via resolveContainmentEdge,
+  // which short-circuits the now-single-candidate objective:feature / objective:
+  // capability pairs to the deliberate-only defer edge. A feature or capability
+  // nested under an objective is an ordinary nesting, never a "parked out of scope"
+  // declaration, so it must stay node_informs_node.
+  it('objective -> feature nesting stays node_informs_node (objective_defers_feature is deliberate-only)', async () => {
+    const items = await adapter.list({
+      content: ['# Grow Retention', 'Type: objective', '', '## Onboarding Wizard', 'Type: feature'].join('\n'),
+    })
+    const result = await adapter.convert(items)
+    assertAllEdgesCatalogued(result.edges, 'MarkdownAdapter objective->feature')
+    expect(result.edges.find((e) => e.type === 'objective_defers_feature')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
+  })
+
+  it('objective -> capability nesting stays node_informs_node (objective_defers_capability is deliberate-only)', async () => {
+    const items = await adapter.list({
+      content: ['# Grow Retention', 'Type: objective', '', '## Realtime Sync', 'Type: capability'].join('\n'),
+    })
+    const result = await adapter.convert(items)
+    assertAllEdgesCatalogued(result.edges, 'MarkdownAdapter objective->capability')
+    expect(result.edges.find((e) => e.type === 'objective_defers_capability')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
+  })
 })
 
 // ─── Notion adapter ───────────────────────────────────────────────────────────
@@ -195,6 +249,34 @@ describe('NotionAdapter: edges are all catalogued', () => {
     // DATABASE_TYPE_MAP, so it defaults to 'insight'. Verify edges are still catalogued.
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'NotionAdapter feature_area hierarchy')
+  })
+
+  // Regression (0.17.4 P0): notion also resolves parentage via resolveContainmentEdge.
+  // An "Objectives" DB item containing a "Features" / "Capabilities" DB item must
+  // not infer the deliberate-only objective_defers_* edge.
+  it('objective -> feature nesting stays node_informs_node (objective_defers_feature is deliberate-only)', async () => {
+    const items: SourceItem[] = [
+      makeItem('obj-1', 'Grow retention', 'database_item', 'Objectives', [
+        makeItem('feat-1', 'Onboarding wizard', 'database_item', 'Features'),
+      ]),
+    ]
+    const result = await adapter.convert(items)
+    assertAllEdgesCatalogued(result.edges, 'NotionAdapter objective->feature')
+    expect(result.edges.find((e) => e.type === 'objective_defers_feature')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
+  })
+
+  it('objective -> capability nesting stays node_informs_node (objective_defers_capability is deliberate-only)', async () => {
+    const items: SourceItem[] = [
+      makeItem('obj-1', 'Grow retention', 'database_item', 'Objectives', [
+        makeItem('cap-1', 'Realtime sync', 'database_item', 'Capabilities'),
+      ]),
+    ]
+    const result = await adapter.convert(items)
+    assertAllEdgesCatalogued(result.edges, 'NotionAdapter objective->capability')
+    expect(result.nodes.find((n) => n.type === 'capability')).toBeDefined()
+    expect(result.edges.find((e) => e.type === 'objective_defers_capability')).toBeUndefined()
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeDefined()
   })
 })
 

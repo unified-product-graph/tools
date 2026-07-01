@@ -316,7 +316,7 @@ describe('ProductboardAdapter: hierarchy edge emission', () => {
     expect(warnText).toContain('evidence chain')
   })
 
-  it('feature under an objective falls back to a generic link (no canonical objective->feature edge)', async () => {
+  it('feature under an objective falls back to a generic link (objective_defers_feature is deliberate-only)', async () => {
     const items: SourceItem[] = [
       makeFeature('obj1', 'Grow retention', 'objective'),
       makeFeature('f1', 'Improve onboarding', 'feature', {
@@ -326,6 +326,9 @@ describe('ProductboardAdapter: hierarchy edge emission', () => {
     ]
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'objective->feature link')
+    // objective_defers_feature exists in the catalog (0.17.4) but is deliberate-only
+    // (an objective PARKS a feature), so it is never inferred from a parentage.
+    expect(result.edges.find((e) => e.type === 'objective_defers_feature')).toBeUndefined()
     const edge = result.edges.find((e) => e.type === 'node_informs_node')
     expect(edge).toBeDefined()
   })

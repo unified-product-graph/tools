@@ -30,7 +30,8 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolveContainmentEdge, getLifecycleForType } from '@unified-product-graph/core'
+import { getLifecycleForType } from '@unified-product-graph/core'
+import { resolveContainmentEdgeInferrable } from './resolve-pair-edge.js'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Issue label sets ─────────────────────────────────────────────────────────
@@ -439,7 +440,7 @@ export class GitHubAdapter implements UPGAdapter {
 
         nodes.push(childNode)
 
-        const childEdgeType = resolveContainmentEdge(resolvedType, 'task') ?? 'node_informs_node'
+        const childEdgeType = resolveContainmentEdgeInferrable(resolvedType, 'task') ?? 'node_informs_node'
         edges.push({
           id: `edge-${nodeId}-${childNodeId}`,
           source: nodeId,
@@ -469,7 +470,7 @@ export class GitHubAdapter implements UPGAdapter {
         } else {
           // Other types: fall back to catalogue-aware resolver
           const releaseEdgeType =
-            resolveContainmentEdge('release', resolvedType) ?? 'node_informs_node'
+            resolveContainmentEdgeInferrable('release', resolvedType) ?? 'node_informs_node'
           const milestoneNodeId = sourceMap[milestoneLinkId]
           if (milestoneNodeId) {
             edges.push({

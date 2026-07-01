@@ -95,3 +95,40 @@ describe('cloud vs SDK logic parity: create_node property validation', () => {
     })
   }
 })
+
+// 0.17.4 keystone — cloud's OWN behavioural check (Postgres-backed; verified at the
+// store seam, not inferred from the SDK): an auto-nest must DECLINE a deliberate-only
+// defer edge and must NOT materialise it on any downstream step. Explicit create_edge
+// still authors it.
+describe('cloud 0.17.4: deliberate-only defer edges are never auto-nested', () => {
+  it('createNode: objective ⊃ feature lands the node but writes NO parent defer edge', async () => {
+    const { ctx, addedEdges, addedNodes } = makeStore([
+      { id: 'obj', product_id: 'p1', type: 'objective', title: 'O' },
+    ])
+    const res = await createNode({ product_id: 'p1', type: 'feature', title: 'F', parent_id: 'obj' }, ctx)
+    expect(res.isError).toBeFalsy()
+    expect(addedNodes).toHaveLength(1) // feature still lands
+    expect(addedEdges, 'no parent edge materialised at the store seam').toHaveLength(0)
+    expect(addedEdges.some((e) => e.type === 'objective_defers_feature')).toBe(false)
+  })
+
+  it('createNode: objective ⊃ capability writes NO parent defer edge either', async () => {
+    const { ctx, addedEdges } = makeStore([
+      { id: 'obj', product_id: 'p1', type: 'objective', title: 'O' },
+    ])
+    await createNode({ product_id: 'p1', type: 'capability', title: 'C', parent_id: 'obj' }, ctx)
+    expect(addedEdges).toHaveLength(0)
+    expect(addedEdges.some((e) => e.type === 'objective_defers_capability')).toBe(false)
+  })
+
+  it('explicit createEdge STILL materialises the defer edge (author on request)', async () => {
+    const { ctx, addedEdges } = makeStore([
+      { id: 'obj', product_id: 'p1', type: 'objective', title: 'O' },
+      { id: 'feat', product_id: 'p1', type: 'feature', title: 'F' },
+    ])
+    const res = await createEdge({ source_id: 'obj', target_id: 'feat' }, ctx)
+    expect(res.isError).toBeFalsy()
+    expect(addedEdges).toHaveLength(1)
+    expect(addedEdges[0].type).toBe('objective_defers_feature')
+  })
+})

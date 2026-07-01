@@ -17,7 +17,8 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolveContainmentEdge, getLifecycleForType } from '@unified-product-graph/core'
+import { getLifecycleForType } from '@unified-product-graph/core'
+import { resolveContainmentEdgeInferrable } from './resolve-pair-edge.js'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Database name → UPG entity type ─────────────────────────────────────────
@@ -85,6 +86,8 @@ export const DATABASE_TYPE_MAP: Record<string, string | null> = {
   okrs: 'objective',
   goal: 'objective',
   goals: 'objective',
+  capability: 'capability',
+  capabilities: 'capability',
 
   'key result': 'key_result',
   'key results': 'key_result',
@@ -724,7 +727,7 @@ export class NotionAdapter implements UPGAdapter {
       // Falls back to node_informs_node when the pair is absent from the catalogue.
       if (parentId) {
         const parentType = nodes.find((n) => n.id === parentId)?.type ?? 'product'
-        const edgeType = resolveContainmentEdge(parentType, entityType) ?? 'node_informs_node'
+        const edgeType = resolveContainmentEdgeInferrable(parentType, entityType) ?? 'node_informs_node'
         edges.push({
           id: `edge-${parentId}-${nodeId}`,
           source: parentId,

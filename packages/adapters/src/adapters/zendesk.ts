@@ -25,7 +25,8 @@
  * - ticket_field: custom field schema definition, not product knowledge
  */
 
-import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
+import { getLifecycleForType } from '@unified-product-graph/core'
+import { resolvePairEdge } from './resolve-pair-edge.js'
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -133,16 +134,6 @@ export function resolveZendeskStatusForType(rawStatus: string, upgType: string):
   const typeMap = ZENDESK_STATUS_MAP[upgType] ?? {}
   const mapped = typeMap[raw]
   return mapped && valid.has(mapped) ? mapped : undefined
-}
-
-/** Canonical UPG edge for a parent UPG type → child UPG type pair via catalogue,
- *  honouring direction; null when no canonical edge exists. */
-function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
-  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
-  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
-  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
-  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
-  return null
 }
 
 /** Resolve mapping confidence for a Zendesk entity type */

@@ -743,6 +743,17 @@ describe('resolve_edge_for_pair', () => {
  expect(typeof type).toBe('string')
  })
 
+ it('still resolves the deliberate-only defer edges for EXPLICIT resolution (0.17.4)', () => {
+ // resolve_edge_for_pair is the explicit resolution path. It MUST keep returning
+ // objective_defers_feature / objective_defers_capability even though the import
+ // adapters filter these out of generic-parentage inference (the spec resolver is
+ // untouched; only the adapter layer skips them).
+ const feat = call(resolveEdgeForPair, { source_type: 'objective', target_type: 'feature' })
+ expect((feat.body as { edge_type: string | null }).edge_type).toBe('objective_defers_feature')
+ const cap = call(resolveEdgeForPair, { source_type: 'objective', target_type: 'capability' })
+ expect((cap.body as { edge_type: string | null }).edge_type).toBe('objective_defers_capability')
+ })
+
  it('returns edge_type null for an uncatalogued pair', () => {
  const { body } = call(resolveEdgeForPair, {
  source_type: 'not_a_type_x',

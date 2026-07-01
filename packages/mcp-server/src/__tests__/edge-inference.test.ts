@@ -125,3 +125,30 @@ describe('inferEdgeTypeWithTier', () => {
     }
   })
 })
+
+// 0.17.4 keystone: auto-nest mode declines deliberate-only edges so a parent
+// nesting never silently materialises objective_defers_feature/capability;
+// explicit resolution (no flag) still returns them.
+describe('inferEdgeTypeWithTier — deliberate-only auto-nest filter (0.17.4)', () => {
+  it('DECLINES the defer edges in auto-nest mode', () => {
+    for (const [s, t] of [['objective', 'feature'], ['objective', 'capability']] as const) {
+      const r = inferEdgeTypeWithTier(s, t, { forAutoNest: true })
+      expect(r.ok, `${s}->${t} should decline in auto-nest mode`).toBe(false)
+    }
+  })
+
+  it('STILL returns the defer edges for explicit resolution (no forAutoNest)', () => {
+    const feat = inferEdgeTypeWithTier('objective', 'feature')
+    expect(feat.ok).toBe(true)
+    if (feat.ok) expect(feat.edgeType).toBe('objective_defers_feature')
+    const cap = inferEdgeTypeWithTier('objective', 'capability')
+    expect(cap.ok).toBe(true)
+    if (cap.ok) expect(cap.edgeType).toBe('objective_defers_capability')
+  })
+
+  it('auto-nest mode leaves ordinary edges untouched', () => {
+    const r = inferEdgeTypeWithTier('feature_area', 'feature', { forAutoNest: true })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.edgeType).toBe('feature_area_contains_feature')
+  })
+})

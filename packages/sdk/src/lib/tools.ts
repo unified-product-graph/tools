@@ -1079,7 +1079,7 @@ export function createNode(
         warning: (warning ? warning + ' | ' : '') + `Parent node ${args.parent_id} not found. Node created without edge.`,
       }
     }
-    const inference = inferEdgeTypeWithTier(parent.type, canonicalNodeType)
+    const inference = inferEdgeTypeWithTier(parent.type, canonicalNodeType, { forAutoNest: true })
     if (!inference.ok) {
       // Do NOT fabricate the parent edge. Node still lands; caller
       // is told the edge couldn't be canonicalised so they can pick an
@@ -1610,7 +1610,7 @@ export function moveNode(store: UPGFileStore, args: MoveNodeArgs): MoveNodeResul
     }
     newEdgeType = args.new_edge_type as UPGEdgeType
   } else {
-    const inference = inferEdgeTypeWithTier(newParent.type, node.type)
+    const inference = inferEdgeTypeWithTier(newParent.type, node.type, { forAutoNest: true })
     if (!inference.ok) {
       const suggestion = inference.suggestions.length > 0
         ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
@@ -1730,7 +1730,7 @@ export function batchMoveNodes(
       return { ok: false, error: `Move at index ${i}: new_edge_type "${m.new_edge_type}" is not in UPG_EDGE_CATALOG.`, failed_at_index: i }
     }
     if (!m.new_edge_type) {
-      const inference = inferEdgeTypeWithTier(parent.type, node.type)
+      const inference = inferEdgeTypeWithTier(parent.type, node.type, { forAutoNest: true })
       if (!inference.ok) {
         return { ok: false, error: `Move at index ${i}: no canonical edge for ${parent.type} → ${node.type}. Pass an explicit new_edge_type.`, failed_at_index: i }
       }
@@ -2167,7 +2167,7 @@ export function batchCreateNodes(
       if (parentId) {
         const parent = store.getNode(parentId)
         if (parent) {
-          const inference = inferEdgeTypeWithTier(parent.type, newNode.type)
+          const inference = inferEdgeTypeWithTier(parent.type, newNode.type, { forAutoNest: true })
           if (inference.ok) {
             const edge: UPGEdge = { id: edgeId(), source: parentId, target: newNode.id, type: inference.edgeType }
             //: report the stored edge (existing on a dedup hit; new node

@@ -155,7 +155,7 @@ export const batchCreateNodes: ToolHandler = async (args, { store }) => {
           const parentType = parentRows[0].type as string
           // Do NOT fabricate a `_contains_` edge: skip with a warning when the
           // pair has no canonical edge, matching create_node.
-          const inference = inferEdgeTypeWithTier(parentType, nodeType)
+          const inference = inferEdgeTypeWithTier(parentType, nodeType, { forAutoNest: true })
           if (!inference.ok) {
             warnings.push(`Node "${newId}": parent edge not created; no canonical edge for ${parentType} → ${nodeType}.`)
           } else {
@@ -591,7 +591,7 @@ export const batchMoveNodes: ToolHandler = async (args, { store }) => {
     if (!node) return textError(`Move at index ${i}: node "${m.node_id}" not found`)
     const newParent = await store.getNode(m.new_parent_id as string)
     if (!newParent) return textError(`Move at index ${i}: new parent "${m.new_parent_id}" not found`)
-    const inference = inferEdgeTypeWithTier(newParent.type, node.type)
+    const inference = inferEdgeTypeWithTier(newParent.type, node.type, { forAutoNest: true })
     if (!inference.ok) {
       const suggestion = inference.suggestions.length > 0
         ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`

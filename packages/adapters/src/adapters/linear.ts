@@ -27,7 +27,8 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolveContainmentEdge, getLifecycleForType } from '@unified-product-graph/core'
+import { getLifecycleForType } from '@unified-product-graph/core'
+import { resolveContainmentEdgeInferrable } from './resolve-pair-edge.js'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Issue type map (discriminated by issueType.name from Linear API) ─────────
@@ -357,7 +358,7 @@ export class LinearAdapter implements UPGAdapter {
       if (parentId) {
         const parentNode = nodes.find((n) => n.id === parentId)
         const parentType = parentNode?.type ?? 'project'
-        const edgeType = resolveContainmentEdge(parentType, resolvedType) ?? 'node_informs_node'
+        const edgeType = resolveContainmentEdgeInferrable(parentType, resolvedType) ?? 'node_informs_node'
         edges.push({
           id: `edge-${parentId}-${nodeId}`,
           source: parentId,

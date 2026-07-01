@@ -259,6 +259,10 @@ describe('AirfocusAdapter: edge emission', () => {
     assertAllEdgesCatalogued(result.edges, 'outcome_delivered_by_feature')
     const edge = result.edges.find((e) => e.type === 'outcome_delivered_by_feature')
     expect(edge).toBeDefined()
+    // objective_defers_feature exists in the catalog (0.17.4) but is deliberate-only:
+    // a feature under an objective is a delivery link, never a park, so the defer
+    // edge is never emitted from parentage.
+    expect(result.edges.find((e) => e.type === 'objective_defers_feature')).toBeUndefined()
   })
 
   it('insight_informs_opportunity emitted when feature has insight parent (with warning)', async () => {

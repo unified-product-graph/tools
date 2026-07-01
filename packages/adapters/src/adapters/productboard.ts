@@ -28,7 +28,8 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { getLifecycleForType, UPG_EDGE_PAIR_MAP } from '@unified-product-graph/core'
+import { resolvePairEdge } from './resolve-pair-edge.js'
+import { getLifecycleForType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Entity type → UPG entity type ───────────────────────────────────────────
@@ -131,20 +132,6 @@ function resolveProductboardStatus(rawStatus: string, upgType: string): string |
   const mapped = PRODUCTBOARD_STATUS_MAP[raw]
   if (mapped && valid.has(mapped)) return mapped
   return undefined
-}
-
-/**
- * Resolve the canonical UPG edge for a parent UPG type → child UPG type pair via
- * the edge catalogue, honouring the catalogue's declared direction. Returns the
- * edge type plus whether the CHILD is the edge source (so callers orient
- * source/target correctly), or null when no canonical edge exists.
- */
-function resolvePairEdge(parentUpg: string, childUpg: string): { type: string; sourceIsChild: boolean } | null {
-  const fwd = UPG_EDGE_PAIR_MAP[`${parentUpg}:${childUpg}`]
-  if (fwd && fwd.length > 0) return { type: fwd[0], sourceIsChild: false }
-  const rev = UPG_EDGE_PAIR_MAP[`${childUpg}:${parentUpg}`]
-  if (rev && rev.length > 0) return { type: rev[0], sourceIsChild: true }
-  return null
 }
 
 /** Get confidence for a Productboard entity type → UPG entity type mapping */

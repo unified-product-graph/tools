@@ -395,7 +395,7 @@ export const createNode: ToolHandler = async (args, { store }) => {
       // Catalog-strict parent-edge inference. Do NOT fabricate a
       // `_contains_` edge: the node still lands, but a non-canonical pair
       // yields a warning so the caller can wire an explicit edge type.
-      const inference = inferEdgeTypeWithTier(parent.type, nodeType)
+      const inference = inferEdgeTypeWithTier(parent.type, nodeType, { forAutoNest: true })
       if (!inference.ok) {
         const suggestion = inference.suggestions.length > 0
           ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`
@@ -555,7 +555,7 @@ export const moveNode: ToolHandler = async (args, { store }) => {
 
   // Catalog-strict: validate the new containment edge BEFORE any mutation.
   // On a non-canonical pair the graph is left exactly as it started.
-  const inference = inferEdgeTypeWithTier(newParent.type, node.type)
+  const inference = inferEdgeTypeWithTier(newParent.type, node.type, { forAutoNest: true })
   if (!inference.ok) {
     const suggestion = inference.suggestions.length > 0
       ? ` Suggestions: ${inference.suggestions.map((s) => `${s.source_type} → ${s.target_type} (${s.edge_type})`).join('; ')}.`

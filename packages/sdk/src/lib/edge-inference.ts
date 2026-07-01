@@ -1,5 +1,6 @@
 import {
   getReplacementType,
+  isDeliberateOnlyEdge,
   pickCanonicalEdge,
   UPG_EDGE_TYPES,
   UPG_TYPES,
@@ -138,6 +139,16 @@ function suggestEdgePairs(sourceType: string, targetType: string): EdgeInference
 export function inferEdgeTypeWithTier(
   sourceType: string,
   targetType: string,
+  options?: {
+    /**
+     * Auto-nest mode (0.17.4). When `true`, the inference declines a
+     * deliberate-only edge (`isDeliberateOnlyEdge`) rather than returning it, so
+     * a parent nesting never silently materialises an edge that must be authored
+     * on request (e.g. `objective_defers_feature`). Explicit callers
+     * (`create_edge`, `resolve_edge_for_pair`) omit this and still get the edge.
+     */
+    forAutoNest?: boolean
+  },
 ): EdgeInferenceResult {
   // Resolve deprecated source/target via the spec's migration map BEFORE
   // catalog lookup. A `jtbd → need` request becomes `job → need`.
@@ -149,24 +160,38 @@ export function inferEdgeTypeWithTier(
 
   const key = `${canonicalSource}:${canonicalTarget}`
 
+  // Tier 1 (core verb lookup), then Tier 2 (catalog pair map, classification-ranked
+  // via pickCanonicalEdge: hierarchy ≻ causal ≻ semantic ≻ cross-domain).
+  let candidate: UPGEdgeType | undefined
+  let tier: 'core' | 'extended' | undefined
   const core = CORE_EDGE_LOOKUP.get(key)
   if (core) {
-    return {
-      ok: true,
-      edgeType: core,
-      tier: 'core',
-      ...(aliased.length > 0 ? { aliased } : {}),
+    candidate = core
+    tier = 'core'
+  } else {
+    const extended = pickCanonicalEdge(canonicalSource, canonicalTarget)
+    if (extended) {
+      candidate = extended
+      tier = 'extended'
     }
   }
 
-  // Pair map is list-valued; pickCanonicalEdge applies
-  // the classification-ranked policy (hierarchy ≻ causal ≻ semantic ≻ cross-domain).
-  const extended = pickCanonicalEdge(canonicalSource, canonicalTarget)
-  if (extended) {
+  if (candidate && tier) {
+    // 0.17.4: a deliberate-only edge must never be inferred from a parent nesting.
+    // Decline in auto-nest mode so the write path falls back to node_informs_node /
+    // decline+warn; explicit resolution keeps returning the edge.
+    if (options?.forAutoNest && isDeliberateOnlyEdge(candidate)) {
+      return {
+        ok: false,
+        reason: `${candidate} is a deliberate-only edge for ${canonicalSource} → ${canonicalTarget}; it is never inferred from a parent nesting. Author it explicitly with create_edge if intended.`,
+        suggestions: [],
+        resolved: { source_type: canonicalSource, target_type: canonicalTarget },
+      }
+    }
     return {
       ok: true,
-      edgeType: extended,
-      tier: 'extended',
+      edgeType: candidate,
+      tier,
       ...(aliased.length > 0 ? { aliased } : {}),
     }
   }
