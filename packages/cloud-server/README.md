@@ -1,6 +1,6 @@
 # @unified-product-graph/cloud-server
 
-**91 MCP tools across 14 domains, backed by Postgres.** Self-hostable [Model Context Protocol](https://modelcontextprotocol.io) server for the [Unified Product Graph](https://unifiedproductgraph.org).
+**100 MCP tools across 15 domains, backed by Postgres.** Self-hostable [Model Context Protocol](https://modelcontextprotocol.io) server for the [Unified Product Graph](https://unifiedproductgraph.org).
 
 <!-- badges -->
 <!-- [![npm](https://img.shields.io/npm/v/@unified-product-graph/cloud-server)](https://www.npmjs.com/package/@unified-product-graph/cloud-server) -->
@@ -57,7 +57,7 @@ Add this to your `.claude/settings.json` or MCP client config:
 
 ## MCP Tools
 
-**91 tools across 14 domains.** Reference: [`TOOLS.md`](./TOOLS.md) (generated from JSDoc by `npm run generate-tools`). The high-level shape:
+**100 tools across 15 domains.** Reference: [`TOOLS.md`](./TOOLS.md) (generated from JSDoc by `npm run generate-tools`). The high-level shape:
 
 | Domain | What it covers |
 | ------ | -------------- |

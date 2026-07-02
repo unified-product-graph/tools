@@ -86,7 +86,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 134 tools', () => {
+  it('exposes the expected 139 tools', () => {
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
