@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 138 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 139 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 138 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 11 tools
-- [Workspace & Portfolios](#workspace-portfolios): 38 tools
+- [Workspace & Portfolios](#workspace-portfolios): 39 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 51 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1333,6 +1333,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`portfolio_validate`](#portfolio-validate)
 - [`promote_to_canonical`](#promote-to-canonical)
 - [`register_instance`](#register-instance)
+- [`reload_product`](#reload-product)
 - [`switch_product`](#switch-product)
 - [`update_canonical_entity`](#update-canonical-entity)
 - [`update_product`](#update-product)
@@ -2208,6 +2209,30 @@ Link a product node to a canonical registry entity by creating an `instance_of` 
 JSON: `{ edge, instance, canonical, portfolio_file, already_existed? }`.
 
 **See also:** `define_canonical_entity`, `list_registry`
+
+
+### `reload_product`
+
+Re-read the ACTIVE product from disk, discarding any unsaved in-memory changes. The in-band escape from a wedged save-conflict: when the active product was edited in another session, flush()/switch_product keep throwing CONFLICT and the stale snapshot persists; this clears it WITHOUT restarting the server. When there are unsaved changes you must pass `discard_local: true` to proceed (the reload would drop them); with no unsaved changes it is a safe refresh. Local-only.
+
+**Atomicity:** `non-atomic. Stops the watcher, re-reads the file, re-arms the watcher.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `discard_local` | boolean |  | Discard unsaved in-memory changes and re-read from disk. Required (true) when the active product has unsaved changes; ignored when it is clean. Default false. |
+
+**Returns:**
+
+JSON: `{ message, file, product: { title, stage }, entities,
+discarded_local_changes }`.
+
+**Throws:**
+
+- textError when unsaved changes exist and `discard_local` is not true.
+
+**See also:** `switch_product`, `get_workspace_info`
 
 
 ### `switch_product`
@@ -3325,7 +3350,7 @@ Plan approach: path of arrival to "what should I build next?". Returns the Plan 
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `exhaustive` | boolean |  | If true, score against the entire 312-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted. |
+| `exhaustive` | boolean |  | If true, score against the entire 319-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted. |
 | `region` | string |  | Optional UPGRegionId or atomic-domain id. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit to scope to the product's active regions. |
 
 **Returns:**

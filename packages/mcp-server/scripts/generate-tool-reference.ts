@@ -144,6 +144,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   // workspace
   listLocalProducts: 'list_local_products',
   switchProduct: 'switch_product',
+  reloadProduct: 'reload_product',
   getWorkspaceInfo: 'get_workspace_info',
   initWorkspaceTool: 'init_workspace',
   createProductTool: 'create_product',

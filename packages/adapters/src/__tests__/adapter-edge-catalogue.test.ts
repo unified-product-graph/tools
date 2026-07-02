@@ -92,7 +92,14 @@ describe('resolveContainmentEdgeInferrable', () => {
   })
 
   it('the adapters read core UPG_DELIBERATE_ONLY_EDGE_TYPES (single source of truth, no local copy)', () => {
-    expect([...UPG_DELIBERATE_ONLY_EDGE_TYPES].sort()).toEqual(['objective_defers_capability', 'objective_defers_feature'])
+    // 0.17.6 added insight_informs_opportunity to the deliberate-only set (a
+    // PM-judgment link, never inferred from parentage). The adapters pick it up
+    // for free via the core set — no local edit here beyond this expectation.
+    expect([...UPG_DELIBERATE_ONLY_EDGE_TYPES].sort()).toEqual([
+      'insight_informs_opportunity',
+      'objective_defers_capability',
+      'objective_defers_feature',
+    ])
   })
 })
 

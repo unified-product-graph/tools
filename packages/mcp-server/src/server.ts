@@ -54,6 +54,7 @@ export const SERVER_INSTRUCTIONS = [
   'Edge migration: rename_edge_type({ from, to, flip?, dry_run? }): single transactional rename.',
   '',
   'Multi-product: list_local_products, switch_product, init_workspace.',
+  'Conflict recovery: if a write or switch_product fails with CONFLICT (the active .upg was edited elsewhere), reload_product({ discard_local: true }) discards the stale in-memory state and re-reads it from disk, no restart needed.',
   '',
   'Schema: get_entity_schema returns valid parent→child hierarchy, properties, and edge types per type.',
   '',

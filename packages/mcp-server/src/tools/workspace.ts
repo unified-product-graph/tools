@@ -261,8 +261,33 @@ export const switchProduct: ToolHandler = async (args, ctx): Promise<ToolResult>
     )
   }
 
+  // Two phases with distinct error scoping (0.17.6). Before, a single try/catch
+  // wrapped both the pre-switch flush of the ACTIVE product and the load of the
+  // TARGET, so a flush CONFLICT (the active file was edited in another session)
+  // surfaced as "Failed to switch" for every target — implying the requested
+  // product failed to load, when it was never touched, and leaving the caller
+  // with no in-band fix (restart-only). Separate them.
+  const activeFile = store.getFilePath()
+  const activeRel = path.relative(cwd, activeFile) || path.basename(activeFile)
+
+  // Phase 1 — persist the active product before switching away. `flush()` is
+  // dirty-guarded (a clean store is a no-op), so this writes only when there are
+  // unsaved changes. A CONFLICT here is about the ACTIVE file, not the target.
   try {
     await store.flush()
+  } catch (err) {
+    return textError(
+      `Cannot switch away from the active product (${activeRel}): saving its unsaved changes failed.\n` +
+        `${(err as Error).message}\n` +
+        `The requested product "${fileArg}" was NOT loaded and the active product is unchanged. ` +
+        `To recover in-band, run reload_product({ discard_local: true }) — it discards the stale local ` +
+        `state and re-reads ${activeRel} from disk — then retry switch_product.`,
+    )
+  }
+
+  // Phase 2 — load the target. A failure here is a load/parse problem with the
+  // REQUESTED file; the active product's watcher has already been stopped.
+  try {
     store.stopWatching()
     await store.load(resolved)
 
@@ -281,7 +306,71 @@ export const switchProduct: ToolHandler = async (args, ctx): Promise<ToolResult>
       ),
     )
   } catch (err) {
-    return textError(`Failed to switch: ${(err as Error).message}`)
+    return textError(
+      `Failed to load the requested product "${fileArg}" (${resolved}): ${(err as Error).message}. ` +
+        `The previous product (${activeRel}) is no longer watched — call get_workspace_info to confirm the ` +
+        `active product, or reload_product to restore it.`,
+    )
+  }
+}
+
+/**
+ * Re-read the active product from disk, discarding any unsaved in-memory
+ * changes. The in-band escape from a wedged save-conflict (0.17.6): when the
+ * active product's flush conflicts with an external edit, every write —
+ * including `switch_product`, which flushes the active product first — keeps
+ * throwing `CONFLICT`, and the stale snapshot persists with no way out short of
+ * restarting the server. Reloading from disk drops the stale snapshot so the
+ * next flush cannot conflict.
+ *
+ * `discard_local` (default false) is a safety gate: when the active product has
+ * unsaved changes, it must be `true` to proceed, so a reload never silently
+ * destroys unpersisted work. With no unsaved changes the reload always runs (a
+ * safe refresh). This is LOCAL-only — cloud sessions have no on-disk file to
+ * re-read.
+ *
+ * @returns JSON: `{ message, file, product: { title, stage }, entities,
+ *   discarded_local_changes }`.
+ * @throws textError when unsaved changes exist and `discard_local` is not true.
+ * @atomicity non-atomic. Stops the watcher, re-reads the file, re-arms the watcher.
+ * @see switch_product
+ * @see get_workspace_info
+ */
+export const reloadProduct: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const { store } = ctx
+  const discardLocal = args.discard_local === true
+  const cwd = process.cwd()
+  const activeFile = store.getFilePath()
+  const rel = path.relative(cwd, activeFile) || path.basename(activeFile)
+
+  if (store.hasUnsavedChanges() && !discardLocal) {
+    return textError(
+      `The active product (${rel}) has unsaved in-memory changes; reloading from disk would discard them. ` +
+        `Pass discard_local: true to discard the local state and re-read the file. This is the reliable escape ` +
+        `from a save-conflict (a CONFLICT thrown by flush / switch_product) without restarting the server.`,
+    )
+  }
+
+  try {
+    const result = await store.reloadFromDisk()
+    const product = store.getProduct()
+    return text(
+      JSON.stringify(
+        {
+          message: `Reloaded ${product.title} from disk${
+            result.discardedLocalChanges ? ' (discarded unsaved local changes)' : ''
+          }`,
+          file: result.file,
+          product: { title: product.title, stage: product.stage },
+          entities: result.nodes,
+          discarded_local_changes: result.discardedLocalChanges,
+        },
+        null,
+        2,
+      ),
+    )
+  } catch (err) {
+    return textError(`Failed to reload the active product (${rel}): ${(err as Error).message}`)
   }
 }
 

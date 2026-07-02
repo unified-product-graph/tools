@@ -74,6 +74,11 @@ const CLOUD_NA = new Set([
   'init_workspace',
   'list_local_products',
   'switch_product',
+  // reload_product (0.17.6): re-reads the ACTIVE product from an on-disk .upg
+  // file to escape a wedged save-conflict. A pure local file-concurrency concern
+  // — the cloud server is stateless per request with no persistent in-memory
+  // snapshot to go stale, so there is nothing to reload. Category error on cloud.
+  'reload_product',
   'get_workspace_info',
   // process-local session state (the cloud server is stateless per request)
   'get_session_context',

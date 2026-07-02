@@ -160,7 +160,12 @@ describe('Tool registry: completeness', () => {
     //   inverse of batch_create_cross_product_edges — retire a wave of superseded
     //   portfolio cross-edges in one flush instead of one delete per id. Local-only
     //   (portfolio.upg write surface). → 138.
-    expect(TOOL_DEFINITIONS).toHaveLength(138)
+    // + reload_product (0.17.6): re-read the active product from disk, discarding
+    //   the stale in-memory snapshot — the in-band escape from a wedged save
+    //   CONFLICT (switch_product flushes the active product first, so a conflict
+    //   there blocks every switch) without a server restart. Local-only (no
+    //   on-disk file to re-read in the cloud). → 139.
+    expect(TOOL_DEFINITIONS).toHaveLength(139)
   })
 })
 

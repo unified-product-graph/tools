@@ -74,7 +74,11 @@ export interface UPGClientOptions {
   lazy?: boolean
 }
 
-export interface NodeListOptions extends ListNodesOptions {}
+// A type alias, not an empty extending interface: NodeListOptions IS
+// ListNodesOptions today (kept as a distinct public name for the client's
+// nodes.list surface). @typescript-eslint/no-empty-object-type flags the empty
+// `extends` form; the alias is the equivalent that satisfies it.
+export type NodeListOptions = ListNodesOptions
 
 export interface EdgeListOptions {
   source?: string

@@ -895,6 +895,55 @@ export class UPGFileStore {
     if (wasWatching) await this.startWatching()
   }
 
+  /**
+   * Whether the store holds unsaved in-memory changes (mutations not yet
+   * flushed to disk). Read-only introspection so a caller can warn before a
+   * destructive reload or scope a flush-conflict error, without reaching into
+   * the private `dirty` flag.
+   */
+  hasUnsavedChanges(): boolean {
+    return this.dirty
+  }
+
+  /**
+   * Discard any unsaved in-memory changes and re-read the active file from
+   * disk. This is the in-band escape from a wedged conflict (0.17.6): once a
+   * `flush()`/`save()` has thrown `CONFLICT` (a stale dirty snapshot whose
+   * baseline no longer matches disk, e.g. the same node's same field edited in
+   * two sessions), every subsequent flush — and so every `switch_product`,
+   * which flushes the active product first — keeps throwing the same conflict.
+   * Restarting the server was the only prior exit. Re-reading from disk drops
+   * the stale snapshot: `doc`, indexes, content hash and the disk baseline are
+   * all rebuilt from the current file, `dirty` is cleared, the pending debounced
+   * save is cancelled, and the watcher is re-armed on the same path. After it
+   * returns the next flush cannot conflict on stale local state.
+   *
+   * @returns the reloaded entity counts and whether local changes were dropped.
+   */
+  async reloadFromDisk(): Promise<{ discardedLocalChanges: boolean; file: string; nodes: number; edges: number }> {
+    const discardedLocalChanges = this.dirty
+    // Clear the stale snapshot BEFORE the reload: drop the dirty flag and cancel
+    // any queued debounced save so a scheduled save() cannot fire the old
+    // (conflicting) state at disk after load() has reset the baseline.
+    this.dirty = false
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
+    const file = this.filePath
+    this.stopWatching()
+    // load() re-reads disk, rebuilds indexes, resets baselineFileHash, and
+    // re-arms the watcher (startWatching() is a no-op only while a watcher is
+    // live — we stopped it above). load() does not touch `dirty`; it stays false.
+    await this.load(file)
+    return {
+      discardedLocalChanges,
+      file,
+      nodes: this.doc.nodes.length,
+      edges: this.doc.edges.length,
+    }
+  }
+
   // ── Index Management ─────────────────────────────────────────────────────
 
   private rebuildIndexes(): void {

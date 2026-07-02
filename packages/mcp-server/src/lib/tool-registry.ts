@@ -57,6 +57,7 @@ import {
 import {
   listLocalProducts,
   switchProduct,
+  reloadProduct,
   getWorkspaceInfo,
   initWorkspaceTool,
   createProductTool,
@@ -766,6 +767,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'reload_product',
+    description:
+      'Re-read the ACTIVE product from disk, discarding any unsaved in-memory changes. The in-band escape from a wedged save-conflict: when the active product was edited in another session, flush()/switch_product keep throwing CONFLICT and the stale snapshot persists; this clears it WITHOUT restarting the server. When there are unsaved changes you must pass `discard_local: true` to proceed (the reload would drop them); with no unsaved changes it is a safe refresh. Local-only.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        discard_local: {
+          type: 'boolean',
+          description:
+            'Discard unsaved in-memory changes and re-read from disk. Required (true) when the active product has unsaved changes; ignored when it is clean. Default false.',
+        },
+      },
+    },
+  },
+  {
     name: 'get_workspace_info',
     description:
       'Workspace info: which product is loaded, what other products are available, current workspace mode.',
@@ -1010,7 +1026,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       type: 'object' as const,
       properties: {
         region: { type: 'string', description: 'Optional UPGRegionId or atomic-domain id. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit to scope to the product\'s active regions.' },
-        exhaustive: { type: 'boolean', description: 'If true, score against the entire 312-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted.' },
+        exhaustive: { type: 'boolean', description: 'If true, score against the entire 319-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted.' },
       },
     },
   },
@@ -2535,6 +2551,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_area_graph: getAreaGraph,
   list_local_products: listLocalProducts,
   switch_product: switchProduct,
+  reload_product: reloadProduct,
   get_workspace_info: getWorkspaceInfo,
   init_workspace: initWorkspaceTool,
   create_product: createProductTool,

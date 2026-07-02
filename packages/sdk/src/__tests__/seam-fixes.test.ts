@@ -35,6 +35,9 @@ import {
 // @unified-product-graph/frameworks research catalog. 0.8.6 broadened RICE/ICE/
 // WSJF/cost-of-delay declared targets here; the tests must verify that surface.
 import { UPG_FRAMEWORKS_BY_ID, validateProductStageStrict } from '@unified-product-graph/core'
+// inferEdgeTypeWithTier is an internal lib (not on the public SDK surface); the
+// deliberate-only auto-nest tests exercise it directly at the inference seam.
+import { inferEdgeTypeWithTier } from '../lib/edge-inference.js'
 
 // A connected, well-formed graph: persona → job → need, solution → feature, etc.
 function fixtureDoc() {
@@ -511,5 +514,25 @@ describe('0.17.4 deliberate-only defer edges are never auto-nested', () => {
     const res = createEdge(store, { source_id: obj.node.id, target_id: feat.node.id })
     expect('edge' in res).toBe(true)
     if ('edge' in res) expect(res.edge.type).toBe('objective_defers_feature')
+  })
+})
+
+// ── 0.17.6: insight_informs_opportunity is deliberate-only ───────────────────
+//
+// Same keystone applied to the research→discovery link. Which opportunity a
+// finding feeds is a PM judgment, not a hierarchy fact, so the auto-nest path
+// declines it; explicit resolution still returns it. Tested at the inference
+// seam directly (the flag flows into every auto-nest chokepoint from there).
+describe('0.17.6 insight_informs_opportunity is never auto-nested', () => {
+  it('auto-nest (forAutoNest) declines insight → opportunity', () => {
+    const res = inferEdgeTypeWithTier('insight', 'opportunity', { forAutoNest: true })
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.reason).toMatch(/deliberate-only/i)
+  })
+
+  it('explicit inference STILL resolves insight → opportunity', () => {
+    const res = inferEdgeTypeWithTier('insight', 'opportunity')
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.edgeType).toBe('insight_informs_opportunity')
   })
 })

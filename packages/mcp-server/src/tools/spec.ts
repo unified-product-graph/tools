@@ -426,7 +426,7 @@ export const plan: ToolHandler = (args, ctx): ToolResult => {
   const region = args.region as string | undefined
   const exhaustive = args.exhaustive as boolean | undefined
   // (Seam 5): no-region plan scopes to the product's ACTIVE regions by
-  // default; whole-universe (312-type) scoring is opt-in via `exhaustive:true`.
+  // default; whole-universe (319-type) scoring is opt-in via `exhaustive:true`.
   const result = executePlan(ctx.store, { region, exhaustive })
   // NOTE: the envelope's top-level `scope` is the region arg (its established
   // meaning across all approach tools). The plan's scope-KIND (active_regions
