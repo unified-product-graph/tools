@@ -55,6 +55,7 @@ import {
   UPG_STRUCTURE_PATTERNS,
   UPG_DOMAIN_RINGS,
   resolveContainmentEdge,
+  crossProductScope,
   resolveLabel,
   getRegionForEntityType,
   listTreePatternSummaries,
@@ -857,7 +858,9 @@ export const getSpecVersion: ToolHandler = (): ToolResult => {
  * key, then fall back to a polymorphic edge (e.g. `node_informs_node`) or
  * skip when `edge_type` is `null`.
  *
- * @returns JSON: `{ source_type, target_type, edge_type: string | null }`
+ * @returns JSON: `{ source_type, target_type, edge_type: string | null, cross_product_scope? }`
+ *   — `cross_product_scope` is the derived 3-state scope (`'curated' | 'provisional'`,
+ *   omitted for `resident`).
  * @throws textError when `source_type` or `target_type` is missing.
  * @atomicity atomic (read-only)
  * @warning Returns `edge_type: null` when no canonical pair is registered;
@@ -874,13 +877,20 @@ export const resolveEdgeForPair: ToolHandler = (args): ToolResult => {
   if (!sourceType) return textError('Missing required parameter: source_type')
   if (!targetType) return textError('Missing required parameter: target_type')
   const edgeType = resolveContainmentEdge(sourceType, targetType)
-  return text(
-    JSON.stringify(
-      { source_type: sourceType, target_type: targetType, edge_type: edgeType },
-      null,
-      2,
-    ),
-  )
+  const response: Record<string, unknown> = {
+    source_type: sourceType,
+    target_type: targetType,
+    edge_type: edgeType,
+  }
+  if (edgeType !== null) {
+    // Surface the derived 3-state cross-product scope (0.18.0) at model-time, before
+    // the caller hits the create_cross_product_edge write surface. `curated` /
+    // `provisional` are emitted; `resident` (within-graph only) is omitted, matching
+    // `get_edge_type`'s omit-when-absent convention.
+    const scope = crossProductScope(edgeType)
+    if (scope !== 'resident') response.cross_product_scope = scope
+  }
+  return text(JSON.stringify(response, null, 2))
 }
 
 // ── Cross-edge types ──────────────────────────────────────────────

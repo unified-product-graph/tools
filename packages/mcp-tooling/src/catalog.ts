@@ -25,9 +25,11 @@ import {
   getLifecycleForType,
   getPropertySchema,
   resolveEntityType,
+  crossProductScope,
   UnknownEntityTypeError,
   type EntityTypeResolution,
   type PropertyModifier,
+  type UPGEdgeDefinition,
   type UPGEntityType,
 } from '@unified-product-graph/core'
 
@@ -44,12 +46,23 @@ export interface EntitySchemaEdgeOut {
   edge_type: string
   target_type: string
   forward_verb: string
+  /**
+   * Cross-product scope (0.18.0), present for `curated` / `provisional` and omitted
+   * for `resident` — mirrors `get_edge_type`'s omit-when-absent convention. Surfaces
+   * the derived 3-state model at model-time, so a caller sees whether this edge is
+   * blessed-canonical (`curated`), gate-passing-but-uncurated (`provisional`, allowed
+   * with a warning), or within-graph-only (omitted) BEFORE hitting the
+   * `create_cross_product_edge` write surface.
+   */
+  cross_product_scope?: 'curated' | 'provisional'
 }
 
 export interface EntitySchemaEdgeIn {
   edge_type: string
   source_type: string
   reverse_verb: string
+  /** See `EntitySchemaEdgeOut.cross_product_scope`. */
+  cross_product_scope?: 'curated' | 'provisional'
 }
 
 export interface EntitySchemaDomainGuideAntiPattern {
@@ -121,12 +134,16 @@ export function buildEntitySchema(
 
   const edgesOut: EntitySchemaEdgeOut[] = []
   const edgesIn: EntitySchemaEdgeIn[] = []
-  for (const [edgeKey, def] of Object.entries(UPG_EDGE_CATALOG)) {
+  for (const [edgeKey, def] of Object.entries(UPG_EDGE_CATALOG) as [string, UPGEdgeDefinition][]) {
+    // Derived 3-state cross-product scope (0.18.0): omit `resident`, surface
+    // `curated` / `provisional` so the caller sees the constraint at model-time.
+    const scope = crossProductScope(edgeKey)
     if (def.source_type === entityType) {
       edgesOut.push({
         edge_type: edgeKey,
         target_type: def.target_type,
         forward_verb: def.forward_verb,
+        ...(scope !== 'resident' ? { cross_product_scope: scope } : {}),
       })
     }
     if (def.target_type === entityType) {
@@ -134,6 +151,7 @@ export function buildEntitySchema(
         edge_type: edgeKey,
         source_type: def.source_type,
         reverse_verb: def.reverse_verb,
+        ...(scope !== 'resident' ? { cross_product_scope: scope } : {}),
       })
     }
   }

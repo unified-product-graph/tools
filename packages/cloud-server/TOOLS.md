@@ -2248,7 +2248,9 @@ Resolve the canonical UPGEdgeType for a source_type → target_type containment 
 
 **Returns:**
 
-JSON: `{ source_type, target_type, edge_type: string | null }`
+JSON: `{ source_type, target_type, edge_type: string | null, cross_product_scope? }`
+— `cross_product_scope` is the derived 3-state scope (`'curated' | 'provisional'`,
+omitted for `resident`).
 
 **Throws:**
 

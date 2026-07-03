@@ -859,6 +859,13 @@ async function portfolioAntiPatternReport(
  *   cross-edge), a `portfolio_anti_patterns` block reports the portfolio-scoped
  *   (`scope: 'portfolio'`) anti-patterns: specification-without-implementer,
  *   primitive-scattered-without-canonical, product-reimplements-specification (0.9.13).
+ * @remarks Cross-product eligibility (0.18.0): `portfolio_validate` does NOT
+ *   re-check the 3-state cross-edge gate and does NOT re-surface the `provisional`
+ *   cross-edge warning. That warning is a WRITE-TIME signal only, emitted once at
+ *   authoring (`create_cross_product_edge` / `batch_create_cross_product_edges` /
+ *   the CLI / the SDK store backstop). A provisional cross-edge already in
+ *   `portfolio.cross_edges[]` validates silently here — validate is not an
+ *   eligibility backstop, and its silence is not an eligibility endorsement.
  * @atomicity atomic (read-only). Never mutates active-product state.
  * @see validate_graph
  * @see portfolio_digest

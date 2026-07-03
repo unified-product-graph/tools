@@ -33,7 +33,7 @@ import {
   edgeId,
   buildPortfolioNodeIndex,
 } from '@unified-product-graph/sdk'
-import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, validateEdgeProperties, friendlyToAssessment, type UPGCrossEdgeType, type UPGEdgeType, type UPGEntityType } from '@unified-product-graph/core'
+import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, validateEdgeProperties, friendlyToAssessment, crossProductScope, type UPGCrossEdgeType, type UPGEdgeType, type UPGEntityType } from '@unified-product-graph/core'
 import { discoverUPGFile, loadStore } from '../lib/graph.js'
 import { upgHeader, success, fail, label } from '../lib/formatter.js'
 import { die, runtimeError, usageError, violation } from '../lib/errors.js'
@@ -807,12 +807,20 @@ const connectSub = new Command('connect')
     try {
       const edgeType = opts.type as string
 
-      if (!(UPG_CROSS_EDGE_TYPES as readonly string[]).includes(edgeType)) {
+      // 3-state cross-product gate (0.18.0): curated → allow; provisional
+      // (unflagged catalog edge, ≥1 endpoint portfolio-shared) → allow with a
+      // surfaced warning; resident (no shared endpoint) → hard-reject.
+      const scope = crossProductScope(edgeType)
+      if (scope === 'resident') {
         die(usageError(
-          `Invalid cross-product edge type: "${sanitizeForTerminal(edgeType)}". ` +
-          `Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`,
+          `Cross-product edge type "${sanitizeForTerminal(edgeType)}" is not authorable across ` +
+          `product graphs: neither endpoint type is portfolio-shared (a within-graph/resident relationship).`,
         ))
       }
+      const provisionalWarning = scope === 'provisional'
+        ? `Provisional cross-product edge: "${edgeType}" is not curated, but ≥1 endpoint type is ` +
+          `portfolio-shared, so it is allowed. Consider promoting it to the curated set if it recurs.`
+        : undefined
       if (edgeType === 'instance_of') {
         die(usageError(
           'instance_of edges are created via `register_instance` (MCP), not `upg portfolio connect`.',
@@ -896,6 +904,7 @@ const connectSub = new Command('connect')
           ok: true,
           edge: newEdge,
           portfolio_file: path.relative(cwd, portfolioPath),
+          ...(provisionalWarning ? { warnings: [provisionalWarning] } : {}),
         }, null, 2))
         return
       }
@@ -903,6 +912,7 @@ const connectSub = new Command('connect')
       console.log(`  ${chalk.dim('src')} ${chalk.white(sanitizeForTerminal(qualifiedSource))}`)
       console.log(`  ${chalk.dim('tgt')} ${chalk.white(sanitizeForTerminal(qualifiedTarget))}`)
       console.log(`  ${chalk.dim('id')}  ${chalk.dim(sanitizeForTerminal(newEdge.id))}\n`)
+      if (provisionalWarning) console.log(`  ${chalk.yellow('⚠')} ${chalk.dim(provisionalWarning)}\n`)
     } catch (err) {
       die(err)
     }

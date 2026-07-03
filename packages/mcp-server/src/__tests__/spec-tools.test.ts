@@ -767,6 +767,32 @@ describe('resolve_edge_for_pair', () => {
  expect(call(resolveEdgeForPair, { source_type: 'persona' }).ok).toBe(false)
  expect(call(resolveEdgeForPair, { target_type: 'feature' }).ok).toBe(false)
  })
+
+ it('surfaces cross_product_scope: "curated" for a curated resolved pair (model-time visibility)', () => {
+ // product_pursues_outcome is a curated cross type.
+ const { body } = call(resolveEdgeForPair, { source_type: 'product', target_type: 'outcome' })
+ const b = body as { edge_type: string | null; cross_product_scope?: string }
+ expect(b.edge_type).toBe('product_pursues_outcome')
+ expect(b.cross_product_scope).toBe('curated')
+ })
+
+ it('surfaces cross_product_scope: "provisional" for an uncurated gate-passing pair', () => {
+ // capability_implemented_by_feature is not curated, but `capability` is
+ // portfolio-shared, so the edge is provisional (allowed with a write-time warning).
+ const { body } = call(resolveEdgeForPair, { source_type: 'capability', target_type: 'feature' })
+ const b = body as { edge_type: string | null; cross_product_scope?: string }
+ expect(b.edge_type).toBe('capability_implemented_by_feature')
+ expect(b.cross_product_scope).toBe('provisional')
+ })
+
+ it('omits cross_product_scope for a resident resolved pair (both endpoints non-shared)', () => {
+ // feature_area_contains_feature: neither endpoint is portfolio-shared → resident.
+ const { body } = call(resolveEdgeForPair, { source_type: 'feature_area', target_type: 'feature' })
+ const b = body as { edge_type: string | null; cross_product_scope?: string }
+ expect(b.edge_type).toBe('feature_area_contains_feature')
+ expect(b.cross_product_scope).toBeUndefined()
+ expect(Object.prototype.hasOwnProperty.call(b, 'cross_product_scope')).toBe(false)
+ })
 })
 
 // ── Cross-edge types ──────────────────────────────────────────────

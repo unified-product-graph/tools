@@ -11,7 +11,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { UPG_CROSS_EDGE_TYPES, REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties, friendlyToAssessment } from '@unified-product-graph/core'
+import { REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties, friendlyToAssessment, crossProductScope } from '@unified-product-graph/core'
 import { UPGPortfolioStore, UPGFileStore } from '@unified-product-graph/sdk'
 import { buildPortfolioNodeIndex } from '@unified-product-graph/sdk'
 import { preflightPayload } from '../lib/payload-guard.js'
@@ -681,10 +681,25 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
   if (!targetIdArg) return textError('Missing required parameter: target_id')
   if (!edgeTypeArg) return textError('Missing required parameter: type')
 
-  if (!UPG_CROSS_EDGE_TYPES.includes(edgeTypeArg as UPGCrossEdgeType)) {
+  // 3-state cross-product gate (0.18.0). `curated` → allow; `provisional` (an
+  // unflagged catalog edge whose ≥1 endpoint is portfolio-shared) → allow WITH a
+  // surfaced warning; `resident` (no shared endpoint) → hard-reject. The provisional
+  // tier is what removes the per-edge catalog-PR friction: a genuinely cross
+  // relationship can be modelled now, no spec change mid-session.
+  const warnings: string[] = []
+  const scope = crossProductScope(edgeTypeArg)
+  if (scope === 'resident') {
     return textError(
-      `Invalid cross-product edge type: ${edgeTypeArg}. ` +
-      `Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`,
+      `Cross-product edge type "${edgeTypeArg}" is not authorable across product graphs: ` +
+      `neither endpoint type is portfolio-shared, so this is a within-graph (resident) ` +
+      `relationship. It belongs in a product's edges[], not portfolio.cross_edges[].`,
+    )
+  }
+  if (scope === 'provisional') {
+    warnings.push(
+      `Provisional cross-product edge: "${edgeTypeArg}" is not in the curated cross-edge set, ` +
+      `but ≥1 endpoint type is portfolio-shared, so it is allowed as a provisional cross ` +
+      `relationship. If this pattern recurs, consider promoting it to the curated set (a spec change).`,
     )
   }
   if (edgeTypeArg === 'instance_of') {
@@ -806,6 +821,7 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
           would: preview.would,
           edge: preview.edge,
           portfolio_file: path.relative(cwd, portfolioPath),
+          ...(warnings.length > 0 ? { warnings } : {}),
         },
         null,
         2,
@@ -863,6 +879,7 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
         ...(registeredProducts.length > 0
           ? { registered_products: registeredProducts }
           : {}),
+        ...(warnings.length > 0 ? { warnings } : {}),
       },
       null,
       2,
@@ -1687,6 +1704,7 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
 
   // Validate + qualify EVERY edge before touching the store (all-or-nothing).
   const prepared: UPGCrossEdge[] = []
+  const warnings: string[] = []
   for (let i = 0; i < edgesArg.length; i++) {
     const e = edgesArg[i]
     const sourceIdArg = e.source_id as string | undefined
@@ -1697,8 +1715,21 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
     if (!sourceIdArg) return textError(`edges[${i}]: missing source_id`)
     if (!targetIdArg) return textError(`edges[${i}]: missing target_id`)
     if (!edgeTypeArg) return textError(`edges[${i}]: missing type`)
-    if (!UPG_CROSS_EDGE_TYPES.includes(edgeTypeArg as UPGCrossEdgeType)) {
-      return textError(`edges[${i}]: invalid cross-product edge type "${edgeTypeArg}". Valid types: ${UPG_CROSS_EDGE_TYPES.join(', ')}`)
+    // 3-state cross-product gate (0.18.0), per edge: resident → reject the whole
+    // batch (all-or-nothing); provisional → allow with a per-edge warning.
+    const scope = crossProductScope(edgeTypeArg)
+    if (scope === 'resident') {
+      return textError(
+        `edges[${i}]: cross-product edge type "${edgeTypeArg}" is not authorable across product ` +
+        `graphs (neither endpoint type is portfolio-shared — a within-graph/resident relationship). ` +
+        `It belongs in a product's edges[], not portfolio.cross_edges[].`,
+      )
+    }
+    if (scope === 'provisional') {
+      warnings.push(
+        `edges[${i}]: provisional cross-product edge "${edgeTypeArg}" — not curated, but ≥1 endpoint ` +
+        `type is portfolio-shared, so allowed. Consider promoting to the curated set if it recurs.`,
+      )
     }
     if (edgeTypeArg === 'instance_of') {
       return textError(`edges[${i}]: instance_of edges are created via \`register_instance\` (registry same-type rules), not batch_create_cross_product_edges.`)
@@ -1761,6 +1792,7 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
           count: previews.length,
           would_counts: wouldCounts,
           portfolio_file: path.relative(cwd, portfolioPath),
+          ...(warnings.length > 0 ? { warnings } : {}),
         },
         null,
         2,
@@ -1816,6 +1848,7 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
         ...(supersededCount > 0 ? { superseded_total: supersededCount } : {}),
         portfolio_file: path.relative(cwd, portfolioPath),
         ...(registeredProducts.length > 0 ? { registered_products: registeredProducts } : {}),
+        ...(warnings.length > 0 ? { warnings } : {}),
       },
       null,
       2,

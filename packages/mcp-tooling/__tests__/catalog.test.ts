@@ -88,4 +88,36 @@ describe('buildEntitySchema', () => {
       }
     }
   })
+
+  it('surfaces cross_product_scope: "curated" on a curated edges_out/edges_in entry (model-time visibility)', () => {
+    // persona_delegates_to_persona is a curated cross type (a gate-exception — persona
+    // is not portfolio-shared, so it rides on the explicit curated flag). It's a
+    // persona -> persona self-loop, so it lands in both edges_out and edges_in for
+    // 'persona' — exercise both sides of the symmetric case.
+    const schema = buildEntitySchema('persona')
+    const delegatesOut = schema.edges_out.find((e) => e.edge_type === 'persona_delegates_to_persona')
+    expect(delegatesOut).toBeDefined()
+    expect(delegatesOut?.cross_product_scope).toBe('curated')
+    const delegatesIn = schema.edges_in.find((e) => e.edge_type === 'persona_delegates_to_persona')
+    expect(delegatesIn).toBeDefined()
+    expect(delegatesIn?.cross_product_scope).toBe('curated')
+  })
+
+  it('surfaces cross_product_scope: "provisional" on an uncurated gate-passing edges_in entry', () => {
+    // experiment_run_measures_metric is not curated, but `metric` is portfolio-shared,
+    // so it is provisional. metric is the target → it lands in metric's edges_in.
+    const schema = buildEntitySchema('metric')
+    const measures = schema.edges_in.find((e) => e.edge_type === 'experiment_run_measures_metric')
+    expect(measures).toBeDefined()
+    expect(measures?.cross_product_scope).toBe('provisional')
+  })
+
+  it('omits cross_product_scope on a resident edges_out entry', () => {
+    // persona_pursues_job: neither endpoint is portfolio-shared → resident (omitted).
+    const schema = buildEntitySchema('persona')
+    const pursuesJob = schema.edges_out.find((e) => e.edge_type === 'persona_pursues_job')
+    expect(pursuesJob).toBeDefined()
+    expect(pursuesJob?.cross_product_scope).toBeUndefined()
+    expect(Object.prototype.hasOwnProperty.call(pursuesJob, 'cross_product_scope')).toBe(false)
+  })
 })

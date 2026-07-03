@@ -223,15 +223,17 @@ describe('createCrossProductEdge handler', () => {
     expect((result.content[0] as { text: string }).text).toContain('Missing required parameter: type')
   })
 
-  it('rejects invalid cross-edge types', async () => {
+  it('rejects a resident cross-edge type (both endpoints non-shared)', async () => {
     const { pool } = createMockPool()
     const ctx = makeContext(pool)
 
+    // persona_pursues_job is resident under the 3-state gate (0.18.0): neither
+    // persona nor job is portfolio-shared, so it is hard-rejected cross-product.
     const result = await createCrossProductEdge({
       product_id: 'p1', source: 'p1/n1', target: 'p2/n2', type: 'persona_pursues_job',
     }, ctx)
     const text = (result.content[0] as { text: string }).text
-    expect(text).toContain('Invalid cross-edge type: "persona_pursues_job"')
+    expect(text).toContain('is not authorable across product graphs')
   })
 
   it('creates edge with valid cross-edge type', async () => {

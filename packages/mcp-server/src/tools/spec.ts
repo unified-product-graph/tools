@@ -82,6 +82,7 @@ import {
   UPG_SCALES,
   UPG_DOMAIN_RINGS,
   resolveContainmentEdge,
+  crossProductScope,
   resolveLabel,
   getRegionForEntityType,
   listTreePatternSummaries,
@@ -1148,7 +1149,9 @@ export const getSpecVersion: ToolHandler = (): ToolResult => {
  *   source. Helps the author discover what they CAN reach.
  *
  * @returns JSON: `{ source_type, target_type, edge_type: string | null,
- *   anchor_hint?, alternate_anchors?, adjacent_edges? }`
+ *   cross_product_scope?, anchor_hint?, alternate_anchors?, adjacent_edges? }` — where
+ *   `cross_product_scope` is the derived 3-state scope (`'curated' | 'provisional'`,
+ *   omitted for `resident`).
  * @throws textError when `source_type` or `target_type` is missing.
  * @atomicity atomic (read-only)
  * @warning Returns `edge_type: null` when no canonical pair is registered.
@@ -1169,6 +1172,14 @@ export const resolveEdgeForPair: ToolHandler = (args): ToolResult => {
     source_type: sourceType,
     target_type: targetType,
     edge_type: edgeType,
+  }
+  if (edgeType !== null) {
+    // Surface the derived 3-state cross-product scope (0.18.0) at model-time, before
+    // the caller hits the create_cross_product_edge write surface. `curated` /
+    // `provisional` are emitted; `resident` (within-graph only) is omitted, matching
+    // `get_edge_type`'s omit-when-absent convention.
+    const scope = crossProductScope(edgeType)
+    if (scope !== 'resident') response.cross_product_scope = scope
   }
   if (edgeType === null) {
     Object.assign(response, buildResolverHints(sourceType, targetType))

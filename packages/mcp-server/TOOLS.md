@@ -3449,7 +3449,9 @@ Resolve the canonical `UPGEdgeType` for a `source_type` → `target_type` contai
 **Returns:**
 
 JSON: `{ source_type, target_type, edge_type: string | null,
-anchor_hint?, alternate_anchors?, adjacent_edges? }`
+cross_product_scope?, anchor_hint?, alternate_anchors?, adjacent_edges? }` — where
+`cross_product_scope` is the derived 3-state scope (`'curated' | 'provisional'`,
+omitted for `resident`).
 
 **Throws:**
 

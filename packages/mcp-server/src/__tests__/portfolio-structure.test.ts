@@ -510,6 +510,32 @@ describe(' · create_cross_product_edge auto-registers products on portfolio.upg
     expect(body.registered_products).toHaveLength(2)
   })
 
+  it('accepts a provisional cross-edge (uncurated, gate-passing) and surfaces a warning (0.18.0)', async () => {
+    // experiment_run_measures_metric is not curated, but `metric` is portfolio-shared,
+    // so the 3-state gate allows it as provisional — written, with a surfaced warning.
+    const result = await parseHandlerResult(
+      createCrossProductEdge(
+        {
+          source_id: 'p_alpha/n_a1',
+          target_id: 'p_beta/n_b1',
+          type: 'experiment_run_measures_metric',
+          auto_create_portfolio: true,
+        },
+        ctx,
+      ),
+    )
+    expect(result.isError).toBeUndefined()
+    const body = result.body as { status?: string; warnings?: string[] }
+    expect(body.status).toBe('created')
+    expect(body.warnings).toBeDefined()
+    expect(body.warnings?.[0]).toMatch(/provisional cross-product edge/i)
+    // The edge is actually persisted.
+    const portfolio = readPortfolio(cwd)
+    const crossEdges = portfolio?.cross_edges as Array<{ type: string }>
+    expect(crossEdges).toHaveLength(1)
+    expect(crossEdges[0].type).toBe('experiment_run_measures_metric')
+  })
+
   it('does not double-register an already-listed product on a second cross-edge', async () => {
     await parseHandlerResult(
       createCrossProductEdge(
@@ -849,7 +875,8 @@ describe('0.8.16 · portfolio edit/cleanup tier', () => {
       ),
     )
     expect(res.isError).toBe(true)
-    expect(res.error).toMatch(/invalid cross-product edge type/i)
+    // `not_a_type` is unknown → resident under the 3-state gate (0.18.0) → hard-reject.
+    expect(res.error).toMatch(/not authorable across product graphs/i)
     const list = await parseHandlerResult(listPortfolioCrossEdges({}, ctx))
     expect((list.body as { cross_edges: unknown[] }).cross_edges).toHaveLength(0)
   })

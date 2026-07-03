@@ -198,11 +198,29 @@ describe('UPGPortfolioStore.addCrossEdge', () => {
  ).toThrow(/qualified ID/)
  })
 
- it('rejects an invalid edge type', async () => {
+ it('accepts a provisional edge type (uncurated catalog edge, ≥1 endpoint portfolio-shared)', async () => {
  const portfolioPath = join(cwd, 'portfolio.upg')
  const pStore = new UPGPortfolioStore()
  await pStore.loadOrInit(portfolioPath)
 
+ // experiment_run_measures_metric is not curated, but `metric` is portfolio-shared
+ // → provisional → the store backstop persists it (the warning is surfaced by callers).
+ const { status, edge } = pStore.addCrossEdge({
+ id: 'e_prov',
+ source: 'prod_a/n_run',
+ target: 'prod_b/n_metric',
+ type: 'experiment_run_measures_metric' as never,
+ })
+ expect(status).toBe('created')
+ expect(edge.type).toBe('experiment_run_measures_metric')
+ })
+
+ it('rejects a resident edge type (unknown / both endpoints non-shared)', async () => {
+ const portfolioPath = join(cwd, 'portfolio.upg')
+ const pStore = new UPGPortfolioStore()
+ await pStore.loadOrInit(portfolioPath)
+
+ // `invalid_type` is unknown → resident under the 3-state gate (0.18.0) → hard-reject.
  expect(() =>
  pStore.addCrossEdge({
  id: 'e_bad',
@@ -210,7 +228,7 @@ describe('UPGPortfolioStore.addCrossEdge', () => {
  target: 'prod_b/n_222',
  type: 'invalid_type' as never,
  }),
- ).toThrow(/Invalid cross-product edge type/)
+ ).toThrow(/not authorable across product graphs/)
  })
 
  it('throws when portfolio not loaded', () => {

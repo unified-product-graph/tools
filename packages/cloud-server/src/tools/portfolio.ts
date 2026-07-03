@@ -5,11 +5,9 @@
  * `repair_dangling_edges` for orphaned cross-product rows.
  */
 
-import { UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
+import { crossProductScope } from '@unified-product-graph/core'
 import { type ToolHandler, text, textError } from '../lib/server-context.js'
 import { edgeId } from '../id-helpers.js'
-
-const crossEdgeTypeSet = new Set<string>(UPG_CROSS_EDGE_TYPES)
 
 // ── Portfolio family ─────────────────────────────────────────────────────
 
@@ -93,9 +91,23 @@ export const createCrossProductEdge: ToolHandler = async (args, { store }) => {
   const target = args.target as string
   const type = args.type as string
 
-  if (!crossEdgeTypeSet.has(type)) {
+  // 3-state cross-product gate (0.18.0): curated → allow; provisional (unflagged
+  // catalog edge, ≥1 endpoint portfolio-shared) → allow with a surfaced warning;
+  // resident (no shared endpoint) → hard-reject.
+  const warnings: string[] = []
+  const scope = crossProductScope(type)
+  if (scope === 'resident') {
     return textError(
-      `Invalid cross-edge type: "${type}". Must be one of: ${UPG_CROSS_EDGE_TYPES.join(', ')}`,
+      `Cross-product edge type "${type}" is not authorable across product graphs: neither ` +
+      `endpoint type is portfolio-shared (a within-graph/resident relationship). It belongs in ` +
+      `a product's edges, not the cross_product_edges table.`,
+    )
+  }
+  if (scope === 'provisional') {
+    warnings.push(
+      `Provisional cross-product edge: "${type}" is not in the curated cross-edge set, but ≥1 ` +
+      `endpoint type is portfolio-shared, so it is allowed as a provisional cross relationship. ` +
+      `Consider promoting it to the curated set (a spec change) if it recurs.`,
     )
   }
   if (type === 'instance_of') {
@@ -113,7 +125,7 @@ export const createCrossProductEdge: ToolHandler = async (args, { store }) => {
 
   try {
     const edge = await store.addCrossProductEdge(edgeId(), productId, source, target, type)
-    return text(JSON.stringify({ edge }, null, 2))
+    return text(JSON.stringify({ edge, ...(warnings.length > 0 ? { warnings } : {}) }, null, 2))
   } catch (err) {
     return textError((err as Error).message)
   }
