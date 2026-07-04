@@ -1,0 +1,56 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.2",
+    "product": {
+      "id": "p_northstar",
+      "title": "Northstar Ops — Competitor Intel",
+      "stage": "growth"
+    },
+    "summary": "Competitive intelligence graph for Northstar Ops.",
+    "counts": {
+      "nodes": 3,
+      "edges": 0
+    },
+    "member_kind": "watched",
+    "provenance": {
+      "tool": "build-portfolio-saturated",
+      "exported_at": "2026-07-03T19:07:17.383Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "103be528051988a77bc706cd56b68024"
+    }
+  },
+  "product": {
+    "id": "p_northstar",
+    "title": "Northstar Ops — Competitor Intel",
+    "description": "Competitive intelligence graph for Northstar Ops.",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_D6ivem407w45T3Ok",
+      "type": "competitor",
+      "title": "Northstar Ops",
+      "slug": "northstar-ops"
+    },
+    {
+      "id": "n_c0xHDpTIdLVL1SIq",
+      "type": "competitor_signal",
+      "title": "Northstar launched an AI dispatch copilot",
+      "slug": "northstar-launched-an-ai-dispatch-copilot",
+      "properties": {
+        "signal_type": "feature_launch"
+      }
+    },
+    {
+      "id": "n_nXcjl0Qg97SZLq9s",
+      "type": "opportunity",
+      "title": "Ship AI-assisted reassignment before Northstar captures the narrative",
+      "slug": "ship-ai-assisted-reassignment-before-northstar-captures-the-narrative",
+      "status": "identified"
+    }
+  ],
+  "edges": []
+}

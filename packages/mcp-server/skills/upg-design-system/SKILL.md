@@ -42,7 +42,7 @@ These go between logical sections (header, lifecycle, metrics, actions, footer).
 
 Always prefix entity names with their type emoji.
 
-*This table is the canonical display reference for the types listed. It is also mirrored by the live `get_type_label({ entity_type }).emoji` field — use the live field for any type not in this table, or when you need to verify a specific emoji against the current spec.*
+*This table is the canonical display reference for the types listed. It is also mirrored by the live `get_catalog_entry({ kind: 'type_label', id: entity_type }).emoji` field — use the live field for any type not in this table, or when you need to verify a specific emoji against the current spec.*
 
 | Type | Emoji | Domain |
 |---|---|---|
@@ -129,7 +129,7 @@ Use colored emoji dots for entity state. One dot, inline or right-aligned:
 
 Display: `🟡 active` or right-aligned at end of a tree line.
 
-> Hypothesis phases are `drafted` → `active` → `validated` / `invalidated` / `archived`. Derive valid phases live via `list_status_values({ entity_type })` or `get_lifecycle({ entity_type })`; never hard-code phase names.
+> Hypothesis phases are `drafted` → `active` → `validated` / `invalidated` / `archived`. Derive valid phases live via `list_catalog({ kind: 'status_values', entity_type })` or `get_catalog_entry({ kind: 'lifecycle', id: entity_type })`; never hard-code phase names.
 
 ## Nested Detail Blocks
 

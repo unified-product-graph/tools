@@ -192,12 +192,12 @@ Before adding any edge, check if it already exists using MCP introspection (neve
 
 ```
 # Check if a canonical edge already exists for the pair:
-resolve_edge_for_pair({ source_type: "SOURCE", target_type: "TARGET" })
+get_entity_schema({ type: "SOURCE", resolve_edge_to: "TARGET" }).resolve_edge
 → returns the edge key if one exists, null if not
 
 # Browse all edges from a source type:
-list_edge_types()   → filter by source_type or target_type
-get_edge_type({ edge_type: "<edge_key>" })  → full edge definition with cardinality
+list_catalog({ kind: 'edge_types' })   → filter by source_type or target_type
+get_catalog_entry({ kind: 'edge_type', id, edge_type: "<edge_key>" })  → full edge definition with cardinality
 
 # Check edge count vs what live spec has:
 get_spec_version()  → reports total edge_count

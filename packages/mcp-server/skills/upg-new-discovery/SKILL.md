@@ -22,7 +22,7 @@ You are a Unified Product Graph discovery facilitator. Your job is to walk the u
 
 Use the `mcp__unified-product-graph__*` MCP tools (create_node, create_edge, search_nodes, list_nodes, get_product_context, get_node).
 
-> **MCP-first (applies to every create below).** Before creating an outcome, opportunity, solution, hypothesis, or experiment plan, call `get_entity_schema({ type: <type> })` for its `expected_properties`. Set the node's top-level `status` from a phase id returned by `get_lifecycle({ entity_type: <type> })` — phases live there, NOT in `get_entity_schema` (many types are stateless and have no phases; omit `status` for those). Pass any property the schema marks as an assessment (reach, frequency, pain, impact, confidence, effort, etc.) as `{ value, label }`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. The OST payloads below show shape and intent; the authoritative keys and phases come from the schema/lifecycle. Use `get_valid_children({ parent_type: <type> })` to confirm what lives under each layer.
+> **MCP-first (applies to every create below).** Before creating an outcome, opportunity, solution, hypothesis, or experiment plan, call `get_entity_schema({ type: <type> })` for its `expected_properties`. Set the node's top-level `status` from a phase id returned by `get_catalog_entry({ kind: 'lifecycle', id: <type> })` — phases live there, NOT in `get_entity_schema` (many types are stateless and have no phases; omit `status` for those). Pass any property the schema marks as an assessment (reach, frequency, pain, impact, confidence, effort, etc.) as `{ value, label }`. Before any edge, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and let the server infer the edge type. The OST payloads below show shape and intent; the authoritative keys and phases come from the schema/lifecycle. Use `get_entity_schema({ type: <type>, include: ['valid_children'] })` to confirm what lives under each layer.
 
 ## Phase Map
 
@@ -85,13 +85,13 @@ Bad outcomes:
 
 If they give a solution disguised as an outcome, coach them: **"That sounds more like a solution. What outcome would that solution drive? What changes for the user or the business?"**
 
-Create or select the outcome. The outcome is a top-level entity: create it at ROOT. The product is a top-level `.upg` field, not a node — `list_nodes({ type: "product" })` is empty, so there is no product id to parent under. Read `get_entity_schema({ type: "outcome" })` for properties and `get_lifecycle({ entity_type: "outcome" })` for its status phases first:
+Create or select the outcome. The outcome is a top-level entity: create it at ROOT. The product is a top-level `.upg` field, not a node — `list_nodes({ type: "product" })` is empty, so there is no product id to parent under. Read `get_entity_schema({ type: "outcome" })` for properties and `get_catalog_entry({ kind: 'lifecycle', id: "outcome" })` for its status phases first:
 ```
 create_node({
   type: "outcome",
   title: "<measurable outcome>",
   description: "<why this matters>",
-  status: "<a phase id from get_lifecycle({ entity_type: 'outcome' })>",
+  status: "<a phase id from get_catalog_entry({ kind: 'lifecycle', id: 'outcome' })>",
   properties: { /* keys from the schema, e.g. timeline */ }
   // no parent_id — outcome is the top of the OST and is created at root
 })
@@ -115,12 +115,12 @@ Help them generate 2-3 opportunities. For each:
 
 ```
 // Read get_entity_schema({ type: "opportunity" }) for properties and
-// get_lifecycle({ entity_type: "opportunity" }) for its status phases, then:
+// get_catalog_entry({ kind: 'lifecycle', id: "opportunity" }) for its status phases, then:
 create_node({
   type: "opportunity",
   title: "<user need or problem observed>",
   description: "<evidence; where did you observe this?>",
-  status: "<a phase id from get_lifecycle({ entity_type: 'opportunity' })>",
+  status: "<a phase id from get_catalog_entry({ kind: 'lifecycle', id: 'opportunity' })>",
   properties: {
     /* keys from the schema; assessment properties (reach, frequency, pain) → { value, label } */
   },
@@ -154,12 +154,12 @@ Coach divergent thinking:
 For each solution:
 ```
 // Read get_entity_schema({ type: "solution" }) for properties and
-// get_lifecycle({ entity_type: "solution" }) for its status phases, then:
+// get_catalog_entry({ kind: 'lifecycle', id: "solution" }) for its status phases, then:
 create_node({
   type: "solution",
   title: "<approach>",
   description: "<how it addresses the opportunity>",
-  status: "<a phase id from get_lifecycle({ entity_type: 'solution' })>",
+  status: "<a phase id from get_catalog_entry({ kind: 'lifecycle', id: 'solution' })>",
   properties: {
     /* keys from the schema; assessment properties (reach, impact, confidence, effort) → { value, label } */
   },
@@ -198,28 +198,28 @@ Create the experiment chain. Read `get_entity_schema({ type: "hypothesis" })` an
 // opportunity→hypothesis edge by design). Wanting to skip the solution layer
 // is a signal you have not articulated the *approach* yet.
 // Read get_entity_schema({ type: "hypothesis" }) for properties and
-// get_lifecycle({ entity_type: "hypothesis" }) for its status phases.
-// get_lifecycle({ entity_type: "hypothesis" }) returns phases: drafted | active | validated | invalidated | archived
-// Use the first phase ("drafted") as the initial status — derive via list_status_values({ entity_type: "hypothesis" })
+// get_catalog_entry({ kind: 'lifecycle', id: "hypothesis" }) for its status phases.
+// get_catalog_entry({ kind: 'lifecycle', id: "hypothesis" }) returns phases: drafted | active | validated | invalidated | archived
+// Use the first phase ("drafted") as the initial status — derive via list_catalog({ kind: 'status_values', entity_type: "hypothesis" })
 create_node({
   type: "hypothesis",
   title: "<riskiest assumption>",
   properties: { /* keys from the schema: we-believe / will-result-in / we-know-when */ },
-  status: "<first phase from get_lifecycle({ entity_type: 'hypothesis' }) — currently 'drafted'>",
+  status: "<first phase from get_catalog_entry({ kind: 'lifecycle', id: 'hypothesis' }) — currently 'drafted'>",
   parent_id: "<solution_id>"  // parent_ref auto-chains the canonical solution→hypothesis edge
 })
 
-// Then the experiment-plan type (find it via get_valid_children({ parent_type: "hypothesis" })).
-// Read its get_entity_schema + get_lifecycle first.
+// Then the experiment-plan type (find it via get_entity_schema({ type: "hypothesis", include: ['valid_children'] })).
+// Read its get_entity_schema + get_catalog_entry({ kind: 'lifecycle', id }) first.
 create_node({
-  type: "<experiment-plan type from get_valid_children({ parent_type: 'hypothesis' })>",
+  type: "<experiment-plan type from get_entity_schema({ type: 'hypothesis', include: ['valid_children'] })>",
   title: "<experiment description>",
-  status: "<a phase id from get_lifecycle({ entity_type: '<plan type>' })>",
+  status: "<a phase id from get_catalog_entry({ kind: 'lifecycle', id: '<plan type>' })>",
   properties: { /* keys from the schema, e.g. method */ },
   parent_id: "<hypothesis_id>"  // parent_ref auto-chains the canonical hypothesis→plan edge
 })
 // If you create the edge explicitly instead of via parent_id:
-// edge = resolve_edge_for_pair({ source_type: "hypothesis", target_type: "<plan type>" })
+// edge = get_entity_schema({ type: "hypothesis", resolve_edge_to: "<plan type>" }).resolve_edge
 // create_edge({ source_id: "<hypothesis_id>", target_id: "<plan_id>" })  // server infers type
 ```
 

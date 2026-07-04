@@ -19,7 +19,7 @@ This is the home of the **Prioritise** approach. Where Inspect tells you *what's
 
 Use the `mcp__unified-product-graph__*` MCP tools:
 - **Read candidates:** `list_nodes`, `search_nodes`, `get_node`, `get_product_context`
-- **Approach + frameworks:** `get_approach({ approach_id: "prioritise" })`, `get_framework({ framework_id: "..." })`
+- **Approach + frameworks:** `get_catalog_entry({ kind: 'approach', id, approach_id: "prioritise" })`, `get_catalog_entry({ kind: 'framework', id, framework_id: "..." })`
 - **Run + record a framework (the result lives on the graph):** `apply_framework` (creates the exercise and pulls candidates in), `score_entity` (records each candidate's result on its edge). On the CLI: `upg apply <framework> [ids...]`, `upg score <exercise> <entity> --data '{...}'`, and `upg show <exercise>` to read the scores back.
 - **Capture a decision (optional):** `create_node`, `update_node`, `create_edge`
 
@@ -39,7 +39,7 @@ Use the `mcp__unified-product-graph__*` MCP tools:
 
 These are the named frameworks inside the Prioritise approach. The LLM is the facilitator; you walk the user through the framework's scoring dimensions, take their inputs, compute the ranking, and present results.
 
-> **Note:** this table is illustrative. The canonical list is always fetched live from `get_approach({ approach_id: "prioritise" }).framework_id_examples` at Step 2 so it stays current as the spec evolves. Never hardcode a framework id that the live call cannot confirm.
+> **Note:** this table is illustrative. The canonical list is always fetched live from `get_catalog_entry({ kind: 'approach', id, approach_id: "prioritise" }).framework_id_examples` at Step 2 so it stays current as the spec evolves. Never hardcode a framework id that the live call cannot confirm.
 
 ## Flow
 
@@ -69,7 +69,7 @@ Once candidates are identified, display them as a numbered list with titles and 
 **Always start by enumerating the canonical frameworks from the spec** so the table above can't drift:
 
 ```
-get_approach({ approach_id: "prioritise" })
+get_catalog_entry({ kind: 'approach', id, approach_id: "prioritise" })
 ```
 
 The returned `framework_id_examples` carries the canonical framework ids. When the spec gains a new prioritisation framework, it surfaces here automatically; no skill edit required.
@@ -83,7 +83,7 @@ Recommend one framework based on context:
 | User wants a quick rough-cut with minimal data | `ice-scoring` |
 | User wants to understand which features users can't live without vs which delight them | `kano-model` |
 | User wants a 2×2 for a stakeholder meeting | `value-vs-effort` |
-| User is sequencing a development backlog with cost-of-delay thinking | `wsjf` (Note: WSJF is in the `planning` framework category; use `get_approach({ approach_id: 'prioritise' })` to look it up, not `list_frameworks({ category: 'prioritization' })`) |
+| User is sequencing a development backlog with cost-of-delay thinking | `wsjf` (Note: WSJF is in the `planning` framework category; use `get_catalog_entry({ kind: 'approach', id, approach_id: 'prioritise' })` to look it up, not `list_catalog({ kind: 'frameworks', category: 'prioritization' })`) |
 | User wants to quantify the economic cost of not delivering something now | `cost-of-delay` |
 | User is looking for the most underserved user needs from JTBD research | `opportunity-sizing` |
 | User wants to triage tasks by urgency vs importance | `eisenhower-matrix` |
@@ -95,7 +95,7 @@ If unclear, present the full table as numbered options and let the user pick. Al
 Once the user picks a framework, fetch its definition:
 
 ```
-get_framework({ id: "<chosen_id>" })
+get_catalog_entry({ kind: 'framework', id: "<chosen_id>" })
 ```
 
 The returned `UPGFramework` record carries everything you need:
@@ -210,6 +210,6 @@ After rendering your recommendation, call:
 
 ## Why This Skill Exists
 
-Prioritise is one of the 5 canonical UPG approaches (`get_approach({ approach_id: "prioritise" })`). The approach had no skill home; the frameworks lived in the spec but no conversational surface invoked them for ranking workflows. This skill closes that gap.
+Prioritise is one of the 5 canonical UPG approaches (`get_catalog_entry({ kind: 'approach', id, approach_id: "prioritise" })`). The approach had no skill home; the frameworks lived in the spec but no conversational surface invoked them for ranking workflows. This skill closes that gap.
 
 It is the only canonical entry point for the Prioritise approach in the user-invocable surface. Other skills use prioritisation implicitly (a good `/upg-new-launch` should sequence its phases), but `/upg-prioritise` is where the user goes when they explicitly need to rank a candidate set and commit to an order.

@@ -67,23 +67,23 @@ This is the critical test. Check 4 structural dimensions:
 
 **2a. Parent types**: Do they have the same canonical parent?
 ```
-get_valid_children({ parent_type: "bounded_context" })   → check if type_a is listed
-get_valid_children({ parent_type: "design_system" })      → check if type_b is listed
+get_entity_schema({ type: "bounded_context", include: ['valid_children'] })   → check if type_a is listed
+get_entity_schema({ type: "design_system", include: ['valid_children'] })      → check if type_b is listed
 get_entity_schema({ type: "type_a" })                     → shows canonical parent
 → DIFFERENT parents = structural divergence
 ```
 
 **2b. Child types**: Do they have the same children?
 ```
-get_valid_children({ parent_type: "type_a" })   → children of type_a
-get_valid_children({ parent_type: "type_b" })   → children of type_b
+get_entity_schema({ type: "type_a", include: ['valid_children'] })   → children of type_a
+get_entity_schema({ type: "type_b", include: ['valid_children'] })   → children of type_b
 → DIFFERENT children = structural divergence
 ```
 
 **2c. Edge types**: Do they participate in the same relationships?
 ```
-list_edge_types()   → filter by source_type or target_type matching type_a or type_b
-resolve_edge_for_pair({ source_type: "type_a", target_type: X })  → check common pair edges
+list_catalog({ kind: 'edge_types' })   → filter by source_type or target_type matching type_a or type_b
+get_entity_schema({ type: "type_a", resolve_edge_to: X }).resolve_edge  → check common pair edges
 → DIFFERENT edges = semantic divergence
 ```
 
@@ -105,7 +105,7 @@ get_entity_schema({ type: "type_b" }).domain   → type_b's domain
 Check how each type is used in practice:
 
 **3a. Skill references**: Which skills create/reference each type?
-Review the skills directory for references to `type_a` and `type_b`; the search tools or a workspace grep can locate these. Alternatively, call `get_type_label({ entity_type: "type_a" })` to see the alt_labels and designations — any skill that surfaces this type will reference those labels.
+Review the skills directory for references to `type_a` and `type_b`; the search tools or a workspace grep can locate these. Alternatively, call `get_catalog_entry({ kind: 'type_label', id: "type_a" })` to see the alt_labels and designations — any skill that surfaces this type will reference those labels.
 
 **3b. Lens relevance**: Do they appear in different lenses?
 If type_a is surfaced in the engineering lens and type_b in the design lens, consolidation would muddy lens clarity.
@@ -189,7 +189,7 @@ Save to a decisions log in your project (wherever your team keeps ADRs) for futu
 
 When called with a domain name instead of specific types:
 
-1. List all types in the domain via `list_entity_types()` filtered by domain, or `get_domain_guide({ domain_id })`
+1. List all types in the domain via `list_catalog({ kind: 'entity_types' })` filtered by domain, or `get_catalog_entry({ kind: 'domain_guide', id: domain_id })`
 2. For each pair, compute property overlap percentage
 3. Flag pairs with >60% overlap as candidates
 4. Present a summary table:
@@ -208,7 +208,7 @@ Then deep-dive into any pair the user wants to investigate.
 
 ## Known Consolidation Precedents
 
-These consolidations have already happened in UPG and can be referenced as patterns. The table below is an **illustrative subset frozen at 0.2.0**; for the authoritative, complete, version-current migration map, call `list_type_migrations()`:
+These consolidations have already happened in UPG and can be referenced as patterns. The table below is an **illustrative subset frozen at 0.2.0**; for the authoritative, complete, version-current migration map, call `list_catalog({ kind: 'type_migrations' })`:
 
 | Old Types | Unified As | Discriminator | Version |
 |-----------|-----------|---------------|---------|

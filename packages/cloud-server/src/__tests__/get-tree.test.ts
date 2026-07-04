@@ -158,11 +158,7 @@ describe('cloud get_tree (0.9.16)', () => {
       listsAll('cloud get_tree pattern arg', props.pattern.description)
     })
 
-    it('get_tree_pattern id arg lists every catalogue pattern', () => {
-      const t = def('get_tree_pattern')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const props = t.inputSchema.properties as any
-      listsAll('cloud get_tree_pattern id arg', props.id.description)
-    })
+    // `get_tree_pattern` retired in 0.19.0 (folded into get_catalog_entry).
+    // Its id-enum lockstep no longer applies.
   })
 })

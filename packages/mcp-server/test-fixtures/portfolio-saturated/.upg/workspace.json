@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "default_product": "products/helm.upg",
+  "products": [
+    {
+      "file": "products/helm.upg",
+      "title": "Helm"
+    },
+    {
+      "file": "products/helm-mobile.upg",
+      "title": "Helm Mobile"
+    },
+    {
+      "file": "products/conduit-sdk.upg",
+      "title": "Conduit SDK"
+    },
+    {
+      "file": "products/beacon.upg",
+      "title": "Beacon"
+    },
+    {
+      "file": "products/legacy-console.upg",
+      "title": "Legacy Console"
+    },
+    {
+      "file": "products/revenue-ops.upg",
+      "title": "Revenue Ops",
+      "member_kind": "operating_function"
+    },
+    {
+      "file": "products/success-ops.upg",
+      "title": "Success Ops",
+      "member_kind": "operating_function"
+    },
+    {
+      "file": "design-system/meridian-design-system.upg",
+      "title": "Meridian Design System"
+    },
+    {
+      "file": "web-ecosystem/meridian-website.upg",
+      "title": "Meridian Website"
+    },
+    {
+      "file": "competitors/competitor-skywire.upg",
+      "title": "SkyWire Ops — Competitor Intel",
+      "member_kind": "watched"
+    },
+    {
+      "file": "competitors/competitor-altiplane.upg",
+      "title": "Altiplane — Competitor Intel",
+      "member_kind": "watched"
+    },
+    {
+      "file": "competitors/competitor-northstar-ops.upg",
+      "title": "Northstar Ops — Competitor Intel",
+      "member_kind": "watched"
+    },
+    {
+      "file": "meridian-org.upg",
+      "title": "Meridian Flight Systems (Org)",
+      "member_kind": "org_rollup"
+    }
+  ]
+}

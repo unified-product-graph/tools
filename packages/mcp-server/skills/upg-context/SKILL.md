@@ -13,7 +13,7 @@ This is the shared brain for all `/upg-*` skills. When you load this, you unders
 
 ## What Is the Unified Product Graph?
 
-The Unified Product Graph is an **open standard for structured product thinking**. It defines how product knowledge connects: a catalogue of entity types organised into canonical regions (Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations, Foundations), with typed properties and semantic relationships. The live catalogue is the source of truth: call `list_entity_types` for the current types and `list_regions` for the current regions rather than relying on any count quoted here.
+The Unified Product Graph is an **open standard for structured product thinking**. It defines how product knowledge connects: a catalogue of entity types organised into canonical regions (Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations, Foundations), with typed properties and semantic relationships. The live catalogue is the source of truth: call `list_catalog({ kind: 'entity_types' })` for the current types and `list_catalog({ kind: 'regions' })` for the current regions rather than relying on any count quoted here.
 
 It's not a tool. It's a vocabulary. A shared language for product decisions.
 
@@ -29,13 +29,13 @@ A `.upg` file is a JSON file that holds an entire product graph. You can read it
 
 The spec evolves: entity types, status/phase enums, property keys, valid children, and canonical edges all change between versions. **Do not write payloads from memory.** Before you create or change anything, fetch the live spec from the MCP server. This is the documented default for all `/upg-*` skills:
 
-- **Before creating or updating any entity:** call `get_entity_schema({ type: <type> })` and drive the form from its `expected_properties` and valid parent→child hierarchy. (`list_entity_types` lists what types exist; `get_valid_children({ parent_type: <type> })` answers "what can live under this?")
-- **For a node's top-level lifecycle `status`:** read the phases from `get_lifecycle({ entity_type: <type> })`. The phases live there — `get_entity_schema` does not return a `status` descriptor for stateless types (e.g. persona), so don't try to derive top-level `status` from it. Set top-level `status` to one of the phase ids `get_lifecycle` returns (e.g. objective → `draft`/`active`/`achieved`/`missed`/`deferred`). Many types are stateless and take no `status` at all; if `get_lifecycle` returns no phases, omit `status`.
+- **Before creating or updating any entity:** call `get_entity_schema({ type: <type> })` and drive the form from its `expected_properties` and valid parent→child hierarchy. (`list_catalog({ kind: 'entity_types' })` lists what types exist; `get_entity_schema({ type: <type>, include: ['valid_children'] })` answers "what can live under this?")
+- **For a node's top-level lifecycle `status`:** read the phases from `get_catalog_entry({ kind: 'lifecycle', id: <type> })`. The phases live there — `get_entity_schema` does not return a `status` descriptor for stateless types (e.g. persona), so don't try to derive top-level `status` from it. Set top-level `status` to one of the phase ids `get_catalog_entry({ kind: 'lifecycle', id })` returns (e.g. objective → `draft`/`active`/`achieved`/`missed`/`deferred`). Many types are stateless and take no `status` at all; if `get_catalog_entry({ kind: 'lifecycle', id })` returns no phases, omit `status`.
 - **`*_status` PROPERTIES are NOT the node's lifecycle `status`.** Some types carry a property such as `objective_status` (an enum inside `expected_properties`). These are distinct fields from the node's top-level lifecycle `status` and use their own enum values — never copy a lifecycle phase into a `*_status` property or vice versa.
-- **Before creating any edge:** call `resolve_edge_for_pair({ source_type, target_type })` to get the canonical edge for that pair, then let the server infer `type` (omit an explicit `type:` where you can).
+- **Before creating any edge:** call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` to get the canonical edge for that pair, then let the server infer `type` (omit an explicit `type:` where you can).
 - **Before quoting a number** (how many types, frameworks, regions, lenses, playbooks, anti-patterns): derive it from the relevant `list_*` call or `get_spec_version`, or don't quote it. Counts written into a skill drift the moment the spec moves.
 
-Any catalogue table reproduced in this file (entity emojis, framework-label Rosetta, region/lens/stage names) is a **display convenience, not the authoritative spec**. The live MCP introspection tools (`get_type_label({ entity_type })`, `list_regions`, `get_region`, `list_lenses`, `get_lens`, `list_product_stages`, `list_playbooks`, `get_playbook`, `list_frameworks`, `get_framework`) are always the source of truth, and these tables are codegen-from-core candidates that may lag the spec.
+Any catalogue table reproduced in this file (entity emojis, framework-label Rosetta, region/lens/stage names) is a **display convenience, not the authoritative spec**. The live MCP introspection tools (`get_catalog_entry({ kind: 'type_label', id: entity_type })`, `list_catalog({ kind: 'regions' })`, `get_catalog_entry({ kind: 'region', id })`, `list_catalog({ kind: 'lenses' })`, `get_catalog_entry({ kind: 'lens', id })`, `list_catalog({ kind: 'product_stages' })`, `list_catalog({ kind: 'playbooks' })`, `get_catalog_entry({ kind: 'playbook', id })`, `list_catalog({ kind: 'frameworks' })`, `get_catalog_entry({ kind: 'framework', id })`) are always the source of truth, and these tables are codegen-from-core candidates that may lag the spec.
 
 ---
 
@@ -44,7 +44,7 @@ Any catalogue table reproduced in this file (entity emojis, framework-label Rose
 UPG is a **chart** of product knowledge. Two orthogonal organising principles:
 
 **Regions**: *where* knowledge lives.
-The canonical regions roll up atomic domains (enumerate them live with `list_regions` / `list_domains`). Each region has an anchor entity, a shape archetype, a mental model, and a canonical playbook that walks its creation sequence.
+The canonical regions roll up atomic domains (enumerate them live with `list_catalog({ kind: 'regions' })` / `list_catalog({ kind: 'domains' })`). Each region has an anchor entity, a shape archetype, a mental model, and a canonical playbook that walks its creation sequence.
 
 **Approaches**: *how* you read the chart.
 Five paths of arrival, each answering one question:
@@ -60,13 +60,13 @@ Five paths of arrival, each answering one question:
 Approaches are the **agent's vocabulary**, not the user's menu. Users speak natural language; the LLM translates intent into one of the five approaches and routes to the fitting skill.
 
 **Playbooks**: region-anchored creation sequences.
-Canonical playbooks (enumerate via `list_playbooks`, load one via `get_playbook`; roughly one per region plus a few cross-region). A playbook says: "If you're filling out the Strategy region, do this in this order, with these entities." Reference them by their prefixed id (e.g. `playbook:strategy-outcomes`).
+Canonical playbooks (enumerate via `list_catalog({ kind: 'playbooks' })`, load one via `get_catalog_entry({ kind: 'playbook', id })`; roughly one per region plus a few cross-region). A playbook says: "If you're filling out the Strategy region, do this in this order, with these entities." Reference them by their prefixed id (e.g. `playbook:strategy-outcomes`).
 
 **Frameworks**: named techniques inside an approach.
-Framework definitions served by `list_frameworks` / `get_framework` (RICE lives inside Prioritise; Wardley Map lives inside Plan). The approach is the cognitive operation; the framework is one specific shape of that operation. (The broader frameworks package catalogues more; the MCP surface exposes the canonical subset; enumerate it live rather than quoting a count.)
+Framework definitions served by `list_catalog({ kind: 'frameworks' })` / `get_catalog_entry({ kind: 'framework', id })` (RICE lives inside Prioritise; Wardley Map lives inside Plan). The approach is the cognitive operation; the framework is one specific shape of that operation. (The broader frameworks package catalogues more; the MCP surface exposes the canonical subset; enumerate it live rather than quoting a count.)
 
 **Anti-patterns**: curated audit catalogue.
-Anti-patterns codify what *bad* product thinking looks like (personas without jobs, opportunities without needs, etc.). Enumerate via `list_anti_patterns`; they run inside the Inspect approach.
+Anti-patterns codify what *bad* product thinking looks like (personas without jobs, opportunities without needs, etc.). Enumerate via `list_catalog({ kind: 'anti_patterns' })`; they run inside the Inspect approach.
 
 ---
 
@@ -87,7 +87,7 @@ When you're running a UPG skill, you are a **product thinking partner**. Not a c
 
 ## The 8 Business Areas
 
-Every entity in the graph maps to one of 8 areas. These are the questions every product must answer. The areas themselves are an editorial grouping (stable); the **Key Entities** column is illustrative, not exhaustive: when you actually need the types in an area, confirm against `list_entity_types` rather than treating this column as the spec.
+Every entity in the graph maps to one of 8 areas. These are the questions every product must answer. The areas themselves are an editorial grouping (stable); the **Key Entities** column is illustrative, not exhaustive: when you actually need the types in an area, confirm against `list_catalog({ kind: 'entity_types' })` rather than treating this column as the spec.
 
 | Area | Emoji | Question | Key Entities |
 |---|---|---|---|
@@ -268,7 +268,7 @@ Skills should narrate the graph like a story, not recite a spreadsheet. The grap
 
 Skills must adapt to where the product actually is, not where it could theoretically be. A solo builder sketching their first idea doesn't need compliance frameworks.
 
-**Detecting the stage:** Read `product.stage` from `get_product_context()`. The value is a canonical `UPGProductStage`; the canonical list is served by `list_product_stages` (source of truth). At time of writing the stages are `concept | validation | build | beta | launch | growth | mature | maintenance | sunset` (a static convenience for the table below; if it disagrees with `list_product_stages`, trust the tool). If missing, default to `concept`. The stage governs how the session adapts.
+**Detecting the stage:** Read `product.stage` from `get_product_context()`. The value is a canonical `UPGProductStage`; the canonical list is served by `list_catalog({ kind: 'product_stages' })` (source of truth). At time of writing the stages are `concept | validation | build | beta | launch | growth | mature | maintenance | sunset` (a static convenience for the table below; if it disagrees with `list_catalog({ kind: 'product_stages' })`, trust the tool). If missing, default to `concept`. The stage governs how the session adapts.
 
 | Stage | Tone | Focus |
 |-------|------|-------|
@@ -391,7 +391,7 @@ The UPG stores canonical types (`need`, `hypothesis`, `opportunity`). Users thin
 
 **High-frequency type → framework label mapping** *(static display reference / codegen-from-core candidate; not authoritative):*
 
-Framework label keys are `lean_canvas`, `bmc`, `jtbd`, `design_thinking`, `lean_startup`. A blank cell means the spec defines no label for that type under that framework; fall back to the canonical UPG name. These values were taken verbatim from core's `framework_labels` at a point in time; do not improvise, and treat `get_type_label({ entity_type }).framework_labels` as the live source of truth (this table may lag the spec).
+Framework label keys are `lean_canvas`, `bmc`, `jtbd`, `design_thinking`, `lean_startup`. A blank cell means the spec defines no label for that type under that framework; fall back to the canonical UPG name. These values were taken verbatim from core's `framework_labels` at a point in time; do not improvise, and treat `get_catalog_entry({ kind: 'type_label', id: entity_type }).framework_labels` as the live source of truth (this table may lag the spec).
 
 | UPG Type | Lean Canvas (`lean_canvas`) | BMC (`bmc`) | JTBD (`jtbd`) | Design Thinking (`design_thinking`) | Lean Startup (`lean_startup`) |
 |----------|-------------|-----|------|-----------------|--------------|
@@ -402,7 +402,7 @@ Framework label keys are `lean_canvas`, `bmc`, `jtbd`, `design_thinking`, `lean_
 | `persona` | Customer Segment | Customer Archetype | | Persona | |
 | `metric` | Key Metric | | | | |
 
-For labels under other frameworks (OST, VPC, AARRR, DORA, etc.), call `get_type_label({ entity_type })` and read `framework_labels`; the resolver is the source of truth. Full mapping lives in `packages/upg-spec/src/type-labels.ts`; the Rosetta Stone.
+For labels under other frameworks (OST, VPC, AARRR, DORA, etc.), call `get_catalog_entry({ kind: 'type_label', id: entity_type })` and read `framework_labels`; the resolver is the source of truth. Full mapping lives in `packages/upg-spec/src/type-labels.ts`; the Rosetta Stone.
 
 **Rules:**
 1. **Store canonical, display contextual.** Never change the underlying type. A "Problem" in Lean Canvas is stored as `need`. Always.
@@ -428,7 +428,7 @@ For labels under other frameworks (OST, VPC, AARRR, DORA, etc.), call `get_type_
 
 ### Entity Emojis
 
-*Static display reference (codegen-from-core candidate; the authoritative emoji for a type is `get_type_label({ entity_type }).emoji`). Use this table for quick rendering; if a type is missing or disagrees, trust `get_type_label`.*
+*Static display reference (codegen-from-core candidate; the authoritative emoji for a type is `get_catalog_entry({ kind: 'type_label', id: entity_type }).emoji`). Use this table for quick rendering; if a type is missing or disagrees, trust `get_catalog_entry({ kind: 'type_label', id })`.*
 
 | Type | Emoji | Type | Emoji |
 |---|---|---|---|
@@ -470,11 +470,11 @@ For labels under other frameworks (OST, VPC, AARRR, DORA, etc.), call `get_type_
 
 ## Lens System
 
-UPG has a set of **lenses** that change what is surfaced first, recommended, and how gaps are framed. The lens is stored in `sessionContext.lens`. Check it via `get_session_context()`. The canonical lens ids are served by `list_lenses` / `get_lens` (source of truth); at time of writing they are `product`, `ux_design`, `engineering`, `growth`, `business`, `research`, `marketing`, `full`. **The design lens id is `ux_design`, not `design`** — `update_session_context({ lens: "ux_design" })`.
+UPG has a set of **lenses** that change what is surfaced first, recommended, and how gaps are framed. The lens is stored in `sessionContext.lens`. Check it via `get_session_context()`. The canonical lens ids are served by `list_catalog({ kind: 'lenses' })` / `get_catalog_entry({ kind: 'lens', id })` (source of truth); at time of writing they are `product`, `ux_design`, `engineering`, `growth`, `business`, `research`, `marketing`, `full`. **The design lens id is `ux_design`, not `design`** — `update_session_context({ lens: "ux_design" })`.
 
 ### Lenses
 
-*Static display reference (codegen-from-core candidate). The **Key entity types** column is illustrative; for the authoritative per-lens visible types call `get_lens(<id>).visible_types`.*
+*Static display reference (codegen-from-core candidate). The **Key entity types** column is illustrative; for the authoritative per-lens visible types call `get_catalog_entry({ kind: 'lens', id: <id> }).visible_types`.*
 
 | Lens id | Name | Protagonist | Session-start skill | Key entity types |
 |------|------|-------------|--------------------|--------------------|
@@ -521,7 +521,7 @@ When `sessionContext.lens` is set, adapt your behavior:
 
 ### Lens Entity Emojis
 
-*Static display reference (codegen-from-core candidate; authoritative source is `get_type_label({ entity_type }).emoji`).* In addition to the standard emojis above, use these for lens-specific types:
+*Static display reference (codegen-from-core candidate; authoritative source is `get_catalog_entry({ kind: 'type_label', id: entity_type }).emoji`).* In addition to the standard emojis above, use these for lens-specific types:
 
 **Engineering:** 🐛 bug, 📋 task, 🔧 technical_debt_item, 🔍 investigation, 🌿 root_cause, 💊 fix, 🚩 feature_flag, 🚀 deployment
 

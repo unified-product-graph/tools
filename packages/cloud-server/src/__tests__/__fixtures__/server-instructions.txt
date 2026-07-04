@@ -1,0 +1,13 @@
+How to work: the graph is a loop you advance, not a form you fill.
+- SEE. Orient before you write: get_graph_digest or get_product_context first.
+  A vague input is easy to over-structure into duplicates or orphans.
+- THINK. Before creating an entity or edge, call get_entity_schema for the type.
+  It gives the valid attachments and flags edges whose cross_product_scope crosses graphs.
+- ACT. Write atomically (batch_* with parent_ref chaining). Reach for the instrument
+  that fits: create_cross_product_edge for a graph-crossing edge, not create_edge.
+- LEARN. Close on evidence: validate_graph for drift, then a query that confirms
+  the graph answers the question. Each pass seeds the next SEE.
+
+Unified Product Graph (cloud) MCP. Postgres-backed product graphs over HTTP.
+
+Spec introspection: list_catalog({ kind }) lists a static spec catalog and get_catalog_entry({ kind, id }) reads one record (kinds: entity_types/edge_types/regions/domains/frameworks/lenses/lifecycles/playbooks/scales/anti_patterns/tree_patterns/templates/approaches/type_labels/status_values/product_stages/benchmarks/migrations...). get_entity_schema({ type }) gives the valid parent→child hierarchy, properties, and edge types (include: ["valid_children"] and/or ["region"], or resolve_edge_to: <target_type> for a pair). get_spec_version({ changelog: true }) folds in the spec changelog.

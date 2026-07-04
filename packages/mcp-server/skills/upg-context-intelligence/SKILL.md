@@ -127,7 +127,7 @@ Phase 7: Learning        /upg-walk-region team_org, /upg-check-gaps, /upg-walk-r
 
 ## Level 2: Benchmark Intelligence
 
-When the graph has 10+ entities, compare against product management benchmarks from `@unified-product-graph/core`. Derive the current benchmark set live via `list_benchmarks()` rather than relying on counts quoted here; the set grows with the spec. These encode wisdom from Ries, Christensen, Torres, Osterwalder, Cagan, Moore, and others.
+When the graph has 10+ entities, compare against product management benchmarks from `@unified-product-graph/core`. Derive the current benchmark set live via `list_catalog({ kind: 'benchmarks' })` rather than relying on counts quoted here; the set grows with the spec. These encode wisdom from Ries, Christensen, Torres, Osterwalder, Cagan, Moore, and others.
 
 **The rule: never state a number without explaining what you're trying to achieve.**
 
@@ -191,7 +191,7 @@ A benchmark is not "you have 1 persona, expected 2-4." A benchmark is a conversa
 **The voice:** A coach who's been through this before. Not a linter flagging errors. Not a dashboard showing red/green. A thinking partner who says "here's what I've seen work" and lets you decide.
 
 **How to use the full benchmark set:**
-- Derive the live benchmark set via `list_benchmarks()` (MCP introspection); this covers count, relationship, and ratio benchmarks without hardcoding any numbers.
+- Derive the live benchmark set via `list_catalog({ kind: 'benchmarks' })` (MCP introspection); this covers count, relationship, and ratio benchmarks without hardcoding any numbers.
 - `/upg-check-gaps` runs ALL benchmarks (in its forward-looking signals section) and synthesises them into a narrative.
 - Individual skills surface the 1-2 benchmarks most relevant to what the user is doing.
 - Never show the raw benchmark table. Always narrate.

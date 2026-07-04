@@ -48,7 +48,7 @@ get_session_context()
 search_nodes({ query: "<user's search term>" })   // if they gave a title, not an ID
 get_node({ node_id: "<id>" })                      // get the target entity + edges
 query({ from_id: "<id>", traverse: ["root_cause_causes_bug", "technical_debt_item_blocks_feature", "bug_affects_feature", "root_cause_affects_feature", "root_cause_shares_cause_with_root_cause", "service_powers_feature"], depth: 5 })
-// Use resolve_edge_for_pair({ source_type, target_type }) per hop to confirm edge names before
+// Use get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge per hop to confirm edge names before
 // traversing; treat a null result as a signal to re-anchor rather than a dead end.
 ```
 
@@ -84,7 +84,7 @@ Use the `query` tool to traverse downstream from the entity. Follow these edge t
 - `feature_decomposed_into_epic` / `epic_specified_by_user_story`; feature breakdown
 - `service_powers_feature`: service enables feature
 
-> **Edge name safety:** call `resolve_edge_for_pair({ source_type, target_type })` for each hop before traversing. If it returns `null`, treat that as a re-anchor signal (check the returned `anchor_hint`/`alternate_anchors`), not a dead end. Do not use bare `causes`, `blocks`, `debt_blocks_feature`, or `same_root_cause` — these are not valid catalog edge names.
+> **Edge name safety:** call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` for each hop before traversing. If it returns `null`, treat that as a re-anchor signal (check the returned `anchor_hint`/`alternate_anchors`), not a dead end. Do not use bare `causes`, `blocks`, `debt_blocks_feature`, or `same_root_cause` — these are not valid catalog edge names.
 
 ### Step 3: Compute Blast Radius
 

@@ -19,7 +19,7 @@ This is the home of the **Reflect** approach. Where Plan asks "what should I bui
 
 Use the `mcp__unified-product-graph__*` MCP tools:
 - **Read scope:** `search_nodes`, `get_node`, `list_nodes`, `query`, `get_product_context`
-- **Approach + frameworks:** `get_approach({ approach_id: "reflect" })`, `get_framework({ framework_id: "..." })`
+- **Approach + frameworks:** `get_catalog_entry({ kind: 'approach', id, approach_id: "reflect" })`, `get_catalog_entry({ kind: 'framework', id, framework_id: "..." })`
 - **Capture findings (optional):** `create_node`, `update_node`, `create_edge`
 
 ## The 5 Reflection Frameworks
@@ -60,7 +60,7 @@ If no argument provided, ask:
 Once scope is chosen, fetch the relevant context so reflection has something to grip on:
 
 - **Entity scope:** `get_node({ node_id })` + 1-hop neighbours via `query({ from_id, depth: 1 })`
-- **Region scope:** `list_nodes({ type })` for the region's anchor entity, plus `get_region({ region_id })` for the canonical entity coverage
+- **Region scope:** `list_nodes({ type })` for the region's anchor entity, plus `get_catalog_entry({ kind: 'region', id, region_id })` for the canonical entity coverage
 - **Whole graph:** `get_product_context()` digest
 - **Free-text scope:** No fetch; work from the user's framing
 
@@ -71,7 +71,7 @@ Render a brief context card (3-5 lines) so the user sees what you're reflecting 
 **Always start by enumerating the canonical reflection frameworks from the spec** so the recommendation table can't drift:
 
 ```
-get_approach({ id: "reflect" })
+get_catalog_entry({ kind: 'approach', id: "reflect" })
 ```
 
 The returned `framework_id_examples` carries the canonical reflection
@@ -93,7 +93,7 @@ Recommend one based on what you just saw:
 | A "this is obviously the right move" energy | `second-order-thinking` |
 
 If the table doesn't fit (e.g. a newly-shipped framework that isn't listed),
-fall back to the full enumeration from `get_approach`. If unclear, present
+fall back to the full enumeration from `get_catalog_entry({ kind: 'approach', id })`. If unclear, present
 the full list as numbered options and let the user pick. Always allow
 override.
 
@@ -103,13 +103,13 @@ The canonical content for each framework; its purpose, core question,
 when-to-use signals, when-NOT-to-use signals, and structural slots; lives
 in the spec, not in this skill. Source of truth is
 `packages/upg-spec/src/frameworks/definitions/` (exposed via the MCP
-`get_framework` tool). Loading it at runtime means a framework refinement
+`get_catalog_entry({ kind: 'framework', id })` tool). Loading it at runtime means a framework refinement
 or addition surfaces here without a skill edit.
 
 Once the user picks a framework, fetch its definition:
 
 ```
-get_framework({ id: "<chosen_id>" })
+get_catalog_entry({ kind: 'framework', id: "<chosen_id>" })
 ```
 
 The returned `UPGFramework` record carries everything you need:
@@ -197,6 +197,6 @@ A few rules that make this work:
 
 ## Why This Skill Exists
 
-Reflect is one of the 5 canonical UPG approaches (`get_approach({ approach_id: "reflect" })`). Until v0.3.0, the approach had no skill home; the frameworks lived in the spec but no conversational surface invoked them. This skill closes that gap.
+Reflect is one of the 5 canonical UPG approaches (`get_catalog_entry({ kind: 'approach', id, approach_id: "reflect" })`). Until v0.3.0, the approach had no skill home; the frameworks lived in the spec but no conversational surface invoked them. This skill closes that gap.
 
 It's the only canonical entry point for the Reflect approach in the user-invocable surface. Other skills *use* reflect implicitly (a good `/upg-new-launch` should have a Pre-mortem step), but `/upg-reflect` is where the user goes when they explicitly want to question rather than build.

@@ -32,7 +32,7 @@ get_graph_digest()
 
 The digest pre-computes counts, health metrics, chain completeness (`chains` section), and business area coverage (`coverage` section); all in ~500 tokens. Use the `query` tool only for structural gap details (e.g. which specific personas lack jobs).
 
-**Read the product stage** from `get_product_context()`. The stage is a canonical product-stage value — don't hard-code the enum; if you need the valid set, call `list_product_stages`. If no stage is set, default to the earliest (concept) stage.
+**Read the product stage** from `get_product_context()`. The stage is a canonical product-stage value — don't hard-code the enum; if you need the valid set, call `list_catalog({ kind: 'product_stages' })`. If no stage is set, default to the earliest (concept) stage.
 
 **Map stage to tier** (the three tiers are an editorial maturity framing; stable):
 
@@ -42,7 +42,7 @@ The digest pre-computes counts, health metrics, chain completeness (`chains` sec
 | launch / growth | Small Team |
 | mature / maintenance / sunset | Scale-Up |
 
-The tier sets the *denominator* for the business completeness score in Step 4b. **Derive that denominator from MCP, not a baked number**: prefer `get_graph_digest`'s `coverage` section (it already reports area coverage against the spec), or count the relevant types from `list_entity_types` / `get_region`. The "40/55/70" figures from earlier versions of this skill are drift-prone — use the live counts instead and report whatever the digest's coverage fields give you.
+The tier sets the *denominator* for the business completeness score in Step 4b. **Derive that denominator from MCP, not a baked number**: prefer `get_graph_digest`'s `coverage` section (it already reports area coverage against the spec), or count the relevant types from `list_catalog({ kind: 'entity_types' })` / `get_catalog_entry({ kind: 'region', id })`. The "40/55/70" figures from earlier versions of this skill are drift-prone — use the live counts instead and report whatever the digest's coverage fields give you.
 
 ### Step 2: Check Structural Gaps
 
@@ -106,7 +106,7 @@ Structural gaps tell you *what's missing right now*. This step interprets the gr
 
 | Signal | Condition | Level |
 |--------|-----------|-------|
-| Unvalidated bets | ⚗️ hypotheses with status `drafted` (or no status), created >14 days ago — derive valid statuses via `list_status_values({ entity_type: "hypothesis" })` | 🔴 High |
+| Unvalidated bets | ⚗️ hypotheses with status `drafted` (or no status), created >14 days ago — derive valid statuses via `list_catalog({ kind: 'status_values', entity_type: "hypothesis" })` | 🔴 High |
 | Assumption-based personas | 👤 personas with no connected 🔬 research_study or 💎 insight | 🟡 Medium |
 | Orphan features | 📦 features not connected to any 👤 persona (directly or via job chain) | 🔴 High |
 | Missing business model | Product at `build`, `launch`, or `growth` stage, zero 💰 business_model entities | 🔴 High |
@@ -182,7 +182,7 @@ This section scores the graph against the **8 business areas**: the fundamental 
 
 #### The 8 Business Areas
 
-The **8 areas are an editorial grouping** (stable). The **type lists below are illustrative anchors, not the authoritative spec**: prefer `get_graph_digest`'s `coverage`/`by_type` sections for which types exist and are populated, and confirm any type name against `list_entity_types` (or `get_region(<region>)` for a region's membership) before treating a missing type as a gap. If a type listed below has been renamed or removed, defer to the digest's area coverage rather than reporting a phantom gap. Count how many of the area's live types have **at least 1 entity**.
+The **8 areas are an editorial grouping** (stable). The **type lists below are illustrative anchors, not the authoritative spec**: prefer `get_graph_digest`'s `coverage`/`by_type` sections for which types exist and are populated, and confirm any type name against `list_catalog({ kind: 'entity_types' })` (or `get_catalog_entry({ kind: 'region', id: <region> })` for a region's membership) before treating a missing type as a gap. If a type listed below has been renamed or removed, defer to the digest's area coverage rather than reporting a phantom gap. Count how many of the area's live types have **at least 1 entity**.
 
 | Area | Entity Types (illustrative, Solo Builder tier) |
 |---|---|

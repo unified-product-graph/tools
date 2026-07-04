@@ -31,7 +31,7 @@ The digest provides counts by type, chain completeness, and business area covera
 
 ### Step 2: Determine Phase Completion
 
-The **7 phases are an editorial product-thinking framing** (stable). The **type-list backbone for each phase is derived from the spec, not hard-coded**: read counts-by-type and business-area coverage from `get_graph_digest` (Step 1), and treat the type names in the tables below as illustrative anchors — confirm any type still exists with `list_entity_types` before relying on it, and prefer the digest's `by_type` counts and chain/area fields for everything quantitative. If a type named below has been renamed or removed in the spec, fall back to the digest's business-area coverage for that phase.
+The **7 phases are an editorial product-thinking framing** (stable). The **type-list backbone for each phase is derived from the spec, not hard-coded**: read counts-by-type and business-area coverage from `get_graph_digest` (Step 1), and treat the type names in the tables below as illustrative anchors — confirm any type still exists with `list_catalog({ kind: 'entity_types' })` before relying on it, and prefer the digest's `by_type` counts and chain/area fields for everything quantitative. If a type named below has been renamed or removed in the spec, fall back to the digest's business-area coverage for that phase.
 
 Check which entity types have at least 1 node (from the digest) to classify each phase:
 
@@ -148,7 +148,7 @@ Your product graph spans the full journey; from identity to learning. This isn't
 
 ## Phase → Entity Type Reference
 
-This grouping is **editorial (which phase a type belongs to), not authoritative for which types exist**. Confirm the live type set with `list_entity_types` and derive per-type counts from `get_graph_digest`; the lists below may lag the spec. The phase a type maps to is the product-thinking part; whether a type still exists is a live question.
+This grouping is **editorial (which phase a type belongs to), not authoritative for which types exist**. Confirm the live type set with `list_catalog({ kind: 'entity_types' })` and derive per-type counts from `get_graph_digest`; the lists below may lag the spec. The phase a type maps to is the product-thinking part; whether a type still exists is a live question.
 
 | Phase | Entity Types (illustrative) |
 |---|---|

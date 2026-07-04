@@ -21,7 +21,7 @@ When creating 3+ entities, use `batch_create_nodes` with `parent_ref` chaining; 
 When creating 3+ edges, use `batch_create_edges`; never loop `create_edge`.
 When deleting 3+ entities, use `batch_delete_nodes`.
 
-> **MCP-first (applies to every create below).** Before creating a research study, insight, or opportunity, call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any property the schema marks as an assessment as `{ value, label }`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. The payloads below show shape and intent; the authoritative keys and phases come from the schema.
+> **MCP-first (applies to every create below).** Before creating a research study, insight, or opportunity, call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any property the schema marks as an assessment as `{ value, label }`. Before any edge, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and let the server infer the edge type. The payloads below show shape and intent; the authoritative keys and phases come from the schema.
 
 ## Phase Map
 
@@ -156,7 +156,7 @@ create_node({
   parent_id: "<product_id>"
 })
 // The research question is typically a separate entity, not a property; if you
-// model it, resolve the linking edge with resolve_edge_for_pair.
+// model it, resolve the linking edge with get_entity_schema({ type, resolve_edge_to }).resolve_edge.
 ```
 
 Confirm: "**<Study Title>** is in the graph."
@@ -252,14 +252,14 @@ create_node({
   parent_id: "<product_id>"
 })
 
-// edge = resolve_edge_for_pair({ source_type: "insight", target_type: "opportunity" })
+// edge = get_entity_schema({ type: "insight", resolve_edge_to: "opportunity" }).resolve_edge
 create_edge({ source_id: "<insight_id>", target_id: "<opportunity_id>" })  // server infers type
 ```
 
 If linking to an existing opportunity, resolve the same edge and create it without an explicit `type:`:
 
 ```
-// edge = resolve_edge_for_pair({ source_type: "insight", target_type: "opportunity" })
+// edge = get_entity_schema({ type: "insight", resolve_edge_to: "opportunity" }).resolve_edge
 create_edge({ source_id: "<insight_id>", target_id: "<existing_opportunity_id>" })  // server infers type
 ```
 

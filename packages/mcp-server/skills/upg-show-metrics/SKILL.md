@@ -18,7 +18,7 @@ You are a fast analytics dashboard. Your job: fetch metrics, render a dashboard,
 Call `get_graph_digest()` first. Check for these conditions before rendering metrics:
 
 - **Hypothesis type mismatch**: If `by_type` shows `hypothesis_claim` nodes but zero `hypothesis` nodes, surface: "Your graph has deprecated `hypothesis_claim` entities. Run `/upg-fix-types` to convert them to `hypothesis` before this analysis is accurate."
-- **Hypothesis velocity**: The "Hypothesis Velocity" metric shows a point-in-time distribution across hypothesis statuses (derive the valid phases via `list_status_values({ entity_type: "hypothesis" })`), not a rate of change. Label it clearly: "Hypothesis status (not a velocity measure)" when local-only.
+- **Hypothesis velocity**: The "Hypothesis Velocity" metric shows a point-in-time distribution across hypothesis statuses (derive the valid phases via `list_catalog({ kind: 'status_values', entity_type: "hypothesis" })`), not a rate of change. Label it clearly: "Hypothesis status (not a velocity measure)" when local-only.
 - **Stage benchmarks are canonical**: `product.stage` is a canonical `UPGProductStage` (`concept | validation | build | beta | launch | growth | mature | maintenance | sunset`), and the count/relationship benchmarks are keyed on those same canonical stages. Compare directly; do NOT translate to legacy `idea`/`mvp`/`scale` labels.
 
 ## Tools

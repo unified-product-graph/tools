@@ -1,0 +1,258 @@
+{
+  "generated_at": "2026-07-03T19:07:17.469Z",
+  "digest_rollup": {
+    "products": 13,
+    "total_nodes": 81,
+    "total_edges": 32,
+    "by_stage": {
+      "mature": 4,
+      "growth": 5,
+      "beta": 1,
+      "launch": 1,
+      "validation": 1,
+      "sunset": 1
+    }
+  },
+  "persona_census_total": 4,
+  "validation_rollup": {
+    "products": 13,
+    "valid": 7,
+    "invalid": 6,
+    "structurally_valid": 13,
+    "anti_pattern_violations": {
+      "high": 14,
+      "medium": 19,
+      "low": 0
+    },
+    "all_valid": false
+  },
+  "validation_by_product": [
+    {
+      "product_id": "p_org",
+      "title": "Meridian Flight Systems (Org)",
+      "valid": true,
+      "anti_patterns": {
+        "high": 0,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_helm",
+      "title": "Helm",
+      "valid": false,
+      "anti_patterns": {
+        "high": 3,
+        "medium": 3,
+        "low": 0
+      },
+      "top_violations": [
+        "building-without-validating",
+        "features-without-hypotheses",
+        "roadmap-feature-without-outcome-link",
+        "competitors-missing-past-validation",
+        "orphan-loose-thoughts",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_helmmobile",
+      "title": "Helm Mobile",
+      "valid": false,
+      "anti_patterns": {
+        "high": 3,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "building-without-validating",
+        "features-without-hypotheses",
+        "roadmap-feature-without-outcome-link",
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_conduit",
+      "title": "Conduit SDK",
+      "valid": false,
+      "anti_patterns": {
+        "high": 3,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "building-without-validating",
+        "features-without-hypotheses",
+        "roadmap-feature-without-outcome-link",
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_beacon",
+      "title": "Beacon",
+      "valid": false,
+      "anti_patterns": {
+        "high": 1,
+        "medium": 0,
+        "low": 0
+      },
+      "top_violations": [
+        "personas-without-jobs"
+      ]
+    },
+    {
+      "product_id": "p_legacy",
+      "title": "Legacy Console",
+      "valid": true,
+      "anti_patterns": {
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "top_violations": []
+    },
+    {
+      "product_id": "p_revops",
+      "title": "Revenue Ops",
+      "valid": true,
+      "anti_patterns": {
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "top_violations": []
+    },
+    {
+      "product_id": "p_successops",
+      "title": "Success Ops",
+      "valid": false,
+      "anti_patterns": {
+        "high": 1,
+        "medium": 0,
+        "low": 0
+      },
+      "top_violations": [
+        "operating-function-without-north-star"
+      ]
+    },
+    {
+      "product_id": "p_designsys",
+      "title": "Meridian Design System",
+      "valid": true,
+      "anti_patterns": {
+        "high": 0,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_website",
+      "title": "Meridian Website",
+      "valid": false,
+      "anti_patterns": {
+        "high": 3,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "building-without-validating",
+        "features-without-hypotheses",
+        "roadmap-feature-without-outcome-link",
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_skywire",
+      "title": "SkyWire Ops — Competitor Intel",
+      "valid": true,
+      "anti_patterns": {
+        "high": 0,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_altiplane",
+      "title": "Altiplane — Competitor Intel",
+      "valid": true,
+      "anti_patterns": {
+        "high": 0,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    },
+    {
+      "product_id": "p_northstar",
+      "title": "Northstar Ops — Competitor Intel",
+      "valid": true,
+      "anti_patterns": {
+        "high": 0,
+        "medium": 2,
+        "low": 0
+      },
+      "top_violations": [
+        "competitors-missing-past-validation",
+        "persona-count-below-stage-benchmark"
+      ]
+    }
+  ],
+  "registry_drift": {
+    "canonical_entities": 9,
+    "instances": 4,
+    "on_canon": 3,
+    "sanctioned": 1,
+    "issues_total": 0,
+    "issues_by_kind": {},
+    "issues": [],
+    "clean": true
+  },
+  "portfolio_anti_patterns": {
+    "evaluated": [
+      "specification-without-implementer",
+      "primitive-scattered-without-canonical",
+      "product-reimplements-specification",
+      "operating-function-without-org-link"
+    ],
+    "specifications": 1,
+    "violations": [
+      {
+        "anti_pattern_id": "operating-function-without-org-link",
+        "severity": "medium",
+        "count": 1,
+        "instances": [
+          {
+            "operating_function": "p_successops",
+            "title": "Success Ops"
+          }
+        ]
+      }
+    ],
+    "issues_total": 1,
+    "clean": false
+  },
+  "tree_stats": {
+    "areas": 4,
+    "portfolios": 5,
+    "products": 13,
+    "unassigned_products": 1
+  }
+}

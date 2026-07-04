@@ -46,17 +46,17 @@ You are a schema evolution advisor. Your job is to help the UPG schema grow thou
 
 Load the domain via MCP introspection (never read spec source files directly — paths don't exist in deployed environments):
 ```
-list_domains()                        → find the domain record by name/id
-get_domain_guide({ domain_id })       → anchor entity, creation sequence, anti-patterns
-list_entity_types({ domain_id? })     → all entity types in the domain
+list_catalog({ kind: 'domains' })                        → find the domain record by name/id
+get_catalog_entry({ kind: 'domain_guide', id: domain_id })       → anchor entity, creation sequence, anti-patterns
+list_catalog({ kind: 'entity_types', domain_id? })     → all entity types in the domain
 get_entity_schema({ type })           → property interface for each type
-list_edge_types()                     → edges involving each type
-get_valid_children({ parent_type })   → what nests under each parent type
+list_catalog({ kind: 'edge_types' })                     → edges involving each type
+get_entity_schema({ type: parent_type, include: ['valid_children'] })   → what nests under each parent type
 ```
 
 For each type in the domain, check:
 - Does it have expected properties? (`get_entity_schema({ type })`)
-- What edges connect it to other types? (`list_edge_types()` filtered by source/target)
+- What edges connect it to other types? (`list_catalog({ kind: 'edge_types' })` filtered by source/target)
 - Is it referenced in any skills? (skills directory)
 - Does it appear in real graphs? (`list_nodes({ type })` on the active product)
 
@@ -212,7 +212,7 @@ Mapping to existing types:
   - debugging session → investigation (exists)
   - bug → bug (exists)
   - root cause → root_cause (exists)
-  - relate to → `root_cause_causes_bug` (exists); resolve any pair via `resolve_edge_for_pair`
+  - relate to → `root_cause_causes_bug` (exists); resolve any pair via `get_entity_schema({ type, resolve_edge_to }).resolve_edge`
 
 → FULLY COVERED by existing schema. No new types needed.
 ```

@@ -5,14 +5,14 @@ description: "Full property schemas and edge type reference for /upg-walk-region
 
 # /upg-walk-region: Property Schemas & Edge Types (Detail)
 
-This file is an **illustrative reference**, not the spec. It is loaded on demand by /upg-walk-region. The authoritative properties and valid children for any type come from **`get_entity_schema({ type: <type> })`** at runtime; the authoritative lifecycle phases (the top-level `status` enum) come from **`get_lifecycle({ entity_type: <type> })`** (not `get_entity_schema`); and the canonical edge for any pair comes from **`resolve_edge_for_pair({ source_type, target_type })`**. Where this file disagrees with those live calls, the live calls win. Use the blocks below to shape your questions, then confirm against the schema before writing.
+This file is an **illustrative reference**, not the spec. It is loaded on demand by /upg-walk-region. The authoritative properties and valid children for any type come from **`get_entity_schema({ type: <type> })`** at runtime; the authoritative lifecycle phases (the top-level `status` enum) come from **`get_catalog_entry({ kind: 'lifecycle', id: <type> })`** (not `get_entity_schema`); and the canonical edge for any pair comes from **`get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge`**. Where this file disagrees with those live calls, the live calls win. Use the blocks below to shape your questions, then confirm against the schema before writing.
 
 ## Full Property Schemas
 
 When creating an entity, actively prompt for the key properties. Do not just set title and description.
 
 > **Two conventions these schemas follow (and you must too):**
-> 1. **Lifecycle `status` is a TOP-LEVEL field on the node, not a property.** Where a block below shows `status (top-level ...)`, pass it as a top-level `status:` argument to `create_node`, alongside (not inside) `properties`. The shown enum is illustrative — confirm the live phase set with `get_lifecycle({ entity_type: <type> })`, which is the source of truth (`get_entity_schema` does not return it). Note: a `*_status` PROPERTY (e.g. `objective_status`) is a SEPARATE enum field that lives inside `properties` and is distinct from the top-level lifecycle `status` — never copy one into the other.
+> 1. **Lifecycle `status` is a TOP-LEVEL field on the node, not a property.** Where a block below shows `status (top-level ...)`, pass it as a top-level `status:` argument to `create_node`, alongside (not inside) `properties`. The shown enum is illustrative — confirm the live phase set with `get_catalog_entry({ kind: 'lifecycle', id: <type> })`, which is the source of truth (`get_entity_schema` does not return it). Note: a `*_status` PROPERTY (e.g. `objective_status`) is a SEPARATE enum field that lives inside `properties` and is distinct from the top-level lifecycle `status` — never copy one into the other.
 > 2. **Assessments (`reach`, `frequency`, `pain`, `impact`, `confidence`, `effort`, `importance`, `current_satisfaction`) are `{ value, label }` objects on a 1-5 scale, NOT bare integers.** Where a block shows `1-5`, write `{ value: <1-5>, label: "<word>" }`.
 
 ### outcome
@@ -301,19 +301,19 @@ After creating an entity, search for related entities and suggest connections.
 
 **The canonical edge for any pair is determined by the spec, not by a `{source}_has_{target}` pattern.** Most UPG edges use a meaningful verb (e.g. `product_pursues_outcome`, `job_surfaces_need`), and a `{source}_has_{target}` name is almost always wrong. Before you create an edge:
 
-1. Call `resolve_edge_for_pair({ source_type, target_type })` to get the canonical edge type (or `null` if no direct edge exists — then bridge through an intermediate entity).
-2. Or browse the full catalog with `list_edge_types` / `get_edge_type`.
+1. Call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` to get the canonical edge type (or `null` if no direct edge exists — then bridge through an intermediate entity).
+2. Or browse the full catalog with `list_catalog({ kind: 'edge_types' })` / `get_catalog_entry({ kind: 'edge_type', id })`.
 
 When you pass `parent_id` to `create_node`, the server auto-infers the correct canonical edge for you, so you usually don't need to name the edge type at all.
 
 ### How the core discovery chain connects
 
-The canonical OST/discovery chain runs product → persona → job → need, and outcome → opportunity → solution → hypothesis → experiment, with research feeding it (research study → insight → opportunity). **Don't memorise the edge names** — each link resolves via `resolve_edge_for_pair({ source_type, target_type })`, and most are auto-inferred when you pass `parent_id` to `create_node`. A couple of illustrative resolutions (confirm everything else with the resolver):
+The canonical OST/discovery chain runs product → persona → job → need, and outcome → opportunity → solution → hypothesis → experiment, with research feeding it (research study → insight → opportunity). **Don't memorise the edge names** — each link resolves via `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge`, and most are auto-inferred when you pass `parent_id` to `create_node`. A couple of illustrative resolutions (confirm everything else with the resolver):
 
 | From -> To | Resolve with |
 |---|---|
-| persona -> job | `resolve_edge_for_pair({ source_type: "persona", target_type: "job" })` |
-| opportunity -> solution | `resolve_edge_for_pair({ source_type: "opportunity", target_type: "solution" })` |
+| persona -> job | `get_entity_schema({ type: "persona", resolve_edge_to: "job" }).resolve_edge` |
+| opportunity -> solution | `get_entity_schema({ type: "opportunity", resolve_edge_to: "solution" }).resolve_edge` |
 
 Pairs with NO direct canonical edge resolve to `null` and must be bridged through an intermediate entity — model the relationship through the canonical chain instead of inventing an edge.
 

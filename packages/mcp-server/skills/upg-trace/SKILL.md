@@ -19,9 +19,9 @@ This is the home of the **Trace** approach. Where Inspect gives you a cross-sect
 
 Use the `mcp__unified-product-graph__*` MCP tools:
 - **Navigate the graph:** `get_node`, `search_nodes`, `list_nodes`, `list_nodes({ parent_id })`, `query`
-- **Approach:** `get_approach({ approach_id: "trace" })`
-- **Edge inspection:** `list_cross_edge_types`, `get_entity_schema`, `resolve_edge_for_pair`
-- **Entity context:** `get_entity_schema`, `get_lifecycle`
+- **Approach:** `get_catalog_entry({ kind: 'approach', id, approach_id: "trace" })`
+- **Edge inspection:** `list_catalog({ kind: 'cross_edge_types' })`, `get_entity_schema`, `get_entity_schema({ type, resolve_edge_to }).resolve_edge`
+- **Entity context:** `get_entity_schema`, `get_catalog_entry({ kind: 'lifecycle', id })`
 - **Capture (optional):** `create_node`, `create_edge`, `update_node`
 
 ## Canonical Trace Paths
@@ -30,14 +30,14 @@ These are the well-travelled routes through a product graph. Use them to orient 
 
 | Path name | Chain | What it reveals |
 |-----------|-------|-----------------|
-| OST chain | `persona → job → need ← opportunity → solution → feature` | Does every feature trace back to a real user need? (`opportunity_addresses_need` is the reverse hop; use `resolve_edge_for_pair` to confirm each direction) |
+| OST chain | `persona → job → need ← opportunity → solution → feature` | Does every feature trace back to a real user need? (`opportunity_addresses_need` is the reverse hop; use `get_entity_schema({ type, resolve_edge_to }).resolve_edge` to confirm each direction) |
 | OKR → execution | `objective → key_result` then anchor on `strategic_theme → initiative → epic → feature` | Are OKRs connected to the work that delivers them? (`key_result → initiative` resolves null; re-anchor via `strategic_theme_pursues_initiative`) |
 | Validation chain | `hypothesis → experiment_plan → experiment_run → learning` | Is each hypothesis actually being tested, and have findings landed? |
 | Value delivery | `value_proposition → outcome → opportunity → solution → feature` | Does your value proposition connect to concrete deliverables? (`value_proposition → feature` is null; bridge through outcome/opportunity/solution) |
 | Competitive intelligence | `competitor → competitor_feature → solution` or `competitor → learning` | Are competitive signals translating into product opportunities? (`competitor → insight` resolves null; use `competitor_yields_learning` or `competitor_feature_inspires_solution`) |
 | Strategic cascade | `vision → mission → strategic_pillar → strategic_theme → initiative → outcome` | Does strategy connect down to measurable outcomes? |
 
-> **Important:** every hop in a trace path must be confirmed live with `resolve_edge_for_pair({ source_type, target_type })` before traversing. If the resolver returns `null`, that hop does not exist as a direct edge — treat it as a **re-anchor signal**: read the returned `anchor_hint`/`alternate_anchors`, find the correct bridge entity, and continue from there. Never hard-code an edge name; use the resolver per hop.
+> **Important:** every hop in a trace path must be confirmed live with `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` before traversing. If the resolver returns `null`, that hop does not exist as a direct edge — treat it as a **re-anchor signal**: read the returned `anchor_hint`/`alternate_anchors`, find the correct bridge entity, and continue from there. Never hard-code an edge name; use the resolver per hop.
 
 These are examples. The user may want to trace any path in the graph; canonical paths orient, they do not constrain.
 
@@ -45,7 +45,7 @@ These are examples. The user may want to trace any path in the graph; canonical 
 
 ## Graph Readiness Check
 
-Before starting the trace, call `get_graph_digest()` and `resolve_edge_for_pair({ source_type, target_type })` for the first hop of the requested path. If:
+Before starting the trace, call `get_graph_digest()` and `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` for the first hop of the requested path. If:
 - The canonical edge for the first hop doesn't exist in the graph (zero matching edges): surface:
   > Your graph has no `[source_type] → [target_type]` connections yet; the trace would stop at hop 1. Run `/upg-link` or `/upg-walk-region` to add the missing links first.
 - The graph has fewer than 10 nodes total: surface:
@@ -101,7 +101,7 @@ At each hop:
 
 1. Load the current node's outgoing edges:
    - Use `list_nodes({ parent_id: "<current_id>" })` for hierarchy-based children
-   - Use `list_cross_edge_types` or `query` for cross-domain edge relationships
+   - Use `list_catalog({ kind: 'cross_edge_types' })` or `query` for cross-domain edge relationships
 2. Display the reachable nodes at this hop:
 
 ```
@@ -194,6 +194,6 @@ After rendering your recommendation, call:
 
 ## Why This Skill Exists
 
-Trace is one of the 5 canonical UPG approaches (`get_approach({ approach_id: "trace" })`). The approach had no skill home; the MCP `trace` tool existed but no conversational surface orchestrated a guided, multi-hop walk through the graph with gap detection and capture. This skill closes that gap.
+Trace is one of the 5 canonical UPG approaches (`get_catalog_entry({ kind: 'approach', id, approach_id: "trace" })`). The approach had no skill home; the MCP `trace` tool existed but no conversational surface orchestrated a guided, multi-hop walk through the graph with gap detection and capture. This skill closes that gap.
 
 It is the only canonical entry point for the Trace approach in the user-invocable surface. Other skills use tracing implicitly (a good `/upg-show-impact` walks downstream edges), but `/upg-trace` is where the user goes when they explicitly want to plot a route; to test whether the product graph is coherent from anchor to destination.

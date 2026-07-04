@@ -1,0 +1,61 @@
+{
+  "$comment": "UPG 0.19.0 tool-consolidation equivalence contract. The bijection each retired spec-introspection tool → its replacement on the new faceted surface. RATIFIED BY THE CAPTAIN before any Phase-2 removal. Phase 1 is additive: every 'from' tool below is STILL REGISTERED; the catalog-parity gate proves each one's output is reachable + byte-equivalent through its 'via' replacement while both are present. 48 retired = 25 list_* + 15 get_*-by-id + 3 folds + 5 routers.",
+  "version": "0.19.0",
+  "phase": 1,
+  "list": {
+    "list_entity_types": { "via": "list_catalog", "kind": "entity_types", "filters": ["domain", "maturity", "deprecated", "limit", "cursor"] },
+    "list_edge_types": { "via": "list_catalog", "kind": "edge_types", "filters": ["source_type", "target_type"] },
+    "list_cross_edge_types": { "via": "list_catalog", "kind": "cross_edge_types", "filters": [] },
+    "list_regions": { "via": "list_catalog", "kind": "regions", "filters": [] },
+    "list_domains": { "via": "list_catalog", "kind": "domains", "filters": ["with_guide_only"] },
+    "list_domain_rings": { "via": "list_catalog", "kind": "domain_rings", "filters": [] },
+    "list_frameworks": { "via": "list_catalog", "kind": "frameworks", "filters": ["category", "limit", "cursor"] },
+    "list_framework_categories": { "via": "list_catalog", "kind": "framework_categories", "filters": [] },
+    "list_framework_structure_patterns": { "via": "list_catalog", "kind": "framework_structure_patterns", "filters": [] },
+    "list_lenses": { "via": "list_catalog", "kind": "lenses", "filters": [] },
+    "list_lifecycles": { "via": "list_catalog", "kind": "lifecycles", "filters": [] },
+    "list_playbooks": { "via": "list_catalog", "kind": "playbooks", "filters": ["region", "canonical_only", "framework_id"] },
+    "list_scales": { "via": "list_catalog", "kind": "scales", "filters": [] },
+    "list_anti_patterns": { "via": "list_catalog", "kind": "anti_patterns", "filters": ["limit", "cursor"] },
+    "list_tree_patterns": { "via": "list_catalog", "kind": "tree_patterns", "filters": [] },
+    "list_templates": { "via": "list_catalog", "kind": "templates", "filters": [] },
+    "list_approaches": { "via": "list_catalog", "kind": "approaches", "filters": ["framework_id"] },
+    "list_type_labels": { "via": "list_catalog", "kind": "type_labels", "filters": ["limit", "cursor"] },
+    "list_status_values": { "via": "list_catalog", "kind": "status_values", "filters": ["entity_type"] },
+    "list_product_stages": { "via": "list_catalog", "kind": "product_stages", "filters": [] },
+    "list_benchmarks": { "via": "list_catalog", "kind": "benchmarks", "filters": ["stage", "domain"], "arg_remap": { "kind": "benchmark_kind" }, "note": "list_benchmarks' own required `kind` (count|relationship|ratio|domain_activation) is accepted on the facet as `benchmark_kind` to avoid colliding with the facet discriminator." },
+    "list_edge_migrations": { "via": "list_catalog", "kind": "edge_migrations", "filters": [] },
+    "list_scalar_to_edge_migrations": { "via": "list_catalog", "kind": "scalar_to_edge_migrations", "filters": [] },
+    "list_split_migrations": { "via": "list_catalog", "kind": "split_migrations", "filters": [] },
+    "list_type_migrations": { "via": "list_catalog", "kind": "type_migrations", "filters": [] }
+  },
+  "get": {
+    "get_entity_meta": { "via": "get_catalog_entry", "kind": "entity_meta", "id_param": "name" },
+    "get_edge_type": { "via": "get_catalog_entry", "kind": "edge_type", "id_param": "type" },
+    "get_region": { "via": "get_catalog_entry", "kind": "region", "id_param": "id" },
+    "get_domain_guide": { "via": "get_catalog_entry", "kind": "domain_guide", "id_param": "domain_id" },
+    "get_domain_ring": { "via": "get_catalog_entry", "kind": "domain_ring", "id_param": "id" },
+    "get_framework": { "via": "get_catalog_entry", "kind": "framework", "id_param": "id" },
+    "get_lens": { "via": "get_catalog_entry", "kind": "lens", "id_param": "id" },
+    "get_lifecycle": { "via": "get_catalog_entry", "kind": "lifecycle", "id_param": "entity_type" },
+    "get_playbook": { "via": "get_catalog_entry", "kind": "playbook", "id_param": "id" },
+    "get_scale": { "via": "get_catalog_entry", "kind": "scale", "id_param": "id" },
+    "get_anti_pattern": { "via": "get_catalog_entry", "kind": "anti_pattern", "id_param": "id" },
+    "get_tree_pattern": { "via": "get_catalog_entry", "kind": "tree_pattern", "id_param": "id" },
+    "get_type_label": { "via": "get_catalog_entry", "kind": "type_label", "id_param": "entity_type" },
+    "get_template": { "via": "get_catalog_entry", "kind": "template", "id_param": "id" },
+    "get_approach": { "via": "get_catalog_entry", "kind": "approach", "id_param": "id" }
+  },
+  "fold": {
+    "get_valid_children": { "via": "get_entity_schema", "include": "valid_children", "source_id_param": "parent_type", "schema_arg": "type", "result_field": "valid_children" },
+    "get_region_for_entity_type": { "via": "get_entity_schema", "include": "region", "source_id_param": "entity_type", "schema_arg": "type", "result_field": "region" },
+    "resolve_edge_for_pair": { "via": "get_entity_schema", "schema_arg": "type", "schema_source": "source_type", "schema_edge_target_arg": "resolve_edge_to", "source_args": ["source_type", "target_type"], "result_field": "resolve_edge", "note": "get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge equals resolve_edge_for_pair({ source_type, target_type })." }
+  },
+  "prompt": {
+    "plan": { "via": "skill", "skill": "upg-plan", "note": "LLM-mediated routing envelope, not computed results; already shadowed by a /upg-* skill." },
+    "inspect": { "via": "skill", "skill": "upg-inspect" },
+    "prioritise": { "via": "skill", "skill": "upg-prioritise" },
+    "reflect": { "via": "skill", "skill": "upg-reflect" },
+    "trace": { "via": "skill", "skill": "upg-trace" }
+  }
+}

@@ -57,9 +57,9 @@ When the user answers, don't just silently move on. Briefly acknowledge, reflect
 
 ## Entity Types
 
-A GTM plan spans a container strategy, the ideal-customer profile, positioning, messaging, the launch itself, acquisition channels, and content strategy. **Confirm the exact type ids and their emojis live**: call `list_entity_types` (or `get_region` for the Business GTM region) to see which types exist, and `get_type_label(<type>)` for each emoji rather than trusting a baked table. Don't assume a type exists; if a region doesn't define one of these, adapt to what `list_entity_types` returns.
+A GTM plan spans a container strategy, the ideal-customer profile, positioning, messaging, the launch itself, acquisition channels, and content strategy. **Confirm the exact type ids and their emojis live**: call `list_catalog({ kind: 'entity_types' })` (or `get_catalog_entry({ kind: 'region', id })` for the Business GTM region) to see which types exist, and `get_catalog_entry({ kind: 'type_label', id: <type> })` for each emoji rather than trusting a baked table. Don't assume a type exists; if a region doesn't define one of these, adapt to what `list_catalog({ kind: 'entity_types' })` returns.
 
-> **MCP-first.** Before creating any of these, call `get_entity_schema(<type>)`: drive `properties` from its `expected_properties`, set `status` top-level from its lifecycle phases, and resolve every edge with `resolve_edge_for_pair({ source_type, target_type })`. The flow detail's payloads show shape and intent only.
+> **MCP-first.** Before creating any of these, call `get_entity_schema(<type>)`: drive `properties` from its `expected_properties`, set `status` top-level from its lifecycle phases, and resolve every edge with `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge`. The flow detail's payloads show shape and intent only.
 
 ## Discovery Flow
 

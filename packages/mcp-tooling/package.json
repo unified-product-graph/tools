@@ -29,6 +29,7 @@
   },
   "files": [
     "dist",
+    "retired-tools.json",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"

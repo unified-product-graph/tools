@@ -18,12 +18,12 @@ If they want a phonebook, they can ask for it. The default is conversation.
 
 Use the `mcp__unified-product-graph__*` MCP tools:
 - **State:** `get_product_context`, `get_graph_digest`, `get_session_context`
-- **Approaches:** `list_approaches`, `get_approach`
-- **Regions / playbooks (when relevant):** `list_regions`, `get_region`, `list_playbooks`, `get_playbook`
+- **Approaches:** `list_catalog({ kind: 'approaches' })`, `get_catalog_entry({ kind: 'approach', id })`
+- **Regions / playbooks (when relevant):** `list_catalog({ kind: 'regions' })`, `get_catalog_entry({ kind: 'region', id })`, `list_catalog({ kind: 'playbooks' })`, `get_catalog_entry({ kind: 'playbook', id })`
 
 ## The Cartographic Frame
 
-UPG is a chart of your product knowledge. The chart is organised into regions (call `list_regions` for the live set; the spec currently has 11: Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations, Foundations). The chart is read through one of **5 approaches**: five paths of arrival to five different questions:
+UPG is a chart of your product knowledge. The chart is organised into regions (call `list_catalog({ kind: 'regions' })` for the live set; the spec currently has 11: Strategy, Users & Needs, Discovery, Market, Experience, Delivery, Engineering, Business GTM, Analytics, Operations, Foundations). The chart is read through one of **5 approaches**: five paths of arrival to five different questions:
 
 | Approach | Question | Cartographic sense |
 |---|---|---|
@@ -92,7 +92,7 @@ When the user selects an approach (or you infer one from their description), pre
 
 | Approach | Pre-call | Entry skill |
 |---|---|---|
-| 🧠 Plan | `mcp__unified-product-graph__list_playbooks()`; see region options | `/upg-walk-region <region>` |
+| 🧠 Plan | `list_catalog({ kind: 'playbooks' })`; see region options | `/upg-walk-region <region>` |
 | 🔍 Inspect | `mcp__unified-product-graph__get_graph_digest()`; health metrics | `/upg-show-status` |
 | 📊 Prioritise | `mcp__unified-product-graph__get_graph_digest()`; gap + coverage data | `/upg-check-gaps` |
 | 🧵 Trace | `mcp__unified-product-graph__get_product_context()`; find anchor entities | `/upg-show-impact <entity>` |
@@ -131,7 +131,7 @@ Render (real markdown, NOT a code block):
 
 Your graph lives in a `.upg` file: a JSON format you own and track with git, with no cloud required.
 
-UPG is a chart of your product knowledge across regions (call `list_regions` for the live set; currently 11 canonical regions including Foundations).
+UPG is a chart of your product knowledge across regions (call `list_catalog({ kind: 'regions' })` for the live set; currently 11 canonical regions including Foundations).
 
 You read the chart through **5 approaches**: Plan, Inspect, Prioritise, Trace, Reflect.
 
@@ -153,7 +153,7 @@ You read the chart through **5 approaches**: Plan, Inspect, Prioritise, Trace, R
 If `/upg <something>` is given:
 
 1. **Match a subcommand:** `init`, `status`, `tree`, `gaps`, `inspect`, `reflect`, `explore`, `journey`, etc. → run the corresponding `/upg-<x>` skill.
-2. **Match an approach name:** `plan`, `inspect`, `prioritise`, `trace`, `reflect` → call `get_approach({ approach_id })` and route the user to the most-fitting skill for their graph state.
+2. **Match an approach name:** `plan`, `inspect`, `prioritise`, `trace`, `reflect` → call `get_catalog_entry({ kind: 'approach', id, approach_id })` and route the user to the most-fitting skill for their graph state.
 3. **Match a region name:** `strategy`, `users_needs`, `experience_design_brand`, etc. → suggest `/upg-walk-region <region>`.
 4. **Free-text question:** parse intent into one of the 5 approaches, then suggest a skill.
 
@@ -239,7 +239,7 @@ After routing the user to the next skill, call:
 If a returning user asks "what's new?":
 
 - **5 approaches** (Plan / Inspect / Prioritise / Trace / Reflect) replace the old "14 canonical workflows" framing; cognitive operations, not menus.
-- **Region-anchored playbooks** organised under canonical regions (call `list_playbooks` for the live count; currently 13 across 11 regions).
+- **Region-anchored playbooks** organised under canonical regions (call `list_catalog({ kind: 'playbooks' })` for the live count; currently 13 across 11 regions).
 - **MCP tools** across 6 buckets: primitives, approaches, catalog readers, spec metadata, mutations, workspace ops (call `get_spec_version()` for the live tool count).
 - **Reflect** is now first-class; `/upg-reflect` walks Five Whys, Pre-mortem, Red Team, Devil's Advocate, or Second-order Thinking against any entity, region, or the whole graph.
 - **Skill frontmatter** declares `category` (cognitive / tooling / schema / meta) and `approaches`; agents and the aggregator can route by these instead of grepping descriptions.

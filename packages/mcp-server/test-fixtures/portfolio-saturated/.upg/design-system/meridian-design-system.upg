@@ -1,0 +1,74 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.2",
+    "product": {
+      "id": "p_designsys",
+      "title": "Meridian Design System",
+      "stage": "mature"
+    },
+    "summary": "Shared design system: components, tokens, brand identity.",
+    "counts": {
+      "nodes": 4,
+      "edges": 2
+    },
+    "provenance": {
+      "tool": "build-portfolio-saturated",
+      "exported_at": "2026-07-03T19:07:17.379Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "5365c16e270911e83aab0ec6386dae23"
+    }
+  },
+  "product": {
+    "id": "p_designsys",
+    "title": "Meridian Design System",
+    "description": "Shared design system: components, tokens, brand identity.",
+    "stage": "mature"
+  },
+  "nodes": [
+    {
+      "id": "n_K4Amm86NCpoT7xF_",
+      "type": "brand_identity",
+      "title": "Meridian Brand Identity",
+      "slug": "meridian-brand-identity",
+      "status": "exploratory"
+    },
+    {
+      "id": "n_lxMr8YVanJ5v6oNp",
+      "type": "design_component",
+      "title": "Fleet Status Badge",
+      "slug": "fleet-status-badge",
+      "status": "alpha"
+    },
+    {
+      "id": "n_JY7s6-6p1P3i-Iks",
+      "type": "design_component",
+      "title": "Route Card",
+      "slug": "route-card",
+      "status": "alpha"
+    },
+    {
+      "id": "n_18fkNOIa_vt2BMxn",
+      "type": "design_system",
+      "title": "Meridian Design System",
+      "slug": "meridian-design-system",
+      "status": "alpha"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_TT9hnMs6PFMKEQdr",
+      "source": "n_18fkNOIa_vt2BMxn",
+      "target": "n_JY7s6-6p1P3i-Iks",
+      "type": "design_system_contains_design_component"
+    },
+    {
+      "id": "e_sD72xHjNqwYW3Sx9",
+      "source": "n_18fkNOIa_vt2BMxn",
+      "target": "n_lxMr8YVanJ5v6oNp",
+      "type": "design_system_contains_design_component"
+    }
+  ]
+}

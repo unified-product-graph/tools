@@ -25,7 +25,7 @@ For `kind: 'domain_guide'` steps, the runtime expands them via `DomainUsageGuide
 
 The user invokes this skill with a playbook id, e.g. `/upg-walk-playbook playbook:business-gtm-growth`.
 
-If no argument is given, list the canonical ids and ask the user to pick one. Call `mcp__unified-product-graph__list_playbooks` (optionally with `canonical_only: true`) to get the live list — **do not hardcode counts or ids**. The live server currently ships 13 playbooks across 11 regions (illustrative list; verify with `list_playbooks` at runtime):
+If no argument is given, list the canonical ids and ask the user to pick one. Call `list_catalog({ kind: 'playbooks' })` (optionally with `canonical_only: true`) to get the live list — **do not hardcode counts or ids**. The live server currently ships 13 playbooks across 11 regions (illustrative list; verify with `list_catalog({ kind: 'playbooks' })` at runtime):
 
 - **Canonical** (one per region): `playbook:strategy-outcomes`, `playbook:users-needs`, `playbook:discovery-research-validation`, `playbook:market-competitive`, `playbook:experience-design-brand`, `playbook:product-delivery`, `playbook:engineering-platform`, `playbook:business-gtm-growth`, `playbook:analytics-data`, `playbook:operations-quality`, `playbook:foundations`.
 - **Specialised** (alternative entry paths): `playbook:business-growth-metric-driven`, `playbook:business-marketing-audience-first`.
@@ -34,7 +34,7 @@ If no argument is given, list the canonical ids and ask the user to pick one. Ca
 
 ### 1. Load the playbook
 
-Use the MCP tool `mcp__unified-product-graph__get_playbook({ id })` or call `getPlaybookById` from `@unified-product-graph/core`. If the id is unknown, tell the user and list canonical playbooks via `mcp__unified-product-graph__list_playbooks({ canonical_only: true })`.
+Use the MCP tool `get_catalog_entry({ kind: 'playbook', id })` or call `getPlaybookById` from `@unified-product-graph/core`. If the id is unknown, tell the user and list canonical playbooks via `list_catalog({ kind: 'playbooks', canonical_only: true })`.
 
 ### 2. Orient the user
 

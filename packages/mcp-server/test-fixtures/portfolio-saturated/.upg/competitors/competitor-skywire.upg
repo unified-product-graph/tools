@@ -1,0 +1,46 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.2",
+    "product": {
+      "id": "p_skywire",
+      "title": "SkyWire Ops — Competitor Intel",
+      "stage": "growth"
+    },
+    "summary": "Competitive intelligence graph for SkyWire Ops.",
+    "counts": {
+      "nodes": 2,
+      "edges": 0
+    },
+    "member_kind": "watched",
+    "provenance": {
+      "tool": "build-portfolio-saturated",
+      "exported_at": "2026-07-03T19:07:17.381Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "ff4e894dad8bf30d44a839508aa49814"
+    }
+  },
+  "product": {
+    "id": "p_skywire",
+    "title": "SkyWire Ops — Competitor Intel",
+    "description": "Competitive intelligence graph for SkyWire Ops.",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_a5Hy99iFctkXr3kF",
+      "type": "competitor",
+      "title": "SkyWire Ops",
+      "slug": "skywire-ops"
+    },
+    {
+      "id": "n_o1C3SRaea5ogEVG3",
+      "type": "competitor_feature",
+      "title": "SkyWire Live Map",
+      "slug": "skywire-live-map"
+    }
+  ],
+  "edges": []
+}

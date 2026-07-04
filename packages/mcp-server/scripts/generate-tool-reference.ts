@@ -54,7 +54,7 @@ const DOMAIN_SOURCE_FILES: Record<string, readonly string[]> = {
   // the Spec domain section (frameworks), alongside prioritise/get_framework.
   // list_templates / get_template (the curated starter-template library) are
   // canonical-reference reads and group under Spec Introspection too.
-  spec: ['spec.ts', 'frameworks.ts', 'templates.ts'],
+  spec: ['spec.ts', 'frameworks.ts', 'templates.ts', 'catalog.ts'],
   // portfolio_query / portfolio_digest (0.9.1 batch-3 #13) — the cross-product
   // read layer — live in their own file but belong to the Workspace section.
   workspace: ['workspace.ts', 'portfolio-read.ts', 'clone-structure.ts', 'registry.ts'],
@@ -102,6 +102,9 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   // templates
   listTemplatesTool: 'list_templates',
   getTemplateTool: 'get_template',
+  // catalog facets (0.19.0)
+  listCatalog: 'list_catalog',
+  getCatalogEntry: 'get_catalog_entry',
   // nodes
   listNodes: 'list_nodes',
   getNode: 'get_node',

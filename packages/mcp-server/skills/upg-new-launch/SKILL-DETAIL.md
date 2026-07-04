@@ -7,7 +7,7 @@ description: "Detailed discovery flow steps for /upg-new-launch"
 
 Loaded on demand when entering the guided launch planning flow.
 
-> **MCP-first (applies to every create below).** Before creating any entity (GTM strategy, ICP, positioning, messaging, launch, acquisition channel, content strategy), call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any assessment as `{ value, label }`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })`: if it returns an edge, create it without an explicit `type:` (server infers); if it returns `null`, keep the relationship implicit (shared `parent_id`) rather than inventing an edge. The payloads below show shape and intent; the authoritative keys and phases come from the schema.
+> **MCP-first (applies to every create below).** Before creating any entity (GTM strategy, ICP, positioning, messaging, launch, acquisition channel, content strategy), call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any assessment as `{ value, label }`. Before any edge, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge`: if it returns an edge, create it without an explicit `type:` (server infers); if it returns `null`, keep the relationship implicit (shared `parent_id`) rather than inventing an edge. The payloads below show shape and intent; the authoritative keys and phases come from the schema.
 
 ## Discovery Flow
 
@@ -55,7 +55,7 @@ create_node({
 })
 ```
 
-If an existing feature or release was selected, link them through a `launch` entity rather than the GTM strategy directly: resolve the GTM-strategy→launch edge with `resolve_edge_for_pair`, and the launch then relates to the feature/release it ships. Always confirm a pair has a canonical edge via `resolve_edge_for_pair` before connecting; if it returns `null`, note the relationship in the description rather than inventing an edge.
+If an existing feature or release was selected, link them through a `launch` entity rather than the GTM strategy directly: resolve the GTM-strategy→launch edge with `get_entity_schema({ type, resolve_edge_to }).resolve_edge`, and the launch then relates to the feature/release it ships. Always confirm a pair has a canonical edge via `get_entity_schema({ type, resolve_edge_to }).resolve_edge` before connecting; if it returns `null`, note the relationship in the description rather than inventing an edge.
 
 Confirm: "📣 **GTM strategy started** for <launch description>."
 
@@ -92,7 +92,7 @@ create_node({
 Connect to existing persona if relevant; resolve the edge first:
 
 ```
-// edge = resolve_edge_for_pair({ source_type: "ideal_customer_profile", target_type: "persona" })
+// edge = get_entity_schema({ type: "ideal_customer_profile", resolve_edge_to: "persona" }).resolve_edge
 create_edge({ source_id: "<icp_id>", target_id: "<persona_id>" })  // server infers type
 ```
 
@@ -133,7 +133,7 @@ create_node({
 If competitors exist in the graph, resolve the edge first:
 
 ```
-// edge = resolve_edge_for_pair({ source_type: "positioning", target_type: "competitor" })
+// edge = get_entity_schema({ type: "positioning", resolve_edge_to: "competitor" }).resolve_edge
 create_edge({ source_id: "<positioning_id>", target_id: "<competitor_id>" })  // server infers type
 ```
 
@@ -169,7 +169,7 @@ create_node({
 })
 ```
 
-Connect to positioning only if a canonical edge exists: call `resolve_edge_for_pair({ source_type: "messaging", target_type: "positioning" })`. If it returns `null`, keep the relationship implicit (both hang off the same `gtm_strategy` via `parent_id`) rather than inventing an edge type.
+Connect to positioning only if a canonical edge exists: call `get_entity_schema({ type: "messaging", resolve_edge_to: "positioning" }).resolve_edge`. If it returns `null`, keep the relationship implicit (both hang off the same `gtm_strategy` via `parent_id`) rather than inventing an edge type.
 
 Confirm: "💬 **Key message set**: *\"<headline>\"*"
 
@@ -288,10 +288,10 @@ create_node({
 })
 ```
 
-Connect each channel to its audience. Resolve the canonical edge first: `resolve_edge_for_pair({ source_type: "acquisition_channel", target_type: "persona" })` (channels typically reach the underlying persona rather than the ICP directly — confirm via the resolver). Then:
+Connect each channel to its audience. Resolve the canonical edge first: `get_entity_schema({ type: "acquisition_channel", resolve_edge_to: "persona" }).resolve_edge` (channels typically reach the underlying persona rather than the ICP directly — confirm via the resolver). Then:
 
 ```
-// edge = resolve_edge_for_pair({ source_type: "acquisition_channel", target_type: "persona" })
+// edge = get_entity_schema({ type: "acquisition_channel", resolve_edge_to: "persona" }).resolve_edge
 create_edge({ source_id: "<acquisition_channel_id>", target_id: "<persona_id>" })  // server infers type
 ```
 
@@ -330,7 +330,7 @@ create_node({
 })
 ```
 
-Connect to relevant acquisition channels only if a canonical edge exists: call `resolve_edge_for_pair({ source_type: "content_strategy", target_type: "acquisition_channel" })`. If it returns `null`, keep the relationship implicit (both hang off the same `gtm_strategy` via `parent_id`) rather than inventing an edge type.
+Connect to relevant acquisition channels only if a canonical edge exists: call `get_entity_schema({ type: "content_strategy", resolve_edge_to: "acquisition_channel" }).resolve_edge`. If it returns `null`, keep the relationship implicit (both hang off the same `gtm_strategy` via `parent_id`) rather than inventing an edge type.
 
 Confirm: "📝 **Content strategy set**: <primary format> focused on <goal>."
 

@@ -1,0 +1,58 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.2",
+    "product": {
+      "id": "p_revops",
+      "title": "Revenue Ops",
+      "stage": "mature"
+    },
+    "summary": "Revenue operating function — pipeline, forecasting, deal desk.",
+    "counts": {
+      "nodes": 3,
+      "edges": 0
+    },
+    "member_kind": "operating_function",
+    "provenance": {
+      "tool": "build-portfolio-saturated",
+      "exported_at": "2026-07-03T19:07:17.378Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "6b36352a01e6059fe837169a087a24d6"
+    }
+  },
+  "product": {
+    "id": "p_revops",
+    "title": "Revenue Ops",
+    "description": "Revenue operating function — pipeline, forecasting, deal desk.",
+    "stage": "mature"
+  },
+  "nodes": [
+    {
+      "id": "n_EgVJH7PUQOPu5M1A",
+      "type": "gtm_strategy",
+      "title": "Regional Carrier Expansion",
+      "slug": "regional-carrier-expansion",
+      "status": "planning"
+    },
+    {
+      "id": "n_wTBOdP961pcLMKmS",
+      "type": "metric",
+      "title": "Net Revenue Retention",
+      "slug": "net-revenue-retention",
+      "properties": {
+        "designation": "north_star",
+        "metric_category": "revenue",
+        "statistical_function": "percentage"
+      }
+    },
+    {
+      "id": "n_YrfCAcp7l9o-gMcY",
+      "type": "pipeline_sales",
+      "title": "Enterprise Fleet Pipeline",
+      "slug": "enterprise-fleet-pipeline"
+    }
+  ],
+  "edges": []
+}

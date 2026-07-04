@@ -29,7 +29,7 @@ Display as: **"Phase 2 of 4: Your user"**
 
 Use the `mcp__unified-product-graph__*` MCP tools (create_node, create_edge, get_product_context, search_nodes).
 
-> **MCP-first (applies to every create below).** Before creating any entity (product, persona, desired outcome, job, need, outcome, metric, hypothesis), call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any assessment as `{ value, label }`. For the chain children under a persona, confirm the valid child types with `get_valid_children("persona")`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. The payloads below show shape and intent; the authoritative keys, phases, and stage values come from the schema/spec at runtime.
+> **MCP-first (applies to every create below).** Before creating any entity (product, persona, desired outcome, job, need, outcome, metric, hypothesis), call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any assessment as `{ value, label }`. For the chain children under a persona, confirm the valid child types with `get_entity_schema({ type: "persona", include: ['valid_children'] })`. Before any edge, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and let the server infer the edge type. The payloads below show shape and intent; the authoritative keys, phases, and stage values come from the schema/spec at runtime.
 
 ## CRITICAL RULES
 
@@ -99,15 +99,15 @@ Ask: **"How far along is <product name>?"**
 7. 🏗️ Mature; established, optimizing
 ```
 
-Map the answer to a canonical product-stage value. **Don't hard-code the stage enum**: call `list_product_stages` (or read the `stage` property off `get_entity_schema("product")`) for the current valid values, and pick the one matching the user's answer. STOP. Wait. Then create the product node:
+Map the answer to a canonical product-stage value. **Don't hard-code the stage enum**: call `list_catalog({ kind: 'product_stages' })` (or read the `stage` property off `get_entity_schema("product")`) for the current valid values, and pick the one matching the user's answer. STOP. Wait. Then create the product node:
 
 ```
-// Read get_entity_schema("product") / list_product_stages first, then:
+// Read get_entity_schema("product") / list_catalog({ kind: 'product_stages' }) first, then:
 create_node({
   type: "product",
   title: "<name>",
   description: "<their vision one-liner>",
-  properties: { stage: "<canonical stage from list_product_stages>" }
+  properties: { stage: "<canonical stage from list_catalog({ kind: 'product_stages' })>" }
 })
 ```
 
@@ -117,14 +117,14 @@ Confirm: "🎯 **<Product Name>** is in the graph." Then move to Step 1d.
 
 ### Step 1d: Lens (infer, don't ask)
 
-**Do not ask about lenses.** Infer the lens from what the user said about their product and role. **Fetch the valid lens ids first** with `list_lenses` (don't assume the id strings) and match intent to one of them:
+**Do not ask about lenses.** Infer the lens from what the user said about their product and role. **Fetch the valid lens ids first** with `list_catalog({ kind: 'lenses' })` (don't assume the id strings) and match intent to one of them:
 
 - Engineering signals (bugs, services, APIs, architecture, "I'm an engineer") → the engineering lens
-- Design signals (screens, components, flows, "I'm a designer") → the design/UX lens id `list_lenses` returns
+- Design signals (screens, components, flows, "I'm a designer") → the design/UX lens id `list_catalog({ kind: 'lenses' })` returns
 - Growth signals (funnels, channels, campaigns) → the growth lens
 - Otherwise → the default product lens
 
-Set silently (using the exact id from `list_lenses`):
+Set silently (using the exact id from `list_catalog({ kind: 'lenses' })`):
 
 ```
 update_session_context({ lens: "<inferred_lens>" })
@@ -166,7 +166,7 @@ STOP. Wait for the answer.
 
 ### Step 2c: Persona: Desired Outcomes
 
-> **Chain model:** desired outcomes are SEPARATE nodes connected to the persona (resolve the edge with `resolve_edge_for_pair` at create time). Never inline them as a `goals` array on the persona.
+> **Chain model:** desired outcomes are SEPARATE nodes connected to the persona (resolve the edge with `get_entity_schema({ type, resolve_edge_to }).resolve_edge` at create time). Never inline them as a `goals` array on the persona.
 
 Ask: **"What outcomes is <Name> trying to achieve? What does success look like for them?"**
 
@@ -201,7 +201,7 @@ STOP. Wait for the answer.
 
 ### Step 2e: Persona: Needs
 
-> **Chain model:** needs are SEPARATE nodes connected to the persona (resolve the edge with `resolve_edge_for_pair` at create time). Never inline as a `frustrations` array.
+> **Chain model:** needs are SEPARATE nodes connected to the persona (resolve the edge with `get_entity_schema({ type, resolve_edge_to }).resolve_edge` at create time). Never inline as a `frustrations` array.
 
 Ask: **"What gets in <Name>'s way today? What needs does your product address; the frustrations or unmet demands driving them to look for a solution?"**
 
@@ -221,7 +221,7 @@ STOP. Wait.
 
 **Vibe check:** Before creating, show a brief summary and ask: "Here's what I've captured about **<Name>**: anything you'd change?"
 
-Then create the persona node. **Read `get_entity_schema("persona")` first** and build `properties` from its `expected_properties` (don't assume a fixed allowlist). **Never set `goals` or `frustrations` on the persona**: those are separate chain nodes connected by edges. Confirm the chain child types with `get_valid_children("persona")` and resolve each edge with `resolve_edge_for_pair`:
+Then create the persona node. **Read `get_entity_schema("persona")` first** and build `properties` from its `expected_properties` (don't assume a fixed allowlist). **Never set `goals` or `frustrations` on the persona**: those are separate chain nodes connected by edges. Confirm the chain child types with `get_entity_schema({ type: "persona", include: ['valid_children'] })` and resolve each edge with `get_entity_schema({ type, resolve_edge_to }).resolve_edge`:
 
 ```
 // 1. Create the persona — properties from get_entity_schema("persona")
@@ -234,8 +234,8 @@ create_node({
 })
 // → persona_id = result.node.id
 
-// 2. For each desired outcome — child type from get_valid_children("persona"),
-//    edge from resolve_edge_for_pair({ source_type: "persona", target_type: <child> }):
+// 2. For each desired outcome — child type from get_entity_schema({ type: "persona", include: ['valid_children'] }),
+//    edge from get_entity_schema({ type: "persona", resolve_edge_to: <child> }).resolve_edge:
 create_node({ /* type from schema */ title: "<outcome>", parent_id: "<persona_id>" })
 create_edge({ source_id: "<persona_id>", target_id: "<child_id>" })  // server infers type
 
@@ -336,7 +336,7 @@ create_node({
 })
 ```
 
-The first lifecycle phase id from `get_lifecycle({ entity_type: "hypothesis" })` is the initial `drafted` phase — use whatever the live call returns as the `status` value. Do not hard-code `"draft"` or `"untested"`.
+The first lifecycle phase id from `get_catalog_entry({ kind: 'lifecycle', id: "hypothesis" })` is the initial `drafted` phase — use whatever the live call returns as the `status` value. Do not hard-code `"draft"` or `"untested"`.
 
 Then ask: **"Got another bet, or are we good for now?"**
 

@@ -4,6 +4,7 @@
  */
 
 import type { ToolDefinition } from '@unified-product-graph/mcp-tooling'
+import { LIST_CATALOG_DEF, GET_CATALOG_ENTRY_DEF } from '@unified-product-graph/mcp-tooling'
 import type { ToolHandler } from './server-context.js'
 import { CANONICAL_LENS_IDS } from './server-context.js'
 import {
@@ -90,55 +91,7 @@ import {
 } from '../tools/registry.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
-import {
-  listPlaybooks,
-  getPlaybook,
-  listApproaches,
-  getApproach,
-  plan,
-  inspect,
-  prioritise,
-  trace,
-  reflect,
-  listDomains,
-  getDomainGuide,
-  listFrameworks,
-  getFramework,
-  listEdgeTypes,
-  getEdgeType,
-  listRegions,
-  getRegion,
-  getRegionForEntity,
-  listTreePatterns,
-  getTreePattern,
-  getSpecVersion,
-  resolveEdgeForPair,
-  listCrossEdgeTypes,
-  listLenses,
-  getLensTool,
-  listTypeLabels,
-  getTypeLabel,
-  getValidChildrenTool,
-  listEntityTypes,
-  getEntityMeta,
-  listAntiPatterns,
-  getAntiPattern,
-  listBenchmarks,
-  listProductStages,
-  listTypeMigrations,
-  listEdgeMigrations,
-  listSplitMigrations,
-  listScalarToEdgeMigrations,
-  listLifecycles,
-  getLifecycle,
-  listStatusValues,
-  listScales,
-  getScale,
-  listFrameworkCategories,
-  listFrameworkStructurePatterns,
-  listDomainRings,
-  getDomainRing,
-} from '../tools/spec.js'
+import { getSpecVersion } from '../tools/spec.js'
 import { getTree } from '../tools/tree.js'
 import { validateGraph, getAntiPatternViolationsFor } from '../tools/validation.js'
 import { migrateStatus } from '../tools/migrations.js'
@@ -148,7 +101,7 @@ import {
   pushToCloud,
 } from '../tools/sync.js'
 import { skillAudit } from '../tools/skills.js'
-import { listTemplatesTool, getTemplateTool } from '../tools/templates.js'
+import { listCatalog, getCatalogEntry } from '../tools/catalog.js'
 import { UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
 
 // `ToolDefinition` lives in `@unified-product-graph/mcp-tooling`. Re-exported
@@ -960,102 +913,29 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_entity_schema',
     description:
-      'Return expected properties, valid statuses, valid edge types, and domain for an entity type. Lets agents construct valid entities without skill prompts.',
+      'Return expected properties, valid statuses, valid edge types, and domain for an entity type. Lets agents construct valid entities without skill prompts. Optional `include` folds in valid child types / super-domain region; optional `resolve_edge_to` folds in the canonical edge for this type → that target.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         type: { type: 'string', description: 'Entity type (e.g. "hypothesis", "persona", "opportunity")' },
+        include: {
+          type: 'array',
+          items: { type: 'string', enum: ['valid_children', 'region'] },
+          description: 'Optional extra blocks: "valid_children" (folds get_valid_children), "region" (folds get_region_for_entity_type).',
+        },
+        resolve_edge_to: {
+          type: 'string',
+          description: 'Optional target entity type. Folds resolve_edge_for_pair(type → target) into a `resolve_edge` block.',
+        },
       },
       required: ['type'],
     },
   },
+  // Faceted spec-catalog surface (0.19.0). Definitions sourced from the shared
+  // `@unified-product-graph/mcp-tooling` module so local + cloud are byte-identical.
+  LIST_CATALOG_DEF,
+  GET_CATALOG_ENTRY_DEF,
   // ── Spec introspection ─────────────────────────────────
-  {
-    name: 'list_playbooks',
-    description:
-      'List canonical UPG playbooks from `@unified-product-graph/core`. Each playbook bootstraps a region; its `creation_sequence` answers "what to create when populating this region". Filters: `region`, `canonical_only`, `framework_id`. The catalog spans 10 regions: one canonical playbook per region, plus specialised playbooks (three carry a `framework_id`: BMC, AARRR, build-measure-learn).',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        region: { type: 'string', description: 'Exact-match UPGRegionId (e.g. "users_needs", "business_gtm_growth").' },
-        canonical_only: { type: 'boolean', description: 'When true, return only the canonical playbook per region (W1 invariant restated).' },
-        framework_id: { type: 'string', description: 'Exact-match UPGFramework.id (e.g. "business-model-canvas", "pirate-metrics-aarrr").' },
-      },
-    },
-  },
-  {
-    name: 'get_playbook',
-    description:
-      'Return one `UPGPlaybook` by id (e.g. "playbook:strategy-outcomes", "playbook:business-gtm-growth"). Includes the ordered `creation_sequence` with step kinds and prompts. IDs are namespace-prefixed `playbook:*`. For approaches, use `get_approach`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Playbook id (namespace-prefixed: playbook:*).' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'list_approaches',
-    description:
-      'List the 5 canonical `UPGApproach` records: Plan, Inspect, Prioritise, Trace, Reflect. An approach is the path of arrival to a region of the graph (final approach to an airport, coastline approach). Each record carries id, label, description, `question_answered`, `signature_hint`, `framework_id_examples`. Optional `framework_id` narrows to approaches whose `framework_id_examples` include it.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        framework_id: { type: 'string', description: 'Exact-match framework id. Narrows to approaches whose framework_id_examples include it (discoverability surface; full reverse lookup is on UPGFramework.approach_ids).' },
-      },
-    },
-  },
-  {
-    name: 'get_approach',
-    description:
-      'Return one `UPGApproach` by id. Valid ids: `plan`, `inspect`, `prioritise`, `trace`, `reflect` (same names as the verb-led MCP tools).',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Approach id. One of: plan, inspect, prioritise, trace, reflect.', enum: ['plan', 'inspect', 'prioritise', 'trace', 'reflect'] },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'plan',
-    description:
-      'Plan approach: path of arrival to "what should I build next?". Returns the Plan record + invocation params wrapped in `{ approach_id, scope, generated_at, approach, params }`. The LLM consumes `signature_hint` and synthesises `{ missing_entities, coverage_score }` against the live graph. Optional `region` narrows scope; omit `region` to scope to the product\'s ACTIVE regions; pass `exhaustive:true` to score the full type universe.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        region: { type: 'string', description: 'Optional UPGRegionId or atomic-domain id. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit to scope to the product\'s active regions.' },
-        exhaustive: { type: 'boolean', description: 'If true, score against the entire 319-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted.' },
-      },
-    },
-  },
-  {
-    name: 'inspect',
-    description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-show-entity skill instead of calling this tool directly. Inspect approach: path of arrival to "what\'s broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        region: { type: 'string', description: 'Optional UPGRegionId. Narrows inspection scope to a single region.' },
-        entities: { type: 'array', items: { type: 'string' }, description: 'Optional entity_id[]. Narrows inspection scope to a specific candidate set. Composable with region.' },
-      },
-    },
-  },
-  {
-    name: 'prioritise',
-    description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing prioritisation, invoke the /upg-prioritise skill instead of calling this tool directly. Prioritise approach: path of arrival to "what\'s most important?". Returns the Prioritise record + invocation params + framework metadata in the family-resemblance envelope. Both `candidates` and `framework_id` are required. The LLM looks up the framework via `get_framework`, reads its scoring spec, and emits `{ ranked: [{ entity_id, score, rationale }], framework_used }`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        candidates: { type: 'array', items: { type: 'string' }, description: 'entity_id[] to rank. Optional when exercise_id is given (the exercise supplies them).' },
-        framework_id: { type: 'string', description: 'Required. UPGFramework.id of the scoring lens (e.g. "rice-scoring", "ice-scoring", "kano-model", "cost-of-delay", "wsjf").' },
-        exercise_id: { type: 'string', description: 'Optional (0.8.4). A framework_exercise id: reads each candidate\'s scoring inputs from its includes-edge properties instead of node.properties, and bypasses the target-type guard so any entity type can be scored.' },
-      },
-      required: ['framework_id'],
-    },
-  },
   {
     name: 'apply_framework',
     description:
@@ -1088,489 +968,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['exercise_id', 'entity_id', 'values'],
     },
   },
-  {
-    name: 'trace',
-    description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing tracing, invoke the /upg-trace skill instead of calling this tool directly. Trace approach: path of arrival to "walk a meaningful path through existing graph". Returns the Trace record + invocation params in the family-resemblance envelope. The LLM uses `anchor` + `path` to compose `query()` calls and emits `{ trail: [{ depth, entity_id, edge_type_in }], reached: entity_id[] }`. `path` is type-shorthand: `["persona","job","feature"]` walks persona→job→feature using the canonical edge per pair (via `resolve_edge_for_pair`). Optional `edges_override` selects non-canonical edges per hop; `null` per element means "use canonical".',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        anchor: { type: 'string', description: 'Required. entity_id where the traversal starts.' },
-        path: { type: 'array', items: { type: 'string' }, description: 'Required. UPGEntityType[] type-shorthand path. Each step walks via the canonical edge for the source→target pair.' },
-        edges_override: { type: 'array', items: { type: ['string', 'null'] }, description: 'Optional. Per-hop edge override array. Length must match path length; element null means "use canonical edge for this pair".' },
-      },
-      required: ['anchor', 'path'],
-    },
-  },
-  {
-    name: 'reflect',
-    description:
-      '[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing reflection, invoke the /upg-reflect skill instead of calling this tool directly. Reflect approach: path of arrival to "what should I be questioning?". Returns the Reflect record + invocation params in the family-resemblance envelope. The LLM consumes `mode` + `scope` + `signature_hint` and emits `{ prompts: [{ kind, question, target_entities? }] }`. `mode` is one of: `assumptions`, `alternatives`, `blind-spots`, `load-bearing`; omit for open reflection. `scope` accepts a region id, entity id, or `null` for whole-graph.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        scope: { type: ['string', 'null'], description: 'Optional. Region id, entity id, or null for whole-graph.' },
-        mode: { type: 'string', description: 'Optional. One of: assumptions, alternatives, blind-spots, load-bearing. Omit for open reflection.', enum: ['assumptions', 'alternatives', 'blind-spots', 'load-bearing'] },
-      },
-    },
-  },
-  {
-    name: 'list_domains',
-    description:
-      'List domains. Default (`with_guide_only: true`) returns every domain with a canonical usage guide: id + `anchor_entity` + `creation_sequence`. Pass `with_guide_only: false` to enumerate every atomic domain from `UPG_DOMAINS`: id + label + description + types + `has_guide`. The two shapes are disjoint by the boolean.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        with_guide_only: {
-          type: 'boolean',
-          description:
-            'Default true. Returns only domains with a canonical usage guide (compact id + anchor_entity + creation_sequence). Pass false to return every atomic domain (id + label + description + types + has_guide).',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_domain_guide',
-    description:
-      'Return the full `UPGDomainUsageGuide` for a domain: anchor entity, creation sequence, named patterns (entity + edge chains), required cross-domain bridges, anti-patterns.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        domain_id: { type: 'string', description: 'Canonical domain id (e.g. "user", "market_intelligence", "growth").' },
-      },
-      required: ['domain_id'],
-    },
-  },
-  {
-    name: 'list_frameworks',
-    description:
-      'List the canonical `UPGFramework` definitions: the curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Returns a lightweight summary per framework (id, name, category, description, tags, approach_ids, structure_pattern); call `get_framework(id)` for the full record. Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        category: { type: 'string', description: 'Exact-match filter on UPGFramework.category (e.g. "strategy", "prioritization").' },
-        limit: { type: 'number', description: 'Page size (default 50, max 200).' },
-        cursor: { type: 'string', description: 'Opaque pagination cursor. Pass next_cursor from a previous response.' },
-      },
-    },
-  },
-  {
-    name: 'get_framework',
-    description:
-      'Return one `UPGFramework` by id (e.g. "rice-scoring", "lean-canvas"). Includes all four layers: data, structure, presentation, education.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Framework id (kebab-case). Alias: `framework_id`.' },
-        framework_id: { type: 'string', description: 'Alias for `id` (matches the key used by apply_framework / prioritise).' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'list_edge_types',
-    description:
-      'List every canonical edge type from `UPG_EDGE_CATALOG`, optionally narrowed by `source_type` and/or `target_type`. Each entry carries the edge key (`type`), forward/reverse verbs, classification, and endpoint types. The polymorphic wildcard `"node"` is preserved on polymorphic edges.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        source_type: { type: 'string', description: 'Exact-match filter on UPGEdgeDefinition.source_type. Pass "node" to find polymorphic edges with a wildcard source.' },
-        target_type: { type: 'string', description: 'Exact-match filter on UPGEdgeDefinition.target_type.' },
-      },
-    },
-  },
-  {
-    name: 'get_edge_type',
-    description:
-      'Return one edge catalogue entry by edge type key (e.g. "persona_pursues_job", "feature_addresses_need").',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        type: { type: 'string', description: 'Edge type key from UPG_EDGE_CATALOG.' },
-      },
-      required: ['type'],
-    },
-  },
   // ── Spec introspection round 2 ─────────────────────────────────
-  {
-    name: 'list_regions',
-    description:
-      'List the 10 canonical UPG super-domain regions from `UPG_REGIONS`. Returns a compact summary per region: id, label, order, shape, `mental_model`, `anchor_type`, `composes_atomic_domains`, `entity_count`, `intra_edge_count`, `boundary_edge_count`. Fixed list, non-paginated.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'get_region',
-    description:
-      'Return the full `UPGRegion` record by id: anchor entity (with rationale and inbound/outbound cross-edge counts), entity memberships with structural roles, intra-domain edge keys, boundary edges to other regions, shape archetype, atomic-domain composition.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: {
-          type: 'string',
-          description:
-            'Region id (e.g. "strategy_outcomes", "users_needs", "product_delivery"). See UPG_REGIONS for the full list of 10.',
-        },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'get_region_for_entity_type',
-    description:
-      'Resolve which super-domain region contains a given entity type. Wraps `getRegionForEntityType`; returns the full `UPGRegion` record. Use for adapters and copilots that route or render an entity by its super-domain.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        entity_type: {
-          type: 'string',
-          description: 'Canonical entity type (e.g. "persona", "feature", "metric").',
-        },
-      },
-      required: ['entity_type'],
-    },
-  },
-  {
-    name: 'list_tree_patterns',
-    description:
-      'List the canonical get_tree patterns as summary rows: id, label, the region each is the tree view of, anchor_type, fallback_anchors, natural_depth, gap_policy, and slot_count. The introspectable index of what get_tree can assemble. Pair with list_regions to see which tree-shaped regions have a pattern. Fixed list, non-paginated.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'get_tree_pattern',
-    description:
-      'Return the full declarative record for one get_tree pattern: its region, anchor_type, fallback_anchors, gap_policy, natural_depth, and its child map resolved to concrete edges. Each parent-to-child slot carries the canonical `via` edge and its `kind`, resolved live from the edge catalogue, so a client reads the real wiring instead of reverse-engineering it and the pattern cannot cite an edge the grammar lacks.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: {
-          type: 'string',
-          description: 'Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, org.',
-        },
-      },
-      required: ['id'],
-    },
-  },
   {
     name: 'get_spec_version',
     description:
-      'Spec-level metadata for compatibility checks: `upg_version`, `markdown_format_version`, and canonical counts (entity types, edge types, atomic domains, super-domain regions). Pin against the version pair; counts are informational.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'resolve_edge_for_pair',
-    description:
-      'Resolve the canonical `UPGEdgeType` for a `source_type` → `target_type` containment pair. Wraps `resolveContainmentEdge` / `UPG_EDGE_PAIR_MAP`. Adapter-critical: every import adapter (Markdown, Notion, Linear, GitHub) uses it to look up the right `_contains_` edge before falling back to a polymorphic edge. Returns `{ edge_type: null }` when the pair is uncatalogued.',
+      'Spec-level metadata for compatibility checks: `upg_version`, `markdown_format_version`, and canonical counts (entity types, edge types, atomic domains, super-domain regions). Pin against the version pair; counts are informational. Pass `changelog: true` to fold in the spec CHANGELOG (a `whats_new` surface); `since` (a version) returns only newer entries.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        source_type: { type: 'string', description: 'Parent / source entity type.' },
-        target_type: { type: 'string', description: 'Child / target entity type.' },
+        changelog: { type: 'boolean', description: 'When true, include a `changelog` array parsed from the spec CHANGELOG.md.' },
+        since: { type: 'string', description: 'With changelog: return only entries strictly newer than this version (e.g. "0.17.0").' },
       },
-      required: ['source_type', 'target_type'],
-    },
-  },
-  {
-    name: 'list_cross_edge_types',
-    description:
-      'List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`, `area_serves_persona`, `area_targets_market_segment`, `rolls_up_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`; `area_serves_persona` / `area_targets_market_segment` (a product_area to a registry persona/segment, with primary/secondary relevance) via `link_area_to_audience`; `rolls_up_to` (a product metric feeding a company metric) via `create_cross_product_edge`. None of the area edges go through the generic `create_cross_product_edge`.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'list_lenses',
-    description:
-      'List every canonical `UPGLens` from `@unified-product-graph/core`: Product, Design, Engineering, Growth, Business, Research, Marketing, Full. Returns a compact summary per lens: id, name, description, icon, audience, perspective, `framework_id`, `playbook_id`, `visible_domain_count`, `intelligence_prompt_count`. Use `get_lens` for the full record.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'get_lens',
-    description:
-      'Return the full `UPGLens` record by id (e.g. "product", "ux_design", "engineering", "full") plus the resolved entity types visible through that lens. Combines the lens record with `visible_types` in one response.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Lens id (e.g. "product", "ux_design", "full").' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'list_type_labels',
-    description:
-      'List canonical `UPGTypeLabel` entries: each entity type\'s display label, alt-labels (synonyms), per-framework labels, and designation labels where applicable. Paginated (default 100, max 500). Cursor is opaque base64 (`offset:N`), same convention as `list_frameworks`. External MCP apps need labels for rendering.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        limit: { type: 'number', description: 'Page size (default 100, max 500).' },
-        cursor: {
-          type: 'string',
-          description: 'Opaque pagination cursor. Pass next_cursor from a previous response.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_type_label',
-    description:
-      'Return one `UPGTypeLabel` by entity type, plus a resolved display label for an optional `framework_id` and/or `designation` (wraps `resolveLabel`). Lookup is exact-match against `UPG_TYPE_LABELS_MAP`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        entity_type: { type: 'string', description: 'Canonical entity type id.' },
-        framework_id: {
-          type: 'string',
-          description: 'Optional framework id (e.g. "lean_canvas", "ost", "design_thinking"). When set, resolved_label uses the framework-specific label.',
-        },
-        designation: {
-          type: 'string',
-          description: 'Optional designation key (e.g. "pain", "gap", "desire") for types that use the designation pattern.',
-        },
-      },
-      required: ['entity_type'],
-    },
-  },
-  {
-    name: 'get_valid_children',
-    description:
-      'Return valid direct-child entity types for a parent type. Wraps `getValidChildren` / `UPG_VALID_CHILDREN`. Empty array when none registered. Answers "what can I create under this?". Pairs with `get_entity_schema`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        parent_type: { type: 'string', description: 'Canonical parent entity type.' },
-      },
-      required: ['parent_type'],
     },
   },
   // ── Spec introspection round 3 ─────────────────────────────────
-  {
-    name: 'list_entity_types',
-    description:
-      'List canonical entity types from `UPG_ENTITY_META` (source of truth for ontology evolution). Every active, deprecated, or removed type with its immutable `type_id`, maturity tier, and version metadata. Paginated (default 50, max 200). Filters AND together and apply before pagination: `domain` (atomic-domain id), `maturity` (`draft` / `proposed` / `stable` / `deprecated` / `removed`), `deprecated` (boolean shortcut). Each row carries the full `EntityTypeMeta` plus resolved `domain_id` (null if no atomic-domain mapping).',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        domain: { type: 'string', description: 'Exact-match atomic-domain id (e.g. "user", "market_intelligence").' },
-        maturity: {
-          type: 'string',
-          enum: ['draft', 'proposed', 'stable', 'deprecated', 'removed'],
-          description: 'Exact-match UPGEntityTypeMaturity.',
-        },
-        deprecated: {
-          type: 'boolean',
-          description: 'true → only deprecated types; false → exclude deprecated and removed types (the active set). Composes with maturity via AND.',
-        },
-        limit: { type: 'number', description: 'Page size (default 50, max 200).' },
-        cursor: {
-          type: 'string',
-          description: 'Opaque pagination cursor. Pass next_cursor from a previous response.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_entity_meta',
-    description:
-      'Return one `EntityTypeMeta` record by entity type name, plus resolved `domain_id` (null when unmapped). One type\'s lifecycle metadata: maturity tier, since-version, replacement target if deprecated. Pass the canonical name (e.g. "persona", "pain_point"), not the immutable `type_id`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        name: { type: 'string', description: 'Canonical entity type name.' },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'list_anti_patterns',
-    description:
-      'List curated cross-domain anti-patterns from `UPG_ANTI_PATTERNS`. Each row pairs a memorable name with a machine-evaluable `IntelligenceCondition`, applicable stages, severity, and remediation. Graph-health patterns evaluated whole-graph (distinct from per-domain anti-patterns via `get_domain_guide`). Paginated (default 50, max 200). Filters AND together: `severity` (`high` / `medium` / `low`), `stage` (keeps patterns whose `stages[]` includes the given `UPGProductStage`).',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        severity: {
-          type: 'string',
-          enum: ['high', 'medium', 'low'],
-          description: 'Exact-match UPGAntiPatternSeverity.',
-        },
-        stage: {
-          type: 'string',
-          enum: [
-            'concept', 'validation', 'build', 'beta', 'launch',
-            'growth', 'mature', 'maintenance', 'sunset',
-          ],
-          description: 'Keeps anti-patterns whose stages[] includes the given UPGProductStage.',
-        },
-        limit: { type: 'number', description: 'Page size (default 50, max 200).' },
-        cursor: {
-          type: 'string',
-          description: 'Opaque pagination cursor. Pass next_cursor from a previous response.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_anti_pattern',
-    description:
-      'Return one curated anti-pattern by id (kebab-case slug, e.g. "features-without-hypotheses", "personas-without-jobs"). Includes structured condition, why-it-matters, remediation, applicable stages, severity, optional source citation. IDs are stable URL fragments.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Anti-pattern id (kebab-case slug).' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'list_benchmarks',
-    description:
-      'Return one of four canonical benchmark catalogs (the data behind `get_graph_digest` health logic). Required `kind` selects the source: `count` → `UPG_COUNT_BENCHMARKS` (per-entity-type ranges across the 9-stage journey); `relationship` → `UPG_RELATIONSHIP_BENCHMARKS` (parent → child minimum counts per stage); `ratio` → `UPG_RATIO_BENCHMARKS` (expected ratios between entity-type counts); `domain_activation` → `UPG_DOMAIN_ACTIVATION` (when each atomic domain is expected to activate). Optional filters AND together: `stage` (`UPGProductStage`), `domain` (atomic-domain id). Non-paginated.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        kind: {
-          type: 'string',
-          enum: ['count', 'relationship', 'ratio', 'domain_activation'],
-          description: 'Required. Which benchmark catalog to return.',
-        },
-        stage: {
-          type: 'string',
-          enum: [
-            'concept', 'validation', 'build', 'beta', 'launch',
-            'growth', 'mature', 'maintenance', 'sunset',
-          ],
-          description: 'Optional UPGProductStage filter. Semantics depend on kind (see tool description).',
-        },
-        domain: {
-          type: 'string',
-          description: 'Optional atomic-domain id filter. Semantics depend on kind (see tool description).',
-        },
-      },
-      required: ['kind'],
-    },
-  },
-  {
-    name: 'list_product_stages',
-    description:
-      'Return the canonical 9-stage product journey from `UPG_PRODUCT_STAGES` in order: concept → validation → build → beta → launch → growth → mature → maintenance → sunset. The closed enum used by `create_product`, `get_graph_digest` health logic, benchmark stage scoping, and anti-pattern stage filters.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
   // ── Spec introspection round 5 ──────────────────────────────────
-  {
-    name: 'list_type_migrations',
-    description:
-      'List every type-rename migration from `UPG_MIGRATIONS` (version-scoped registry of deprecated `from` → canonical `to` renames, e.g. `pain_point` → `need`, `hypothesis` → `hypothesis_claim`). Each row: `{ from, to, since }` where `since` is the spec version that introduced it. Optional `from_type` exact-matches `from`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        from_type: { type: 'string', description: 'Exact-match filter on the deprecated type name (e.g. "pain_point", "hypothesis").' },
-      },
-    },
-  },
-  {
-    name: 'list_edge_migrations',
-    description:
-      'List every edge-key migration from `UPG_EDGE_MIGRATIONS` (renamed or dropped canonical edge keys, e.g. `persona_has_jtbd` → `persona_pursues_job`). Each row: `{ kind, from, to?, since }` where `kind` is `rename` or `drop`. Optional `from_edge` exact-matches `from`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        from_edge: { type: 'string', description: 'Exact-match filter on the deprecated edge key (e.g. "persona_has_jtbd").' },
-      },
-    },
-  },
-  {
-    name: 'list_split_migrations',
-    description:
-      'List every 1→N split migration from `UPG_SPLIT_MIGRATIONS` ("one type became multiple types" rules, e.g. `experiment` → `experiment_plan` + `experiment_run`; `hypothesis` → `hypothesis_claim` + `hypothesis_evidence`). Each row: the full `UPGSplitMigration` record plus `since`. Non-paginated.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'list_scalar_to_edge_migrations',
-    description:
-      'List every scalar→edge promotion from `UPG_SCALAR_TO_EDGE_MIGRATIONS` (P14 conformance: a scalar that named a first-class entity, e.g. `business_model.north_star_metric`, becomes a canonical edge). Each row: the full `UPGScalarToEdgeMigration` record plus `since`. The lossless apply is `promote_scalars_to_edges`. Non-paginated.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'list_lifecycles',
-    description:
-      'List lifecycle definitions from `UPG_LIFECYCLES`. Response includes `free_types` (`UPG_LIFECYCLE_FREE_TYPES`: static types with no phase progression) and `planned_types` (`UPG_LIFECYCLE_PLANNED_TYPES`: lifecycle planned but not yet authored). Filters: `entity_type` (exact-match), `lifecycle_only` (when true, omits the free/planned lists).',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        entity_type: { type: 'string', description: 'Exact-match entity type name (e.g. "feature", "hypothesis"). Returns at most one lifecycle.' },
-        lifecycle_only: { type: 'boolean', description: 'When true, omit free_types and planned_types from response.' },
-      },
-    },
-  },
-  {
-    name: 'get_lifecycle',
-    description:
-      'Return the full `UPGLifecycle` definition for one entity type: initial phase, terminal phases, ordered phases with transitions and core states. Returns a descriptive message (not an error) when the type has no lifecycle.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        entity_type: { type: 'string', description: 'Canonical entity type name (e.g. "feature", "hypothesis", "opportunity").' },
-      },
-      required: ['entity_type'],
-    },
-  },
-  {
-    name: 'list_status_values',
-    description:
-      'List the valid `status` values an entity type can hold: the pre-flight lookup so you no longer learn the set only from a rejected write. For a lifecycle type, returns each phase as `{ status, label, terminal }` plus `initial_status` and `terminal_statuses`; for a lifecycle-free type, returns `lifecycle_free: true` with empty `values`. The focused, low-token sibling of `get_lifecycle`.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        entity_type: { type: 'string', description: 'Canonical entity type name (e.g. "feature", "key_result", "need").' },
-      },
-      required: ['entity_type'],
-    },
-  },
-  {
-    name: 'list_scales',
-    description:
-      'List every spec-defined assessment scale from `UPG_SCALES` (canonical vocabulary for `UPGAssessment` values). Each scale carries id, label, description, min, max, steps, and per-point labels + descriptions. Non-paginated. External `scale_extensions` are graph-instance–scoped and excluded here.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'get_scale',
-    description:
-      'Return one spec-defined assessment scale by id (e.g. "reach_5", "severity_5", "confidence_binary"). Includes the full point array. Returns a descriptive message (not an error) when the id is unknown.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Scale id (e.g. "reach_5", "frequency_5", "severity_5", "importance_5", "confidence_binary").' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'list_framework_categories',
-    description:
-      'List valid framework category values from `UPG_FRAMEWORK_CATEGORIES` (e.g. "strategy", "prioritization", "discovery", "growth", "engineering"). Use as valid values for the `category` filter on `list_frameworks` / `get_framework`.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'list_framework_structure_patterns',
-    description:
-      'List valid framework structure-pattern values from `UPG_STRUCTURE_PATTERNS`. Visual topological shapes: tree, table, matrix, funnel, collection, quadrant, flow. Mirrors `UPGFramework.structure.pattern`.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'list_domain_rings',
-    description:
-      'List every `UPGDomainRing` from `UPG_DOMAIN_RINGS` in canonical order: Nucleus → Understand → Define → Build → Grow → Operate → Extend. Rings are the 7 concentric groupings of the 36 UPG atomic domains. Each ring: `{ id, label, description, domain_ids }`. Non-paginated.',
-    inputSchema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'get_domain_ring',
-    description:
-      'Return one `UPGDomainRing` by id (one of: `nucleus`, `understand`, `define`, `build`, `grow`, `operate`, `extend`). Returns a descriptive message (not an error) when the id is unknown.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Ring id. One of: nucleus, understand, define, build, grow, operate, extend.' },
-      },
-      required: ['id'],
-    },
-  },
   {
     name: 'validate_graph',
     description:
@@ -1659,30 +1071,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: 'Optional skill name (e.g. "upg-trace"). If omitted, audits every canonical skill.',
         },
       },
-    },
-  },
-  {
-    name: 'list_templates',
-    description:
-      'List the curated starter templates (proven entity patterns for SaaS, marketplace, mobile, OSS, and agency). Returns summaries: id, name, description, industries, stages, entity_count, entity_types. The same library powers the /upg-new-from-template skill and the site gallery. Use with get_template to fetch a full pattern for instantiation.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        industry: { type: 'string', description: 'Filter by industry (saas, marketplace, mobile, oss, agency)' },
-        stage: { type: 'string', description: 'Filter by stage (concept, validation, growth, mature)' },
-      },
-    },
-  },
-  {
-    name: 'get_template',
-    description:
-      'Get a curated starter template in full by id: its entities (with title/description templates, default properties, tags, status), its typed edges (canonical UPG edge per pair), and its prompts (the questions to fill `{{placeholders}}`). Use to instantiate a template: walk the prompts, substitute placeholders, create the entities and typed edges.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        id: { type: 'string', description: 'Template id (e.g. "saas-business-model"). Run list_templates for the options.' },
-      },
-      required: ['id'],
     },
   },
   {
@@ -2562,60 +1950,14 @@ const HANDLERS: Record<string, ToolHandler> = {
   migrate_status: migrateStatus,
   deduplicate_nodes: deduplicateNodes,
   get_entity_schema: getEntitySchema,
-  list_playbooks: listPlaybooks,
-  get_playbook: getPlaybook,
-  list_approaches: listApproaches,
-  get_approach: getApproach,
-  plan: plan,
-  inspect: inspect,
-  prioritise: prioritise,
-  trace: trace,
-  reflect: reflect,
-  list_domains: listDomains,
-  get_domain_guide: getDomainGuide,
-  list_frameworks: listFrameworks,
-  get_framework: getFramework,
-  list_edge_types: listEdgeTypes,
-  get_edge_type: getEdgeType,
-  list_regions: listRegions,
-  get_region: getRegion,
-  get_region_for_entity_type: getRegionForEntity,
-  list_tree_patterns: listTreePatterns,
-  get_tree_pattern: getTreePattern,
   get_spec_version: getSpecVersion,
-  resolve_edge_for_pair: resolveEdgeForPair,
-  list_cross_edge_types: listCrossEdgeTypes,
-  list_lenses: listLenses,
-  get_lens: getLensTool,
-  list_type_labels: listTypeLabels,
-  get_type_label: getTypeLabel,
-  get_valid_children: getValidChildrenTool,
-  list_entity_types: listEntityTypes,
-  get_entity_meta: getEntityMeta,
-  list_anti_patterns: listAntiPatterns,
-  get_anti_pattern: getAntiPattern,
-  list_benchmarks: listBenchmarks,
-  list_product_stages: listProductStages,
-  list_type_migrations: listTypeMigrations,
-  list_edge_migrations: listEdgeMigrations,
-  list_split_migrations: listSplitMigrations,
-  list_scalar_to_edge_migrations: listScalarToEdgeMigrations,
-  list_lifecycles: listLifecycles,
-  get_lifecycle: getLifecycle,
-  list_status_values: listStatusValues,
-  list_scales: listScales,
-  get_scale: getScale,
-  list_framework_categories: listFrameworkCategories,
-  list_framework_structure_patterns: listFrameworkStructurePatterns,
-  list_domain_rings: listDomainRings,
-  get_domain_ring: getDomainRing,
   validate_graph: validateGraph,
   get_anti_pattern_violations_for: getAntiPatternViolationsFor,
   get_session_context: getSessionContext,
   update_session_context: updateSessionContext,
   skill_audit: skillAudit,
-  list_templates: listTemplatesTool,
-  get_template: getTemplateTool,
+  list_catalog: listCatalog,
+  get_catalog_entry: getCatalogEntry,
   get_area_context: getAreaContext,
   create_area: createArea,
   create_portfolio: createPortfolio,

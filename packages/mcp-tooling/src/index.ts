@@ -34,6 +34,35 @@ export {
 } from './transport.js'
 
 export {
+  CATALOG_LIST_KINDS,
+  type CatalogListKind,
+  CATALOG_GET_KINDS,
+  type CatalogGetKind,
+  type ListDispatchEntry,
+  type GetDispatchEntry,
+  LIST_CATALOG_DEF,
+  GET_CATALOG_ENTRY_DEF,
+  makeListCatalogHandler,
+  makeGetCatalogEntryHandler,
+} from './spec-catalog.js'
+
+export {
+  type RetiredListEntry,
+  type RetiredGetEntry,
+  type RetiredFoldEntry,
+  type RetiredPromptEntry,
+  type RetiredToolsContract,
+  loadRetiredTools,
+  retiredToolNames,
+} from './retired-tools.js'
+
+export {
+  type SpecChangelogEntry,
+  compareSemver,
+  readSpecChangelog,
+} from './spec-changelog.js'
+
+export {
   type EntityTypeResolution,
   UnknownEntityTypeError,
   resolveEntityType,

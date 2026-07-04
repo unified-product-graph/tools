@@ -123,7 +123,7 @@ METRICS
 | 🔗 Connectivity | **85%** | `▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░` |
 | ⚗️ Validation | **25%** | `▓▓▓▓▓░░░░░░░░░░░░░░░` ← risk |
 | 👤 User coverage | **100%** | `▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓` |
-| 🗺️ Domains | **7/<N from list_domains()>** | `▓▓▓▓▓▓▓░░░░░░░░░░░░░` |
+| 🗺️ Domains | **7/<N from list_catalog({ kind: 'domains' })>** | `▓▓▓▓▓▓▓░░░░░░░░░░░░░` |
 
 Connectivity = % entities with ≥1 edge. Validation = experiments / hypotheses. User coverage = personas with jobs / total personas.
 
@@ -210,7 +210,7 @@ Check `get_session_context()` for the current lens. Adapt the dashboard:
 | 🔵 Planned | N | [feature names] |
 | ✅ Shipped | N | [feature names] |
 
-A feature counts as **Blocked** when it has an inbound blocking edge (e.g. `bug_affects_feature`, `technical_debt_item_blocks_feature`). Use `resolve_edge_for_pair({ source_type: "bug", target_type: "feature" })` and `resolve_edge_for_pair({ source_type: "technical_debt_item", target_type: "feature" })` to confirm the canonical edge names at runtime. There is no `blocker` entity type. Map feature `status` (`proposed | in_progress | shipped | archived`) to In Progress / Planned / Shipped.
+A feature counts as **Blocked** when it has an inbound blocking edge (e.g. `bug_affects_feature`, `technical_debt_item_blocks_feature`). Use `get_entity_schema({ type: "bug", resolve_edge_to: "feature" }).resolve_edge` and `get_entity_schema({ type: "technical_debt_item", resolve_edge_to: "feature" }).resolve_edge` to confirm the canonical edge names at runtime. There is no `blocker` entity type. Map feature `status` (`proposed | in_progress | shipped | archived`) to In Progress / Planned / Shipped.
 
 Show: `BLOCKED: N features · BUGS: N open (M critical) · DEBT: N items` (blocking signal comes from `bug` / `technical_debt_item` / `dependency` / `root_cause` entities, not a `blocker` type)
 

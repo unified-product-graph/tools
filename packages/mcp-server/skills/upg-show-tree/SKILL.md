@@ -90,7 +90,7 @@ Optional arguments: `from_id` (root at a specific node), `depth` (override the p
 }
 ```
 
-Render `roots` as the tree. Surface `gaps` and the anchor fallback (below). Do **not** call `query`, `resolve_edge_for_pair`, or build traverse chains; `get_tree` already did the walk.
+Render `roots` as the tree. Surface `gaps` and the anchor fallback (below). Do **not** call `query`, `get_entity_schema({ type, resolve_edge_to }).resolve_edge`, or build traverse chains; `get_tree` already did the walk.
 
 For auto-detect mode, call `get_graph_digest()` first to see which entity types exist, then pick the best pattern and call `get_tree`.
 

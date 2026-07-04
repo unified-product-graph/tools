@@ -86,7 +86,9 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 139 tools', () => {
+  it('exposes the expected 93 tools', () => {
+    // 0.19.0 tool consolidation: 141 (Phase-1 additive) minus the 48 retired
+    // spec-introspection + router tools = 93 (see retired-tools.json).
     // 77 from v0.3.0 +
     // 11 spec-introspection round-5 tools:
     //   list_type_migrations, list_edge_migrations, list_split_migrations,
@@ -165,7 +167,7 @@ describe('Tool registry: completeness', () => {
     //   CONFLICT (switch_product flushes the active product first, so a conflict
     //   there blocks every switch) without a server restart. Local-only (no
     //   on-disk file to re-read in the cloud). → 139.
-    expect(TOOL_DEFINITIONS).toHaveLength(139)
+    expect(TOOL_DEFINITIONS).toHaveLength(93)
   })
 })
 
@@ -308,10 +310,7 @@ describe('get_tree description enums stay in lockstep with UPG_TREE_PATTERNS', (
     listsAll('get_tree pattern arg', props.pattern.description)
   })
 
-  it('get_tree_pattern id arg lists every catalogue pattern', () => {
-    const t = def('get_tree_pattern')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const props = t.inputSchema.properties as any
-    listsAll('get_tree_pattern id arg', props.id.description)
-  })
+  // `get_tree_pattern` retired in 0.19.0 (folded into get_catalog_entry({ kind:
+  // 'tree_pattern' })). Its id-enum lockstep no longer applies — the facet takes
+  // a free-string id and validation still derives the pattern list from core.
 })

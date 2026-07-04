@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 139 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 93 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -10,7 +10,7 @@ Reference for the 139 tools exposed by `@unified-product-graph/mcp-server`. Gene
 - [Areas & Change Log](#areas-change-log): 11 tools
 - [Workspace & Portfolios](#workspace-portfolios): 39 tools
 - [Schema](#schema): 1 tool
-- [Spec Introspection](#spec-introspection): 51 tools
+- [Spec Introspection](#spec-introspection): 5 tools
 - [Cloud Sync](#cloud-sync): 3 tools
 - [Validation](#validation): 3 tools
 
@@ -2330,7 +2330,7 @@ _Entity schema introspection. Same constraints the LSP enforces._
 
 ### `get_entity_schema`
 
-Return expected properties, valid statuses, valid edge types, and domain for an entity type. Lets agents construct valid entities without skill prompts.
+Return expected properties, valid statuses, valid edge types, and domain for an entity type. Lets agents construct valid entities without skill prompts. Optional `include` folds in valid child types / super-domain region; optional `resolve_edge_to` folds in the canonical edge for this type → that target.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2338,12 +2338,15 @@ Return expected properties, valid statuses, valid edge types, and domain for an 
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `include` | array |  | Optional extra blocks: "valid_children" (folds get_valid_children), "region" (folds get_region_for_entity_type). |
+| `resolve_edge_to` | string |  | Optional target entity type. Folds resolve_edge_for_pair(type → target) into a `resolve_edge` block. |
 | `type` | string | ✓ | Entity type (e.g. "hypothesis", "persona", "opportunity") |
 
 **Returns:**
 
 JSON: `{ type, alias_of?, domain, expected_properties, edges_out,
-edges_in, phases?, initial_phase?, terminal_phases?, domain_guide? }`.
+edges_in, phases?, initial_phase?, terminal_phases?, domain_guide?,
+valid_children?, region?, resolve_edge? }`.
 
 **Throws:**
 
@@ -2357,56 +2360,10 @@ edges_in, phases?, initial_phase?, terminal_phases?, domain_guide? }`.
 _Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings (from `@unified-product-graph/core`), plus the curated starter-template library (`list_templates` / `get_template`, from `@unified-product-graph/templates`)._
 
 - [`apply_framework`](#apply-framework)
-- [`get_anti_pattern`](#get-anti-pattern)
-- [`get_approach`](#get-approach)
-- [`get_domain_guide`](#get-domain-guide)
-- [`get_domain_ring`](#get-domain-ring)
-- [`get_edge_type`](#get-edge-type)
-- [`get_entity_meta`](#get-entity-meta)
-- [`get_framework`](#get-framework)
-- [`get_lens`](#get-lens)
-- [`get_lifecycle`](#get-lifecycle)
-- [`get_playbook`](#get-playbook)
-- [`get_region`](#get-region)
-- [`get_region_for_entity_type`](#get-region-for-entity-type)
-- [`get_scale`](#get-scale)
+- [`get_catalog_entry`](#get-catalog-entry)
 - [`get_spec_version`](#get-spec-version)
-- [`get_template`](#get-template)
-- [`get_tree_pattern`](#get-tree-pattern)
-- [`get_type_label`](#get-type-label)
-- [`get_valid_children`](#get-valid-children)
-- [`inspect`](#inspect)
-- [`list_anti_patterns`](#list-anti-patterns)
-- [`list_approaches`](#list-approaches)
-- [`list_benchmarks`](#list-benchmarks)
-- [`list_cross_edge_types`](#list-cross-edge-types)
-- [`list_domain_rings`](#list-domain-rings)
-- [`list_domains`](#list-domains)
-- [`list_edge_migrations`](#list-edge-migrations)
-- [`list_edge_types`](#list-edge-types)
-- [`list_entity_types`](#list-entity-types)
-- [`list_framework_categories`](#list-framework-categories)
-- [`list_framework_structure_patterns`](#list-framework-structure-patterns)
-- [`list_frameworks`](#list-frameworks)
-- [`list_lenses`](#list-lenses)
-- [`list_lifecycles`](#list-lifecycles)
-- [`list_playbooks`](#list-playbooks)
-- [`list_product_stages`](#list-product-stages)
-- [`list_regions`](#list-regions)
-- [`list_scalar_to_edge_migrations`](#list-scalar-to-edge-migrations)
-- [`list_scales`](#list-scales)
-- [`list_split_migrations`](#list-split-migrations)
-- [`list_status_values`](#list-status-values)
-- [`list_templates`](#list-templates)
-- [`list_tree_patterns`](#list-tree-patterns)
-- [`list_type_labels`](#list-type-labels)
-- [`list_type_migrations`](#list-type-migrations)
-- [`plan`](#plan)
-- [`prioritise`](#prioritise)
-- [`reflect`](#reflect)
-- [`resolve_edge_for_pair`](#resolve-edge-for-pair)
+- [`list_catalog`](#list-catalog)
 - [`score_entity`](#score-entity)
-- [`trace`](#trace)
 
 ### `apply_framework`
 
@@ -2437,9 +2394,9 @@ entity resolves (no dangling exercise is left behind).
 **See also:** `score_entity`
 
 
-### `get_anti_pattern`
+### `get_catalog_entry`
 
-Return one curated anti-pattern by id (kebab-case slug, e.g. "features-without-hypotheses", "personas-without-jobs"). Includes structured condition, why-it-matters, remediation, applicable stages, severity, optional source citation. IDs are stable URL fragments.
+Fetch one static spec catalog record by `kind` + `id` (one faceted tool replacing the 15 `get_*-by-id` spec-introspection tools). Reads `@unified-product-graph/core`. `id` is the record identifier for that kind: `playbook`/`framework`/`lens`/`scale`/`anti_pattern`/`tree_pattern`/`domain_ring`/`region`/`approach` take their record id; `entity_meta` takes an entity-type name; `edge_type` takes an edge-type key; `lifecycle`/`type_label` take an entity type; `domain_guide` takes a domain id; `template` takes a template id. Use `list_catalog` to enumerate a kind.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2447,311 +2404,32 @@ Return one curated anti-pattern by id (kebab-case slug, e.g. "features-without-h
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Anti-pattern id (kebab-case slug). |
+| `id` | string | ✓ | The record identifier for that kind (see the tool description for the per-kind id meaning). |
+| `kind` | `entity_meta` \| `edge_type` \| `region` \| `domain_guide` \| `domain_ring` \| `framework` \| `lens` \| `lifecycle` \| `playbook` \| `scale` \| `anti_pattern` \| `tree_pattern` \| `type_label` \| `template` \| `approach` | ✓ | Which static spec catalog to read one record from. |
 
 **Returns:**
 
-JSON: `UPGCuratedAntiPattern`
+JSON: the delegated `get_<kind>` record verbatim (shape varies by kind).
 
 **Throws:**
 
-- textError when `id` is missing or unknown.
+- textError when `kind` or `id` is missing, or the kind is unknown.
 
-**See also:** `list_anti_patterns`, `get_anti_pattern_violations_for`, `inspect`, `validate_graph`
-
-
-### `get_approach`
-
-Return one `UPGApproach` by id. Valid ids: `plan`, `inspect`, `prioritise`, `trace`, `reflect` (same names as the verb-led MCP tools).
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `id` | `plan` \| `inspect` \| `prioritise` \| `trace` \| `reflect` | ✓ | Approach id. One of: plan, inspect, prioritise, trace, reflect. |
-
-**Returns:**
-
-JSON: the full `UPGApproach` record.
-
-**Throws:**
-
-- textError when `id` is missing or unknown.
-
-**See also:** `list_approaches`, `plan`, `inspect`, `prioritise`, `trace`, `reflect`
-
-
-### `get_domain_guide`
-
-Return the full `UPGDomainUsageGuide` for a domain: anchor entity, creation sequence, named patterns (entity + edge chains), required cross-domain bridges, anti-patterns.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `domain_id` | string | ✓ | Canonical domain id (e.g. "user", "market_intelligence", "growth"). |
-
-**Returns:**
-
-JSON: the full `UPGDomainUsageGuide` record.
-
-**Throws:**
-
-- textError when `domain_id` is missing or unknown.
-
-**See also:** `list_domains`, `get_domain_ring`, `list_anti_patterns`, `get_playbook`
-
-
-### `get_domain_ring`
-
-Return one `UPGDomainRing` by id (one of: `nucleus`, `understand`, `define`, `build`, `grow`, `operate`, `extend`). Returns a descriptive message (not an error) when the id is unknown.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Ring id. One of: nucleus, understand, define, build, grow, operate, extend. |
-
-**Returns:**
-
-JSON: the full `UPGDomainRing` record.
-
-**See also:** `list_domain_rings`, `list_domains`, `get_domain_guide`
-
-
-### `get_edge_type`
-
-Return one edge catalogue entry by edge type key (e.g. "persona_pursues_job", "feature_addresses_need").
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `type` | string | ✓ | Edge type key from UPG_EDGE_CATALOG. |
-
-**Returns:**
-
-JSON: `{ type, forward_verb, reverse_verb, classification, source_type, target_type }`
-
-**Throws:**
-
-- textError when `type` is missing or unknown.
-
-**See also:** `list_edge_types`, `resolve_edge_for_pair`, `list_edge_migrations`, `rename_edge_type`
-
-
-### `get_entity_meta`
-
-Return one `EntityTypeMeta` record by entity type name, plus resolved `domain_id` (null when unmapped). One type's lifecycle metadata: maturity tier, since-version, replacement target if deprecated. Pass the canonical name (e.g. "persona", "pain_point"), not the immutable `type_id`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `name` | string | ✓ | Canonical entity type name. |
-
-**Returns:**
-
-JSON: `EntityTypeMeta & { domain_id: string | null }`
-
-**Throws:**
-
-- textError when `name` is missing or unknown.
-
-**See also:** `list_entity_types`, `get_type_label`, `get_entity_schema`, `list_type_migrations`
-
-
-### `get_framework`
-
-Return one `UPGFramework` by id (e.g. "rice-scoring", "lean-canvas"). Includes all four layers: data, structure, presentation, education.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `framework_id` | string |  | Alias for `id` (matches the key used by apply_framework / prioritise). |
-| `id` | string | ✓ | Framework id (kebab-case). Alias: `framework_id`. |
-
-**Returns:**
-
-JSON: the full `UPGFramework` record.
-
-**Throws:**
-
-- textError when neither `id` nor `framework_id` is provided, or the
-id is unknown.
-
-**See also:** `list_frameworks`, `prioritise`, `get_playbook`, `get_approach`
-
-
-### `get_lens`
-
-Return the full `UPGLens` record by id (e.g. "product", "ux_design", "engineering", "full") plus the resolved entity types visible through that lens. Combines the lens record with `visible_types` in one response.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Lens id (e.g. "product", "ux_design", "full"). |
-
-**Returns:**
-
-JSON: `{ ...UPGLens, visible_types: string[] }`
-
-**Throws:**
-
-- textError when `id` is missing or unknown.
-
-**See also:** `list_lenses`, `get_playbook`, `get_framework`, `list_entity_types`
-
-
-### `get_lifecycle`
-
-Return the full `UPGLifecycle` definition for one entity type: initial phase, terminal phases, ordered phases with transitions and core states. Returns a descriptive message (not an error) when the type has no lifecycle.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `entity_type` | string | ✓ | Canonical entity type name (e.g. "feature", "hypothesis", "opportunity"). |
-
-**Returns:**
-
-JSON: the full `UPGLifecycle` record, or a descriptive message.
-
-**See also:** `list_lifecycles`, `get_entity_meta`, `get_entity_schema`
-
-
-### `get_playbook`
-
-Return one `UPGPlaybook` by id (e.g. "playbook:strategy-outcomes", "playbook:business-gtm-growth"). Includes the ordered `creation_sequence` with step kinds and prompts. IDs are namespace-prefixed `playbook:*`. For approaches, use `get_approach`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Playbook id (namespace-prefixed: playbook:*). |
-
-**Returns:**
-
-JSON: the full `UPGPlaybook` record.
-
-**Throws:**
-
-- textError when `id` is missing or unknown.
-
-**Examples:**
-
-// Fetch the full Users & Needs playbook to guide entity creation
-// Input:
-{ "id": "playbook:users-needs" }
-// Output (truncated):
-{
-  "id": "playbook:users-needs",
-  "name": "Users & Needs",
-  "region": "users_needs",
-  "is_canonical": true,
-  "target_anchor_entity": "persona",
-  "creation_sequence": ["persona", "job", "need", "pain_point"],
-  "steps": [
-    { "kind": "create", "type": "persona", "prompt": "Who are the primary users?" },
-    { "kind": "create", "type": "job", "prompt": "What jobs do they need to accomplish?" }
-  ]
-}
-
-**See also:** `list_playbooks`, `get_approach`, `get_framework`, `get_region`
-
-
-### `get_region`
-
-Return the full `UPGRegion` record by id: anchor entity (with rationale and inbound/outbound cross-edge counts), entity memberships with structural roles, intra-domain edge keys, boundary edges to other regions, shape archetype, atomic-domain composition.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Region id (e.g. "strategy_outcomes", "users_needs", "product_delivery"). See UPG_REGIONS for the full list of 10. |
-
-**Returns:**
-
-JSON: the full `UPGRegion` record plus `coverage_keys` and `business_areas`.
-
-**Throws:**
-
-- textError when `id` is missing or unknown.
-
-**See also:** `list_regions`, `get_region_for_entity_type`, `get_playbook`, `list_lenses`
-
-
-### `get_region_for_entity_type`
-
-Resolve which super-domain region contains a given entity type. Wraps `getRegionForEntityType`; returns the full `UPGRegion` record. Use for adapters and copilots that route or render an entity by its super-domain.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `entity_type` | string | ✓ | Canonical entity type (e.g. "persona", "feature", "metric"). |
-
-**Returns:**
-
-JSON: the full `UPGRegion` record.
-
-**Throws:**
-
-- textError when `entity_type` is missing or no region contains it.
-
-**See also:** `get_region`, `list_regions`, `get_entity_meta`, `list_entity_types`
-
-
-### `get_scale`
-
-Return one spec-defined assessment scale by id (e.g. "reach_5", "severity_5", "confidence_binary"). Includes the full point array. Returns a descriptive message (not an error) when the id is unknown.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Scale id (e.g. "reach_5", "frequency_5", "severity_5", "importance_5", "confidence_binary"). |
-
-**Returns:**
-
-JSON: the full `UPGScaleDefinition` record including all points.
-
-**See also:** `list_scales`, `get_entity_schema`
+**See also:** `list_catalog`, `get_entity_schema`
 
 
 ### `get_spec_version`
 
-Spec-level metadata for compatibility checks: `upg_version`, `markdown_format_version`, and canonical counts (entity types, edge types, atomic domains, super-domain regions). Pin against the version pair; counts are informational.
+Spec-level metadata for compatibility checks: `upg_version`, `markdown_format_version`, and canonical counts (entity types, edge types, atomic domains, super-domain regions). Pin against the version pair; counts are informational. Pass `changelog: true` to fold in the spec CHANGELOG (a `whats_new` surface); `since` (a version) returns only newer entries.
 
 **Atomicity:** `atomic (read-only)`
 
-_No arguments._
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `changelog` | boolean |  | When true, include a `changelog` array parsed from the spec CHANGELOG.md. |
+| `since` | string |  | With changelog: return only entries strictly newer than this version (e.g. "0.17.0"). |
 
 **Returns:**
 
@@ -2760,26 +2438,9 @@ JSON: `{ upg_version, markdown_format_version, entity_count, edge_count, domain_
 **See also:** `get_workspace_info`, `list_entity_types`, `list_edge_types`, `list_regions`
 
 
-### `get_template`
+### `list_catalog`
 
-Get a curated starter template in full by id: its entities (with title/description templates, default properties, tags, status), its typed edges (canonical UPG edge per pair), and its prompts (the questions to fill `{{placeholders}}`). Use to instantiate a template: walk the prompts, substitute placeholders, create the entities and typed edges.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Template id (e.g. "saas-business-model"). Run list_templates for the options. |
-
-**Returns:**
-
-`{ template: TemplateSet }`, or `{ error, available }` when the id is unknown
-
-
-### `get_tree_pattern`
-
-Return the full declarative record for one get_tree pattern: its region, anchor_type, fallback_anchors, gap_policy, natural_depth, and its child map resolved to concrete edges. Each parent-to-child slot carries the canonical `via` edge and its `kind`, resolved live from the edge catalogue, so a client reads the real wiring instead of reverse-engineering it and the pattern cannot cite an edge the grammar lacks.
+List a static spec catalog by `kind` (one faceted tool replacing the 25 `list_*` spec-introspection tools). Reads `@unified-product-graph/core`; identical for every client on a given spec version. Kind-specific filters pass straight through: e.g. `playbooks` accepts `region` / `canonical_only` / `framework_id`; `entity_types` accepts `domain` / `maturity` / `deprecated` / `limit` / `cursor`; `benchmarks` requires `benchmark_kind` (`count` | `relationship` | `ratio` | `domain_activation`) plus optional `stage` / `domain`. Use `get_catalog_entry` to fetch one record by id.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2787,683 +2448,27 @@ Return the full declarative record for one get_tree pattern: its region, anchor_
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
-| `id` | string | ✓ | Tree pattern id: ost, okr, user, product, validation, strategy, feature_areas, delivery, architecture, journey, design_system, commercial, north_star, org. |
+| `benchmark_kind` | `count` \| `relationship` \| `ratio` \| `domain_activation` |  | Required for kind=benchmarks: which benchmark catalog (remapped to the retired tool's `kind`). |
+| `canonical_only` | boolean |  | Filter (playbooks): canonical playbook per region only. |
+| `cursor` | string |  | Pagination: opaque cursor from a prior `next_cursor`. |
+| `deprecated` | boolean |  | Filter (entity_types): keep only / exclude deprecated types. |
+| `domain` | string |  | Filter (entity_types / benchmarks): exact atomic-domain id. |
+| `framework_id` | string |  | Filter (playbooks / approaches): exact framework id. |
+| `kind` | `entity_types` \| `edge_types` \| `cross_edge_types` \| `regions` \| `domains` \| `domain_rings` \| `frameworks` \| `framework_categories` \| `framework_structure_patterns` \| `lenses` \| `lifecycles` \| `playbooks` \| `scales` \| `anti_patterns` \| `tree_patterns` \| `templates` \| `approaches` \| `type_labels` \| `status_values` \| `product_stages` \| `benchmarks` \| `edge_migrations` \| `scalar_to_edge_migrations` \| `split_migrations` \| `type_migrations` | ✓ | Which static spec catalog to list. |
+| `limit` | number |  | Pagination (entity_types / type_labels / frameworks / anti_patterns): page size. |
+| `maturity` | string |  | Filter (entity_types): draft \| proposed \| stable \| deprecated \| removed. |
+| `region` | string |  | Filter (playbooks): exact UPGRegionId. |
+| `stage` | string |  | Filter (benchmarks): UPGProductStage. |
 
 **Returns:**
 
-JSON: the `UPGTreePatternDetail` record.
+JSON: the delegated `list_<kind>` payload verbatim (shape varies by kind).
 
 **Throws:**
 
-- textError when `id` is missing or unknown.
+- textError when `kind` is missing or not a known catalog kind.
 
-**See also:** `list_tree_patterns`, `get_tree`, `resolve_edge_for_pair`
-
-
-### `get_type_label`
-
-Return one `UPGTypeLabel` by entity type, plus a resolved display label for an optional `framework_id` and/or `designation` (wraps `resolveLabel`). Lookup is exact-match against `UPG_TYPE_LABELS_MAP`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `designation` | string |  | Optional designation key (e.g. "pain", "gap", "desire") for types that use the designation pattern. |
-| `entity_type` | string | ✓ | Canonical entity type id. |
-| `framework_id` | string |  | Optional framework id (e.g. "lean_canvas", "ost", "design_thinking"). When set, resolved_label uses the framework-specific label. |
-
-**Returns:**
-
-JSON: `{ ...UPGTypeLabel, resolved_label: string }`
-
-**Throws:**
-
-- textError when `entity_type` is missing or unknown.
-
-**See also:** `list_type_labels`, `get_entity_meta`, `list_frameworks`
-
-
-### `get_valid_children`
-
-Return valid direct-child entity types for a parent type. Wraps `getValidChildren` / `UPG_VALID_CHILDREN`. Empty array when none registered. Answers "what can I create under this?". Pairs with `get_entity_schema`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `parent_type` | string | ✓ | Canonical parent entity type. |
-
-**Returns:**
-
-JSON: `{ parent_type, valid_children: string[] }`
-
-**Throws:**
-
-- textError when `parent_type` is missing.
-
-**See also:** `get_entity_schema`, `list_entity_types`, `get_entity_meta`, `create_node`
-
-
-### `inspect`
-
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing inspection, invoke the /upg-show-entity skill instead of calling this tool directly. Inspect approach: path of arrival to "what's broken?". Returns the Inspect record + invocation params in the family-resemblance envelope. The LLM consumes `signature_hint` and emits `{ violations: [{ severity, kind, entity_id, description, fix_hint }] }` against `UPG_ANTI_PATTERNS` + the live graph. Optional `region` or `entities[]` scope the audit.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `entities` | array |  | Optional entity_id[]. Narrows inspection scope to a specific candidate set. Composable with region. |
-| `region` | string |  | Optional UPGRegionId. Narrows inspection scope to a single region. |
-
-**Returns:**
-
-JSON envelope: `{ approach_id, scope, generated_at, approach,
-params, violations, summary, execution_mode: "execution_v0_4_0" }`
-
-**See also:** `get_approach`, `list_anti_patterns`, `get_anti_pattern`, `get_anti_pattern_violations_for`, `validate_graph`, `plan`, `reflect`
-
-
-### `list_anti_patterns`
-
-List curated cross-domain anti-patterns from `UPG_ANTI_PATTERNS`. Each row pairs a memorable name with a machine-evaluable `IntelligenceCondition`, applicable stages, severity, and remediation. Graph-health patterns evaluated whole-graph (distinct from per-domain anti-patterns via `get_domain_guide`). Paginated (default 50, max 200). Filters AND together: `severity` (`high` / `medium` / `low`), `stage` (keeps patterns whose `stages[]` includes the given `UPGProductStage`).
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `cursor` | string |  | Opaque pagination cursor. Pass next_cursor from a previous response. |
-| `limit` | number |  | Page size (default 50, max 200). |
-| `severity` | `high` \| `medium` \| `low` |  | Exact-match UPGAntiPatternSeverity. |
-| `stage` | `concept` \| `validation` \| `build` \| `beta` \| `launch` \| `growth` \| `mature` \| `maintenance` \| `sunset` |  | Keeps anti-patterns whose stages[] includes the given UPGProductStage. |
-
-**Returns:**
-
-JSON: `{ total, count, next_cursor?, anti_patterns: UPGCuratedAntiPattern[] }`
-
-**See also:** `get_anti_pattern`, `get_anti_pattern_violations_for`, `validate_graph`, `inspect`, `get_domain_guide`
-
-
-### `list_approaches`
-
-List the 5 canonical `UPGApproach` records: Plan, Inspect, Prioritise, Trace, Reflect. An approach is the path of arrival to a region of the graph (final approach to an airport, coastline approach). Each record carries id, label, description, `question_answered`, `signature_hint`, `framework_id_examples`. Optional `framework_id` narrows to approaches whose `framework_id_examples` include it.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `framework_id` | string |  | Exact-match framework id. Narrows to approaches whose framework_id_examples include it (discoverability surface; full reverse lookup is on UPGFramework.approach_ids). |
-
-**Returns:**
-
-JSON: `{ count, approaches: UPGApproach[] }`
-
-**See also:** `get_approach`, `plan`, `inspect`, `prioritise`, `trace`, `reflect`, `list_playbooks`
-
-
-### `list_benchmarks`
-
-Return one of four canonical benchmark catalogs (the data behind `get_graph_digest` health logic). Required `kind` selects the source: `count` → `UPG_COUNT_BENCHMARKS` (per-entity-type ranges across the 9-stage journey); `relationship` → `UPG_RELATIONSHIP_BENCHMARKS` (parent → child minimum counts per stage); `ratio` → `UPG_RATIO_BENCHMARKS` (expected ratios between entity-type counts); `domain_activation` → `UPG_DOMAIN_ACTIVATION` (when each atomic domain is expected to activate). Optional filters AND together: `stage` (`UPGProductStage`), `domain` (atomic-domain id). Non-paginated.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `domain` | string |  | Optional atomic-domain id filter. Semantics depend on kind (see tool description). |
-| `kind` | `count` \| `relationship` \| `ratio` \| `domain_activation` | ✓ | Required. Which benchmark catalog to return. |
-| `stage` | `concept` \| `validation` \| `build` \| `beta` \| `launch` \| `growth` \| `mature` \| `maintenance` \| `sunset` |  | Optional UPGProductStage filter. Semantics depend on kind (see tool description). |
-
-**Returns:**
-
-JSON: `{ kind, total, count, benchmarks: ... }`
-
-**Throws:**
-
-- textError when `kind` is missing or not one of the four supported values.
-
-**See also:** `get_graph_digest`, `list_product_stages`, `list_domains`, `list_anti_patterns`
-
-
-### `list_cross_edge_types`
-
-List the canonical cross-product edge types from `UPG_CROSS_EDGE_TYPES`: `shares_persona`, `shares_competitor`, `shares_metric`, `depends_on_product`, `cannibalises`, `succeeds`, `hosts`, `contributes_to`, `instance_of`, `area_serves_persona`, `area_targets_market_segment`, `rolls_up_to`. Portfolio-level relationships across products. Distinct from the within-product `UPG_EDGE_CATALOG`. `instance_of` (product entity to a canonical registry entity) is created via `register_instance`; `area_serves_persona` / `area_targets_market_segment` (a product_area to a registry persona/segment, with primary/secondary relevance) via `link_area_to_audience`; `rolls_up_to` (a product metric feeding a company metric) via `create_cross_product_edge`. None of the area edges go through the generic `create_cross_product_edge`.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ count, types: readonly UPGCrossEdgeType[] }`
-
-**See also:** `list_edge_types`, `list_portfolio_cross_edges`, `migrate_cross_edges`
-
-
-### `list_domain_rings`
-
-List every `UPGDomainRing` from `UPG_DOMAIN_RINGS` in canonical order: Nucleus → Understand → Define → Build → Grow → Operate → Extend. Rings are the 7 concentric groupings of the 36 UPG atomic domains. Each ring: `{ id, label, description, domain_ids }`. Non-paginated.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ rings: UPGDomainRing[], total: number }`
-
-**See also:** `get_domain_ring`, `list_domains`, `get_domain_guide`
-
-
-### `list_domains`
-
-List domains. Default (`with_guide_only: true`) returns every domain with a canonical usage guide: id + `anchor_entity` + `creation_sequence`. Pass `with_guide_only: false` to enumerate every atomic domain from `UPG_DOMAINS`: id + label + description + types + `has_guide`. The two shapes are disjoint by the boolean.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `with_guide_only` | boolean |  | Default true. Returns only domains with a canonical usage guide (compact id + anchor_entity + creation_sequence). Pass false to return every atomic domain (id + label + description + types + has_guide). |
-
-**Returns:**
-
-JSON: `{ count, domains: Array<{ domain_id, anchor_entity, creation_sequence } | { domain_id, label, description, types, has_guide }> }`
-
-**See also:** `get_domain_guide`, `list_domain_rings`, `get_domain_ring`, `list_regions`, `list_entity_types`
-
-
-### `list_edge_migrations`
-
-List every edge-key migration from `UPG_EDGE_MIGRATIONS` (renamed or dropped canonical edge keys, e.g. `persona_has_jtbd` → `persona_pursues_job`). Each row: `{ kind, from, to?, since }` where `kind` is `rename` or `drop`. Optional `from_edge` exact-matches `from`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `from_edge` | string |  | Exact-match filter on the deprecated edge key (e.g. "persona_has_jtbd"). |
-
-**Returns:**
-
-JSON: `{ migrations: [{ kind, from, to?, since }], total: number }`
-
-**See also:** `list_type_migrations`, `list_split_migrations`, `rename_edge_type`, `list_edge_types`, `validate_graph`
-
-
-### `list_edge_types`
-
-List every canonical edge type from `UPG_EDGE_CATALOG`, optionally narrowed by `source_type` and/or `target_type`. Each entry carries the edge key (`type`), forward/reverse verbs, classification, and endpoint types. The polymorphic wildcard `"node"` is preserved on polymorphic edges.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `source_type` | string |  | Exact-match filter on UPGEdgeDefinition.source_type. Pass "node" to find polymorphic edges with a wildcard source. |
-| `target_type` | string |  | Exact-match filter on UPGEdgeDefinition.target_type. |
-
-**Returns:**
-
-JSON: `{ count, edges: Array<{ type, forward_verb, reverse_verb, classification, source_type, target_type }> }`
-
-**See also:** `get_edge_type`, `resolve_edge_for_pair`, `list_cross_edge_types`, `list_edge_migrations`, `create_edge`
-
-
-### `list_entity_types`
-
-List canonical entity types from `UPG_ENTITY_META` (source of truth for ontology evolution). Every active, deprecated, or removed type with its immutable `type_id`, maturity tier, and version metadata. Paginated (default 50, max 200). Filters AND together and apply before pagination: `domain` (atomic-domain id), `maturity` (`draft` / `proposed` / `stable` / `deprecated` / `removed`), `deprecated` (boolean shortcut). Each row carries the full `EntityTypeMeta` plus resolved `domain_id` (null if no atomic-domain mapping).
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `cursor` | string |  | Opaque pagination cursor. Pass next_cursor from a previous response. |
-| `deprecated` | boolean |  | true → only deprecated types; false → exclude deprecated and removed types (the active set). Composes with maturity via AND. |
-| `domain` | string |  | Exact-match atomic-domain id (e.g. "user", "market_intelligence"). |
-| `limit` | number |  | Page size (default 50, max 200). |
-| `maturity` | `draft` \| `proposed` \| `stable` \| `deprecated` \| `removed` |  | Exact-match UPGEntityTypeMaturity. |
-
-**Returns:**
-
-JSON: `{ total, count, next_cursor?, types: Array<EntityTypeMeta & { domain_id: string | null }> }`
-
-**See also:** `get_entity_meta`, `get_entity_schema`, `list_type_labels`, `list_type_migrations`, `list_domains`
-
-
-### `list_framework_categories`
-
-List valid framework category values from `UPG_FRAMEWORK_CATEGORIES` (e.g. "strategy", "prioritization", "discovery", "growth", "engineering"). Use as valid values for the `category` filter on `list_frameworks` / `get_framework`.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ categories: string[], total: number }`
-
-**See also:** `list_frameworks`, `list_framework_structure_patterns`
-
-
-### `list_framework_structure_patterns`
-
-List valid framework structure-pattern values from `UPG_STRUCTURE_PATTERNS`. Visual topological shapes: tree, table, matrix, funnel, collection, quadrant, flow. Mirrors `UPGFramework.structure.pattern`.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ patterns: string[], total: number }`
-
-**See also:** `list_frameworks`, `list_framework_categories`, `get_framework`
-
-
-### `list_frameworks`
-
-List the canonical `UPGFramework` definitions: the curated, famous product frameworks that anchor the public catalog (spanning strategy, discovery, prioritisation, design, growth, engineering, and reflection classics). Returns a lightweight summary per framework (id, name, category, description, tags, approach_ids, structure_pattern); call `get_framework(id)` for the full record. Paginated (default 50, max 200). Cursor is opaque: pass `next_cursor` from a previous response. Optional `category` is exact-match against `UPGFramework.category` and applies before pagination.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `category` | string |  | Exact-match filter on UPGFramework.category (e.g. "strategy", "prioritization"). |
-| `cursor` | string |  | Opaque pagination cursor. Pass next_cursor from a previous response. |
-| `limit` | number |  | Page size (default 50, max 200). |
-
-**Returns:**
-
-JSON: `{ total, count, next_cursor?, frameworks: Array<{ id, name, category, description, tags, approach_ids, structure_pattern }> }`
-
-**See also:** `get_framework`, `list_framework_categories`, `list_framework_structure_patterns`, `prioritise`, `list_approaches`
-
-
-### `list_lenses`
-
-List every canonical `UPGLens` from `@unified-product-graph/core`: Product, Design, Engineering, Growth, Business, Research, Marketing, Full. Returns a compact summary per lens: id, name, description, icon, audience, perspective, `framework_id`, `playbook_id`, `visible_domain_count`, `intelligence_prompt_count`. Use `get_lens` for the full record.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ count, lenses: Array<{ id, name, description, icon, audience, perspective, framework_id?, playbook_id?, visible_domain_count, intelligence_prompt_count }> }`
-
-**See also:** `get_lens`, `list_regions`, `list_playbooks`, `list_frameworks`
-
-
-### `list_lifecycles`
-
-List lifecycle definitions from `UPG_LIFECYCLES`. Response includes `free_types` (`UPG_LIFECYCLE_FREE_TYPES`: static types with no phase progression) and `planned_types` (`UPG_LIFECYCLE_PLANNED_TYPES`: lifecycle planned but not yet authored). Filters: `entity_type` (exact-match), `lifecycle_only` (when true, omits the free/planned lists).
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `entity_type` | string |  | Exact-match entity type name (e.g. "feature", "hypothesis"). Returns at most one lifecycle. |
-| `lifecycle_only` | boolean |  | When true, omit free_types and planned_types from response. |
-
-**Returns:**
-
-JSON: `{ lifecycles, total, free_types: string[], planned_types: string[] }`
-
-**See also:** `get_lifecycle`, `list_entity_types`, `get_entity_meta`
-
-
-### `list_playbooks`
-
-List canonical UPG playbooks from `@unified-product-graph/core`. Each playbook bootstraps a region; its `creation_sequence` answers "what to create when populating this region". Filters: `region`, `canonical_only`, `framework_id`. The catalog spans 10 regions: one canonical playbook per region, plus specialised playbooks (three carry a `framework_id`: BMC, AARRR, build-measure-learn).
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `canonical_only` | boolean |  | When true, return only the canonical playbook per region (W1 invariant restated). |
-| `framework_id` | string |  | Exact-match UPGFramework.id (e.g. "business-model-canvas", "pirate-metrics-aarrr"). |
-| `region` | string |  | Exact-match UPGRegionId (e.g. "users_needs", "business_gtm_growth"). |
-
-**Returns:**
-
-JSON: `{ count, playbooks: UPGPlaybook[] }`
-
-**Examples:**
-
-// List all canonical playbooks to see what bootstrap paths are available
-// Input:
-{ "canonical_only": true }
-// Output (truncated):
-{
-  "count": 10,
-  "playbooks": [
-    {
-      "id": "playbook:users-needs",
-      "name": "Users & Needs",
-      "region": "users_needs",
-      "is_canonical": true,
-      "target_anchor_entity": "persona",
-      "creation_sequence": ["persona", "job", "need", "pain_point"]
-    },
-    { "id": "playbook:strategy-outcomes", "region": "strategy_outcomes", "is_canonical": true, "..." }
-  ]
-}
-
-**See also:** `get_playbook`, `list_regions`, `list_approaches`, `list_frameworks`
-
-
-### `list_product_stages`
-
-Return the canonical 9-stage product journey from `UPG_PRODUCT_STAGES` in order: concept → validation → build → beta → launch → growth → mature → maintenance → sunset. The closed enum used by `create_product`, `get_graph_digest` health logic, benchmark stage scoping, and anti-pattern stage filters.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ count, stages: readonly UPGProductStage[] }`
-
-**See also:** `list_benchmarks`, `list_anti_patterns`, `list_domain_rings`, `create_product`
-
-
-### `list_regions`
-
-List the 10 canonical UPG super-domain regions from `UPG_REGIONS`. Returns a compact summary per region: id, label, order, shape, `mental_model`, `anchor_type`, `composes_atomic_domains`, `entity_count`, `intra_edge_count`, `boundary_edge_count`. Fixed list, non-paginated.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ count, regions: Array<{ id, label, order, shape, mental_model, anchor_type, composes_atomic_domains, entity_count, intra_edge_count, boundary_edge_count, coverage_keys, business_areas }>, area_taxonomy }`
-
-**See also:** `get_region`, `get_region_for_entity_type`, `list_domains`, `list_playbooks`
-
-
-### `list_scalar_to_edge_migrations`
-
-List every scalar→edge promotion from `UPG_SCALAR_TO_EDGE_MIGRATIONS` (P14 conformance: a scalar that named a first-class entity, e.g. `business_model.north_star_metric`, becomes a canonical edge). Each row: the full `UPGScalarToEdgeMigration` record plus `since`. The lossless apply is `promote_scalars_to_edges`. Non-paginated.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ promotions: [...], total: number }`
-
-**See also:** `promote_scalars_to_edges`, `list_split_migrations`
-
-
-### `list_scales`
-
-List every spec-defined assessment scale from `UPG_SCALES` (canonical vocabulary for `UPGAssessment` values). Each scale carries id, label, description, min, max, steps, and per-point labels + descriptions. Non-paginated. External `scale_extensions` are graph-instance–scoped and excluded here.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ scales: UPGScaleDefinition[], total: number }`
-
-**See also:** `get_scale`, `get_entity_schema`
-
-
-### `list_split_migrations`
-
-List every 1→N split migration from `UPG_SPLIT_MIGRATIONS` ("one type became multiple types" rules, e.g. `experiment` → `experiment_plan` + `experiment_run`; `hypothesis` → `hypothesis_claim` + `hypothesis_evidence`). Each row: the full `UPGSplitMigration` record plus `since`. Non-paginated.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ splits: [...], total: number }`
-
-**See also:** `list_type_migrations`, `list_edge_migrations`, `migrate_type`, `validate_graph`
-
-
-### `list_status_values`
-
-List the valid `status` values an entity type can hold: the pre-flight lookup so you no longer learn the set only from a rejected write. For a lifecycle type, returns each phase as `{ status, label, terminal }` plus `initial_status` and `terminal_statuses`; for a lifecycle-free type, returns `lifecycle_free: true` with empty `values`. The focused, low-token sibling of `get_lifecycle`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `entity_type` | string | ✓ | Canonical entity type name (e.g. "feature", "key_result", "need"). |
-
-**Returns:**
-
-JSON: `{ entity_type, lifecycle_free, initial_status?, terminal_statuses?, values: [{ status, label, terminal }], note? }`.
-
-**See also:** `get_lifecycle`, `get_entity_schema`
-
-
-### `list_templates`
-
-List the curated starter templates (proven entity patterns for SaaS, marketplace, mobile, OSS, and agency). Returns summaries: id, name, description, industries, stages, entity_count, entity_types. The same library powers the /upg-new-from-template skill and the site gallery. Use with get_template to fetch a full pattern for instantiation.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `industry` | string |  | Filter by industry (saas, marketplace, mobile, oss, agency) |
-| `stage` | string |  | Filter by stage (concept, validation, growth, mature) |
-
-**Returns:**
-
-`{ templates: TemplateSummary[] }` — id, name, description, industries, stages, entity_count, entity_types
-
-
-### `list_tree_patterns`
-
-List the canonical get_tree patterns as summary rows: id, label, the region each is the tree view of, anchor_type, fallback_anchors, natural_depth, gap_policy, and slot_count. The introspectable index of what get_tree can assemble. Pair with list_regions to see which tree-shaped regions have a pattern. Fixed list, non-paginated.
-
-**Atomicity:** `atomic (read-only)`
-
-_No arguments._
-
-**Returns:**
-
-JSON: `{ count, patterns: UPGTreePatternSummary[] }`
-
-**See also:** `get_tree_pattern`, `get_tree`, `list_regions`
-
-
-### `list_type_labels`
-
-List canonical `UPGTypeLabel` entries: each entity type's display label, alt-labels (synonyms), per-framework labels, and designation labels where applicable. Paginated (default 100, max 500). Cursor is opaque base64 (`offset:N`), same convention as `list_frameworks`. External MCP apps need labels for rendering.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `cursor` | string |  | Opaque pagination cursor. Pass next_cursor from a previous response. |
-| `limit` | number |  | Page size (default 100, max 500). |
-
-**Returns:**
-
-JSON: `{ total, count, next_cursor?, labels: UPGTypeLabel[] }`
-
-**See also:** `get_type_label`, `list_entity_types`, `get_entity_meta`
-
-
-### `list_type_migrations`
-
-List every type-rename migration from `UPG_MIGRATIONS` (version-scoped registry of deprecated `from` → canonical `to` renames, e.g. `pain_point` → `need`, `hypothesis` → `hypothesis_claim`). Each row: `{ from, to, since }` where `since` is the spec version that introduced it. Optional `from_type` exact-matches `from`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `from_type` | string |  | Exact-match filter on the deprecated type name (e.g. "pain_point", "hypothesis"). |
-
-**Returns:**
-
-JSON: `{ migrations: [{ from, to, since }], total: number }`
-
-**See also:** `list_edge_migrations`, `list_split_migrations`, `migrate_type`, `migrate_properties`, `validate_graph`, `list_entity_types`
-
-
-### `plan`
-
-Plan approach: path of arrival to "what should I build next?". Returns the Plan record + invocation params wrapped in `{ approach_id, scope, generated_at, approach, params }`. The LLM consumes `signature_hint` and synthesises `{ missing_entities, coverage_score }` against the live graph. Optional `region` narrows scope; omit `region` to scope to the product's ACTIVE regions; pass `exhaustive:true` to score the full type universe.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `exhaustive` | boolean |  | If true, score against the entire 319-type universe (every domain creation sequence). Off by default; whole-universe gap scoring is noisy for a focused product. Only applies when `region` is omitted. |
-| `region` | string |  | Optional UPGRegionId or atomic-domain id. Narrows planning scope to a single region (e.g. "users_needs", "business_gtm_growth"). Omit to scope to the product's active regions. |
-
-**Returns:**
-
-JSON envelope: `{ approach_id, scope, generated_at, approach,
-params, missing_entities, coverage_score, expected_count, covered_count,
-execution_mode: "execution_v0_4_0" }`.
-
-**Examples:**
-
-// Input: { "region": "users_needs" }
-// Output (truncated):
-{
-  "approach_id": "plan",
-  "scope": "users_needs",
-  "missing_entities": [
-    { "entity_type": "job", "domain": "user", "position_in_sequence": 1,
-      "typical_parent_type": "persona",
-      "hint": "Add job (step 2 in the user sequence; typically attached under persona)." }
-  ],
-  "coverage_score": 0.5,
-  "execution_mode": "execution_v0_4_0"
-}
-
-**See also:** `get_approach`, `list_playbooks`, `get_region`, `inspect`, `prioritise`
-
-
-### `prioritise`
-
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing prioritisation, invoke the /upg-prioritise skill instead of calling this tool directly. Prioritise approach: path of arrival to "what's most important?". Returns the Prioritise record + invocation params + framework metadata in the family-resemblance envelope. Both `candidates` and `framework_id` are required. The LLM looks up the framework via `get_framework`, reads its scoring spec, and emits `{ ranked: [{ entity_id, score, rationale }], framework_used }`.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `candidates` | array |  | entity_id[] to rank. Optional when exercise_id is given (the exercise supplies them). |
-| `exercise_id` | string |  | Optional (0.8.4). A framework_exercise id: reads each candidate's scoring inputs from its includes-edge properties instead of node.properties, and bypasses the target-type guard so any entity type can be scored. |
-| `framework_id` | string | ✓ | Required. UPGFramework.id of the scoring lens (e.g. "rice-scoring", "ice-scoring", "kano-model", "cost-of-delay", "wsjf"). |
-
-**Returns:**
-
-JSON envelope: `{ approach_id, scope, generated_at, approach,
-params, framework_resolved, ranked?, required_properties?,
-hint?, execution_mode }`. Execution mode is `"execution_v0_4_0"` when
-the framework has an expression, `"definition_lookup_v0_4_0"` otherwise.
-
-**Throws:**
-
-- textError when `candidates` or `framework_id` are missing/empty,
-or when `framework_id` is not in `UPG_FRAMEWORKS`.
-
-**See also:** `get_approach`, `list_frameworks`, `get_framework`, `plan`, `trace`
-
-
-### `reflect`
-
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing reflection, invoke the /upg-reflect skill instead of calling this tool directly. Reflect approach: path of arrival to "what should I be questioning?". Returns the Reflect record + invocation params in the family-resemblance envelope. The LLM consumes `mode` + `scope` + `signature_hint` and emits `{ prompts: [{ kind, question, target_entities? }] }`. `mode` is one of: `assumptions`, `alternatives`, `blind-spots`, `load-bearing`; omit for open reflection. `scope` accepts a region id, entity id, or `null` for whole-graph.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `mode` | `assumptions` \| `alternatives` \| `blind-spots` \| `load-bearing` |  | Optional. One of: assumptions, alternatives, blind-spots, load-bearing. Omit for open reflection. |
-| `scope` | string,null |  | Optional. Region id, entity id, or null for whole-graph. |
-
-**Returns:**
-
-JSON envelope: `{ approach_id, scope, generated_at, approach,
-params, prompts, execution_mode: "execution_v0_4_0" }`
-
-**Throws:**
-
-- textError when `mode` is provided but not one of the 4 canonical
-nouns.
-
-**See also:** `get_approach`, `inspect`, `plan`, `get_anti_pattern`
-
-
-### `resolve_edge_for_pair`
-
-Resolve the canonical `UPGEdgeType` for a `source_type` → `target_type` containment pair. Wraps `resolveContainmentEdge` / `UPG_EDGE_PAIR_MAP`. Adapter-critical: every import adapter (Markdown, Notion, Linear, GitHub) uses it to look up the right `_contains_` edge before falling back to a polymorphic edge. Returns `{ edge_type: null }` when the pair is uncatalogued.
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `source_type` | string | ✓ | Parent / source entity type. |
-| `target_type` | string | ✓ | Child / target entity type. |
-
-**Returns:**
-
-JSON: `{ source_type, target_type, edge_type: string | null,
-cross_product_scope?, anchor_hint?, alternate_anchors?, adjacent_edges? }` — where
-`cross_product_scope` is the derived 3-state scope (`'curated' | 'provisional'`,
-omitted for `resident`).
-
-**Throws:**
-
-- textError when `source_type` or `target_type` is missing.
-
-**Warnings (non-error surfaces):**
-
-- Returns `edge_type: null` when no canonical pair is registered.
-Adapters MUST fall back to a polymorphic edge or skip the relationship,
-not synthesise a non-canonical key.
-
-**See also:** `list_edge_types`, `get_edge_type`, `create_edge`, `trace`
+**See also:** `get_catalog_entry`, `get_entity_schema`, `get_spec_version`
 
 
 ### `score_entity`
@@ -3492,47 +2497,6 @@ JSON: `{ edge, warnings }`.
 framework_exercise.
 
 **See also:** `apply_framework`
-
-
-### `trace`
-
-[LLM-mediated] This tool returns a routing envelope, not computed results. For user-facing tracing, invoke the /upg-trace skill instead of calling this tool directly. Trace approach: path of arrival to "walk a meaningful path through existing graph". Returns the Trace record + invocation params in the family-resemblance envelope. The LLM uses `anchor` + `path` to compose `query()` calls and emits `{ trail: [{ depth, entity_id, edge_type_in }], reached: entity_id[] }`. `path` is type-shorthand: `["persona","job","feature"]` walks persona→job→feature using the canonical edge per pair (via `resolve_edge_for_pair`). Optional `edges_override` selects non-canonical edges per hop; `null` per element means "use canonical".
-
-**Atomicity:** `atomic (read-only)`
-
-**Arguments:**
-
-| Name | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `anchor` | string | ✓ | Required. entity_id where the traversal starts. |
-| `edges_override` | array |  | Optional. Per-hop edge override array. Length must match path length; element null means "use canonical edge for this pair". |
-| `path` | array | ✓ | Required. UPGEntityType[] type-shorthand path. Each step walks via the canonical edge for the source→target pair. |
-
-**Returns:**
-
-JSON envelope: `{ approach_id, scope, generated_at, approach,
-params, trail, reached, error?, halted_at_depth?,
-execution_mode: "execution_v0_4_0" }`
-
-**Throws:**
-
-- textError when `anchor` or `path` are missing/invalid.
-
-**Examples:**
-
-// Input: { "anchor": "persona_01", "path": ["job", "feature"] }
-// Output (truncated):
-{
-  "approach_id": "trace",
-  "trail": [
-    { "depth": 0, "entity_id": "persona_01", "edge_type_in": null },
-    { "depth": 1, "entity_id": "job_01", "edge_type_in": "persona_pursues_job" }
-  ],
-  "reached": ["persona_01", "job_01"],
-  "execution_mode": "execution_v0_4_0"
-}
-
-**See also:** `get_approach`, `resolve_edge_for_pair`, `query`, `get_node`, `plan`, `prioritise`
 
 
 ## Cloud Sync

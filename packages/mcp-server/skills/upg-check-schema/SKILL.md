@@ -57,9 +57,9 @@ If auditing multiple graphs, repeat for each `.upg` file via `list_local_product
 
 Load the schema via MCP introspection (never read spec source files directly — paths don't exist in deployed environments):
 ```
-list_entity_types()          → all registered entity types (replaces entity-meta.ts)
-list_domains()               → all domains and their types (replaces domains.ts)
-list_edge_types()            → all edge catalog entries (replaces index.ts)
+list_catalog({ kind: 'entity_types' })          → all registered entity types (replaces entity-meta.ts)
+list_catalog({ kind: 'domains' })               → all domains and their types (replaces domains.ts)
+list_catalog({ kind: 'edge_types' })            → all edge catalog entries (replaces index.ts)
 get_spec_version()           → current version, entity count, edge count, domain count
 ```
 
@@ -75,7 +75,7 @@ Compare types present in the graph against types defined in the schema:
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 TYPE USAGE ANALYSIS
 
-Schema defines: <N entity types from list_entity_types()> (across <M domains from list_domains()>, <R regions from list_regions()>)
+Schema defines: <N entity types from list_catalog({ kind: 'entity_types' })> (across <M domains from list_catalog({ kind: 'domains' })>, <R regions from list_catalog({ kind: 'regions' })>)
 Graph uses:     47 entity types
 Coverage:       <graph_used / schema_total>%
 
@@ -169,7 +169,7 @@ These are candidates for adding to the property interfaces; the user is already 
 ```
 EDGE USAGE
 
-Schema defines: <N edges from list_edge_types() or get_spec_version().edge_count>
+Schema defines: <N edges from list_catalog({ kind: 'edge_types' }) or get_spec_version().edge_count>
 Graph uses:     23 edge types
 Coverage:       <graph_used / schema_total>%
 

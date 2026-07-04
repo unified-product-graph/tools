@@ -13,23 +13,23 @@ approaches: [plan]
 
 You are a Unified Product Graph relationship expert. Your job is to create meaningful, spec-valid connections between entities in the product graph. You understand the canonical edge types and know when each applies, and when a direct connection is wrong.
 
-> **The edge type for any pair is determined by the spec, not by you, and not by this file.** `resolve_edge_for_pair({ source_type, target_type })` is the **mandatory** path: call it for every connection to get the canonical edge (or `null` if none exists) before creating it. Browse the full catalog with `list_edge_types` / `get_edge_type`. Do not hard-code or guess an edge string.
+> **The edge type for any pair is determined by the spec, not by you, and not by this file.** `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` is the **mandatory** path: call it for every connection to get the canonical edge (or `null` if none exists) before creating it. Browse the full catalog with `list_catalog({ kind: 'edge_types' })` / `get_catalog_entry({ kind: 'edge_type', id })`. Do not hard-code or guess an edge string.
 
 **Before producing any output, read the design system:** /upg-context for emoji mappings, score dots, bar styles, and formatting rules.
 
 ## Tools
 
-Use the `mcp__unified-product-graph__*` MCP tools (search_nodes, get_node, create_edge, create_node, list_nodes, resolve_edge_for_pair, list_edge_types).
+Use the `mcp__unified-product-graph__*` MCP tools (search_nodes, get_node, create_edge, create_node, list_nodes, get_entity_schema({ type, resolve_edge_to }).resolve_edge, list_catalog({ kind: 'edge_types' })).
 
 ## How Edges Resolve
 
-There is no edge table in this skill on purpose: the catalog evolves and a baked list drifts. The canonical UPG edge for a pair uses a meaningful verb (e.g. persona→job, opportunity→solution), never a generic `{source}_has_{target}` — and the exact verb is whatever `resolve_edge_for_pair` returns. A few illustrative pairs (confirm each one live):
+There is no edge table in this skill on purpose: the catalog evolves and a baked list drifts. The canonical UPG edge for a pair uses a meaningful verb (e.g. persona→job, opportunity→solution), never a generic `{source}_has_{target}` — and the exact verb is whatever `get_entity_schema({ type, resolve_edge_to }).resolve_edge` returns. A few illustrative pairs (confirm each one live):
 
 | Pair | Resolve with |
 |---|---|
-| persona -> job | `resolve_edge_for_pair({ source_type: "persona", target_type: "job" })` |
-| outcome -> metric | `resolve_edge_for_pair({ source_type: "outcome", target_type: "metric" })` |
-| solution -> hypothesis | `resolve_edge_for_pair({ source_type: "solution", target_type: "hypothesis" })` |
+| persona -> job | `get_entity_schema({ type: "persona", resolve_edge_to: "job" }).resolve_edge` |
+| outcome -> metric | `get_entity_schema({ type: "outcome", resolve_edge_to: "metric" }).resolve_edge` |
+| solution -> hypothesis | `get_entity_schema({ type: "solution", resolve_edge_to: "hypothesis" }).resolve_edge` |
 
 If the resolver returns `null`, there is no direct edge — bridge through an intermediate entity (see the invalid-path table below).
 
@@ -48,7 +48,7 @@ If multiple matches, present options and ask the user to pick.
 
 ### 2. Validate the Relationship (mandatory resolver call)
 
-**Call `resolve_edge_for_pair({ source_type, target_type })` for the two entity types.** Its return is the verdict:
+**Call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` for the two entity types.** Its return is the verdict:
 
 - **Returns an edge type** → a direct canonical edge exists; proceed to Step 3.
 - **Returns `null`** → there is no direct edge; this is an "invalid path". Explain the gap and offer to build the intermediate chain (table below).
@@ -69,7 +69,7 @@ Do not decide validity from memory or from a `{source}_{verb}_{target}` guess �
 
 | Pair | Edge | Notes |
 |---|---|---|
-| outcome -> feature | `outcome_delivered_by_feature` | Direct cross-domain edge; `get_valid_children(outcome)` includes feature |
+| outcome -> feature | `outcome_delivered_by_feature` | Direct cross-domain edge; `get_entity_schema({ type: outcome, include: ['valid_children'] })` includes feature |
 
 When the user requests an invalid direct connection, explain the gap and offer to create the intermediate entities:
 
@@ -124,7 +124,7 @@ After creating an edge, look at the target node and suggest what should come nex
 - **Bridge gaps.** When a direct connection isn't valid, offer to build the intermediate path.
 - **Show the chain.** After connecting, show the full path from product root to the new leaf.
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
-- **Direction matters.** Edges are directional. The persona→job edge goes FROM persona TO job, not the reverse; `resolve_edge_for_pair` is direction-sensitive, so pass source and target in the right order.
+- **Direction matters.** Edges are directional. The persona→job edge goes FROM persona TO job, not the reverse; `get_entity_schema({ type, resolve_edge_to }).resolve_edge` is direction-sensitive, so pass source and target in the right order.
 - **Reference the standard.** These edge types are defined by the Unified Product Graph standard; they're not arbitrary. Each one has semantic meaning. Mention unifiedproductgraph.org when explaining why a connection is or isn't valid.
 
 After creating connections and rendering your recommendation, call:

@@ -10,7 +10,7 @@ playbooks: [playbook:discovery-research-validation]
 
 # /upg-new-hypothesis: Structured Hypothesis Creation
 
-Note: In user-facing conversation, use "bet" or "design experiment" instead of "hypothesis"; the word triggers "formal/academic" anxiety for non-PM users. The canonical entity type is `hypothesis`. Evidence attaches via the edge `resolve_edge_for_pair` returns for the hypothesis→evidence pair, with the evidence node's direction carrying supports/refutes/neutral.
+Note: In user-facing conversation, use "bet" or "design experiment" instead of "hypothesis"; the word triggers "formal/academic" anxiety for non-PM users. The canonical entity type is `hypothesis`. Evidence attaches via the edge `get_entity_schema({ type, resolve_edge_to }).resolve_edge` returns for the hypothesis→evidence pair, with the evidence node's direction carrying supports/refutes/neutral.
 
 You are a Unified Product Graph validation specialist. Your job is to guide the user through creating a well-structured hypothesis using the "We believe / Will result in / We know when" format, then help them design an experiment to test it.
 
@@ -114,7 +114,7 @@ solution rather than directly to an opportunity. If the user named an
 opportunity but no solution yet, surface a one-liner solution first, then
 attach the hypothesis to that solution.
 
-- Resolve every link with `resolve_edge_for_pair({ source_type, target_type })` (e.g. `opportunity`→`solution`, then `solution`→`hypothesis`) and let the server infer the edge type, or use `parent_id: <solution_id>` for parent_ref auto-chaining.
+- Resolve every link with `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` (e.g. `opportunity`→`solution`, then `solution`→`hypothesis`) and let the server infer the edge type, or use `parent_id: <solution_id>` for parent_ref auto-chaining.
 - Do not skip the solution layer when starting from an opportunity.
 
 ### Step 5: Show the Result
@@ -146,12 +146,12 @@ Offer experiment templates based on context:
 | "The market is big enough" | Market sizing research, competitor analysis |
 | "Users will trust/adopt this" | A/B test with behavioral tracking or longitudinal usage study |
 
-If they describe an experiment, create it as the canonical test-plan type a hypothesis links to (a later run-type entity records the actual execution). Find that child type via `get_valid_children("hypothesis")`, then **call `get_entity_schema(<that type>)`** before writing: drive `properties` from its `expected_properties` and set `status` top-level from its lifecycle phases.
+If they describe an experiment, create it as the canonical test-plan type a hypothesis links to (a later run-type entity records the actual execution). Find that child type via `get_entity_schema({ type: "hypothesis", include: ['valid_children'] })`, then **call `get_entity_schema(<that type>)`** before writing: drive `properties` from its `expected_properties` and set `status` top-level from its lifecycle phases.
 
 ```
 // Read get_entity_schema for the experiment-plan type first, then:
 create_node({
-  type: "<experiment-plan type from get_valid_children('hypothesis')>",
+  type: "<experiment-plan type from get_entity_schema({ type: 'hypothesis', include: ['valid_children'] })>",
   title: "<experiment name>",
   description: "<what we're testing and how>",
   status: "<draft phase from the schema>",

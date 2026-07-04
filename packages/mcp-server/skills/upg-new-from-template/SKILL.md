@@ -15,8 +15,8 @@ You are a Unified Product Graph template specialist. Your job is to help the use
 ## Tools
 
 Use the `mcp__unified-product-graph__*` MCP tools:
-- `list_templates` / `get_template` — the curated template library (the same one behind `upg template` and the site gallery). **Prefer these**: the curated templates carry hand-tuned copy, real prompts, and canonical typed edges.
-- `create_node`, `create_edge`, `resolve_edge_for_pair`, `get_entity_schema`, `get_valid_children`, `list_entity_types` — for creating entities and for the live-synthesis fallback when the library has no match.
+- `list_catalog({ kind: 'templates' })` / `get_catalog_entry({ kind: 'template', id })` — the curated template library (the same one behind `upg template` and the site gallery). **Prefer these**: the curated templates carry hand-tuned copy, real prompts, and canonical typed edges.
+- `create_node`, `create_edge`, `get_entity_schema({ type, resolve_edge_to }).resolve_edge`, `get_entity_schema`, `get_entity_schema({ type, include: ['valid_children'] })`, `list_catalog({ kind: 'entity_types' })` — for creating entities and for the live-synthesis fallback when the library has no match.
 - `get_product_context`, `search_nodes`, `list_nodes` — for the maturity check and existing-graph awareness.
 
 ## Phase Map
@@ -71,7 +71,7 @@ Show: **Phase 2 of 4: Choose a template**
 **Fetch the real library — do not invent template names.** Call:
 
 ```
-list_templates({ industry: "<chosen industry>" })
+list_catalog({ kind: 'templates', industry: "<chosen industry>" })
 ```
 
 Each result has `id`, `name`, `description`, `stages`, `entity_count`, and `entity_types`. Present them as numbered options, showing for each:
@@ -87,13 +87,13 @@ After the curated options, always offer one more:
 Ask: **Which template speaks to where you are right now?**
 
 - If they pick a curated template, remember its `id` and go to Phase 3.
-- If they pick "custom pattern", or chose **"Something else"** in Phase 1, or `list_templates` returns nothing for their industry, fall through to the **Live-synthesis fallback** (below) instead of Phase 3/4.
+- If they pick "custom pattern", or chose **"Something else"** in Phase 1, or `list_catalog({ kind: 'templates' })` returns nothing for their industry, fall through to the **Live-synthesis fallback** (below) instead of Phase 3/4.
 
 ### Phase 3: Fill in the Details
 
 Show: **Phase 3 of 4: Fill in the details**
 
-Call `get_template({ id: "<chosen id>" })`. The payload has `entities[]` (each with `title_template`, `description_template`, `default_properties`, `default_tags`, `default_status`), `edges[]` (each `{ source_index, target_index, type }`), and `prompts{}` (a map of `placeholder_key → question`).
+Call `get_catalog_entry({ kind: 'template', id: "<chosen id>" })`. The payload has `entities[]` (each with `title_template`, `description_template`, `default_properties`, `default_tags`, `default_status`), `edges[]` (each `{ source_index, target_index, type }`), and `prompts{}` (a map of `placeholder_key → question`).
 
 **Walk the `prompts` one at a time** — never dump them all at once. For each `{{key}}` in `prompts`, ask its question, wait, and record the answer. If the user says "skip" or "not sure", use a sensible default and note it.
 
@@ -121,7 +121,7 @@ Show: **Phase 4 of 4: Creating entities**
    - Substitute placeholders in `title_template` → `title` and `description_template` → `description`.
    - Pass `default_properties` (placeholders substituted), `default_status`, and `default_tags` through to `create_node`. These are already spec-valid (the templates package is conformance-gated), so do not strip them.
    - Track the created node id per entity index so edges can reference them.
-3. **Create each connection** from the template's `edges[]`: for `{ source_index, target_index, type }`, call `create_edge` with the created source/target ids and the given `type` (it is the canonical edge for the pair). If a create rejects the explicit type, fall back to `resolve_edge_for_pair({ source_type, target_type })` and retry.
+3. **Create each connection** from the template's `edges[]`: for `{ source_index, target_index, type }`, call `create_edge` with the created source/target ids and the given `type` (it is the canonical edge for the pair). If a create rejects the explicit type, fall back to `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and retry.
 4. Show confirmation for each entity created.
 
 After all entities are created, show the batch confirmation:
@@ -142,10 +142,10 @@ That's **5 entities and 4 connections** added to your graph.
 
 When the user wants a custom pattern, picked "Something else", or no curated template fits, **build the pattern live from the spec** instead:
 
-1. `list_entity_types()` and `get_valid_children({ parent_type: "<anchor type>" })` (e.g. `persona` or `product`) to learn the catalog and hierarchy.
+1. `list_catalog({ kind: 'entity_types' })` and `get_entity_schema({ type: "<anchor type>", include: ['valid_children'] })` (e.g. `persona` or `product`) to learn the catalog and hierarchy.
 2. Propose a small pattern (a set of entity types + their parent→child hierarchy and cross-domain edges) derived from the spec, not from memory. Show name, one-line description, and the entity count/types.
 3. For each type, `get_entity_schema({ type })` and derive a natural-language question per `expected_properties` (`title` → "What would you name this [type]?"; assessment props → "On a scale of 1-5…"; enum props → "Which of these: [values]?"). Walk them one at a time, parent first.
-4. Create entities with `create_node`; for each connection call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type (never hardcode an edge name).
+4. Create entities with `create_node`; for each connection call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and let the server infer the edge type (never hardcode an edge name).
 
 ### Smart Ending
 
@@ -161,7 +161,7 @@ If entities were created, add the sync line:
 
 ## Key Principles
 
-- **Curated first, synthesise as fallback.** Prefer `list_templates` / `get_template`; only build live when the library has no fit. Never invent curated template names — fetch them.
+- **Curated first, synthesise as fallback.** Prefer `list_catalog({ kind: 'templates' })` / `get_catalog_entry({ kind: 'template', id })`; only build live when the library has no fit. Never invent curated template names — fetch them.
 - **Templates are starting points, not straitjackets.** The user can modify, skip, or add to any template.
 - **One question at a time.** Never dump all prompts at once. Ask, wait, process, then ask the next.
 - **Replace placeholders with real answers.** Never create entities with `{{placeholder}}` text.

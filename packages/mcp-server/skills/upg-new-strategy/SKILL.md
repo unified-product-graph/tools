@@ -20,7 +20,7 @@ Use the `mcp__unified-product-graph__*` MCP tools (create_node, create_edge, sea
 When creating 3+ entities, use `batch_create_nodes` with `parent_ref` chaining.
 When deleting 3+ entities, use `batch_delete_nodes`.
 
-> **MCP-first (applies to every create below).** Before creating a vision, mission, strategic theme, initiative, or outcome, call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any assessment as `{ value, label }`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. The payloads below show shape and intent; the authoritative keys and phases come from the schema at runtime.
+> **MCP-first (applies to every create below).** Before creating a vision, mission, strategic theme, initiative, or outcome, call `get_entity_schema(<type>)`. Build `properties` from its `expected_properties`, set `status` **top-level** from one of the lifecycle phases the schema returns (don't hard-code the status enum), and pass any assessment as `{ value, label }`. Before any edge, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and let the server infer the edge type. The payloads below show shape and intent; the authoritative keys and phases come from the schema at runtime.
 
 ## Phase Map
 
@@ -181,7 +181,7 @@ STOP. Wait for the answer.
 
 **Vibe check:** Show the user a summary of what you've captured and ask: "Anything you'd change before I save this?"
 
-For each theme the user provides, create a node. **`strategic_theme` is not a containment child of `mission`** — first confirm with `get_valid_children({ parent_type: "mission" })`. If `strategic_theme` is NOT a valid child, create it at root and wire the lateral relationship with `resolve_edge_for_pair({ source_type: "mission", target_type: "strategic_theme" })`:
+For each theme the user provides, create a node. **`strategic_theme` is not a containment child of `mission`** — first confirm with `get_entity_schema({ type: "mission", include: ['valid_children'] })`. If `strategic_theme` is NOT a valid child, create it at root and wire the lateral relationship with `get_entity_schema({ type: "mission", resolve_edge_to: "strategic_theme" }).resolve_edge`:
 
 ```
 // Read get_entity_schema("strategic_theme") first, then:
@@ -190,10 +190,10 @@ create_node({
   title: "<theme name>",
   description: "<why this is a bet worth making>",
   status: "<active phase from the schema>"
-  // Do NOT set parent_id to mission_id unless get_valid_children confirms containment.
-  // Instead, wire the relationship via resolve_edge_for_pair after creation:
+  // Do NOT set parent_id to mission_id unless get_entity_schema({ type, include: ['valid_children'] }) confirms containment.
+  // Instead, wire the relationship via get_entity_schema({ type, resolve_edge_to }).resolve_edge after creation:
 })
-// Then: edge = resolve_edge_for_pair({ source_type: "mission", target_type: "strategic_theme" })
+// Then: edge = get_entity_schema({ type: "mission", resolve_edge_to: "strategic_theme" }).resolve_edge
 // create_edge({ source_id: "<mission_id>", target_id: "<strategic_theme_id>" })  // server infers type
 ```
 
@@ -263,7 +263,7 @@ You already have outcomes in your graph:
 
 If creating a new outcome:
 
-> **`outcome` is not a containment child of `initiative`** — verify with `get_valid_children({ parent_type: "initiative" })`. Create the outcome at root (no `parent_id`) and then wire the lateral relationship between initiative and outcome using the resolved edge (typically `initiative_drives_outcome`).
+> **`outcome` is not a containment child of `initiative`** — verify with `get_entity_schema({ type: "initiative", include: ['valid_children'] })`. Create the outcome at root (no `parent_id`) and then wire the lateral relationship between initiative and outcome using the resolved edge (typically `initiative_drives_outcome`).
 
 ```
 // Read get_entity_schema("outcome") first, then:
@@ -275,14 +275,14 @@ create_node({
   // No parent_id — outcome is not a containment child of initiative
 })
 // Wire the lateral relationship:
-// edge = resolve_edge_for_pair({ source_type: "initiative", target_type: "outcome" })
+// edge = get_entity_schema({ type: "initiative", resolve_edge_to: "outcome" }).resolve_edge
 // create_edge({ source_id: "<initiative_id>", target_id: "<new_outcome_id>" })  // server infers type
 ```
 
 If linking to an existing outcome, resolve the edge first:
 
 ```
-// edge = resolve_edge_for_pair({ source_type: "initiative", target_type: "outcome" })
+// edge = get_entity_schema({ type: "initiative", resolve_edge_to: "outcome" }).resolve_edge
 create_edge({ source_id: "<initiative_id>", target_id: "<existing_outcome_id>" })  // server infers type
 ```
 

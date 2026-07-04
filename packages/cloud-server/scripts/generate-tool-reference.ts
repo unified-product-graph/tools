@@ -112,6 +112,9 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   scoreEntity: 'score_entity',
   // templates (curated starter-template library)
   listTemplatesTool: 'list_templates',
+  // catalog facets (0.19.0)
+  listCatalog: 'list_catalog',
+  getCatalogEntry: 'get_catalog_entry',
   getTemplateTool: 'get_template',
   // nodes (extra)
   moveNode: 'move_node',
@@ -230,7 +233,7 @@ async function main(): Promise<void> {
     // get_tree's handler lives in its own tree.ts; fold it into the context
     // (Context & Traversal) domain, where query sits. list_templates /
     // get_template live in templates.ts but group under Spec Introspection.
-    domainSourceFiles: { context: ['context.ts', 'tree.ts'], spec: ['spec.ts', 'templates.ts'] },
+    domainSourceFiles: { context: ['context.ts', 'tree.ts'], spec: ['spec.ts', 'templates.ts', 'catalog.ts'] },
     symbolToToolName: SYMBOL_TO_TOOL_NAME,
     toolDefinitions: TOOL_DEFINITIONS,
     outputs: {

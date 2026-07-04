@@ -102,8 +102,8 @@ Use this as the persona's `description`; the narrative that brings them to life.
 **MCP-first (do not write payloads from memory).** Before creating anything:
 
 1. Call `get_entity_schema({ type: "persona" })`. Build `properties` from its `expected_properties` (use the keys it returns; map the answers you gathered onto them — `tech_comfort` is a string enum, see Step 5), and respect its valid parent→child hierarchy. Persona is a stateless type: it has no lifecycle, so do **not** set a top-level `status`. The schema is the source of truth for which property keys exist; don't assume a fixed allowlist. **Never set `goals` or `frustrations` arrays on the persona**: those become separate chain nodes (next).
-2. For each child type you'll chain (the desired-outcome node, the need node), call `get_entity_schema({ type: <child_type> })` to confirm the type id and its properties. Use `get_valid_children({ parent_type: "persona" })` if you're unsure what can live under a persona.
-3. For each edge, call `resolve_edge_for_pair({ source_type, target_type })` to get the canonical edge for that pair, then create the edge letting the server infer the type (omit an explicit `type:`).
+2. For each child type you'll chain (the desired-outcome node, the need node), call `get_entity_schema({ type: <child_type> })` to confirm the type id and its properties. Use `get_entity_schema({ type: "persona", include: ['valid_children'] })` if you're unsure what can live under a persona.
+3. For each edge, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` to get the canonical edge for that pair, then create the edge letting the server infer the type (omit an explicit `type:`).
 
 ```
 // 1. Schema-driven create. The persona is a top-level entity: create it at ROOT
@@ -120,15 +120,15 @@ create_node({
 // 1b. Link to the product node if one exists:
 //    product_nodes = list_nodes({ type: "product" })
 //    if (product_nodes.length > 0) {
-//      edge = resolve_edge_for_pair({ source_type: "product", target_type: "persona" })
+//      edge = get_entity_schema({ type: "product", resolve_edge_to: "persona" }).resolve_edge
 //      // → "product_targets_persona"
 //      create_edge({ source_id: product_nodes[0].id, target_id: persona_id })
 //    }
 
 // 2. For each desired outcome from Step 3 — child type + edge resolved live:
-//    childType = the outcome/aspiration type from get_valid_children({ parent_type: "persona" })
+//    childType = the outcome/aspiration type from get_entity_schema({ type: "persona", include: ['valid_children'] })
 create_node({ /* type from schema */ title: "<outcome>", parent_id: "<persona_id>" })
-// edge = resolve_edge_for_pair({ source_type: "persona", target_type: childType })
+// edge = get_entity_schema({ type: "persona", resolve_edge_to: childType }).resolve_edge
 create_edge({ source_id: "<persona_id>", target_id: "<child_id>" })  // server infers type
 
 // 3. For each need from Step 4 — same pattern, child type + edge resolved live.
@@ -169,12 +169,12 @@ A Job-to-be-Done (JTBD) is the thing your user is trying to accomplish; the reas
 
 After creating the persona, ask: **"What's the most important job this persona is hiring your product to do? Think about it as: 'When I [situation], I want to [action], so I can [outcome].'"**
 
-If they answer, create the JTBD and connect it. **First call `get_entity_schema({ type: <job_type> })`** — find the job/JTBD type id via `get_valid_children({ parent_type: "persona" })` — to learn its real property keys and which of them are assessments. Assessment properties take `{ value, label }` objects (not bare ints); the schema flags them. Then resolve the linking edge with `resolve_edge_for_pair`.
+If they answer, create the JTBD and connect it. **First call `get_entity_schema({ type: <job_type> })`** — find the job/JTBD type id via `get_entity_schema({ type: "persona", include: ['valid_children'] })` — to learn its real property keys and which of them are assessments. Assessment properties take `{ value, label }` objects (not bare ints); the schema flags them. Then resolve the linking edge with `get_entity_schema({ type, resolve_edge_to }).resolve_edge`.
 
 ```
 // Read get_entity_schema for the job type first; build properties from its keys.
 create_node({
-  type: "<job type from get_valid_children({ parent_type: 'persona' })>",
+  type: "<job type from get_entity_schema({ type: 'persona', include: ['valid_children'] })>",
   title: "<concise job statement>",
   description: "<the full When I... I want to... So I can... statement>",
   properties: {
@@ -183,7 +183,7 @@ create_node({
   },
   parent_id: "<persona_id>"
 })
-// edge = resolve_edge_for_pair({ source_type: "persona", target_type: "<job type>" })
+// edge = get_entity_schema({ type: "persona", resolve_edge_to: "<job type>" }).resolve_edge
 create_edge({ source_id: "<persona_id>", target_id: "<job_id>" })  // server infers type
 ```
 
@@ -201,5 +201,5 @@ For JTBD importance and satisfaction: ask the user ("On a scale of 1-5, how impo
 - **One question at a time.** Don't dump all 6 questions at once. React to each answer.
 - **Push for specificity.** "Wants to be more productive" is too vague. "Wants to ship features 2x faster without burning out the team" is useful.
 - **Follow the design system.** Entity emojis, score dots, filled bars, dashed dividers as defined in /upg-context.
-- **Check for a product node and link to it.** Call `list_nodes({ type: "product" })` before creating the persona. If a product node exists, link to it via `product_targets_persona` (`resolve_edge_for_pair({ source_type: "product", target_type: "persona" })`). If none exists, create the persona at root. Never skip this check — the persona domain guide flags missing `product_targets_persona` as an anti-pattern when a product node is present.
+- **Check for a product node and link to it.** Call `list_nodes({ type: "product" })` before creating the persona. If a product node exists, link to it via `product_targets_persona` (`get_entity_schema({ type: "product", resolve_edge_to: "persona" }).resolve_edge`). If none exists, create the persona at root. Never skip this check — the persona domain guide flags missing `product_targets_persona` as an anti-pattern when a product node is present.
 - **Bridge to JTBD.** A 👤 persona without a 💼 job is incomplete. Always offer to create the first JTBD.

@@ -34,6 +34,16 @@ import {
  * how every connecting agent learns to use the server.
  */
 export const SERVER_INSTRUCTIONS = [
+  'How to work: the graph is a loop you advance, not a form you fill.',
+  '- SEE. Orient before you write: get_graph_digest or get_product_context first.',
+  '  A vague input is easy to over-structure into duplicates or orphans.',
+  '- THINK. Before creating an entity or edge, call get_entity_schema for the type.',
+  '  It gives the valid attachments and flags edges whose cross_product_scope crosses graphs.',
+  '- ACT. Write atomically (batch_* with parent_ref chaining). Reach for the instrument',
+  '  that fits: create_cross_product_edge for a graph-crossing edge, not create_edge.',
+  '- LEARN. Close on evidence: validate_graph for drift, then a query that confirms',
+  '  the graph answers the question. Each pass seeds the next SEE.',
+  '',
   'Unified Product Graph (local) MCP. Reads and writes .upg files directly.',
   '',
   'Batching (50 per call, atomic):',
@@ -59,20 +69,12 @@ export const SERVER_INSTRUCTIONS = [
   'Schema: get_entity_schema returns valid parent→child hierarchy, properties, and edge types per type.',
   '',
   'Spec introspection (read @unified-product-graph/core without importing it):',
-  '- Entity catalog: list_entity_types, get_entity_meta, list_type_labels, get_type_label, get_valid_children.',
-  '- Edges: list_edge_types, get_edge_type, list_cross_edge_types, resolve_edge_for_pair (canonical edge for source→target).',
-  '- Regions and lenses: list_regions, get_region, get_region_for_entity_type, list_lenses, get_lens (with visible_types).',
-  '- Domains and rings: list_domains, get_domain_guide, list_domain_rings, get_domain_ring.',
-  '- Frameworks: list_frameworks, get_framework, list_framework_categories, list_framework_structure_patterns.',
-  '- Playbooks: list_playbooks, get_playbook (region-anchored creation sequences).',
-  '- Health catalogs: list_anti_patterns, get_anti_pattern, list_benchmarks (kind: count | relationship | ratio | domain_activation).',
-  '- Lifecycles and scales: list_lifecycles, get_lifecycle, list_scales, get_scale, list_product_stages (9-stage enum).',
-  '- Migrations: list_type_migrations, list_edge_migrations, list_split_migrations.',
-  '- Version: get_spec_version.',
+  '- list_catalog({ kind }): faceted list over the static spec catalog. kinds: entity_types, edge_types, cross_edge_types, regions, domains, domain_rings, frameworks, framework_categories, framework_structure_patterns, lenses, lifecycles, playbooks, scales, anti_patterns, tree_patterns, templates, approaches, type_labels, status_values, product_stages, benchmarks (with benchmark_kind: count | relationship | ratio | domain_activation), edge_migrations, scalar_to_edge_migrations, split_migrations, type_migrations. Kind-specific filters pass through (e.g. playbooks accept region / canonical_only / framework_id).',
+  '- get_catalog_entry({ kind, id }): one record by id. kinds: entity_meta, edge_type, region, domain_guide, domain_ring, framework, lens, lifecycle, playbook, scale, anti_pattern, tree_pattern, type_label, template, approach.',
+  '- get_entity_schema({ type }): valid parent→child hierarchy, properties, edge types. include: ["valid_children"] and/or ["region"], or resolve_edge_to: <target_type> for the canonical edge of a source→target pair.',
+  '- get_spec_version(): version + canonical counts. changelog: true folds in the spec CHANGELOG (since: <version> returns only newer entries).',
   '',
-  'Approach verbs (plan, inspect, prioritise, trace, reflect):',
-  '- Return { approach_id, scope, generated_at, approach, params }. The LLM reads signature_hint and synthesises the structured projection against the live graph.',
-  '- An approach is the path of arrival to a region (cartographic framing). Definition lookup: list_approaches, get_approach.',
+  'Approaches (the 5 cognitive operations plan, inspect, prioritise, trace, reflect) are the /upg-* skills; an approach is the path of arrival to a region (cartographic framing). Their records live in the catalog: list_catalog({ kind: "approaches" }), get_catalog_entry({ kind: "approach", id }).',
 ].join('\n')
 
 /**

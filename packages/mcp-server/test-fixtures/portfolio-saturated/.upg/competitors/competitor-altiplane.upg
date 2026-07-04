@@ -1,0 +1,46 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.2",
+    "product": {
+      "id": "p_altiplane",
+      "title": "Altiplane — Competitor Intel",
+      "stage": "growth"
+    },
+    "summary": "Competitive intelligence graph for Altiplane.",
+    "counts": {
+      "nodes": 2,
+      "edges": 0
+    },
+    "member_kind": "watched",
+    "provenance": {
+      "tool": "build-portfolio-saturated",
+      "exported_at": "2026-07-03T19:07:17.382Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "b4b093fd848429c928bc2672cdc8d448"
+    }
+  },
+  "product": {
+    "id": "p_altiplane",
+    "title": "Altiplane — Competitor Intel",
+    "description": "Competitive intelligence graph for Altiplane.",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_JSztKA3s8MicV85_",
+      "type": "competitor",
+      "title": "Altiplane",
+      "slug": "altiplane"
+    },
+    {
+      "id": "n_feOX8w3zOcgF1s6R",
+      "type": "competitor_feature",
+      "title": "Altiplane Auto-Reassign",
+      "slug": "altiplane-auto-reassign"
+    }
+  ],
+  "edges": []
+}

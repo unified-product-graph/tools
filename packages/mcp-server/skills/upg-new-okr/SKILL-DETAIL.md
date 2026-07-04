@@ -5,7 +5,7 @@ description: "Detailed OKR builder discovery flow"
 
 # /upg-new-okr: Discovery Flow Detail
 
-> **MCP-first (applies to every create below).** Before creating an objective, key result, initiative, or metric, call `get_entity_schema({ type: <type> })` for its `expected_properties`. Set the node's top-level `status` from a phase id returned by `get_lifecycle({ entity_type: <type> })` — that is where lifecycle phases live, NOT in `get_entity_schema` (objective phases are `draft`/`active`/`achieved`/`missed`/`deferred`). Note that a `*_status` PROPERTY (e.g. `objective_status`) is a distinct enum field inside `expected_properties` — it is NOT the node's lifecycle `status`; don't conflate the two. Pass any assessment property as `{ value, label }`. Before any edge, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. The payloads below show shape and intent only; the authoritative keys and phases come from the schema/lifecycle at runtime.
+> **MCP-first (applies to every create below).** Before creating an objective, key result, initiative, or metric, call `get_entity_schema({ type: <type> })` for its `expected_properties`. Set the node's top-level `status` from a phase id returned by `get_catalog_entry({ kind: 'lifecycle', id: <type> })` — that is where lifecycle phases live, NOT in `get_entity_schema` (objective phases are `draft`/`active`/`achieved`/`missed`/`deferred`). Note that a `*_status` PROPERTY (e.g. `objective_status`) is a distinct enum field inside `expected_properties` — it is NOT the node's lifecycle `status`; don't conflate the two. Pass any assessment property as `{ value, label }`. Before any edge, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and let the server infer the edge type. The payloads below show shape and intent only; the authoritative keys and phases come from the schema/lifecycle at runtime.
 
 ## Discovery Flow
 
@@ -88,12 +88,12 @@ STOP. Wait for the answer. Then create the objective:
 
 ```
 // Read get_entity_schema({ type: "objective" }) for properties; read
-// get_lifecycle({ entity_type: "objective" }) for the status phases. Then:
+// get_catalog_entry({ kind: 'lifecycle', id: "objective" }) for the status phases. Then:
 create_node({
   type: "objective",
   title: "<objective statement>",
   description: "<why this matters this quarter>",
-  status: "active",  // a phase id from get_lifecycle({ entity_type: "objective" }): draft|active|achieved|missed|deferred
+  status: "active",  // a phase id from get_catalog_entry({ kind: 'lifecycle', id: "objective" }): draft|active|achieved|missed|deferred
   properties: { /* keys from get_entity_schema objective: timeframe, etc. */ }
   // no parent_id — objective is created at root (or under an outcome if one exists)
 })
@@ -136,12 +136,12 @@ Then create the key result:
 
 ```
 // Read get_entity_schema({ type: "key_result" }) for properties and
-// get_lifecycle({ entity_type: "key_result" }) for its status phases, then:
+// get_catalog_entry({ kind: 'lifecycle', id: "key_result" }) for its status phases, then:
 create_node({
   type: "key_result",
   title: "<metric>: <current> → <target>",
   description: "<why this metric matters for the objective>",
-  status: "<a phase id from get_lifecycle({ entity_type: 'key_result' })>",
+  status: "<a phase id from get_catalog_entry({ kind: 'lifecycle', id: 'key_result' })>",
   properties: { /* keys from the schema: current_value, target_value, unit, etc. Delivery health lives on the top-level lifecycle `status`, not a property. */ },
   parent_id: "<objective_id>"
 })
@@ -194,31 +194,31 @@ You have initiatives and features in your graph that might drive this:
 
 If creating a new initiative:
 
-> **`initiative` is not a containment child of `key_result`** — verify with `get_valid_children({ parent_type: "key_result" })`. Create the initiative at root (no `parent_id`) and wire the lateral relationship using `resolve_edge_for_pair({ source_type: "initiative", target_type: "key_result" })`.
+> **`initiative` is not a containment child of `key_result`** — verify with `get_entity_schema({ type: "key_result", include: ['valid_children'] })`. Create the initiative at root (no `parent_id`) and wire the lateral relationship using `get_entity_schema({ type: "initiative", resolve_edge_to: "key_result" }).resolve_edge`.
 
 ```
 // Read get_entity_schema({ type: "initiative" }) for properties and
-// get_lifecycle({ entity_type: "initiative" }) for its status phases, then:
+// get_catalog_entry({ kind: 'lifecycle', id: "initiative" }) for its status phases, then:
 create_node({
   type: "initiative",
   title: "<initiative name>",
   description: "<how this drives the key result>",
-  status: "<a phase id from get_lifecycle({ entity_type: 'initiative' })>"
+  status: "<a phase id from get_catalog_entry({ kind: 'lifecycle', id: 'initiative' })>"
   // No parent_id — initiative is not a containment child of key_result
 })
 // Wire the lateral relationship:
-// edge = resolve_edge_for_pair({ source_type: "initiative", target_type: "key_result" })
+// edge = get_entity_schema({ type: "initiative", resolve_edge_to: "key_result" }).resolve_edge
 // create_edge({ source_id: "<initiative_id>", target_id: "<key_result_id>" })  // server infers type
 ```
 
 If linking to an existing entity, resolve the canonical edge for the pair and let the server infer the type:
 
 ```
-// feature → key_result: edge = resolve_edge_for_pair({ source_type: "feature", target_type: "key_result" })
+// feature → key_result: edge = get_entity_schema({ type: "feature", resolve_edge_to: "key_result" }).resolve_edge
 create_edge({ source_id: "<feature_id>", target_id: "<key_result_id>" })  // server infers type
 
-// initiative → its driven entity: resolve_edge_for_pair({ source_type: "initiative", target_type: <that type> })
-// then create_edge without an explicit type:. Use resolve_edge_for_pair to discover
+// initiative → its driven entity: get_entity_schema({ type: "initiative", resolve_edge_to: <that type> }).resolve_edge
+// then create_edge without an explicit type:. Use get_entity_schema({ type, resolve_edge_to }).resolve_edge to discover
 // what an initiative validly drives rather than assuming a fixed target type.
 ```
 
@@ -263,7 +263,7 @@ create_node({
 Connect to the relevant key result; resolve the edge first:
 
 ```
-// edge = resolve_edge_for_pair({ source_type: "metric", target_type: "key_result" })
+// edge = get_entity_schema({ type: "metric", resolve_edge_to: "key_result" }).resolve_edge
 create_edge({ source_id: "<metric_id>", target_id: "<key_result_id>" })  // server infers type
 ```
 

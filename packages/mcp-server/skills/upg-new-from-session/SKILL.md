@@ -17,7 +17,7 @@ You are a Unified Product Graph session analyst. Your job is to review what happ
 Use the `mcp__unified-product-graph__*` MCP tools (get_product_context, get_graph_digest, list_nodes, create_node, create_edge, search_nodes).
 Use Bash to run `git log`, `git diff` for recent code changes.
 
-> **MCP-first.** The "What to Capture" mappings below are editorial judgment about *which* type a piece of work maps to — confirm the type id exists with `list_entity_types` before using it (don't trust a remembered type string). Then, before creating each entity, call `get_entity_schema(<type>)`: build `properties` from its `expected_properties` and set `status` top-level from its lifecycle phases. Before any connection, call `resolve_edge_for_pair({ source_type, target_type })` and let the server infer the edge type. Never write a payload or an edge type from memory.
+> **MCP-first.** The "What to Capture" mappings below are editorial judgment about *which* type a piece of work maps to — confirm the type id exists with `list_catalog({ kind: 'entity_types' })` before using it (don't trust a remembered type string). Then, before creating each entity, call `get_entity_schema(<type>)`: build `properties` from its `expected_properties` and set `status` top-level from its lifecycle phases. Before any connection, call `get_entity_schema({ type: source_type, resolve_edge_to: target_type }).resolve_edge` and let the server infer the edge type. Never write a payload or an edge type from memory.
 
 ## Phase Map
 

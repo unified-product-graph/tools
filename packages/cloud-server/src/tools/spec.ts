@@ -88,6 +88,7 @@ import {
 } from '@unified-product-graph/core'
 
 import type { ToolHandler, ToolResult } from '../lib/server-context.js'
+import { readSpecChangelog } from '@unified-product-graph/mcp-tooling'
 import { text, textError } from '../lib/server-context.js'
 
 // ── Pagination helpers (mirror list_nodes convention) ───────────────────────
@@ -815,34 +816,38 @@ export const getTreePattern: ToolHandler = (args): ToolResult => {
  * @see list_edge_types
  * @see list_regions
  */
-export const getSpecVersion: ToolHandler = (): ToolResult => {
-  return text(
-    JSON.stringify(
-      {
-        upg_version: UPG_VERSION,
-        markdown_format_version: MARKDOWN_FORMAT_VERSION,
-        entity_count: UPG_ENTITY_COUNT,
-        edge_count: UPG_EDGE_COUNT,
-        domain_count: UPG_DOMAIN_COUNT,
-        region_count: UPG_REGION_COUNT,
-        anti_patterns: {
-          total: UPG_ANTI_PATTERNS.length,
-          // Anti-patterns introduced in a tracked version (the `since` field
-          // landed in 0.9.11). Lets a consumer see which validators are newer
-          // than the version a graph was authored under, so a spec upgrade
-          // doesn't silently flip a clean graph invalid with no heads-up
-          // (batch-6 #36). Baseline patterns (no `since`) predate the tracking.
-          versioned: UPG_ANTI_PATTERNS.filter((p) => p.since).map((p) => ({
-            id: p.id,
-            severity: p.severity,
-            since: p.since,
-          })),
-        },
-      },
-      null,
-      2,
-    ),
-  )
+export const getSpecVersion: ToolHandler = (args): ToolResult => {
+  const payload: Record<string, unknown> = {
+    upg_version: UPG_VERSION,
+    markdown_format_version: MARKDOWN_FORMAT_VERSION,
+    entity_count: UPG_ENTITY_COUNT,
+    edge_count: UPG_EDGE_COUNT,
+    domain_count: UPG_DOMAIN_COUNT,
+    region_count: UPG_REGION_COUNT,
+    anti_patterns: {
+      total: UPG_ANTI_PATTERNS.length,
+      // Anti-patterns introduced in a tracked version (the `since` field
+      // landed in 0.9.11). Lets a consumer see which validators are newer
+      // than the version a graph was authored under, so a spec upgrade
+      // doesn't silently flip a clean graph invalid with no heads-up
+      // (batch-6 #36). Baseline patterns (no `since`) predate the tracking.
+      versioned: UPG_ANTI_PATTERNS.filter((p) => p.since).map((p) => ({
+        id: p.id,
+        severity: p.severity,
+        since: p.since,
+      })),
+    },
+  }
+
+  // Opt-in changelog fold (0.19.0). Default output (no `changelog`) is
+  // byte-identical to the pre-consolidation shape. Shared reader keeps local +
+  // cloud in lockstep. `since` (a version) returns only newer entries.
+  if (args.changelog) {
+    const since = typeof args.since === 'string' ? args.since : undefined
+    payload.changelog = readSpecChangelog(since)
+  }
+
+  return text(JSON.stringify(payload, null, 2))
 }
 
 // ── Edge resolver ─────────────────────────────────────────────────
