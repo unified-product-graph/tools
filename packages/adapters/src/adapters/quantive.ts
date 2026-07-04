@@ -16,8 +16,9 @@
  * Hierarchy edges (all verified in the UPG catalogue):
  * - objective → key_result      → objective_achieved_through_key_result
  * - key_result → metric         → key_result_quantified_by_metric
- * - key_result → initiative     → initiative_drives_outcome (approximation)
- * - key_result → task           → initiative_drives_outcome (approximation, with warning)
+ * - key_result → initiative     → initiative_advances_key_result (reverse; 0.20.1 —
+ *   an initiative parented under a KR in Quantive genuinely advances it)
+ * - key_result → task           → node_informs_node (no canonical edge for this pair)
  * - objective → objective       → team_okr_aligns_with_objective (cascading alignment)
  * - team → objective            → team_targets_team_okr
  *
@@ -204,7 +205,7 @@ export class QuantiveAdapter implements UPGAdapter {
    * - Session entities → skipped with warning (no UPG equivalent)
    * - Check-in entities → skipped with warning (operational data: current_value on KR node)
    * - Unknown entity_types → warning + default to 'document'
-   * - key_result → initiative/task: WARNING (initiative_drives_outcome approximation)
+   * - key_result → initiative: initiative_advances_key_result (reverse); key_result → task: node_informs_node
    * - cascading objective → objective: team_okr_aligns_with_objective
    */
   async convert(items: SourceItem[], _config?: AdapterConfig): Promise<ImportResult> {
@@ -310,9 +311,11 @@ export class QuantiveAdapter implements UPGAdapter {
     // canonical OKR edges (objective_achieved_through_key_result,
     // key_result_quantified_by_metric) and replaces the previous wrong-endpoint
     // approximations (team->objective as team_targets_team_okr [needs team_okr],
-    // objective->objective as team_okr_aligns_with_objective [needs team_okr],
-    // key_result->initiative/task as initiative_drives_outcome [needs initiative
-    // source + outcome target]) with an honest node_informs_node fallback.
+    // objective->objective as team_okr_aligns_with_objective [needs team_okr])
+    // with an honest node_informs_node fallback. key_result->initiative now
+    // resolves too (0.20.1 added initiative_advances_key_result; resolvePairEdge
+    // checks the reverse pair and swaps source/target accordingly); key_result->task
+    // still has no canonical edge and falls back to node_informs_node.
     const nodeTypeById = new Map(nodes.map((n) => [n.id, n.type as string]))
 
     for (const item of items) {

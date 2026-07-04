@@ -355,9 +355,12 @@ describe('QuantiveAdapter: edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('key_result -> initiative has no canonical edge, falls back to node_informs_node', async () => {
-    // The old code emitted initiative_drives_outcome (source must be initiative,
-    // target must be outcome) - a double wrong-endpoint. resolvePairEdge is null here.
+  it('key_result -> initiative resolves to initiative_advances_key_result (reverse pair, 0.20.1)', async () => {
+    // Quantive nests initiative under its key_result, but UPG models the causal
+    // direction the other way (initiative_advances_key_result: initiative -> key_result).
+    // resolvePairEdge finds the pair in reverse and swaps source/target, so the
+    // initiative becomes the edge source and the key_result the target — a real
+    // edge, not the node_informs_node fallback this pair used before the edge existed.
     const items: SourceItem[] = [
       makeEntity('kr1', 'Activation ≥ 60%', 'key_result'),
       makeEntity('init1', 'Onboarding revamp', 'initiative', {
@@ -366,11 +369,16 @@ describe('QuantiveAdapter: edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'kr->initiative fallback')
+    assertAllEdgesCatalogued(result.edges, 'kr->initiative reverse mapping')
+    expect(result.edges.find((e) => e.type === 'node_informs_node')).toBeUndefined()
     expect(result.edges.find((e) => e.type === 'initiative_drives_outcome')).toBeUndefined()
-    const edge = result.edges.find((e) => e.type === 'node_informs_node')
+    const edge = result.edges.find((e) => e.type === 'initiative_advances_key_result')
     expect(edge).toBeDefined()
-    expect(edge?.mapping_confidence).toBe('low')
+    expect(edge?.mapping_confidence).toBe('medium')
+    const initiativeNode = result.nodes.find((n) => n.type === 'initiative')
+    const krNode = result.nodes.find((n) => n.type === 'key_result')
+    expect(edge?.source).toBe(initiativeNode?.id)
+    expect(edge?.target).toBe(krNode?.id)
   })
 
   it('key_result -> task has no canonical edge, falls back to node_informs_node', async () => {
