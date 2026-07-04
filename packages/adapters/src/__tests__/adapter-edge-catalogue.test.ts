@@ -93,12 +93,17 @@ describe('resolveContainmentEdgeInferrable', () => {
 
   it('the adapters read core UPG_DELIBERATE_ONLY_EDGE_TYPES (single source of truth, no local copy)', () => {
     // 0.17.6 added insight_informs_opportunity to the deliberate-only set (a
-    // PM-judgment link, never inferred from parentage). The adapters pick it up
-    // for free via the core set — no local edit here beyond this expectation.
+    // PM-judgment link, never inferred from parentage); 0.20.0 added the planning-
+    // cadence set (story scheduling + the polymorphic work-item issue links). The
+    // adapters pick them up for free via the core set — no local edit beyond this.
     expect([...UPG_DELIBERATE_ONLY_EDGE_TYPES].sort()).toEqual([
       'insight_informs_opportunity',
       'objective_defers_capability',
       'objective_defers_feature',
+      'planning_cycle_schedules_user_story',
+      'work_item_blocks_work_item',
+      'work_item_duplicates_work_item',
+      'work_item_relates_to_work_item',
     ])
   })
 })

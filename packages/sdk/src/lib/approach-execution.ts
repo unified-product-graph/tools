@@ -338,7 +338,7 @@ export interface PlanOptions {
    */
   region?: string
   /**
-   * Score against the ENTIRE 319-type universe (every domain guide's creation
+   * Score against the ENTIRE 320-type universe (every domain guide's creation
    * sequence). Off by default: whole-universe gap scoring is a token-bomb and
    * noise for a focused product. Without this, scope defaults to the product's
    * ACTIVE regions (every region that already has ≥1 entity).
@@ -353,7 +353,7 @@ export interface PlanOptions {
  * Scope (in precedence order):
  *   1. `region` set → just that region/domain (clear error if it doesn't resolve).
  *   2. `exhaustive: true` → every type across all domain guides (the full
- *      319-type universe; opt-in only).
+ *      320-type universe; opt-in only).
  *   3. Default → the product's ACTIVE regions: every canonical region that
  *      already has at least one entity in the graph. This keeps `plan` aligned
  *      with `get_graph_digest`'s focused coverage instead of grading an
