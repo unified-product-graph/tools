@@ -56,7 +56,7 @@ export const HUBSPOT_TYPE_MAP: Record<string, string | null> = {
  * Maps HubSpot status values to UPG lifecycle phase ids.
  *
  * Values are real phase ids from each type's lifecycle:
- * - support_ticket: opened, triaged, in_progress, resolved, closed
+ * - support_ticket: open, triaged, in_progress, resolved, closed
  * - deal: qualified, proposal, negotiation, closed_won, closed_lost
  *
  * Lifecycle-free types (participant, account, observation, market_segment)
@@ -64,8 +64,8 @@ export const HUBSPOT_TYPE_MAP: Record<string, string | null> = {
  */
 export const HUBSPOT_STATUS_MAP: Record<string, string> = {
   // Ticket statuses → support_ticket phases
-  new: 'opened',
-  open: 'opened',
+  new: 'open',
+  open: 'open',
   in_progress: 'in_progress',
   waiting: 'triaged',
   closed: 'closed',

@@ -90,19 +90,20 @@ function crossDepartmentTeamWarning(
 }
 
 /**
- * Batch-6 #36: pairing a hypothesis with an experiment_plan activates it.
- * Auto-promote a `drafted` hypothesis to `active` when it gains a
+ * Batch-6 #36: pairing a hypothesis with an experiment_plan moves it into testing.
+ * Auto-promote an `untested` hypothesis to `testing` when it gains a
  * `hypothesis_requires_experiment_plan` edge, so the documented
  * structural-spine recipe (hypotheses paired with plans) does not self-trip the
  * `untested-hypothesis-pile-up` anti-pattern. Best-effort: a promotion failure
- * never fails the already-created edge.
+ * never fails the already-created edge. (hypothesis folded onto the
+ * VALIDATION template, so the phases are untested -> testing, not drafted -> active.)
  */
 function promoteHypothesisOnPlanEdge(store: ToolContext['store'], edge: UPGEdge): void {
   if (edge.type !== 'hypothesis_requires_experiment_plan') return
   const hyp = store.getNode(edge.source)
-  if (hyp?.type === 'hypothesis' && hyp.status === 'drafted') {
+  if (hyp?.type === 'hypothesis' && hyp.status === 'untested') {
     try {
-      store.updateNode(edge.source, { status: 'active' })
+      store.updateNode(edge.source, { status: 'testing' })
     } catch {
       /* promotion is a courtesy; the edge stands regardless */
     }
@@ -536,7 +537,7 @@ export const batchCreateEdges: ToolHandler = (args, ctx): ToolResult => {
     createdEdges.push(edge)
   }
 
-  // #36: activate a drafted hypothesis paired with an experiment_plan.
+  // #36: move an untested hypothesis into testing when paired with an experiment_plan.
   for (const edge of createdEdges) promoteHypothesisOnPlanEdge(store, edge)
 
   // 0.17.2: non-blocking same-department advisory for any team_contains_team nesting.

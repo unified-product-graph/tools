@@ -207,16 +207,16 @@ describe('SalesforceAdapter: skipped types with warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('SalesforceAdapter: status normalisation', () => {
-  it("case status 'new' normalises to support_ticket phase 'opened'", async () => {
+  it("case status 'new' normalises to support_ticket phase 'open'", async () => {
     const items: SourceItem[] = [makeObject('ca1', 'New case', 'case', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('opened')
+    expect(result.nodes[0].status).toBe('open')
   })
 
-  it("case status 'open' normalises to support_ticket phase 'opened'", async () => {
+  it("case status 'open' normalises to support_ticket phase 'open'", async () => {
     const items: SourceItem[] = [makeObject('ca1', 'Open case', 'case', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('opened')
+    expect(result.nodes[0].status).toBe('open')
   })
 
   it("case status 'closed' normalises to support_ticket phase 'closed'", async () => {

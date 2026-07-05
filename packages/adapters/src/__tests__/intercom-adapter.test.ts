@@ -149,10 +149,10 @@ describe('IntercomAdapter: skipped types + warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('IntercomAdapter: status normalisation', () => {
-  it("status 'open' on conversation (support_ticket) normalises to 'opened'", async () => {
+  it("status 'open' on conversation (support_ticket) normalises to 'open'", async () => {
     const items: SourceItem[] = [makeItem('conv1', 'Help request', 'conversation', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('opened')
+    expect(result.nodes[0].status).toBe('open')
   })
 
   it("status 'pending' on conversation (support_ticket) normalises to 'triaged'", async () => {

@@ -102,7 +102,7 @@ describe('Zendesk e2e — convert conformance', () => {
     const out = await runImportE2E({ adapter: adapter(), items: ITEMS })
     try {
       const byId = Object.fromEntries(out.result.nodes.map((n) => [n.source_id as string, n]))
-      expect(byId.tkt1.status).toBe('opened')
+      expect(byId.tkt1.status).toBe('open')
       expect(byId.tkt2.status).toBe('closed')
       // team, account, participant are lifecycle-free -> no status
       expect(byId.grp1.status).toBeUndefined()

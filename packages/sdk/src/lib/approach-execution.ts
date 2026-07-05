@@ -1025,8 +1025,10 @@ function reflectAssumptions(
   const matches = nodes.filter(
     (n) =>
       (n.type as string) === 'assumption' ||
-      ((n.type as string) === 'hypothesis' && n.status === 'drafted') ||
-      ((n.type as string) === 'hypothesis_claim' && n.status === 'drafted'),
+      //: hypothesis folded onto VALIDATION; the pre-verdict initial
+      // phase is `untested` (was `drafted`).
+      ((n.type as string) === 'hypothesis' && n.status === 'untested') ||
+      ((n.type as string) === 'hypothesis_claim' && n.status === 'untested'),
   )
   const limit = detailed ? 10 : 1
   return matches.slice(0, limit).map((m) => ({

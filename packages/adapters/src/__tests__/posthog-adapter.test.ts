@@ -246,10 +246,12 @@ describe('PostHogAdapter: status normalisation (validated against target lifecyc
     expect(result.nodes[0].status).toBe('running')
   })
 
-  it("experiment 'complete' is omitted (not an experiment phase; terminal is 'done')", async () => {
+  it("experiment 'complete' maps to the STUDY 'complete' phase", async () => {
+    // experiment folded onto the STUDY template (0.21.0); 'complete' is now its
+    // terminal phase, so the value is persisted rather than dropped as invalid.
     const items: SourceItem[] = [makeItem('exp1', 'Done Test', 'experiment', { status: 'complete' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBeUndefined()
+    expect(result.nodes[0].status).toBe('complete')
   })
 
   it("a feature_flag status with no matching feature phase is omitted (never persisted invalid)", async () => {

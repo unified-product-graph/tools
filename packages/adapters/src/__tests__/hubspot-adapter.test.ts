@@ -199,16 +199,16 @@ describe('HubSpotAdapter: skipped types with warnings', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('HubSpotAdapter: status normalisation', () => {
-  it("ticket status 'new' normalises to 'opened'", async () => {
+  it("ticket status 'new' normalises to 'open'", async () => {
     const items: SourceItem[] = [makeObject('t1', 'New ticket', 'ticket', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('opened')
+    expect(result.nodes[0].status).toBe('open')
   })
 
-  it("ticket status 'open' normalises to 'opened'", async () => {
+  it("ticket status 'open' normalises to 'open'", async () => {
     const items: SourceItem[] = [makeObject('t1', 'Open ticket', 'ticket', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('opened')
+    expect(result.nodes[0].status).toBe('open')
   })
 
   it("ticket status 'in_progress' stays 'in_progress' (valid support_ticket phase)", async () => {

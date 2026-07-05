@@ -167,10 +167,12 @@ describe('AmplitudeAdapter: status normalisation', () => {
     expect(result.nodes[0].status).toBe('running')
   })
 
-  it("status 'archived' is omitted for experiment (not in its lifecycle)", async () => {
+  it("status 'archived' maps to the experiment STUDY phase 'abandoned'", async () => {
+    // experiment folded onto the STUDY template (0.21.0); 'abandoned' is now a
+    // valid terminal, so archived -> abandoned is persisted rather than dropped.
     const items: SourceItem[] = [makeItem('exp1', 'Old Test', 'experiment', { status: 'archived' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBeUndefined()
+    expect(result.nodes[0].status).toBe('abandoned')
   })
 
   it('status is omitted for lifecycle-free types like metric (chart)', async () => {

@@ -150,16 +150,16 @@ describe('ZendeskAdapter: skipped entity types', () => {
 // ─── Status normalisation ─────────────────────────────────────────────────────
 
 describe('ZendeskAdapter: status normalisation', () => {
-  it("ticket status 'new' normalises to 'opened'", async () => {
+  it("ticket status 'new' normalises to 'open'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'New ticket', 'ticket', { status: 'new' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('opened')
+    expect(result.nodes[0].status).toBe('open')
   })
 
-  it("ticket status 'open' normalises to 'opened'", async () => {
+  it("ticket status 'open' normalises to 'open'", async () => {
     const items: SourceItem[] = [makeItem('t1', 'Open ticket', 'ticket', { status: 'open' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('opened')
+    expect(result.nodes[0].status).toBe('open')
   })
 
   it("ticket status 'pending' normalises to 'triaged'", async () => {

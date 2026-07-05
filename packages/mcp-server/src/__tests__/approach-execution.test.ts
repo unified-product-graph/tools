@@ -489,7 +489,7 @@ describe('reflect: emits structured prompts based on graph topology', () => {
     expect(prompts.every((p) => p.kind === 'blind_spot')).toBe(true)
   })
 
-  it('assumptions mode surfaces assumption + drafted hypothesis nodes', async () => {
+  it('assumptions mode surfaces assumption + untested hypothesis nodes', async () => {
     const store = await loadStore(
       makeDoc(
         [
@@ -502,7 +502,7 @@ describe('reflect: emits structured prompts based on graph topology', () => {
             id: 'h1',
             type: 'hypothesis' as UPGEntityType,
             title: 'Daily reminders boost retention',
-            status: 'drafted',
+            status: 'untested',
           } as UPGBaseNode,
           {
             id: 'h2',

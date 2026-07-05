@@ -61,8 +61,8 @@ export const SALESFORCE_TYPE_MAP: Record<string, string | null> = {
  */
 export const SALESFORCE_STATUS_MAP: Record<string, string> = {
   // Case statuses -> support_ticket phases
-  new: 'opened',
-  open: 'opened',
+  new: 'open',
+  open: 'open',
   working: 'in_progress',
   escalated: 'in_progress',
   resolved: 'resolved',

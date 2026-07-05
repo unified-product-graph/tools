@@ -136,12 +136,12 @@ describe('Intercom e2e — convert conformance', () => {
     const out = await runImportE2E({ adapter: adapter(), items: ITEMS })
     try {
       const byId = Object.fromEntries(out.result.nodes.map((n) => [n.source_id as string, n]))
-      // support_ticket: open -> opened
-      expect(byId.conv1.status).toBe('opened')
+      // support_ticket: open -> open
+      expect(byId.conv1.status).toBe('open')
       // support_ticket: closed -> closed
       expect(byId.conv2.status).toBe('closed')
-      // customer_feedback: open -> received
-      expect(byId.sur1.status).toBe('received')
+      // customer_feedback (folded onto INCIDENT): open -> open
+      expect(byId.sur1.status).toBe('open')
       // document: closed -> archived
       expect(byId.art1.status).toBe('archived')
       // team, account, market_segment are lifecycle-free -> no status

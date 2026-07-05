@@ -69,8 +69,8 @@ export const ZENDESK_TYPE_MAP: Record<string, string | null> = {
  */
 export const ZENDESK_STATUS_MAP: Record<string, Record<string, string>> = {
   support_ticket: {
-    new: 'opened',
-    open: 'opened',
+    new: 'open',
+    open: 'open',
     pending: 'triaged',
     hold: 'in_progress',
     solved: 'resolved',

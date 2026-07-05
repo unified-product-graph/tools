@@ -58,7 +58,7 @@ export const INTERCOM_TYPE_MAP: Record<string, string | null> = {
  */
 export const INTERCOM_STATUS_MAP: Record<string, Record<string, string>> = {
   support_ticket: {
-    open: 'opened',
+    open: 'open',
     pending: 'triaged',
     snoozed: 'in_progress',
     closed: 'closed',
