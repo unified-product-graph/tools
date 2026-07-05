@@ -54,7 +54,9 @@ const DOMAIN_SOURCE_FILES: Record<string, readonly string[]> = {
   // the Spec domain section (frameworks), alongside prioritise/get_framework.
   // list_templates / get_template (the curated starter-template library) are
   // canonical-reference reads and group under Spec Introspection too.
-  spec: ['spec.ts', 'frameworks.ts', 'templates.ts', 'catalog.ts'],
+  // get_import_recipe (the source→UPG mapping recipe) is a canonical-reference
+  // read in the same family — group it under Spec Introspection alongside them.
+  spec: ['spec.ts', 'frameworks.ts', 'templates.ts', 'catalog.ts', 'import-recipe.ts'],
   // portfolio_query / portfolio_digest (0.9.1 batch-3 #13) — the cross-product
   // read layer — live in their own file but belong to the Workspace section.
   workspace: ['workspace.ts', 'portfolio-read.ts', 'clone-structure.ts', 'registry.ts'],
@@ -79,7 +81,7 @@ const DOMAIN_BLURBS: Record<string, string> = {
   areas: 'Product areas, the `.upg-area.json` cwd scoper, and the session change log.',
   workspace: 'Multi-product discovery, switching, init, cross-product edges.',
   schema: 'Entity schema introspection. Same constraints the LSP enforces.',
-  spec: 'Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings (from `@unified-product-graph/core`), plus the curated starter-template library (`list_templates` / `get_template`, from `@unified-product-graph/templates`).',
+  spec: 'Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings (from `@unified-product-graph/core`), the faceted catalog surface (`list_catalog` / `get_catalog_entry`, the 0.19.0 consolidation of the above), plus the curated starter-template library (`list_templates` / `get_template`, from `@unified-product-graph/templates`), and the source→UPG import recipes (`get_import_recipe`, from `@unified-product-graph/adapters`).',
   sync: 'Read sync state, pull cloud changes, push local graph.',
   validation: 'Schema-drift detection, full per-node drift reports, and source-vs-deployed integrity audits of UPG `/upg-*` skills.',
 }
@@ -105,6 +107,8 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   // catalog facets (0.19.0)
   listCatalog: 'list_catalog',
   getCatalogEntry: 'get_catalog_entry',
+  // import recipe
+  getImportRecipe: 'get_import_recipe',
   // nodes
   listNodes: 'list_nodes',
   getNode: 'get_node',

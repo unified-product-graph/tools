@@ -102,6 +102,7 @@ import {
 } from '../tools/sync.js'
 import { skillAudit } from '../tools/skills.js'
 import { listCatalog, getCatalogEntry } from '../tools/catalog.js'
+import { getImportRecipe } from '../tools/import-recipe.js'
 import { UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
 
 // `ToolDefinition` lives in `@unified-product-graph/mcp-tooling`. Re-exported
@@ -1074,6 +1075,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'get_import_recipe',
+    description:
+      'Get an import recipe for a source: (a) the target UPG schema slice (entity/edge types in play + fields), (b) the source→UPG mapping, a canonical CURATED table served verbatim when one exists (Notion, Jira, Dovetail, and 30+ more), else a schema-grounded SCAFFOLD, and (c) the write tools to call in order (batch_create_nodes → batch_create_edges). You already hold the source data and the write tools; this returns the mapping guidance, executes nothing. The consistency guarantee: a curated source resolves to ONE mapping, so the same source imported twice yields the same graph. Surfaces every deliberate-only edge (e.g. insight_informs_opportunity) as a warning, never a silent write. Sibling of get_catalog_entry (kind: "template"). Omit source to list curated sources.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        source: {
+          type: 'string',
+          description: 'Source slug or free-text description (e.g. "notion", "Linear issues", "a CSV of feature requests"). Omit to list the curated sources.',
+        },
+      },
+    },
+  },
+  {
     name: 'update_session_context',
     description:
       'Update session context: register a skill invocation, record a recommendation, set focus area, switch lens, or store custom state for cross-skill coordination.',
@@ -1958,6 +1973,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   skill_audit: skillAudit,
   list_catalog: listCatalog,
   get_catalog_entry: getCatalogEntry,
+  get_import_recipe: getImportRecipe,
   get_area_context: getAreaContext,
   create_area: createArea,
   create_portfolio: createPortfolio,

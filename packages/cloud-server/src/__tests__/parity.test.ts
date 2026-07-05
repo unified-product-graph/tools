@@ -89,6 +89,12 @@ const CLOUD_NA = new Set([
   'push_to_cloud',
   // local-only introspection (audits the on-disk .claude skill files)
   'skill_audit',
+  // get_import_recipe: returns the source→UPG mapping recipe an agent
+  // executes. Read-only over spec + the adapters mapping tables, so it COULD run
+  // on cloud — shipped local-only in the first agent-native-import increment
+  // (it pairs with the local /upg-sync-import skill + local write tools). Cloud
+  // parity is a tracked follow-up, not a category error.
+  'get_import_recipe',
   // ── Candidate cloud-parity gaps (local-only today, not category errors) ────
   // Could be added to the cloud server later; tracked as follow-ups, dispositioned
   // here so the parity audit stays green in the meantime.

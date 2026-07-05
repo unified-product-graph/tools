@@ -1,165 +1,53 @@
 ---
 name: upg-sync-import
-description: "Import product knowledge from external tools into your .upg graph: Markdown, GitHub, Linear, Jira, Dovetail, Vistaly, Notion, and 30+ more adapters"
+description: "Import product knowledge from any source into your .upg graph: point your agent at the source, get the canonical mapping recipe, and write it in — Notion, Jira, Linear, Dovetail, Vistaly, GitHub, and 30+ more"
 user-invocable: true
-argument-hint: "[tool]"
+argument-hint: "[source]"
 category: tooling
 ---
 
 # /upg-sync-import: Import Product Knowledge
 
-You are a UPG import engine. Pull structured product knowledge from external tools into the user's .upg graph.
+You are a UPG import engine. Pull structured product knowledge from an external source into the user's `.upg` graph.
 
-**Before producing any output, read context:** /upg-context for entity types, formatting rules, and interaction patterns.
+The durable value of an import was never the fetch — as an MCP-native agent you already hold the source data (from a source MCP, an export file, or the conversation). What you need is the **mapping**: how this source's shapes become UPG entities and edges. `get_import_recipe` hands you that mapping, canonically, so the same source always lands the same way.
+
+**Before producing any output, read context:** `/upg-context` for entity types, formatting rules, and interaction patterns.
 
 ## Tools
 
-`mcp__unified-product-graph__*`; create_node, create_edge, list_nodes, get_product_context.
+`mcp__unified-product-graph__*`: `get_import_recipe`, `batch_create_nodes`, `batch_create_edges`, `search_nodes`, `list_nodes`, `get_product_context`, `get_entity_schema`.
 
-## Time Estimate
+## The flow
 
-**2–5 minutes** for CLI imports. MCP-guided flows take 5–10 minutes.
+**1. Point at the source.** The user names a source (`/upg-sync-import notion`) or you already have its data in hand — a Notion database, a Linear export, a CSV, a folder of Markdown. You bring the bytes; transport is yours for free.
 
----
-
-## Step 1: Choose Source
-
-Skip if the user provided an argument (e.g. `/upg-sync-import github`). Otherwise present the menu:
+**2. Get the recipe.** Call `get_import_recipe` with the source:
 
 ```
-Where do you want to import from?
-
-── Fully wired (live API import today) ─────────────────
-
-  1. 📄 Markdown       upg import --from markdown
-  2. 🐙 GitHub         upg import --from github        GITHUB_TOKEN + GITHUB_REPO
-  3. 📋 Linear         upg import --from linear         LINEAR_API_KEY
-  4. 🗂️  Jira           upg import --from jira           JIRA_BASE_URL + JIRA_EMAIL + JIRA_API_TOKEN
-  5. 🔬 Dovetail        upg import --from dovetail       DOVETAIL_API_KEY
-  6. 🌲 Vistaly         upg import --from vistaly        VISTALY_API_KEY
-
-── MCP-guided (agent-driven, no CLI yet) ───────────────
-
-  7. 📝 Notion: uses Notion MCP + upg-notion-sync
-  8. 🔀 Other (37 adapters available; see /integrations)
+get_import_recipe({ source: "notion" })
+get_import_recipe({ source: "a CSV of feature requests" })
+get_import_recipe()                       # lists the curated sources
 ```
 
----
+It returns three parts:
 
-## Step 2a: Markdown (fully implemented, no API key)
+- **`target_schema`** — the UPG entity/edge types this source maps onto, with their fields. Always canonical (from the spec).
+- **`mapping`** — how source shapes become UPG types:
+  - `kind: "curated"` → a verbatim mapping table for a known source (Notion, Jira, Dovetail, and 30+ more). **Apply it as given.** Do NOT invent your own mapping over a curated one — the canonical table is what keeps two imports of the same source from producing two different graphs.
+  - `kind: "scaffold"` → for a novel source, a schema-grounded frame (heuristics + "map it against this catalogue"). Refine it against `get_entity_schema` / `list_catalog({ kind: "entity_types" })`, then proceed.
+- **`execution`** — which write tools to call, in order.
 
-```bash
-upg import --from markdown                    # scans current directory
-upg import --from markdown --file ./docs/     # specific folder
-upg import --from markdown --dry-run          # preview without writing
-```
+**3. Execute the writes.** Follow `execution`:
 
-Parses headings and content. Infers entity types from keywords:
-- "persona/user/audience" → `persona`
-- "feature/capability" → `feature`
-- "pain point/problem/frustration" → `need`
-- "hypothesis/assumption" → `hypothesis`
-- "metric/KPI/measure" → `metric`
-- "objective/OKR/goal" → `objective`
-- "opportunity/gap" → `opportunity`
-- "competitor/alternative" → `competitor`
-- "solution/approach" → `solution`
-- "epic/story" → `epic` / `user_story`
-- "experiment/validation" → `experiment`
-- "insight/learning" → `insight`
+1. Classify each source record to a UPG entity type via the `mapping` (skip records that map to `null`).
+2. `batch_create_nodes` first (≤50 per call). Keep a `source_id → new node id` map. Chain parent→child within a batch via `parent_ref`.
+3. `batch_create_edges` next, resolving endpoints through that id map. Nodes must exist before their edges.
+4. Set provenance on every node: `source_id`, `source_type`, `external_tool` (the source slug), `external_id`.
 
----
+**4. Preview before writing.** Show entity counts by type + any recipe `warnings`, and get confirmation before committing the writes.
 
-## Step 2b: Live API tools (GitHub, Linear, Jira, Dovetail, Vistaly)
-
-All five use the same CLI flow:
-
-```bash
-upg import --from github      # prompts for GITHUB_TOKEN + repo if not in env
-upg import --from linear      # prompts for LINEAR_API_KEY if not in env
-upg import --from jira        # prompts for base URL + email + API token
-upg import --from dovetail    # prompts for DOVETAIL_API_KEY
-upg import --from vistaly     # prompts for VISTALY_API_KEY
-```
-
-**Env vars (set these to skip prompts):**
-
-| Tool | Env vars |
-|------|----------|
-| GitHub | `GITHUB_TOKEN`, `GITHUB_REPO` (owner/repo) |
-| Linear | `LINEAR_API_KEY` |
-| Jira | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` |
-| Dovetail | `DOVETAIL_API_KEY` |
-| Vistaly | `VISTALY_API_KEY`, `VISTALY_WORKSPACE_ID` (optional) |
-
-**All five show the same flow:**
-1. Connects to the API (spinner)
-2. Fetches all entities
-3. Shows a preview: entity counts by type + any warnings
-4. Asks for confirmation before writing
-5. Writes to your `.upg` file (creates or appends)
-
-**Dry-run mode (preview without writing):**
-```bash
-upg import --from github --dry-run
-upg import --from linear --dry-run --yes     # skip confirmation
-```
-
----
-
-## Step 2c: Notion (MCP-guided, bidirectional sync available)
-
-Notion uses a different path; the Notion MCP server + the `upg-notion-sync` package.
-
-**Import (Notion → UPG):**
-```bash
-# Option A: via the MCP (recommended)
-# Ensure Notion MCP is configured in .claude/settings.json, then:
-# The NotionAdapter classifies your databases by name and maps them to UPG types
-
-# Option B: via Notion export
-# 1. In Notion: Settings → Export → Markdown & CSV
-# 2. upg import --from markdown --file ./notion-export/
-```
-
-**Bidirectional sync (UPG ↔ Notion; LIVE TODAY):**
-```bash
-npx @unified-product-graph/notion-sync push    # UPG → Notion
-npx @unified-product-graph/notion-sync pull    # Notion → UPG
-```
-
-The sync package creates one Notion database per UPG entity type and maps edges to Notion relation properties.
-
----
-
-## Step 2d: 30+ other adapters (convert() works for pre-fetched data)
-
-The following adapters have a working `convert()` method; you can pass pre-fetched data:
-
-**Strategy & Discovery:** Productboard, Aha!, Quantive, Shortcut, Chisel, Craft.io, Airfocus, ProdPad, Coda  
-**Delivery:** GitLab, Jira (via CLI above)  
-**Research:** Dovetail (via CLI above), Condens, Lookback, Sprig, Maze  
-**Analytics:** Amplitude, PostHog, Pendo  
-**Feedback:** Canny, Intercom, Zendesk  
-**CRM / CS:** HubSpot, Salesforce, Gainsight  
-**Design:** Figma, Miro, Storybook  
-**Docs:** Confluence, Slack  
-**OKR:** Lattice  
-
-For these, use the adapter directly in code:
-```typescript
-import { ProductboardAdapter } from '@unified-product-graph/adapters'
-const adapter = new ProductboardAdapter()
-const result = await adapter.convert(prefetchedItems)
-```
-
-Or see `/integrations` on unifiedproductgraph.org for the full schema mapping for each tool.
-
-Live CLI support for all adapters is in active development.
-
----
-
-## Step 3: Post-import suggestions
+## Post-import suggestions
 
 After any successful import:
 
@@ -171,13 +59,12 @@ Your graph just grew! Suggested next steps:
 - /upg-new-discovery: AI-powered entity discovery from what you just imported
 ```
 
----
-
 ## Key Principles
 
+- **The recipe is the source of truth.** For a curated source, apply the returned table verbatim — never free-generate a competing mapping. Reproducibility is the whole point.
 - **Preview before creating.** Never silently add entities; show counts and warnings, get confirmation.
-- **Infer conservatively.** Only create when content clearly maps to a UPG type. When uncertain, ask.
-- **Preserve source context.** Store `source_id`, `source_type`, `external_tool` on every imported node.
+- **Infer conservatively.** Only create when a record clearly maps to a UPG type. When uncertain, ask.
+- **Preserve source context.** Store `source_id`, `source_type`, `external_tool`, `external_id` on every imported node.
 - **Deduplicate.** Check existing nodes with `search_nodes` before creating. Flag potential matches.
-- **Respect mapping_confidence.** Adapters set `'high'` / `'medium'` / `'low'`; surface `'low'` items for human review.
-- **Never auto-emit `insight_informs_opportunity`.** This edge always requires PM judgment. Emit a warning instead.
+- **Respect `mapping_confidence`.** Set `high` / `medium` / `low` from the recipe's `confidence_map`; surface `low` items for human review.
+- **Never auto-emit `insight_informs_opportunity`.** Any edge the recipe flags as deliberate-only requires human judgment — emit it as a review candidate, never as a blind write. The recipe surfaces these in `warnings`.

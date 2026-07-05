@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 93 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 94 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -10,7 +10,7 @@ Reference for the 93 tools exposed by `@unified-product-graph/mcp-server`. Gener
 - [Areas & Change Log](#areas-change-log): 11 tools
 - [Workspace & Portfolios](#workspace-portfolios): 39 tools
 - [Schema](#schema): 1 tool
-- [Spec Introspection](#spec-introspection): 5 tools
+- [Spec Introspection](#spec-introspection): 6 tools
 - [Cloud Sync](#cloud-sync): 3 tools
 - [Validation](#validation): 3 tools
 
@@ -2357,10 +2357,11 @@ valid_children?, region?, resolve_edge? }`.
 
 ## Spec Introspection
 
-_Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings (from `@unified-product-graph/core`), plus the curated starter-template library (`list_templates` / `get_template`, from `@unified-product-graph/templates`)._
+_Canonical playbooks, approaches, domain guides, frameworks, edge catalogue, regions, lenses, type labels, hierarchy, version, cross-edges, entity meta, anti-patterns, benchmarks, bare-verb approach handlers, migrations, lifecycles, scales, framework categories/patterns, and domain rings (from `@unified-product-graph/core`), the faceted catalog surface (`list_catalog` / `get_catalog_entry`, the 0.19.0 consolidation of the above), plus the curated starter-template library (`list_templates` / `get_template`, from `@unified-product-graph/templates`), and the source→UPG import recipes (`get_import_recipe`, from `@unified-product-graph/adapters`)._
 
 - [`apply_framework`](#apply-framework)
 - [`get_catalog_entry`](#get-catalog-entry)
+- [`get_import_recipe`](#get-import-recipe)
 - [`get_spec_version`](#get-spec-version)
 - [`list_catalog`](#list-catalog)
 - [`score_entity`](#score-entity)
@@ -2416,6 +2417,30 @@ JSON: the delegated `get_<kind>` record verbatim (shape varies by kind).
 - textError when `kind` or `id` is missing, or the kind is unknown.
 
 **See also:** `list_catalog`, `get_entity_schema`
+
+
+### `get_import_recipe`
+
+Get an import recipe for a source: (a) the target UPG schema slice (entity/edge types in play + fields), (b) the source→UPG mapping, a canonical CURATED table served verbatim when one exists (Notion, Jira, Dovetail, and 30+ more), else a schema-grounded SCAFFOLD, and (c) the write tools to call in order (batch_create_nodes → batch_create_edges). You already hold the source data and the write tools; this returns the mapping guidance, executes nothing. The consistency guarantee: a curated source resolves to ONE mapping, so the same source imported twice yields the same graph. Surfaces every deliberate-only edge (e.g. insight_informs_opportunity) as a warning, never a silent write. Sibling of get_catalog_entry (kind: "template"). Omit source to list curated sources.
+
+**Atomicity:** `atomic (read-only). Touches neither the source nor the graph.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `source` | string |  | Source slug or free-text description (e.g. "notion", "Linear issues", "a CSV of feature requests"). Omit to list the curated sources. |
+
+**Returns:**
+
+JSON: `{ source, target_schema, mapping, execution, warnings? }` for
+a resolved source; `{ available_sources, usage }` when `source` is omitted.
+A curated `mapping.kind` serves verbatim adapter tables; a `scaffold`
+returns catalogue-grounded heuristics. `warnings` surfaces every
+deliberate-only edge (e.g. `insight_informs_opportunity`) the mapping could
+produce, so it is never emitted as a silent write.
+
+**See also:** `get_catalog_entry`, `get_entity_schema`, `resolve_edge_for_pair`, `list_entity_types`
 
 
 ### `get_spec_version`

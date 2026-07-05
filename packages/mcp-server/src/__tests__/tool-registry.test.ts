@@ -86,7 +86,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 93 tools', () => {
+  it('exposes the expected 94 tools', () => {
     // 0.19.0 tool consolidation: 141 (Phase-1 additive) minus the 48 retired
     // spec-introspection + router tools = 93 (see retired-tools.json).
     // 77 from v0.3.0 +
@@ -167,7 +167,19 @@ describe('Tool registry: completeness', () => {
     //   CONFLICT (switch_product flushes the active product first, so a conflict
     //   there blocks every switch) without a server restart. Local-only (no
     //   on-disk file to re-read in the cloud). → 139.
-    expect(TOOL_DEFINITIONS).toHaveLength(93)
+    // 0.19.0 tool consolidation (Phase 1 additive +2, Phase 2 retires 48) nets
+    // the running count down to 93 (see the top-of-block comment +
+    // retired-tools.json); list_templates/get_template are among the 48
+    // retired, replaced by list_catalog/get_catalog_entry (kind: "templates"
+    // / "template").
+    // + get_import_recipe: returns the source→UPG mapping recipe an
+    //   agent executes (schema slice + curated/scaffold mapping + write-tool
+    //   pointers) — the agent-native-import front door, sibling of
+    //   get_catalog_entry (kind: "template"). Read-only over spec + the
+    //   adapters mapping tables. Local-only in the first increment (pairs with
+    //   the local /upg-sync-import skill); cloud parity is a tracked
+    //   follow-up. → 94.
+    expect(TOOL_DEFINITIONS).toHaveLength(94)
   })
 })
 

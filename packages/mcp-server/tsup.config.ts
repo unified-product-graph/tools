@@ -18,5 +18,9 @@ export default defineConfig({
     '@unified-product-graph/core',
     '@unified-product-graph/mcp-tooling',
     '@unified-product-graph/frameworks',
+    // adapters: bundled for the same reason. get_import_recipe reads the mapping
+    // tables via the pure `./recipes` subpath, so bundling keeps the published
+    // server self-contained and never pulls a transport SDK (@linear/sdk etc.).
+    '@unified-product-graph/adapters',
   ],
 })
