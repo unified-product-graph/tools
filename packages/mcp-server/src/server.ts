@@ -433,6 +433,14 @@ export function createServer(store: UPGFileStore) {
     sessionContext,
     queryCache,
     sync: { readSyncState, writeSyncState, hashFile, syncFilePath },
+    // Identity for submit_feedback's outbound context (versions/client only,
+    // never graph content). Client info is resolved lazily — it exists only
+    // after the initialize handshake, which always precedes any tools/call.
+    serverInfo: { name: 'unified-product-graph', version: SERVER_VERSION },
+    getClientInfo: () => {
+      const info = server.getClientVersion()
+      return info ? { name: info.name, version: info.version } : undefined
+    },
   }
 
   // ── Load persisted lens from product properties ──────────────────────────

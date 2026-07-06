@@ -1,10 +1,10 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 94 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 95 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
-- [Context & Session](#context-session): 5 tools
+- [Context & Session](#context-session): 6 tools
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 11 tools
@@ -16,12 +16,13 @@ Reference for the 94 tools exposed by `@unified-product-graph/mcp-server`. Gener
 
 ## Context & Session
 
-_Product overview, graph digest, lens-aware session state._
+_Product overview, graph digest, lens-aware session state, and `submit_feedback` (send a bug / feature request / observation to the project triage queue)._
 
 - [`get_graph_digest`](#get-graph-digest)
 - [`get_product_context`](#get-product-context)
 - [`get_session_context`](#get-session-context)
 - [`start`](#start)
+- [`submit_feedback`](#submit-feedback)
 - [`update_session_context`](#update-session-context)
 
 ### `get_graph_digest`
@@ -145,6 +146,30 @@ for empty/young graphs.
 }
 
 **See also:** `plan`, `get_playbook`, `list_playbooks`, `get_graph_digest`
+
+
+### `submit_feedback`
+
+Send feedback about the Unified Product Graph (a bug, a feature request, an observation) to the project's triage queue at unifiedproductgraph.org, from any MCP client. Anonymous; no account. SHAPE IT FIRST for actionability, asking the user at most one round of questions (don't guess): a bug wants steps to reproduce, expected vs actual, and severity (`details`); a feature_request wants the underlying problem, the desired outcome, and any current workaround (`details`). CONSENT IS REQUIRED: the tool sends NOTHING unless you pass confirmed:true. Call it first WITHOUT confirmed to get back the exact payload, show that payload to the user (including the auto-collected `context`), and only re-call with confirmed:true after they say yes. PRIVACY: `context` is auto-assembled from the MCP client name/version, the server version, the runtime, and graph SIZE counts only; it never includes node titles, descriptions, or any graph content.
+
+**Atomicity:** `atomic (single outbound POST). Never reads or writes the local graph.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `confirmed` | boolean |  | CONSENT GATE. Must be true to actually send. Omit (or false) to get back a preview of the exact payload and send nothing. |
+| `description` | string | ✓ | The full report (≤5000 chars). Make it actionable: enough for someone to act without a follow-up. |
+| `details` | object |  | Type-aware structured fields (optional). For a bug: steps_to_reproduce, expected, actual, severity (low\|medium\|high\|critical). For a feature_request: problem, desired_outcome, workaround. Ignored for observation/general. |
+| `product_stage` | string |  | Optional product stage the reporter is working at. |
+| `title` | string | ✓ | A concise one-line summary (≤200 chars). |
+| `type` | `bug` \| `feature_request` \| `observation` \| `general` | ✓ | Intake type: "bug" (something is broken), "feature_request" (something is missing), "observation" (a note/pattern worth recording), or "general". |
+
+**Returns:**
+
+On send: `{ status: "submitted", id, message }`. Without consent:
+`{ status: "confirmation_required", preview }`. On a rejected/failed POST:
+an error result with a clear message (401 bad key, 429 rate-limited, …).
 
 
 ### `update_session_context`

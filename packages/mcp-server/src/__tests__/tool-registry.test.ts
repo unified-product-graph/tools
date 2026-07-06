@@ -86,7 +86,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 94 tools', () => {
+  it('exposes the expected 95 tools', () => {
     // 0.19.0 tool consolidation: 141 (Phase-1 additive) minus the 48 retired
     // spec-introspection + router tools = 93 (see retired-tools.json).
     // 77 from v0.3.0 +
@@ -179,7 +179,11 @@ describe('Tool registry: completeness', () => {
     //   adapters mapping tables. Local-only in the first increment (pairs with
     //   the local /upg-sync-import skill); cloud parity is a tracked
     //   follow-up. → 94.
-    expect(TOOL_DEFINITIONS).toHaveLength(94)
+    // + submit_feedback (feedback pipeline Phase 2): the one write-OUT tool —
+    //   POSTs a bug / feature request / observation to the public triage queue
+    //   at unifiedproductgraph.org from any MCP client. Local-only (it stamps
+    //   context from the client's own handshake + runtime; CLOUD_NA). → 95.
+    expect(TOOL_DEFINITIONS).toHaveLength(95)
   })
 })
 

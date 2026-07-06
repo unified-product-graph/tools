@@ -95,6 +95,13 @@ const CLOUD_NA = new Set([
   // (it pairs with the local /upg-sync-import skill + local write tools). Cloud
   // parity is a tracked follow-up, not a category error.
   'get_import_recipe',
+  // submit_feedback (feedback pipeline Phase 2): POSTs a feedback report to the
+  // public triage endpoint at unifiedproductgraph.org, stamping context from the
+  // CLIENT's own environment — the MCP initialize handshake (client name/version)
+  // and local runtime. That client environment only exists on the local server;
+  // the stateless per-request cloud server has no handshake/runtime to stamp, so
+  // this is a category error on cloud (never on cloud), not a deferred gap.
+  'submit_feedback',
   // ── Candidate cloud-parity gaps (local-only today, not category errors) ────
   // Could be added to the cloud server later; tracked as follow-ups, dispositioned
   // here so the parity audit stays green in the meantime.

@@ -155,6 +155,18 @@ export interface ToolContext {
     hashFile: typeof hashFile
     syncFilePath: typeof syncFilePath
   }
+  /**
+   * Server identity (name/version). Optional so lightweight test harnesses need
+   * not supply it. Populated by `createServer`. Consumed by `submit_feedback`
+   * to stamp the outbound context — never graph content.
+   */
+  serverInfo?: { name: string; version: string }
+  /**
+   * MCP client identity from the `initialize` handshake, resolved lazily
+   * (available only after the client connects). Optional for the same reason as
+   * `serverInfo`. Populated by `createServer` via the SDK's `getClientVersion()`.
+   */
+  getClientInfo?: () => { name?: string; version?: string } | undefined
 }
 
 export type ToolHandler = (

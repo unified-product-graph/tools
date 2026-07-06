@@ -103,6 +103,7 @@ import {
 import { skillAudit } from '../tools/skills.js'
 import { listCatalog, getCatalogEntry } from '../tools/catalog.js'
 import { getImportRecipe } from '../tools/import-recipe.js'
+import { submitFeedback, FEEDBACK_TYPES } from '../tools/feedback.js'
 import { UPG_CROSS_EDGE_TYPES } from '@unified-product-graph/core'
 
 // `ToolDefinition` lives in `@unified-product-graph/mcp-tooling`. Re-exported
@@ -1089,6 +1090,54 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'submit_feedback',
+    description:
+      "Send feedback about the Unified Product Graph (a bug, a feature request, an observation) to the project's triage queue at unifiedproductgraph.org, from any MCP client. Anonymous; no account. SHAPE IT FIRST for actionability, asking the user at most one round of questions (don't guess): a bug wants steps to reproduce, expected vs actual, and severity (`details`); a feature_request wants the underlying problem, the desired outcome, and any current workaround (`details`). CONSENT IS REQUIRED: the tool sends NOTHING unless you pass confirmed:true. Call it first WITHOUT confirmed to get back the exact payload, show that payload to the user (including the auto-collected `context`), and only re-call with confirmed:true after they say yes. PRIVACY: `context` is auto-assembled from the MCP client name/version, the server version, the runtime, and graph SIZE counts only; it never includes node titles, descriptions, or any graph content.",
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        type: {
+          type: 'string',
+          enum: [...FEEDBACK_TYPES],
+          description:
+            'Intake type: "bug" (something is broken), "feature_request" (something is missing), "observation" (a note/pattern worth recording), or "general".',
+        },
+        title: {
+          type: 'string',
+          description: 'A concise one-line summary (≤200 chars).',
+        },
+        description: {
+          type: 'string',
+          description: 'The full report (≤5000 chars). Make it actionable: enough for someone to act without a follow-up.',
+        },
+        details: {
+          type: 'object',
+          description:
+            'Type-aware structured fields (optional). For a bug: steps_to_reproduce, expected, actual, severity (low|medium|high|critical). For a feature_request: problem, desired_outcome, workaround. Ignored for observation/general.',
+          properties: {
+            steps_to_reproduce: { type: 'string', description: 'bug: how to reproduce it' },
+            expected: { type: 'string', description: 'bug: what should happen' },
+            actual: { type: 'string', description: 'bug: what actually happens' },
+            severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'], description: 'bug: impact severity' },
+            problem: { type: 'string', description: 'feature_request: the underlying problem' },
+            desired_outcome: { type: 'string', description: 'feature_request: the outcome wanted' },
+            workaround: { type: 'string', description: 'feature_request: any current workaround' },
+          },
+        },
+        product_stage: {
+          type: 'string',
+          description: 'Optional product stage the reporter is working at.',
+        },
+        confirmed: {
+          type: 'boolean',
+          description:
+            'CONSENT GATE. Must be true to actually send. Omit (or false) to get back a preview of the exact payload and send nothing.',
+        },
+      },
+      required: ['type', 'title', 'description'],
+    },
+  },
+  {
     name: 'update_session_context',
     description:
       'Update session context: register a skill invocation, record a recommendation, set focus area, switch lens, or store custom state for cross-skill coordination.',
@@ -1974,6 +2023,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   list_catalog: listCatalog,
   get_catalog_entry: getCatalogEntry,
   get_import_recipe: getImportRecipe,
+  submit_feedback: submitFeedback,
   get_area_context: getAreaContext,
   create_area: createArea,
   create_portfolio: createPortfolio,

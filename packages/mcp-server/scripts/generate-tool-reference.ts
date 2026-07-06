@@ -48,6 +48,10 @@ const DOMAINS = [
 // `migrate_properties`), `skill_audit` under Validation (it is an integrity
 // check). The handlers stay in `migrations.ts` / `skills.ts`.
 const DOMAIN_SOURCE_FILES: Record<string, readonly string[]> = {
+  // submit_feedback (the one write-out tool) is a session-level meta operation
+  // — group it under Context & Session, its natural home, rather than minting a
+  // singleton section (the anti-pattern). Handler stays in feedback.ts.
+  context: ['context.ts', 'feedback.ts'],
   nodes: ['nodes.ts', 'migrations.ts', 'tree.ts'],
   validation: ['validation.ts', 'skills.ts'],
   // apply_framework / score_entity (0.8.4) live in their own file but belong to
@@ -75,7 +79,7 @@ const DOMAIN_LABELS: Record<string, string> = {
 }
 
 const DOMAIN_BLURBS: Record<string, string> = {
-  context: 'Product overview, graph digest, lens-aware session state.',
+  context: 'Product overview, graph digest, lens-aware session state, and `submit_feedback` (send a bug / feature request / observation to the project triage queue).',
   nodes: 'Read, search, traverse, mutate, batch, migrate type/properties/status, dedupe.',
   edges: 'Single create/delete/move plus matching atomic batches.',
   areas: 'Product areas, the `.upg-area.json` cwd scoper, and the session change log.',
@@ -109,6 +113,8 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   getCatalogEntry: 'get_catalog_entry',
   // import recipe
   getImportRecipe: 'get_import_recipe',
+  // feedback (the one write-out tool)
+  submitFeedback: 'submit_feedback',
   // nodes
   listNodes: 'list_nodes',
   getNode: 'get_node',

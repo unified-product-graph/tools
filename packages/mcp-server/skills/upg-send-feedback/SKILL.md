@@ -1,23 +1,23 @@
 ---
 name: upg-send-feedback
-description: "Share feedback about the Unified Product Graph: bugs, feature requests, ideas. Captured locally as a portable file you can send to the team."
+description: "Share feedback about the Unified Product Graph: bugs, feature requests, ideas. Sent straight to the UPG team's triage queue."
 user-invocable: true
 argument-hint: "[bug|feature|observation]"
 category: tooling
 ---
 
-# /upg-send-feedback: Capture Feedback for the UPG Team
+# /upg-send-feedback: Send Feedback to the UPG Team
 
-You collect user feedback about the UPG and write it to a local Markdown file in the project root. Fast, transparent, private. No graph mutations; this is about THEIR feedback to US.
+You collect the user's feedback about the UPG and **send it via the `submit_feedback` MCP tool** so it lands directly in the maintainers' triage queue. Fast, transparent, private. No graph mutations; this is about THEIR feedback to US.
 
-There is no public feedback endpoint to submit to, and the `WebFetch` tool cannot POST a body anyway. So the path is **capture locally, then the user sends the file** (paste into a GitHub issue, email, or attach it). The local file IS the deliverable, not a fallback.
+> **Mechanism:** this skill calls the native `mcp__unified-product-graph__submit_feedback` tool — the one write-OUT tool in the UPG surface. The tool is a thin HTTP client to `POST https://unifiedproductgraph.org/api/feedback`; it assembles context and enforces consent itself, so you do not `curl` and you do not gather context by hand.
 
 **Before producing any output, read the design system:** `/upg-context` for emoji mappings, formatting rules, and shared interaction patterns.
 
 ## Tools
 
-- `mcp__unified-product-graph__get_product_context` and `mcp__unified-product-graph__get_graph_digest`: for automatic context gathering only
-- `Write`: to save the feedback file to the project root
+- `mcp__unified-product-graph__submit_feedback`: the send tool. Params: `type`, `title`, `description`, `details?`, `product_stage?`, `confirmed`. It auto-assembles `context` (client/server versions, runtime, and graph SIZE counts only) server-side — you never pass context, and no graph content is ever included.
+- `Write`: ONLY as an offline fallback if the tool reports it could not reach the endpoint (see Step 7).
 
 ## Flow
 
@@ -46,75 +46,89 @@ ONE question. Wait for answer.
 
 Wait for answer.
 
-### Step 4: Ask Description
+### Step 4: Ask Description (and shape it to be actionable)
 
-> Now the details; what were you doing, what happened, what did you expect? For feature requests: what would this unlock for you?
+> Now the details; what were you doing, what happened, what did you expect?
 
-Wait for answer.
+Then SHAPE it so the team can act without a round-trip. Ask **one** short round of follow-ups only if the answer is thin; never guess. These become the tool's `details` object:
 
-### Step 5: Gather Context (silent: no questions)
+- **bug** → gather `steps_to_reproduce`, `expected`, `actual`, and a `severity` (low/medium/high/critical).
+- **feature_request** → capture the underlying `problem` and `desired_outcome`, not just the proposed solution; note any current `workaround`.
+- **observation / general** → the description is enough; omit `details`.
 
-Collect metadata automatically. **Never read or send node titles, descriptions, or graph content.**
+### Step 5: Preview (mandatory consent gate)
 
-- **UPG version**: call `get_spec_version().upg_version` (falls back silently if unavailable)
-- **Product stage**: read from `get_product_context` if available
-- **Entity count**: read from `get_graph_digest` if available
-- **Recent skill**: scan conversation history for the most recent `/upg-*` invocation
-
-If MCP calls fail, use defaults silently. Don't slow down the flow.
-
-### Step 6: Show Payload (mandatory)
-
-Transparency is critical. Show exactly what will be written to the file:
+Do NOT set `confirmed` yet. Call the tool with the collected fields and **no `confirmed`** (or `confirmed: false`):
 
 ```
-Here's what I'll save for the UPG team:
+submit_feedback({
+  type: "<type>",
+  title: "<title>",
+  description: "<description>",
+  details: { <type-aware fields, omit if none> }
+})
+```
+
+The tool sends NOTHING and returns `{ "status": "confirmation_required", "preview": { … } }`. The `preview` is the exact payload — including the auto-collected `context`. Show it to the user verbatim and get a yes:
+
+```
+Here's what I'll send to the UPG team:
 
   Type: <type>
   Title: "<title>"
   Description: "<description>"
-  Context: UPG v<version> · <stage> stage · <N> entities · from <skill>
+  Details: <the type-aware fields, if any>
+  Context: <the auto-collected context from the preview — client/server versions, runtime, graph counts>
 
-No product graph data is included; just your feedback + metadata above.
+No product graph data is included; just your feedback + the metadata above.
 
-Save it? (y/n)
+Send it? (y/n)
 ```
 
-Wait for confirmation. If they say no, ask what to change or cancel gracefully.
+Wait for confirmation. If they say no, ask what to change or cancel gracefully. **Do not send without an explicit yes.**
 
-### Step 7: Save
+### Step 6: Send
 
-Use the `Write` tool to save the feedback as Markdown in the project root, filename `upg-feedback-YYYY-MM-DD.md` (use today's date; if a file with that name already exists, append `-2`, `-3`, etc. so nothing is overwritten).
-
-The file format:
-
-```markdown
-# UPG Feedback: YYYY-MM-DD
-
-**Type:** <bug|feature_request|observation|general>
-**Title:** <title>
-**Description:** <description>
-**Context:** UPG v<version> · <stage> · <N> entities · from <skill>
-```
-
-### Step 8: Confirm
+On an explicit yes, call the tool again with the **same fields plus `confirmed: true`**:
 
 ```
-Saved to upg-feedback-YYYY-MM-DD.md; thank you!
+submit_feedback({
+  type: "<type>",
+  title: "<title>",
+  description: "<description>",
+  details: { <same as preview> },
+  confirmed: true
+})
+```
 
-To get it to the team, send the file however suits you:
-- open an issue at unifiedproductgraph.org (follow the feedback link) and paste it in, or
-- email it / attach the file.
+A success returns `{ "status": "submitted", "id": "…", "message": "…" }`.
+
+### Step 7: Confirm (or fall back offline)
+
+On `status: "submitted"`:
+
+```
+Sent to the UPG team; thank you! Reference id: <id>
 
 Your input directly shapes the Unified Product Graph.
 ```
 
+The tool surfaces its own errors clearly:
+- **429 (rate limited)** — tell the user to try again in about an hour. Nothing was saved.
+- **401 (key rotated)** — ask the user to update `@unified-product-graph/mcp-server`.
+- **Could not reach the endpoint** (network/offline) — fall back to local capture: use `Write` to save the feedback as `upg-feedback-YYYY-MM-DD.md` in the project root (append `-2`, `-3` if it exists), and tell the user:
+
+```
+Couldn't reach the feedback endpoint, so I saved it locally to upg-feedback-YYYY-MM-DD.md.
+Send it when you're back online (open an issue at unifiedproductgraph.org and paste it in, or email it).
+```
+
 ## Key Principles
 
-- **FAST.** 30 seconds. Three questions max (type + title + description), then confirm and save.
+- **FAST.** ~30 seconds. Type + title + description, shape if needed, preview, confirm, send.
 - **One question at a time.** Never batch questions.
-- **Capture locally.** There is no submit endpoint; write the file, the user sends it. The file is the deliverable.
-- **NEVER include product graph data.** Only feedback text + opt-in metadata shown in the preview.
-- **Show before saving.** The user must see and approve the exact payload.
+- **Send, don't stash.** The tool is the deliverable; the local file is only an offline fallback.
+- **NEVER include product graph data.** The tool auto-assembles `context` from an allowlist (versions, runtime, SIZE counts) — never node titles, descriptions, or graph content. You never add context yourself.
+- **Show before sending.** Use the tool's `confirmation_required` preview as the consent gate — the user must see and approve the exact payload before you re-call with `confirmed: true`.
 - **No graph mutations.** Feedback only; no entities created.
-- **Graceful degradation.** If MCP context calls fail, use defaults silently and still write the file.
+- **Graceful degradation.** If the tool reports it couldn't reach the endpoint, save locally.

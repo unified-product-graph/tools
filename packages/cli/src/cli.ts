@@ -15,6 +15,7 @@
 import { Command } from 'commander'
 import { existsSync, readdirSync } from 'node:fs'
 import { ALL_COMMANDS, commandNames } from './lib/command-registry.js'
+import { feedbackCommand } from './commands/feedback.js'
 import chalk from 'chalk'
 import { upgLogo } from './lib/formatter.js'
 import { applyColorPreference } from './lib/output.js'
@@ -226,6 +227,13 @@ const program = new Command()
   })
 
 for (const c of ALL_COMMANDS) program.addCommand(c)
+
+// Crew-internal, HIDDEN command: `upg feedback` triages the feedback queue via
+// the admin API on unifiedproductgraph.org. Deliberately kept OUT of
+// ALL_COMMANDS / helpTopics / printHelp / the public site CLI reference — it is
+// for maintainers only, gated on UPG_FEEDBACK_ADMIN_TOKEN. Registered with
+// `{ hidden: true }` so it never appears in any consumer-facing help surface.
+program.addCommand(feedbackCommand, { hidden: true })
 
 // Apply --no-color / NO_COLOR before anything renders.
 applyColorPreference(process.argv.includes('--no-color'))
