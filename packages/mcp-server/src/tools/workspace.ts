@@ -55,6 +55,89 @@ function isExistingFile(p: string): boolean {
 }
 
 /**
+ * Best-effort check that a cross-edge endpoint still resolves to a real node.
+ * Used only to HARDEN the idempotent-`unchanged` response: when a create/dry-run
+ * reports an edge already exists, we confirm the stored edge's endpoints actually
+ * resolve so a genuine no-op is distinguishable from a phantom/stale edge that a
+ * caller should delete-and-retry (the reporter's dead-end in 0.22.0).
+ *
+ * Definitive only for `{product_id}/{node_id}` endpoints (the common case): if the
+ * owning product file resolves but has no such node, the endpoint is DANGLING.
+ * Endpoints we cannot cheaply prove — the `registry/{id}` tier (checked against the
+ * portfolio registry), area-anchored bare ids, or a product whose file is missing —
+ * are treated as resolvable (never a false alarm). Returns `null` when resolvable,
+ * or a human reason string when definitively dangling.
+ */
+function crossEndpointDanglingReason(
+  cwd: string,
+  portfolioStore: UPGPortfolioStore,
+  qualifiedId: string,
+  role: 'source' | 'target',
+): string | null {
+  const slash = qualifiedId.indexOf('/')
+  if (slash === -1) return null // bare (area-anchored source) — resolves elsewhere; skip
+  const productId = qualifiedId.slice(0, slash)
+  const bareId = qualifiedId.slice(slash + 1)
+
+  // Registry tier: resolve against the portfolio's own registry section.
+  if (productId === REGISTRY_PRODUCT_ID) {
+    const registry = portfolioStore.getRegistry()
+    if (!registry) return null // no registry loaded — cannot disprove; skip
+    const found = (registry.nodes ?? []).some((n) => n.id === bareId)
+    return found ? null : `${role} "${qualifiedId}" does not resolve to a registry node`
+  }
+
+  // Product tier: load the owning product file and look for the node.
+  const lookup = findProductFileById(cwd, productId)
+  if (!lookup) return null // product file not found — cannot disprove; skip
+  try {
+    const abs = path.resolve(cwd, lookup.file_path)
+    const doc = JSON.parse(fs.readFileSync(abs, 'utf-8')) as { nodes?: Array<{ id?: string }> }
+    const found = (doc.nodes ?? []).some((n) => n.id === bareId)
+    return found ? null : `${role} "${qualifiedId}" does not resolve to a node in ${lookup.file_path}`
+  } catch {
+    return null // unreadable/malformed — cannot disprove; skip
+  }
+}
+
+/**
+ * Diagnose an idempotent cross-edge `unchanged`/`would: unchanged` hit: attach the
+ * existing edge id, the read/delete tools that actually operate on portfolio
+ * cross-edges (NOT `delete_edge` / `export_edges`, which read the product graph),
+ * and — if the stored edge's endpoints no longer resolve — a DANGLING warning so a
+ * stale phantom edge is recoverable instead of a silent dead-end. (0.22.1)
+ */
+function diagnoseUnchangedCrossEdge(
+  cwd: string,
+  portfolioStore: UPGPortfolioStore,
+  existing: UPGCrossEdge,
+): { note: string; hint: string; dangling?: string[] } {
+  const reasons = [
+    crossEndpointDanglingReason(cwd, portfolioStore, existing.source, 'source'),
+    crossEndpointDanglingReason(cwd, portfolioStore, existing.target, 'target'),
+  ].filter((r): r is string => r !== null)
+  const base = {
+    note:
+      `A cross-product edge with this (source, target, type) already exists in ` +
+      `.upg/portfolio.upg as id "${existing.id}", so no new edge was written. Cross-edges ` +
+      `live in portfolio.upg, NOT in a product graph's edges[]; read them with ` +
+      `\`list_portfolio_cross_edges\` and remove them with \`delete_cross_product_edge\` ` +
+      `(\`delete_edge\` / \`export_edges\` / \`get_node.edges_in\` operate on the active ` +
+      `product graph and never see cross-edges).`,
+    hint: `To replace it: delete_cross_product_edge({ edge_id: "${existing.id}" }) then recreate.`,
+  }
+  return reasons.length > 0
+    ? {
+        ...base,
+        note:
+          `${base.note} NOTE: this existing edge appears STALE: ${reasons.join('; ')}. ` +
+          `It is likely a phantom left by a prior write; delete it (delete_cross_product_edge) and retry.`,
+        dangling: reasons,
+      }
+    : base
+}
+
+/**
  * Discover every `.upg` file in the workspace: the project root plus its
  * immediate subdirectories (including `.upg/`). Skips dotfiles other than
  * `.upg/`. Returns absolute paths. Shared by `list_local_products` and the
@@ -814,12 +897,22 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
   // before it runs. Returns the would-be-stored edge.
   if (args.dry_run === true) {
     const preview = portfolioStore.previewCrossEdge(newEdge)
+    // An idempotent `unchanged` forecast is the exact state that stranded the
+    // 0.22.0 reporter (a real hit read as a silent failure): explain WHY and point
+    // at the tools that actually see cross-edges. (0.22.1)
+    const diag =
+      preview.would === 'unchanged'
+        ? diagnoseUnchangedCrossEdge(cwd, portfolioStore, preview.edge)
+        : undefined
     return text(
       JSON.stringify(
         {
           dry_run: true,
           would: preview.would,
           edge: preview.edge,
+          ...(diag
+            ? { already_exists: true, existing_edge_id: preview.edge.id, message: diag.note, hint: diag.hint, ...(diag.dangling ? { dangling: diag.dangling } : {}) }
+            : {}),
           portfolio_file: path.relative(cwd, portfolioPath),
           ...(warnings.length > 0 ? { warnings } : {}),
         },
@@ -865,12 +958,22 @@ export const createCrossProductEdge: ToolHandler = async (args, _ctx): Promise<T
   // 0.10.6 (edge-property-upsert brief #4): report the STORED edge + the write
   // status so a no-op (`unchanged`) is distinguishable from an applied write and
   // the response never echoes unapplied properties as if stored.
+  // 0.22.1: an `unchanged` write is no longer a bare no-op — it names the existing
+  // edge id, the tools that actually read/delete cross-edges, and flags the edge as
+  // stale if its endpoints no longer resolve (the 0.22.0 silent-dead-end fix).
+  const diag =
+    outcome.status === 'unchanged'
+      ? diagnoseUnchangedCrossEdge(cwd, portfolioStore, outcome.edge)
+      : undefined
   return text(
     JSON.stringify(
       {
         edge: outcome.edge,
         status: outcome.status,
         applied: outcome.status !== 'unchanged',
+        ...(diag
+          ? { already_exists: true, existing_edge_id: outcome.edge.id, message: diag.note, hint: diag.hint, ...(diag.dangling ? { dangling: diag.dangling } : {}) }
+          : {}),
         // 0.11.3: a same-axis move on a single-select axis retires the prior edge.
         ...(outcome.superseded && outcome.superseded.length > 0
           ? { superseded: outcome.superseded.map((e) => ({ edge_id: e.id, target: e.target })) }
@@ -1791,6 +1894,12 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
           edges: previews.map((p) => ({ would: p.would, edge: p.edge })),
           count: previews.length,
           would_counts: wouldCounts,
+          // 0.22.1: an `unchanged` forecast means the (source, target, type) already
+          // exists in portfolio.upg (see each edge's id) — not a failure. Read/delete
+          // via list_portfolio_cross_edges / delete_cross_product_edge, not delete_edge.
+          ...(wouldCounts.unchanged > 0
+            ? { unchanged_hint: `${wouldCounts.unchanged} edge(s) already exist in portfolio.upg (each edge's id is above). To replace one: delete_cross_product_edge({ edge_id }) then recreate. delete_edge / export_edges read the product graph and never see cross-edges.` }
+            : {}),
           portfolio_file: path.relative(cwd, portfolioPath),
           ...(warnings.length > 0 ? { warnings } : {}),
         },
@@ -1846,6 +1955,10 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
         count: results.length,
         counts,
         ...(supersededCount > 0 ? { superseded_total: supersededCount } : {}),
+        // 0.22.1: surface why any `unchanged` rows are not failures + the tools that read them.
+        ...(counts.unchanged > 0
+          ? { unchanged_hint: `${counts.unchanged} edge(s) already existed in portfolio.upg (each edge's id is above). To replace one: delete_cross_product_edge({ edge_id }) then recreate. delete_edge / export_edges read the product graph and never see cross-edges.` }
+          : {}),
         portfolio_file: path.relative(cwd, portfolioPath),
         ...(registeredProducts.length > 0 ? { registered_products: registeredProducts } : {}),
         ...(warnings.length > 0 ? { warnings } : {}),
