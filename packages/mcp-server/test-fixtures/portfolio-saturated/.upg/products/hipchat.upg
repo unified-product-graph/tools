@@ -1,0 +1,82 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_x6JxWNAwOM-6E6yJ",
+      "title": "Hipchat",
+      "stage": "sunset"
+    },
+    "summary": "The original team chat product, sunset in favour of partner messaging. Kept as a wind-down graph.",
+    "counts": {
+      "nodes": 7,
+      "edges": 0
+    },
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.703Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "4a341da7c5a75cc95073b90a68a4a4f9"
+    }
+  },
+  "product": {
+    "id": "p_x6JxWNAwOM-6E6yJ",
+    "title": "Hipchat",
+    "description": "The original team chat product, sunset in favour of partner messaging. Kept as a wind-down graph.",
+    "stage": "sunset"
+  },
+  "nodes": [
+    {
+      "id": "n_BlQf2tKXkmQAf_jw",
+      "type": "assumption",
+      "title": "Orphaned assumption nobody connected to anything.",
+      "slug": "orphaned-assumption-nobody-connected-to-anything",
+      "status": "untested"
+    },
+    {
+      "id": "n_8dMuF6eNVHVgP1df",
+      "type": "decision",
+      "title": "Decided to freeze feature work - never linked to anything downstream.",
+      "slug": "decided-to-freeze-feature-work-never-linked-to-anything-downstream",
+      "status": "proposed"
+    },
+    {
+      "id": "n_Ffn1_ACT1_PlrlkP",
+      "type": "feature_request",
+      "title": "Add threaded replies",
+      "slug": "add-threaded-replies",
+      "status": "new"
+    },
+    {
+      "id": "n_ndDT5EWibHnKOPTX",
+      "type": "insight",
+      "title": "Users say Hipchat feels slow.",
+      "slug": "users-say-hipchat-feels-slow",
+      "status": "proposed"
+    },
+    {
+      "id": "n_0urrCg7hZAXcN1Tv",
+      "type": "learning",
+      "title": "Learned users want threads - nobody wired it to a hypothesis.",
+      "slug": "learned-users-want-threads-nobody-wired-it-to-a-hypothesis"
+    },
+    {
+      "id": "n_pRq-siicl9Q3976p",
+      "type": "market_trend",
+      "title": "Stray market-trend note from an old strategy deck.",
+      "slug": "stray-market-trend-note-from-an-old-strategy-deck"
+    },
+    {
+      "id": "p_x6JxWNAwOM-6E6yJ",
+      "type": "product",
+      "title": "Hipchat",
+      "description": "The original team chat product, sunset in favour of partner messaging. Kept as a wind-down graph.",
+      "properties": {
+        "stage": "sunset"
+      }
+    }
+  ],
+  "edges": []
+}

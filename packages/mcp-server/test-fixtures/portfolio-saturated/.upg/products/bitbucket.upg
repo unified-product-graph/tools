@@ -1,0 +1,60 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_aOEKM8qCE6a0r-rS",
+      "title": "Bitbucket",
+      "stage": "mature"
+    },
+    "summary": "Git code hosting and CI/CD (Pipelines) for teams - the source-of-truth for repositories and deploys.",
+    "counts": {
+      "nodes": 3,
+      "edges": 0
+    },
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.689Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "f0f23b4519092c9cb1f018ffd55cab12"
+    }
+  },
+  "product": {
+    "id": "p_aOEKM8qCE6a0r-rS",
+    "title": "Bitbucket",
+    "description": "Git code hosting and CI/CD (Pipelines) for teams - the source-of-truth for repositories and deploys.",
+    "stage": "mature"
+  },
+  "nodes": [
+    {
+      "id": "n_kPnSNQ8AqW06cnTu",
+      "type": "api_contract",
+      "title": "Bitbucket REST API",
+      "slug": "bitbucket-rest-api",
+      "status": "draft",
+      "properties": {
+        "protocol": "REST",
+        "version": "v2"
+      }
+    },
+    {
+      "id": "n_NBiIeGJ0dM99VEyS",
+      "type": "feature",
+      "title": "Pipelines (CI/CD)",
+      "slug": "pipelines-cicd",
+      "status": "proposed"
+    },
+    {
+      "id": "p_aOEKM8qCE6a0r-rS",
+      "type": "product",
+      "title": "Bitbucket",
+      "description": "Git code hosting and CI/CD (Pipelines) for teams - the source-of-truth for repositories and deploys.",
+      "properties": {
+        "stage": "mature"
+      }
+    }
+  ],
+  "edges": []
+}

@@ -670,12 +670,12 @@ describe('canonical registry (0.9.6)', () => {
       writeFileSync(join(cwd, '.upg', `${pid}.upg`), JSON.stringify(PROD, null, 2))
     }
 
-    // Registry: specification_groq has NO implementer; specification_graphql is
+    // Registry: specification_nql has NO implementer; specification_graphql is
     // implemented by BOTH products (reimplementation). No canonical "Token" primitive.
     writePortfolioDoc({
       registry: {
         nodes: [
-          { id: 'specification_groq', type: 'specification', title: 'GROQ' },
+          { id: 'specification_nql', type: 'specification', title: 'NQL' },
           { id: 'specification_graphql', type: 'specification', title: 'GraphQL' },
         ],
       },
@@ -699,9 +699,9 @@ describe('canonical registry (0.9.6)', () => {
     const byId = Object.fromEntries(
       block.violations.map((v: { anti_pattern_id: string }) => [v.anti_pattern_id, v]),
     )
-    // 1 · GROQ has no implementer (GraphQL does, so it is not flagged).
+    // 1 · NQL has no implementer (GraphQL does, so it is not flagged).
     expect(byId['specification-without-implementer'].count).toBe(1)
-    expect(byId['specification-without-implementer'].instances[0].specification).toBe('specification_groq')
+    expect(byId['specification-without-implementer'].instances[0].specification).toBe('specification_nql')
     // 2 · "Token" primitive scattered across p_a + p_b with no registry canonical.
     expect(byId['primitive-scattered-without-canonical'].count).toBe(1)
     expect(byId['primitive-scattered-without-canonical'].instances[0].products).toEqual(['p_a', 'p_b'])
@@ -724,10 +724,10 @@ describe('canonical registry (0.9.6)', () => {
     })
     writeFileSync(join(cwd, '.upg', 'a.upg'), JSON.stringify(PROD, null, 2))
     writePortfolioDoc({
-      registry: { nodes: [{ id: 'specification_groq', type: 'specification', title: 'GROQ' }] },
+      registry: { nodes: [{ id: 'specification_nql', type: 'specification', title: 'NQL' }] },
       cross_edges: [
         {
-          id: 'ce_a', source: 'p_a/p_a_prod', target: 'registry/specification_groq',
+          id: 'ce_a', source: 'p_a/p_a_prod', target: 'registry/specification_nql',
           type: 'product_implements_specification', source_product_id: 'p_a', target_product_id: 'registry',
         },
       ],

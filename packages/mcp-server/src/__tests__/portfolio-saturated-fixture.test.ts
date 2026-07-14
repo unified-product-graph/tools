@@ -58,10 +58,16 @@ describe('portfolio-saturated fixture', () => {
     }
   })
 
-  it('emitted exactly one reclassification signal (SkyWire on the Deployment Model axis)', () => {
+  it('emitted exactly one reclassification signal (GitLab on the Deployment Model axis)', () => {
     expect(portfolio.signals).toHaveLength(1)
     expect(portfolio.signals[0].properties.signal_type).toBe('reclassification')
-    expect(portfolio.signals[0].properties.competitor).toContain('p_skywire')
+    // Product ids are minted by create_product, so resolve GitLab's id from
+    // workspace.json by title rather than hard-coding it, then assert the
+    // signal's competitor reference is qualified with that product.
+    const gitlabEntry = workspace.products.find((p: any) => /gitlab/i.test(p.title))
+    expect(gitlabEntry).toBeTruthy()
+    const gitlabId = readJson(gitlabEntry.file).product.id
+    expect(portfolio.signals[0].properties.competitor).toContain(gitlabId)
   })
 
   it('kept the org_rollup product outside every portfolio and area', () => {

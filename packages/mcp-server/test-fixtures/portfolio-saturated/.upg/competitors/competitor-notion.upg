@@ -1,0 +1,65 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_JgB2u9CylGy1gR0u",
+      "title": "Notion - Competitor Intel",
+      "stage": "growth"
+    },
+    "summary": "Competitive intelligence graph for Notion (rivals Confluence).",
+    "counts": {
+      "nodes": 4,
+      "edges": 0
+    },
+    "member_kind": "watched",
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.717Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "156faf06e190816cb5a9c75fd7bf871e"
+    }
+  },
+  "product": {
+    "id": "p_JgB2u9CylGy1gR0u",
+    "title": "Notion - Competitor Intel",
+    "description": "Competitive intelligence graph for Notion (rivals Confluence).",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_D66DtELYaeFFCe0X",
+      "type": "competitor",
+      "title": "Notion",
+      "slug": "notion"
+    },
+    {
+      "id": "n_hzHoAzle9wEkSIqf",
+      "type": "competitor_signal",
+      "title": "Notion shipped AI Q&A over your workspace",
+      "slug": "notion-shipped-ai-qa-over-your-workspace",
+      "properties": {
+        "signal_type": "feature_launch"
+      }
+    },
+    {
+      "id": "n_GT9JL__p8J4NaASO",
+      "type": "opportunity",
+      "title": "Ship Rovo answers before Notion owns the AI-wiki narrative",
+      "slug": "ship-rovo-answers-before-notion-owns-the-ai-wiki-narrative",
+      "status": "identified"
+    },
+    {
+      "id": "p_JgB2u9CylGy1gR0u",
+      "type": "product",
+      "title": "Notion - Competitor Intel",
+      "description": "Competitive intelligence graph for Notion (rivals Confluence).",
+      "properties": {
+        "stage": "growth"
+      }
+    }
+  ],
+  "edges": []
+}

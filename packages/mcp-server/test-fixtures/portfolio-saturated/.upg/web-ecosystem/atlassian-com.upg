@@ -1,0 +1,63 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_wZUbgqGqpPkppsdD",
+      "title": "atlassian.com",
+      "stage": "growth"
+    },
+    "summary": "Marketing site - product pages, competitor comparisons, pricing.",
+    "counts": {
+      "nodes": 4,
+      "edges": 0
+    },
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.707Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "65827d0f4fe96d2526bb5bc38000b141"
+    }
+  },
+  "product": {
+    "id": "p_wZUbgqGqpPkppsdD",
+    "title": "atlassian.com",
+    "description": "Marketing site - product pages, competitor comparisons, pricing.",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_smydFPXs2hK5h6zS",
+      "type": "feature",
+      "title": "Product Showcase Block",
+      "slug": "product-showcase-block",
+      "status": "proposed"
+    },
+    {
+      "id": "p_wZUbgqGqpPkppsdD",
+      "type": "product",
+      "title": "atlassian.com",
+      "description": "Marketing site - product pages, competitor comparisons, pricing.",
+      "properties": {
+        "stage": "growth"
+      }
+    },
+    {
+      "id": "n_hBy9vbWkJMtqeCod",
+      "type": "screen",
+      "title": "Homepage",
+      "slug": "homepage",
+      "status": "draft"
+    },
+    {
+      "id": "n_ptP9GEQ027uUq_Td",
+      "type": "screen",
+      "title": "Jira vs GitLab Comparison",
+      "slug": "jira-vs-gitlab-comparison",
+      "status": "draft"
+    }
+  ],
+  "edges": []
+}

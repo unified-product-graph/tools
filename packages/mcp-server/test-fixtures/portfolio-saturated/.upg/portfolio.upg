@@ -1,13 +1,13 @@
 {
   "$upg": {
     "format_version": "1.0.0",
-    "spec_version": "0.17.8",
+    "spec_version": "0.23.0",
     "kind": "portfolio",
     "organization": {
-      "id": "org_46bbc64a",
-      "title": "Meridian Flight Systems"
+      "id": "org_b63b20d5",
+      "title": "Atlassian"
     },
-    "summary": "Fictional fleet-operations SaaS company — the UPG portfolio-saturated fixture. Not a real company; structurally modelled on the Sanity .upg portfolio to battle-test portfolio features (nested portf...",
+    "summary": "Enterprise software company - the maker of Jira, Confluence, Bitbucket, and more. Modelled here as the UPG portfolio-saturated fixture: a real, recognisable multi-product portfolio used to battle-t...",
     "counts": {
       "products": 13,
       "product_areas": 4,
@@ -16,550 +16,425 @@
     },
     "provenance": {
       "tool": "upg-mcp-local",
-      "exported_at": "2026-07-03T19:07:17.432Z"
+      "exported_at": "2026-07-14T08:39:16.807Z"
     },
     "integrity": {
       "algorithm": "sha256-128",
-      "body": "07b7b5479c7b8315eaf125f3da0e17a2"
+      "body": "6fea1d77a210b8328ca070afc278d53c"
     }
   },
   "organization": {
-    "id": "org_46bbc64a",
-    "title": "Meridian Flight Systems",
-    "description": "Fictional fleet-operations SaaS company — the UPG portfolio-saturated fixture. Not a real company; structurally modelled on the Sanity .upg portfolio to battle-test portfolio features (nested portfolios/areas, registry, cross-edges, all member_kinds, reclassification signals).",
-    "industry": "Fleet operations software (SaaS)"
+    "id": "org_b63b20d5",
+    "title": "Atlassian",
+    "description": "Enterprise software company - the maker of Jira, Confluence, Bitbucket, and more. Modelled here as the UPG portfolio-saturated fixture: a real, recognisable multi-product portfolio used to battle-test portfolio features (nested portfolios/areas, registry, cross-edges, all member_kinds, reclassification signals). Content is a simplified public-knowledge model.",
+    "industry": "Team collaboration & developer software (SaaS)"
   },
   "product_areas": [
     {
-      "id": "n_6jrvUn57Wthw_Uqt",
+      "id": "n_5drLZ2PGXNoD6a4h",
       "title": "Design & Brand",
       "strategic_priority": "medium",
       "products": [
-        "p_designsys",
-        "p_website"
+        "p_ZTAcJwn5U8xyFwyG",
+        "p_wZUbgqGqpPkppsdD"
       ]
     },
     {
-      "id": "n_IrazdOW6wxEw8dfg",
-      "title": "Mobile",
-      "parent_area_id": "n_n5vVn75jrUzfnvAy",
+      "id": "n_bB3qSzBY6fyZZAa7",
+      "title": "Product Engineering",
+      "strategic_priority": "urgent",
+      "products": [
+        "p_3-6AULYmwl97I4yn",
+        "p_lhduCfGR_5UQxIYj",
+        "p_aOEKM8qCE6a0r-rS",
+        "p_x6JxWNAwOM-6E6yJ"
+      ]
+    },
+    {
+      "id": "n_dV72FMjVzO_HnPhl",
+      "title": "AI & Intelligence",
+      "parent_area_id": "n_bB3qSzBY6fyZZAa7",
       "strategic_priority": "high",
       "products": [
-        "p_helmmobile"
+        "p_i3jIcg_z5SfdBIUr"
       ]
     },
     {
-      "id": "n_n-viPjXooBMkEndX",
+      "id": "n_zm2fnXttIKQ1iOKs",
       "title": "Go-to-Market Org",
       "strategic_priority": "high",
       "products": [
-        "p_revops",
-        "p_successops"
-      ]
-    },
-    {
-      "id": "n_n5vVn75jrUzfnvAy",
-      "title": "Platform & Engineering",
-      "strategic_priority": "urgent",
-      "products": [
-        "p_helm",
-        "p_conduit",
-        "p_beacon",
-        "p_legacy"
+        "p_95L1HjtnqX_Ca4LX",
+        "p_X0kygj5a04s5t_ps"
       ]
     }
   ],
   "portfolios": [
     {
-      "id": "n_JVfN40XOZ_68NG3_",
-      "title": "New Bets",
-      "parent_portfolio_id": "n_KhbtEvV_KKTnJt4e",
+      "id": "n_5jVf6szfCVvI70sz",
+      "title": "Point A",
+      "parent_portfolio_id": "n_dqq_Dxi_xxUtF3VL",
       "products": [
-        "p_beacon"
+        "p_i3jIcg_z5SfdBIUr"
       ],
       "kind": "strategic"
     },
     {
-      "id": "n_KhbtEvV_KKTnJt4e",
-      "title": "Core Platform",
+      "id": "n_WTQ2qXjW7o5C0O0p",
+      "title": "Brand & Web",
+      "products": [
+        "p_ZTAcJwn5U8xyFwyG",
+        "p_wZUbgqGqpPkppsdD"
+      ],
+      "kind": "internal"
+    },
+    {
+      "id": "n_dqq_Dxi_xxUtF3VL",
+      "title": "Atlassian Cloud",
       "hierarchy_model": "nested",
       "products": [
-        "p_helm",
-        "p_helmmobile",
-        "p_conduit",
-        "p_legacy"
+        "p_3-6AULYmwl97I4yn",
+        "p_lhduCfGR_5UQxIYj",
+        "p_aOEKM8qCE6a0r-rS",
+        "p_x6JxWNAwOM-6E6yJ"
       ],
       "kind": "owned"
     },
     {
-      "id": "n_LKm3-Mq7W_jIrFvp",
-      "title": "Competitive Landscape",
-      "products": [
-        "p_skywire",
-        "p_altiplane",
-        "p_northstar"
-      ],
-      "kind": "watched"
-    },
-    {
-      "id": "n_T_N4fhH3JxIX_Fce",
+      "id": "n_jvWCXnqEOSD18MJ7",
       "title": "Go-to-Market",
       "products": [
-        "p_revops",
-        "p_successops"
+        "p_95L1HjtnqX_Ca4LX",
+        "p_X0kygj5a04s5t_ps"
       ],
       "kind": "gtm"
     },
     {
-      "id": "n_eAGtP4zmFVPSzlga",
-      "title": "Internal Surfaces",
+      "id": "n_onuRab0ULtoMRFHU",
+      "title": "Competitive Landscape",
       "products": [
-        "p_designsys",
-        "p_website"
+        "p_HpSAytItOV7uX9--",
+        "p_qeecyhtudNI1zEK5",
+        "p_JgB2u9CylGy1gR0u"
       ],
-      "kind": "internal"
+      "kind": "watched"
     }
   ],
   "products": [
     {
-      "id": "p_altiplane",
-      "title": "Altiplane — Competitor Intel",
-      "file_path": ".upg/competitors/competitor-altiplane.upg",
+      "id": "p_3-6AULYmwl97I4yn",
+      "title": "Jira",
+      "file_path": ".upg/products/jira.upg",
       "nodes": [],
       "edges": []
     },
     {
-      "id": "p_beacon",
-      "title": "Beacon",
-      "file_path": ".upg/products/beacon.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_conduit",
-      "title": "Conduit SDK",
-      "file_path": ".upg/products/conduit-sdk.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_designsys",
-      "title": "Meridian Design System",
-      "file_path": ".upg/design-system/meridian-design-system.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_helm",
-      "title": "Helm",
-      "file_path": ".upg/products/helm.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_helmmobile",
-      "title": "Helm Mobile",
-      "file_path": ".upg/products/helm-mobile.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_legacy",
-      "title": "Legacy Console",
-      "file_path": ".upg/products/legacy-console.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_northstar",
-      "title": "Northstar Ops — Competitor Intel",
-      "file_path": ".upg/competitors/competitor-northstar-ops.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_org",
-      "title": "Meridian Flight Systems (Org)",
-      "file_path": ".upg/meridian-org.upg",
-      "nodes": [],
-      "edges": []
-    },
-    {
-      "id": "p_revops",
-      "title": "Revenue Ops",
+      "id": "p_95L1HjtnqX_Ca4LX",
+      "title": "Revenue Operations",
       "file_path": ".upg/products/revenue-ops.upg",
       "nodes": [],
       "edges": []
     },
     {
-      "id": "p_skywire",
-      "title": "SkyWire Ops — Competitor Intel",
-      "file_path": ".upg/competitors/competitor-skywire.upg",
+      "id": "p_HpSAytItOV7uX9--",
+      "title": "GitLab - Competitor Intel",
+      "file_path": ".upg/competitors/competitor-gitlab.upg",
       "nodes": [],
       "edges": []
     },
     {
-      "id": "p_successops",
-      "title": "Success Ops",
-      "file_path": ".upg/products/success-ops.upg",
+      "id": "p_JgB2u9CylGy1gR0u",
+      "title": "Notion - Competitor Intel",
+      "file_path": ".upg/competitors/competitor-notion.upg",
       "nodes": [],
       "edges": []
     },
     {
-      "id": "p_website",
-      "title": "Meridian Website",
-      "file_path": ".upg/web-ecosystem/meridian-website.upg",
+      "id": "p_X0kygj5a04s5t_ps",
+      "title": "Support Operations",
+      "file_path": ".upg/products/support-ops.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_ZTAcJwn5U8xyFwyG",
+      "title": "Atlassian Design System",
+      "file_path": ".upg/design-system/atlassian-design-system.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_aOEKM8qCE6a0r-rS",
+      "title": "Bitbucket",
+      "file_path": ".upg/products/bitbucket.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_atlassian_corp",
+      "title": "Atlassian (Corporate Rollup)",
+      "file_path": ".upg/atlassian-corp.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_i3jIcg_z5SfdBIUr",
+      "title": "Rovo",
+      "file_path": ".upg/products/rovo.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_lhduCfGR_5UQxIYj",
+      "title": "Confluence",
+      "file_path": ".upg/products/confluence.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_qeecyhtudNI1zEK5",
+      "title": "Linear - Competitor Intel",
+      "file_path": ".upg/competitors/competitor-linear.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_wZUbgqGqpPkppsdD",
+      "title": "atlassian.com",
+      "file_path": ".upg/web-ecosystem/atlassian-com.upg",
+      "nodes": [],
+      "edges": []
+    },
+    {
+      "id": "p_x6JxWNAwOM-6E6yJ",
+      "title": "Hipchat",
+      "file_path": ".upg/products/hipchat.upg",
       "nodes": [],
       "edges": []
     }
   ],
   "cross_edges": [
     {
-      "id": "e_Oh_dZFrGopyMZcqf",
-      "source": "n_n-viPjXooBMkEndX",
-      "target": "registry/market_segment_regional_carriers",
-      "type": "area_targets_market_segment",
-      "target_product_id": "registry",
-      "relevance": "primary"
-    },
-    {
-      "id": "e_RKap9QdlcPqm7grE",
-      "source": "n_n5vVn75jrUzfnvAy",
-      "target": "registry/persona_fleet_dispatcher",
+      "id": "e_4qTHmv6q8X1VY3_m",
+      "source": "n_bB3qSzBY6fyZZAa7",
+      "target": "registry/persona_software_team_lead",
       "type": "area_serves_persona",
       "target_product_id": "registry",
       "relevance": "primary",
       "audience_role": "user"
     },
     {
-      "id": "e_hRD-mYAcEqia74Jp",
-      "source": "p_beacon/p_beacon",
-      "target": "p_helm/p_helm",
-      "type": "cannibalises",
-      "source_product_id": "p_beacon",
-      "target_product_id": "p_helm"
+      "id": "e_14gvXJhcKM4KrDqA",
+      "source": "n_zm2fnXttIKQ1iOKs",
+      "target": "registry/market_segment_enterprise_engineering_orgs",
+      "type": "area_targets_market_segment",
+      "target_product_id": "registry",
+      "relevance": "primary"
     },
     {
-      "id": "e_VE1zaBocYkSdMdMC",
-      "source": "p_conduit/n_DjkOswMH1SrupF9H",
-      "target": "registry/specification_conduit_protocol",
-      "type": "api_contract_speaks_specification",
-      "source_product_id": "p_conduit",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_naUAptlmPTGjLTSU",
-      "source": "p_conduit/n_i6DUmDOLCo-vZQA0",
-      "target": "registry/primitive_flight_manifest",
-      "type": "feature_manipulates_primitive",
-      "source_product_id": "p_conduit",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_ofMXCzqYl70EOVOc",
-      "source": "p_conduit/n_i6DUmDOLCo-vZQA0",
-      "target": "registry/specification_conduit_protocol",
-      "type": "feature_conforms_to_specification",
-      "source_product_id": "p_conduit",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_2EKEvkeBi6T7gU-i",
-      "source": "p_conduit/p_conduit",
-      "target": "registry/primitive_flight_manifest",
-      "type": "product_exposes_primitive",
-      "source_product_id": "p_conduit",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_DOvJ_oEQvnZpvL7Z",
-      "source": "p_conduit/p_conduit",
-      "target": "registry/specification_conduit_protocol",
-      "type": "product_exposes_specification",
-      "source_product_id": "p_conduit",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_4utA6WzrrLZwurYh",
-      "source": "p_conduit/p_conduit",
-      "target": "registry/specification_conduit_protocol",
-      "type": "product_implements_specification",
-      "source_product_id": "p_conduit",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_FVQCuUjHSEpYv8rM",
-      "source": "p_helm/n_2KJ7XZUUdDhWZzIC",
-      "target": "p_helmmobile/n_r9jxbzEy2wQwiNYa",
-      "type": "shares_need",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_helmmobile"
-    },
-    {
-      "id": "e_irLWp2UEnvdMLWw2",
-      "source": "p_helm/n_GM0RMMltPiMMx5yZ",
-      "target": "p_helmmobile/n_3_ULVTQHtENxalEO",
-      "type": "shares_metric",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_helmmobile"
-    },
-    {
-      "id": "e_g455ywtE4hm7Bb-4",
-      "source": "p_helm/n_GM0RMMltPiMMx5yZ",
-      "target": "p_org/n_qKkZ2KNJ7c9atS9j",
+      "id": "e_dowtmQYZeQu-o_I3",
+      "source": "p_3-6AULYmwl97I4yn/n_-HuQk7KfUpdJjfBh",
+      "target": "p_atlassian_corp/n_XH68Swr7tO05Pyic",
       "type": "rolls_up_to",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_org"
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_atlassian_corp"
     },
     {
-      "id": "e_Y2URXskNp6SHN_rJ",
-      "source": "p_helm/n_QgnyyyZEQHZS4cDJ",
-      "target": "p_beacon/n_eE3iJ-5VhrSP2fEk",
-      "type": "objective_defers_capability",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_beacon",
-      "properties": {
-        "deferred_to": "2027-Q1"
-      }
+      "id": "e_DNFOgxmsKo9gxIDR",
+      "source": "p_3-6AULYmwl97I4yn/n_-HuQk7KfUpdJjfBh",
+      "target": "p_lhduCfGR_5UQxIYj/n_rxJKp0_qVQCkBytH",
+      "type": "shares_metric",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_lhduCfGR_5UQxIYj"
     },
     {
-      "id": "e_C1Lh-CTvf9Adz7Q5",
-      "source": "p_helm/n_QgnyyyZEQHZS4cDJ",
-      "target": "p_org/n_EYwIyIt_Am7-p42J",
-      "type": "objective_depends_on_dependency",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_org"
+      "id": "e_dp-e-xDiCPUrtz6X",
+      "source": "p_3-6AULYmwl97I4yn/n_8QFAoOs4YjHr0myT",
+      "target": "p_3-6AULYmwl97I4yn/n_kVFCyhhqhAw8Ih5N",
+      "type": "persona_delegates_to_persona",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
     },
     {
-      "id": "e_jv_EWsTqTI3cKZ8H",
-      "source": "p_helm/n_QgnyyyZEQHZS4cDJ",
-      "target": "p_org/n_S2iHqQ_on1Z5aD1I",
-      "type": "objective_achieved_through_key_result",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_org"
+      "id": "e_Jr6zDay2XK_4sPCf",
+      "source": "p_3-6AULYmwl97I4yn/n_8QFAoOs4YjHr0myT",
+      "target": "p_lhduCfGR_5UQxIYj/n_T6bJUOB4TiZC0D3M",
+      "type": "shares_persona",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_lhduCfGR_5UQxIYj"
     },
     {
-      "id": "e_xMl9pfChjJOoRnE7",
-      "source": "p_helm/n_QgnyyyZEQHZS4cDJ",
-      "target": "p_org/n_odN88m4niCVCbvIk",
-      "type": "objective_defers_capability",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_org",
-      "properties": {
-        "deferred_to": "2026-Q4"
-      }
+      "id": "e_8SprBhles0EWJJq9",
+      "source": "p_3-6AULYmwl97I4yn/n_8QFAoOs4YjHr0myT",
+      "target": "registry/persona_software_team_lead",
+      "type": "instance_of",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "registry"
     },
     {
-      "id": "e_WIq4KMBXcZ_3Pa54",
-      "source": "p_helm/n_g9mCNuffglfIySq6",
-      "target": "p_altiplane/n_feOX8w3zOcgF1s6R",
+      "id": "e_o7l2rEfBfhbkgOXl",
+      "source": "p_3-6AULYmwl97I4yn/n_E2kgVvT69wCv9HUB",
+      "target": "p_HpSAytItOV7uX9--/n_eUiQM9EWLKCDPs5A",
+      "type": "shares_competitor",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_HpSAytItOV7uX9--"
+    },
+    {
+      "id": "e_Ns6Zq2G8Wj4g9yV_",
+      "source": "p_3-6AULYmwl97I4yn/n_E2kgVvT69wCv9HUB",
+      "target": "registry/canon_gitlab_competitor",
+      "type": "instance_of",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e_Lp3iqm48JDIVPOIY",
+      "source": "p_3-6AULYmwl97I4yn/n_Eof0eG4_z4ocAcxk",
+      "target": "p_qeecyhtudNI1zEK5/n_n5EdIHTagdWcD8xU",
       "type": "feature_rivals_competitor_feature",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_altiplane",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_qeecyhtudNI1zEK5",
       "properties": {
         "parity_status": "behind",
         "quality": "worse",
         "is_gap": true,
         "assessed_on": "2026-06-01",
-        "evidence": "Altiplane auto-reassigns within 8s; Helm dispatch copilot averages 45s (Q2 2026 bakeoff).",
+        "evidence": "Linear auto-triages in under 2s; Jira Rovo triage averages 12s (Q2 2026 bakeoff).",
         "confidence": "medium"
       }
     },
     {
-      "id": "e_-xjOSHo22u2Znsl9",
-      "source": "p_helm/n_g9mCNuffglfIySq6",
-      "target": "p_designsys/n_JY7s6-6p1P3i-Iks",
-      "type": "feature_uses_design_component",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_designsys"
+      "id": "e_lBU-rpW-LHxQv8M5",
+      "source": "p_3-6AULYmwl97I4yn/n_F-Y1xgVfbvjFwTjy",
+      "target": "p_atlassian_corp/n_Cy3tm5H4XkuJRo3U",
+      "type": "objective_depends_on_dependency",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_atlassian_corp"
     },
     {
-      "id": "e_--DWl_IyQ6qSQG6h",
-      "source": "p_helm/n_hYZaBGLxgKvXLiO1",
-      "target": "p_skywire/n_a5Hy99iFctkXr3kF",
-      "type": "shares_competitor",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_skywire"
-    },
-    {
-      "id": "e__q3gfr-Nwr0Ga9kn",
-      "source": "p_helm/n_hYZaBGLxgKvXLiO1",
-      "target": "registry/canon_skywire_competitor",
-      "type": "instance_of",
-      "source_product_id": "p_helm",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_6S47V7jT-qQsDADX",
-      "source": "p_helm/n_p9cjyyH7wex4AhIG",
-      "target": "p_helm/n_DaKTiezIDI9j6wxX",
-      "type": "persona_delegates_to_persona",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_helm"
-    },
-    {
-      "id": "e_7vnYiwxGWeVGH73p",
-      "source": "p_helm/n_p9cjyyH7wex4AhIG",
-      "target": "p_helmmobile/n_ql7_64dRk2Zsu0wb",
-      "type": "shares_persona",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_helmmobile"
-    },
-    {
-      "id": "e_FnpNmVSnuRYF0eq8",
-      "source": "p_helm/n_p9cjyyH7wex4AhIG",
-      "target": "registry/persona_fleet_dispatcher",
-      "type": "instance_of",
-      "source_product_id": "p_helm",
-      "target_product_id": "registry"
-    },
-    {
-      "id": "e_88a7YlSjltwFZ0nb",
-      "source": "p_helm/n_uNky_yhVMcNRNprN",
-      "target": "p_helmmobile/n_mteJ4UdaLg0-os3w",
-      "type": "shares_job",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_helmmobile"
-    },
-    {
-      "id": "e_GpZm6G3hHNpdBvDE",
-      "source": "p_helm/p_helm",
-      "target": "p_conduit/p_conduit",
-      "type": "hosts",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_conduit"
-    },
-    {
-      "id": "e_4-k2IkLkm8pyCCfg",
-      "source": "p_helm/p_helm",
-      "target": "p_designsys/n_18fkNOIa_vt2BMxn",
-      "type": "product_implements_design_system",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_designsys"
-    },
-    {
-      "id": "e_8TtLbHhPAYAMDYYI",
-      "source": "p_helm/p_helm",
-      "target": "p_legacy/p_legacy",
-      "type": "succeeds",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_legacy"
-    },
-    {
-      "id": "e_vpMPijY7Ekf9YE8k",
-      "source": "p_helm/p_helm",
-      "target": "p_org/n_DXs2r9z-t8eI5htj",
-      "type": "product_targets_objective",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_org"
-    },
-    {
-      "id": "e_oBVo6ITcxVR2gfAB",
-      "source": "p_helm/p_helm",
-      "target": "p_org/n_Li41g6yRG07Hm3y5",
-      "type": "node_owned_by_team",
-      "source_product_id": "p_helm",
-      "target_product_id": "p_org"
-    },
-    {
-      "id": "e_l7TO-gaAkV3zjcXw",
-      "source": "p_helmmobile/n_ql7_64dRk2Zsu0wb",
-      "target": "registry/persona_fleet_dispatcher",
-      "type": "instance_of",
-      "source_product_id": "p_helmmobile",
-      "target_product_id": "registry",
-      "alias": true
-    },
-    {
-      "id": "e_pVU6q4C1iS0q-9Xy",
-      "source": "p_helmmobile/p_helmmobile",
-      "target": "p_helm/p_helm",
-      "type": "depends_on_product",
-      "source_product_id": "p_helmmobile",
-      "target_product_id": "p_helm"
-    },
-    {
-      "id": "e_n3ds5yI77UtyVVb_",
-      "source": "p_legacy/p_legacy",
-      "target": "registry/classification_value_on_prem_legacy",
-      "type": "node_classified_as_classification_value",
-      "source_product_id": "p_legacy",
-      "target_product_id": "registry",
+      "id": "e_eP_6w-ZQ1ABqrVXp",
+      "source": "p_3-6AULYmwl97I4yn/n_F-Y1xgVfbvjFwTjy",
+      "target": "p_atlassian_corp/n_IRxT5zK-ouTzGlE8",
+      "type": "objective_defers_capability",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_atlassian_corp",
       "properties": {
-        "assessed_on": "2026-07-03",
-        "rationale": "Legacy Console is our own on-prem-era product, kept for classification-axis coverage."
+        "deferred_to": "2026-Q4"
       }
     },
     {
-      "id": "e_TSULPjA2229WAZ20",
-      "source": "p_northstar/n_c0xHDpTIdLVL1SIq",
-      "target": "p_helm/n_AUFYhEEBlcnGItzu",
-      "type": "competitor_signal_maps_to_feature",
-      "source_product_id": "p_northstar",
-      "target_product_id": "p_helm"
+      "id": "e_5atYpo6l7Z4TG5D4",
+      "source": "p_3-6AULYmwl97I4yn/n_F-Y1xgVfbvjFwTjy",
+      "target": "p_atlassian_corp/n_h7vclCvC24oIFr08",
+      "type": "objective_achieved_through_key_result",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_atlassian_corp"
     },
     {
-      "id": "e_4zsYME84sOWgbxTg",
-      "source": "p_northstar/n_c0xHDpTIdLVL1SIq",
-      "target": "p_northstar/n_nXcjl0Qg97SZLq9s",
-      "type": "competitor_signal_surfaces_opportunity",
-      "source_product_id": "p_northstar",
-      "target_product_id": "p_northstar"
+      "id": "e_CpbBGQFtyGrI-uv6",
+      "source": "p_3-6AULYmwl97I4yn/n_F-Y1xgVfbvjFwTjy",
+      "target": "p_i3jIcg_z5SfdBIUr/n_wIYcy4jw-A-7oIeR",
+      "type": "objective_defers_capability",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_i3jIcg_z5SfdBIUr",
+      "properties": {
+        "deferred_to": "2027-Q1"
+      }
     },
     {
-      "id": "e_45W4pQyggbDn96z1",
-      "source": "p_org/n_EYwIyIt_Am7-p42J",
-      "target": "p_helm/n_QgnyyyZEQHZS4cDJ",
-      "type": "dependency_blocks_objective",
-      "source_product_id": "p_org",
-      "target_product_id": "p_helm"
+      "id": "e_mPTfGtsGOO3kTfdo",
+      "source": "p_3-6AULYmwl97I4yn/n_JW5YZ6zW6qtMnq9D",
+      "target": "p_ZTAcJwn5U8xyFwyG/n_S9PXPfbRgTdVijj8",
+      "type": "feature_uses_design_component",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_ZTAcJwn5U8xyFwyG"
     },
     {
-      "id": "e_l3pYGRjB7xetlMc_",
-      "source": "p_org/n_Q-NQOjcYx-UZVJKG",
-      "target": "registry/metric_on_time_performance",
-      "type": "instance_of",
-      "source_product_id": "p_org",
-      "target_product_id": "registry"
+      "id": "e_qDOKwE78LcQJpIr3",
+      "source": "p_3-6AULYmwl97I4yn/n_QtKFOIjt-olv8eKZ",
+      "target": "p_lhduCfGR_5UQxIYj/n_O8e9EUx4DXrqb9ay",
+      "type": "shares_job",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_lhduCfGR_5UQxIYj"
     },
     {
-      "id": "e_qOu-UfasKu6VhBin",
-      "source": "p_org/n_rvQxEZ83cP4ucMNO",
-      "target": "p_helm/n_QgnyyyZEQHZS4cDJ",
-      "type": "strategic_theme_contains_objective",
-      "source_product_id": "p_org",
-      "target_product_id": "p_helm"
+      "id": "e_ktvgiNtcIt8hDn4e",
+      "source": "p_3-6AULYmwl97I4yn/n_kSdAWem0Zq3bXek6",
+      "target": "p_lhduCfGR_5UQxIYj/n_VO4IX0zRoRldtQAl",
+      "type": "shares_need",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_lhduCfGR_5UQxIYj"
     },
     {
-      "id": "e_5Fa4LM-wBM1bKtvo",
-      "source": "p_revops/n_wTBOdP961pcLMKmS",
-      "target": "p_org/n_Wwm1xI6pRDOKu5uo",
+      "id": "e_CEe9r21xat87a84i",
+      "source": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "target": "p_ZTAcJwn5U8xyFwyG/n_JzQX6WKJmx2DFdbt",
+      "type": "product_implements_design_system",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_ZTAcJwn5U8xyFwyG"
+    },
+    {
+      "id": "e_MlgrvFEzgFJ16IqO",
+      "source": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "target": "p_aOEKM8qCE6a0r-rS/p_aOEKM8qCE6a0r-rS",
+      "type": "hosts",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_aOEKM8qCE6a0r-rS"
+    },
+    {
+      "id": "e_ZmUAX90M8mlYFbfv",
+      "source": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "target": "p_atlassian_corp/n_E1SfYdWHVgVnPsVA",
+      "type": "product_targets_objective",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_atlassian_corp"
+    },
+    {
+      "id": "e_vUxbPFpyvZlOeAwZ",
+      "source": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "target": "p_atlassian_corp/n_dIE03-0rXMGwDRCI",
+      "type": "node_owned_by_team",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_atlassian_corp"
+    },
+    {
+      "id": "e_8PIwmOYzDPUgiVyv",
+      "source": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "target": "p_x6JxWNAwOM-6E6yJ/p_x6JxWNAwOM-6E6yJ",
+      "type": "succeeds",
+      "source_product_id": "p_3-6AULYmwl97I4yn",
+      "target_product_id": "p_x6JxWNAwOM-6E6yJ"
+    },
+    {
+      "id": "e_29g4x65QBOJUyZCT",
+      "source": "p_95L1HjtnqX_Ca4LX/n__A3eP0qj-R22J-PE",
+      "target": "p_atlassian_corp/n_ATDWRyh-KW6dLnfi",
       "type": "contributes_to",
-      "source_product_id": "p_revops",
-      "target_product_id": "p_org"
+      "source_product_id": "p_95L1HjtnqX_Ca4LX",
+      "target_product_id": "p_atlassian_corp"
     },
     {
-      "id": "e_jFHqtc0sYh_wMqGm",
-      "source": "p_revops/p_revops",
-      "target": "p_org/n_Wwm1xI6pRDOKu5uo",
+      "id": "e_vHIhBXZRendQGVPA",
+      "source": "p_95L1HjtnqX_Ca4LX/p_95L1HjtnqX_Ca4LX",
+      "target": "p_atlassian_corp/n_ATDWRyh-KW6dLnfi",
       "type": "product_pursues_outcome",
-      "source_product_id": "p_revops",
-      "target_product_id": "p_org"
+      "source_product_id": "p_95L1HjtnqX_Ca4LX",
+      "target_product_id": "p_atlassian_corp"
     },
     {
-      "id": "e_iJqPFr-0Dnb7lGxZ",
-      "source": "p_revops/p_revops",
-      "target": "p_org/n_YYNnZqmzBzfTi_Fx",
+      "id": "e_kjrrebg4dhpYdYQ7",
+      "source": "p_95L1HjtnqX_Ca4LX/p_95L1HjtnqX_Ca4LX",
+      "target": "p_atlassian_corp/n_H0fRwoZhQIBhR9Lk",
       "type": "node_owned_by_department",
-      "source_product_id": "p_revops",
-      "target_product_id": "p_org"
+      "source_product_id": "p_95L1HjtnqX_Ca4LX",
+      "target_product_id": "p_atlassian_corp"
     },
     {
-      "id": "e_kX17U2U3cAXqkDws",
-      "source": "p_skywire/n_a5Hy99iFctkXr3kF",
+      "id": "e_C5djKMrBwr2fmQEz",
+      "source": "p_HpSAytItOV7uX9--/n_eUiQM9EWLKCDPs5A",
       "target": "registry/classification_value_cloud_native",
       "type": "competitor_classified_as_classification_value",
-      "source_product_id": "p_skywire",
+      "source_product_id": "p_HpSAytItOV7uX9--",
       "target_product_id": "registry",
       "properties": {
         "confidence": {
@@ -567,50 +442,175 @@
           "label": "Confident",
           "scale_id": "confidence_5"
         },
-        "assessed_on": "2026-07-03",
-        "rationale": "SkyWire completed cloud migration in Q1 2026 — reclassifying.",
-        "evidence": "SkyWire changelog, 2026-03-14: \"Cloud-only GA.\""
+        "assessed_on": "2026-07-14",
+        "rationale": "GitLab is steering customers to GitLab.com SaaS - reclassifying to Cloud-Native.",
+        "evidence": "GitLab SaaS-first positioning, 2025."
       }
     },
     {
-      "id": "e_gHGPfHnrb8ZXddOR",
-      "source": "p_website/n_3N3ogiB-hwm4PLoN",
-      "target": "p_helm/p_helm",
-      "type": "feature_surfaces_product",
-      "source_product_id": "p_website",
-      "target_product_id": "p_helm"
+      "id": "e_zvcPAusLhGTf2FID",
+      "source": "p_JgB2u9CylGy1gR0u/n_hzHoAzle9wEkSIqf",
+      "target": "p_3-6AULYmwl97I4yn/n_Eof0eG4_z4ocAcxk",
+      "type": "competitor_signal_maps_to_feature",
+      "source_product_id": "p_JgB2u9CylGy1gR0u",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
     },
     {
-      "id": "e_vYzPOeW91lpSDZti",
-      "source": "p_website/n_KstlfCS7M2g0qBsr",
-      "target": "p_designsys/n_lxMr8YVanJ5v6oNp",
-      "type": "screen_renders_design_component",
-      "source_product_id": "p_website",
-      "target_product_id": "p_designsys"
+      "id": "e_bpwj1-KMJ-boJiOp",
+      "source": "p_JgB2u9CylGy1gR0u/n_hzHoAzle9wEkSIqf",
+      "target": "p_JgB2u9CylGy1gR0u/n_GT9JL__p8J4NaASO",
+      "type": "competitor_signal_surfaces_opportunity",
+      "source_product_id": "p_JgB2u9CylGy1gR0u",
+      "target_product_id": "p_JgB2u9CylGy1gR0u"
     },
     {
-      "id": "e_YcJYNlOx_ZIoiUao",
-      "source": "p_website/n_KstlfCS7M2g0qBsr",
-      "target": "p_helm/p_helm",
-      "type": "screen_markets_product",
-      "source_product_id": "p_website",
-      "target_product_id": "p_helm"
-    },
-    {
-      "id": "e_w2morKqZBeDzs2fR",
-      "source": "p_website/n_YWuGTMTAma0hTzXT",
-      "target": "p_skywire/n_a5Hy99iFctkXr3kF",
-      "type": "screen_targets_competitor",
-      "source_product_id": "p_website",
-      "target_product_id": "p_skywire"
-    },
-    {
-      "id": "e_JmEIyigrp_rt5tFp",
-      "source": "p_website/p_website",
-      "target": "registry/persona_fleet_dispatcher",
-      "type": "product_expresses_brand_identity",
-      "source_product_id": "p_website",
+      "id": "e_jGe63h0M4PEvJYdo",
+      "source": "p_aOEKM8qCE6a0r-rS/n_NBiIeGJ0dM99VEyS",
+      "target": "registry/primitive_repository",
+      "type": "feature_manipulates_primitive",
+      "source_product_id": "p_aOEKM8qCE6a0r-rS",
       "target_product_id": "registry"
+    },
+    {
+      "id": "e_JJY6-FlOmru0H4OF",
+      "source": "p_aOEKM8qCE6a0r-rS/n_NBiIeGJ0dM99VEyS",
+      "target": "registry/specification_git_protocol",
+      "type": "feature_conforms_to_specification",
+      "source_product_id": "p_aOEKM8qCE6a0r-rS",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e_ircot61A94ZQgU1J",
+      "source": "p_aOEKM8qCE6a0r-rS/n_kPnSNQ8AqW06cnTu",
+      "target": "registry/specification_git_protocol",
+      "type": "api_contract_speaks_specification",
+      "source_product_id": "p_aOEKM8qCE6a0r-rS",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e_yBbrEPMzg9W8o9UT",
+      "source": "p_aOEKM8qCE6a0r-rS/p_aOEKM8qCE6a0r-rS",
+      "target": "registry/primitive_repository",
+      "type": "product_exposes_primitive",
+      "source_product_id": "p_aOEKM8qCE6a0r-rS",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e__LRl5BLVn7BMU0hg",
+      "source": "p_aOEKM8qCE6a0r-rS/p_aOEKM8qCE6a0r-rS",
+      "target": "registry/specification_git_protocol",
+      "type": "product_exposes_specification",
+      "source_product_id": "p_aOEKM8qCE6a0r-rS",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e_hJj4gw-aN1HdG_JL",
+      "source": "p_aOEKM8qCE6a0r-rS/p_aOEKM8qCE6a0r-rS",
+      "target": "registry/specification_git_protocol",
+      "type": "product_implements_specification",
+      "source_product_id": "p_aOEKM8qCE6a0r-rS",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e_phS_-P_0WXdc60gH",
+      "source": "p_atlassian_corp/n_Cy3tm5H4XkuJRo3U",
+      "target": "p_3-6AULYmwl97I4yn/n_F-Y1xgVfbvjFwTjy",
+      "type": "dependency_blocks_objective",
+      "source_product_id": "p_atlassian_corp",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
+    },
+    {
+      "id": "e_PLYP2W0ioXqHMq6J",
+      "source": "p_atlassian_corp/n_iO4fgwGqBN7Nq68q",
+      "target": "registry/metric_monthly_active_users",
+      "type": "instance_of",
+      "source_product_id": "p_atlassian_corp",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e_0YUativ8DLlVnlGu",
+      "source": "p_atlassian_corp/n_vadwOkeIzYH8h0Mc",
+      "target": "p_3-6AULYmwl97I4yn/n_F-Y1xgVfbvjFwTjy",
+      "type": "strategic_theme_contains_objective",
+      "source_product_id": "p_atlassian_corp",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
+    },
+    {
+      "id": "e_Jnt1DZsGY_moAFUK",
+      "source": "p_i3jIcg_z5SfdBIUr/p_i3jIcg_z5SfdBIUr",
+      "target": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "type": "cannibalises",
+      "source_product_id": "p_i3jIcg_z5SfdBIUr",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
+    },
+    {
+      "id": "e_jcUHSkOkk2QC26cw",
+      "source": "p_lhduCfGR_5UQxIYj/n_T6bJUOB4TiZC0D3M",
+      "target": "registry/persona_software_team_lead",
+      "type": "instance_of",
+      "source_product_id": "p_lhduCfGR_5UQxIYj",
+      "target_product_id": "registry",
+      "alias": true
+    },
+    {
+      "id": "e_CXu1C-dsAMEe-hre",
+      "source": "p_lhduCfGR_5UQxIYj/p_lhduCfGR_5UQxIYj",
+      "target": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "type": "depends_on_product",
+      "source_product_id": "p_lhduCfGR_5UQxIYj",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
+    },
+    {
+      "id": "e_fUO_T6Rc-dVGKJIw",
+      "source": "p_wZUbgqGqpPkppsdD/n_hBy9vbWkJMtqeCod",
+      "target": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "type": "screen_markets_product",
+      "source_product_id": "p_wZUbgqGqpPkppsdD",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
+    },
+    {
+      "id": "e_mISsUoqVGSBdXz1_",
+      "source": "p_wZUbgqGqpPkppsdD/n_hBy9vbWkJMtqeCod",
+      "target": "p_ZTAcJwn5U8xyFwyG/n_Fd9Gta3ltL3pAfSx",
+      "type": "screen_renders_design_component",
+      "source_product_id": "p_wZUbgqGqpPkppsdD",
+      "target_product_id": "p_ZTAcJwn5U8xyFwyG"
+    },
+    {
+      "id": "e_zre7W1UnMhPoMb0W",
+      "source": "p_wZUbgqGqpPkppsdD/n_ptP9GEQ027uUq_Td",
+      "target": "p_HpSAytItOV7uX9--/n_eUiQM9EWLKCDPs5A",
+      "type": "screen_targets_competitor",
+      "source_product_id": "p_wZUbgqGqpPkppsdD",
+      "target_product_id": "p_HpSAytItOV7uX9--"
+    },
+    {
+      "id": "e_xsHh5leH4wjona_k",
+      "source": "p_wZUbgqGqpPkppsdD/n_smydFPXs2hK5h6zS",
+      "target": "p_3-6AULYmwl97I4yn/p_3-6AULYmwl97I4yn",
+      "type": "feature_surfaces_product",
+      "source_product_id": "p_wZUbgqGqpPkppsdD",
+      "target_product_id": "p_3-6AULYmwl97I4yn"
+    },
+    {
+      "id": "e_UYPaREKVaKr7DhC5",
+      "source": "p_wZUbgqGqpPkppsdD/p_wZUbgqGqpPkppsdD",
+      "target": "registry/persona_software_team_lead",
+      "type": "product_expresses_brand_identity",
+      "source_product_id": "p_wZUbgqGqpPkppsdD",
+      "target_product_id": "registry"
+    },
+    {
+      "id": "e_8Xv8SxBwDtG5FlGR",
+      "source": "p_x6JxWNAwOM-6E6yJ/p_x6JxWNAwOM-6E6yJ",
+      "target": "registry/classification_value_data_center_self_managed",
+      "type": "node_classified_as_classification_value",
+      "source_product_id": "p_x6JxWNAwOM-6E6yJ",
+      "target_product_id": "registry",
+      "properties": {
+        "assessed_on": "2026-07-14",
+        "rationale": "Hipchat shipped a self-managed Server edition; kept for classification-axis coverage."
+      }
     }
   ],
   "registry": {
@@ -625,93 +625,93 @@
         "type": "classification_value",
         "title": "Cloud-Native",
         "properties": {
-          "rationale": "Multi-tenant SaaS, no on-prem option."
+          "rationale": "Multi-tenant SaaS, no self-managed option."
         }
       },
       {
-        "id": "classification_value_on_prem_legacy",
+        "id": "classification_value_data_center_self_managed",
         "type": "classification_value",
-        "title": "On-Prem Legacy",
+        "title": "Data Center (Self-Managed)",
         "properties": {
-          "rationale": "Requires customer-hosted servers; SkyWire is migrating away from this."
+          "rationale": "Customer-hosted deployment; GitLab is migrating its centre of gravity to SaaS."
         }
       },
       {
-        "id": "canon_skywire_competitor",
+        "id": "canon_gitlab_competitor",
         "type": "competitor",
-        "title": "SkyWire Ops (as tracked by Helm)",
+        "title": "GitLab (as tracked by Jira)",
         "description": "Lightweight local mention; canonicalised into the registry via promote_to_canonical."
       },
       {
-        "id": "market_segment_regional_carriers",
+        "id": "market_segment_enterprise_engineering_orgs",
         "type": "market_segment",
-        "title": "Regional Carriers",
-        "description": "Small-to-mid fleet operators, 5-50 aircraft, regional routes."
+        "title": "Enterprise Engineering Orgs",
+        "description": "Large software organisations, 500+ engineers, standardising on a single toolchain."
       },
       {
-        "id": "metric_on_time_performance",
+        "id": "metric_monthly_active_users",
         "type": "metric",
-        "title": "On-Time Performance",
-        "description": "Percentage of flights departing within 15 minutes of scheduled time.",
+        "title": "Monthly Active Users",
+        "description": "Distinct users active across Atlassian products in a calendar month.",
         "properties": {
           "designation": "kpi",
-          "unit": "%"
+          "unit": "count"
         }
       },
       {
-        "id": "persona_fleet_dispatcher",
+        "id": "persona_software_team_lead",
         "type": "persona",
-        "title": "Fleet Dispatcher",
-        "description": "Coordinates flight assignments and monitors live fleet status.",
+        "title": "Software Team Lead",
+        "description": "Leads a software delivery team; plans sprints and tracks work across Jira and Confluence.",
         "properties": {
           "audience_role": "user"
         }
       },
       {
-        "id": "primitive_flight_manifest",
+        "id": "primitive_repository",
         "type": "primitive",
-        "title": "Flight Manifest",
-        "description": "The canonical data primitive representing a single flight crew, cargo, and routing manifest."
+        "title": "Repository",
+        "description": "The canonical data primitive representing a single version-controlled repository."
       },
       {
-        "id": "specification_conduit_protocol",
+        "id": "specification_git_protocol",
         "type": "specification",
-        "title": "Conduit Protocol",
-        "description": "The open wire protocol for third-party fleet-data integrations."
+        "title": "Git Protocol",
+        "description": "The Git wire protocol Bitbucket implements for clone/fetch/push."
       }
     ],
     "edges": [
       {
-        "id": "e_mYxjh2nWCUJBA8gr",
+        "id": "e_ZvduKq49sTlXWiY8",
         "source": "classification_axis_deployment_model",
         "target": "classification_value_cloud_native",
         "type": "classification_axis_includes_classification_value"
       },
       {
-        "id": "e__hBr5opb1EwNdr4v",
+        "id": "e_7NrTNkdGa5Piryid",
         "source": "classification_axis_deployment_model",
-        "target": "classification_value_on_prem_legacy",
+        "target": "classification_value_data_center_self_managed",
         "type": "classification_axis_includes_classification_value"
       }
     ]
   },
   "signals": [
     {
-      "id": "sig_reclass_5b528993526c",
+      "id": "sig_reclass_25ef40d66145",
       "type": "competitor_signal",
-      "title": "Reclassified on Deployment Model: classification_value_on_prem_legacy to classification_value_cloud_native",
+      "title": "Reclassified on Deployment Model: classification_value_data_center_self_managed to classification_value_cloud_native",
       "properties": {
         "axis": "classification_axis_deployment_model",
-        "competitor": "p_skywire/n_a5Hy99iFctkXr3kF",
+        "competitor": "p_HpSAytItOV7uX9--/n_eUiQM9EWLKCDPs5A",
         "confidence": {
           "label": "Confident",
           "scale_id": "confidence_5",
           "value": 4
         },
-        "from_value": "classification_value_on_prem_legacy",
-        "observed_at": "2026-07-03",
+        "from_value": "classification_value_data_center_self_managed",
+        "observed_at": "2026-07-14",
         "signal_type": "reclassification",
-        "summary": "p_skywire/n_a5Hy99iFctkXr3kF reclassified on Deployment Model: classification_value_on_prem_legacy to classification_value_cloud_native",
+        "summary": "p_HpSAytItOV7uX9--/n_eUiQM9EWLKCDPs5A reclassified on Deployment Model: classification_value_data_center_self_managed to classification_value_cloud_native",
         "to_value": "classification_value_cloud_native"
       }
     }

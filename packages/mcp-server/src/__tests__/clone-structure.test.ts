@@ -38,7 +38,7 @@ function doc(over: Partial<UPGDocument> & { product: UPGDocument['product'] }): 
 // Source carries real content (descriptions + properties + statuses) so we can
 // prove NONE of it crosses into the clone.
 const SOURCE = doc({
-  product: { id: 'p_source', title: 'Content Lake', stage: 'growth' },
+  product: { id: 'p_source', title: 'Content Store', stage: 'growth' },
   nodes: [
     { id: 's_per', type: 'persona', title: 'Solo Builder', description: 'real content', status: 'validated', properties: { segment: 'indie' } },
     { id: 's_job', type: 'job', title: 'Ship faster', description: 'real content' },

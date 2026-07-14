@@ -1,43 +1,43 @@
 {
   "$upg": {
     "format_version": "1.0.0",
-    "spec_version": "0.2",
+    "spec_version": "0.23.0",
     "product": {
-      "id": "p_revops",
-      "title": "Revenue Ops",
+      "id": "p_95L1HjtnqX_Ca4LX",
+      "title": "Revenue Operations",
       "stage": "mature"
     },
-    "summary": "Revenue operating function — pipeline, forecasting, deal desk.",
+    "summary": "Revenue operating function - pipeline, forecasting, deal desk, expansion.",
     "counts": {
-      "nodes": 3,
+      "nodes": 4,
       "edges": 0
     },
     "member_kind": "operating_function",
     "provenance": {
-      "tool": "build-portfolio-saturated",
-      "exported_at": "2026-07-03T19:07:17.378Z"
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.709Z"
     },
     "integrity": {
       "algorithm": "sha256-128",
-      "body": "6b36352a01e6059fe837169a087a24d6"
+      "body": "0881177e9c12ac654e4d7835dae55897"
     }
   },
   "product": {
-    "id": "p_revops",
-    "title": "Revenue Ops",
-    "description": "Revenue operating function — pipeline, forecasting, deal desk.",
+    "id": "p_95L1HjtnqX_Ca4LX",
+    "title": "Revenue Operations",
+    "description": "Revenue operating function - pipeline, forecasting, deal desk, expansion.",
     "stage": "mature"
   },
   "nodes": [
     {
-      "id": "n_EgVJH7PUQOPu5M1A",
+      "id": "n_SbPiq0KpwALIhpid",
       "type": "gtm_strategy",
-      "title": "Regional Carrier Expansion",
-      "slug": "regional-carrier-expansion",
+      "title": "Cloud Migration Land-and-Expand",
+      "slug": "cloud-migration-land-and-expand",
       "status": "planning"
     },
     {
-      "id": "n_wTBOdP961pcLMKmS",
+      "id": "n__A3eP0qj-R22J-PE",
       "type": "metric",
       "title": "Net Revenue Retention",
       "slug": "net-revenue-retention",
@@ -48,10 +48,19 @@
       }
     },
     {
-      "id": "n_YrfCAcp7l9o-gMcY",
+      "id": "n_BFhONh1v-rFcYGcI",
       "type": "pipeline_sales",
-      "title": "Enterprise Fleet Pipeline",
-      "slug": "enterprise-fleet-pipeline"
+      "title": "Enterprise Expansion Pipeline",
+      "slug": "enterprise-expansion-pipeline"
+    },
+    {
+      "id": "p_95L1HjtnqX_Ca4LX",
+      "type": "product",
+      "title": "Revenue Operations",
+      "description": "Revenue operating function - pipeline, forecasting, deal desk, expansion.",
+      "properties": {
+        "stage": "mature"
+      }
     }
   ],
   "edges": []

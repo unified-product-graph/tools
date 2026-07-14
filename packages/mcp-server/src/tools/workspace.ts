@@ -41,7 +41,7 @@ import { createEdge } from './edges.js'
 /**
  * True only when `p` exists AND is a regular file. Used by `switch_product`
  * resolution so a directory whose name collides with a bare product name
- * (e.g. a `sanity/` source dir vs `.upg/sanity.upg`) never satisfies
+ * (e.g. a `nimbus/` source dir vs `.upg/nimbus.upg`) never satisfies
  * resolution — the old `fs.existsSync` check matched the directory and then
  * `store.load` threw `EISDIR` (UPG batch-3 #12). Follows symlinks (a symlink
  * to a file is a file).
@@ -319,9 +319,9 @@ export const switchProduct: ToolHandler = async (args, ctx): Promise<ToolResult>
   }
 
   // Resolve the target to an existing FILE. Order matters: a bare product name
-  // ("sanity") must anchor to the workspace `.upg/` directory FIRST, before the
+  // ("nimbus") must anchor to the workspace `.upg/` directory FIRST, before the
   // cwd-relative resolution — otherwise a same-named sibling in the project root
-  // (e.g. a `sanity/` source directory) shadows `.upg/sanity.upg`. The old code
+  // (e.g. a `nimbus/` source directory) shadows `.upg/nimbus.upg`. The old code
   // gated the `.upg/` fallback on `!fs.existsSync(resolved)`, so a bare name that
   // collided with a *directory* skipped the fallback and `store.load`-ed the
   // directory itself → `EISDIR`. We now (a) try workspace `.upg/` candidates

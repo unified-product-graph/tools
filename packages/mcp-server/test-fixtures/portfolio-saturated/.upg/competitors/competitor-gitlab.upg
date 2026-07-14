@@ -1,0 +1,55 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_HpSAytItOV7uX9--",
+      "title": "GitLab - Competitor Intel",
+      "stage": "growth"
+    },
+    "summary": "Competitive intelligence graph for GitLab (rivals Bitbucket).",
+    "counts": {
+      "nodes": 3,
+      "edges": 0
+    },
+    "member_kind": "watched",
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.715Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "2e0a3511b8323b2dca723a419c304e59"
+    }
+  },
+  "product": {
+    "id": "p_HpSAytItOV7uX9--",
+    "title": "GitLab - Competitor Intel",
+    "description": "Competitive intelligence graph for GitLab (rivals Bitbucket).",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_eUiQM9EWLKCDPs5A",
+      "type": "competitor",
+      "title": "GitLab",
+      "slug": "gitlab"
+    },
+    {
+      "id": "n_P3pugompClzDwu5L",
+      "type": "competitor_feature",
+      "title": "GitLab Duo (AI)",
+      "slug": "gitlab-duo-ai"
+    },
+    {
+      "id": "p_HpSAytItOV7uX9--",
+      "type": "product",
+      "title": "GitLab - Competitor Intel",
+      "description": "Competitive intelligence graph for GitLab (rivals Bitbucket).",
+      "properties": {
+        "stage": "growth"
+      }
+    }
+  ],
+  "edges": []
+}

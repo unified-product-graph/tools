@@ -78,21 +78,21 @@ describe('#45 create_product member_kind', () => {
 
   it('stamps $upg.member_kind, caches it in workspace.json, and labels the listing', async () => {
     const ctx = makeCtx(store)
-    const res = await parse(createProductTool({ name: 'Contentful', member_kind: 'watched', dir: 'competitors' }, ctx))
+    const res = await parse(createProductTool({ name: 'Larch', member_kind: 'watched', dir: 'competitors' }, ctx))
     expect(res.isError).toBeFalsy()
 
-    const graph = JSON.parse(readFileSync(join(cwd, '.upg', 'competitors', 'contentful.upg'), 'utf-8'))
+    const graph = JSON.parse(readFileSync(join(cwd, '.upg', 'competitors', 'larch.upg'), 'utf-8'))
     expect(graph.$upg.member_kind).toBe('watched')
 
     const ws = JSON.parse(readFileSync(join(cwd, '.upg', 'workspace.json'), 'utf-8'))
     const entry = (ws.products as Array<{ file: string; member_kind?: string }>).find(
-      (p) => p.file === 'competitors/contentful.upg',
+      (p) => p.file === 'competitors/larch.upg',
     )
     expect(entry?.member_kind).toBe('watched')
 
     const list = await parse(listLocalProducts({}, ctx))
     const products = list.body?.products as Array<{ title: string; member_kind?: string }>
-    expect(products.find((p) => p.title === 'Contentful')?.member_kind).toBe('watched')
+    expect(products.find((p) => p.title === 'Larch')?.member_kind).toBe('watched')
     expect(products.find((p) => p.title === 'Root')?.member_kind).toBe('product')
   })
 
@@ -104,7 +104,7 @@ describe('#45 create_product member_kind', () => {
         portfolios: [],
         products: [
           { id: 'p_owned', title: 'Owned' },
-          { id: 'p_watch', title: 'Contentful', member_kind: 'watched' },
+          { id: 'p_watch', title: 'Larch', member_kind: 'watched' },
         ],
       }),
     )

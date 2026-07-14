@@ -225,15 +225,15 @@ describe('switch_product resolution (batch-3 #12)', () => {
     cwd = realpathSync(mkdtempSync(join(tmpdir(), 'upg-switch-')))
     mkdirSync(join(cwd, '.upg'))
     writeFileSync(
-      join(cwd, '.upg', 'sanity.upg'),
-      JSON.stringify(doc({ product: { id: 'p_sanity', title: 'Sanity', stage: 'concept' } }), null, 2),
+      join(cwd, '.upg', 'nimbus.upg'),
+      JSON.stringify(doc({ product: { id: 'p_nimbus', title: 'Nimbus', stage: 'concept' } }), null, 2),
     )
     // A sibling SOURCE directory whose name collides with the bare product name.
-    // The old resolution `path.resolve('sanity')` matched this directory and
+    // The old resolution `path.resolve('nimbus')` matched this directory and
     // store.load threw EISDIR. The fix anchors to .upg/ and requires a file.
-    mkdirSync(join(cwd, 'sanity'))
+    mkdirSync(join(cwd, 'nimbus'))
     const store = new UPGFileStore()
-    await store.load(join(cwd, '.upg', 'sanity.upg'))
+    await store.load(join(cwd, '.upg', 'nimbus.upg'))
     store.stopWatching()
     ctx = makeCtx(store)
     process.chdir(cwd)
@@ -245,17 +245,17 @@ describe('switch_product resolution (batch-3 #12)', () => {
   })
 
   it('resolves a bare name to .upg/<name>.upg even when a sibling dir collides', async () => {
-    const result = await switchProduct({ file: 'sanity' }, ctx)
+    const result = await switchProduct({ file: 'nimbus' }, ctx)
     expect(result.isError).toBeUndefined()
     const body = bodyOf(result)
-    expect(body.product.title).toBe('Sanity')
-    expect(body.file.endsWith('.upg/sanity.upg')).toBe(true)
+    expect(body.product.title).toBe('Nimbus')
+    expect(body.file.endsWith('.upg/nimbus.upg')).toBe(true)
   })
 
   it('still resolves an explicit .upg path', async () => {
-    const result = await switchProduct({ file: '.upg/sanity.upg' }, ctx)
+    const result = await switchProduct({ file: '.upg/nimbus.upg' }, ctx)
     expect(result.isError).toBeUndefined()
-    expect(bodyOf(result).product.title).toBe('Sanity')
+    expect(bodyOf(result).product.title).toBe('Nimbus')
   })
 
   it('returns a not-found error for an unknown bare name', async () => {

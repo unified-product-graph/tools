@@ -1,0 +1,173 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.5",
+    "product": {
+      "id": "p_atlassian_corp",
+      "title": "Atlassian (Corporate Rollup)",
+      "stage": "mature"
+    },
+    "summary": "Company umbrella graph - vision, mission, OKR ladder, org structure. The founding graph the portfolio was initialised around.",
+    "counts": {
+      "nodes": 14,
+      "edges": 6
+    },
+    "member_kind": "org_rollup",
+    "provenance": {
+      "tool": "build-portfolio-saturated",
+      "exported_at": "2026-07-14T08:39:16.719Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "504fc35aa6709288ff562f4c54339779"
+    }
+  },
+  "product": {
+    "id": "p_atlassian_corp",
+    "title": "Atlassian (Corporate Rollup)",
+    "description": "Company umbrella graph - vision, mission, OKR ladder, org structure. The founding graph the portfolio was initialised around.",
+    "stage": "mature"
+  },
+  "nodes": [
+    {
+      "id": "n_IRxT5zK-ouTzGlE8",
+      "type": "capability",
+      "title": "Cross-Product Benchmarking",
+      "slug": "cross-product-benchmarking",
+      "status": "planned"
+    },
+    {
+      "id": "n_H0fRwoZhQIBhR9Lk",
+      "type": "department",
+      "title": "Revenue Org",
+      "slug": "revenue-org"
+    },
+    {
+      "id": "n_Cy3tm5H4XkuJRo3U",
+      "type": "dependency",
+      "title": "Company OKR waiting on Jira cycle-time objective",
+      "slug": "company-okr-waiting-on-jira-cycle-time-objective",
+      "status": "identified"
+    },
+    {
+      "id": "n_h7vclCvC24oIFr08",
+      "type": "key_result",
+      "title": "Cloud seat share: 45% -> 60%",
+      "slug": "cloud-seat-share-45-60",
+      "status": "on_track"
+    },
+    {
+      "id": "n_XH68Swr7tO05Pyic",
+      "type": "metric",
+      "title": "Company-wide Cloud Seats",
+      "slug": "company-wide-cloud-seats",
+      "properties": {
+        "designation": "north_star",
+        "statistical_function": "percentage"
+      }
+    },
+    {
+      "id": "n_iO4fgwGqBN7Nq68q",
+      "type": "metric",
+      "title": "Monthly Active Users",
+      "slug": "monthly-active-users",
+      "properties": {
+        "designation": "kpi",
+        "unit": "count"
+      }
+    },
+    {
+      "id": "n_htXRGZBqVMf3j46n",
+      "type": "mission",
+      "title": "Build the system of work for every team.",
+      "slug": "build-the-system-of-work-for-every-team",
+      "status": "drafting"
+    },
+    {
+      "id": "n_E1SfYdWHVgVnPsVA",
+      "type": "objective",
+      "title": "Grow cloud-migrated seat share to 60%",
+      "slug": "grow-cloud-migrated-seat-share-to-60",
+      "status": "draft"
+    },
+    {
+      "id": "n_ATDWRyh-KW6dLnfi",
+      "type": "outcome",
+      "title": "Atlassian is the default system of work for software teams.",
+      "slug": "atlassian-is-the-default-system-of-work-for-software-teams",
+      "status": "identified"
+    },
+    {
+      "id": "p_atlassian_corp",
+      "type": "product",
+      "title": "Atlassian (Corporate Rollup)",
+      "properties": {
+        "stage": "mature"
+      }
+    },
+    {
+      "id": "n_vadwOkeIzYH8h0Mc",
+      "type": "strategic_theme",
+      "title": "Cloud-First",
+      "slug": "cloud-first",
+      "status": "active"
+    },
+    {
+      "id": "n_dIE03-0rXMGwDRCI",
+      "type": "team",
+      "title": "Platform Team",
+      "slug": "platform-team"
+    },
+    {
+      "id": "n_o6FxOnuSbwerI3sZ",
+      "type": "team",
+      "title": "Revenue Team",
+      "slug": "revenue-team"
+    },
+    {
+      "id": "n_w1sRFC3ZXY1SEez1",
+      "type": "vision",
+      "title": "Unleash the potential of every team.",
+      "slug": "unleash-the-potential-of-every-team",
+      "status": "drafting"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_4aw1UueYKxy_fqP1",
+      "source": "n_ATDWRyh-KW6dLnfi",
+      "target": "n_XH68Swr7tO05Pyic",
+      "type": "outcome_measured_by_metric"
+    },
+    {
+      "id": "e_UpuFgVxqzE9x2pD7",
+      "source": "n_E1SfYdWHVgVnPsVA",
+      "target": "n_h7vclCvC24oIFr08",
+      "type": "objective_achieved_through_key_result"
+    },
+    {
+      "id": "e_R97L0rFBJXFsSAC2",
+      "source": "n_H0fRwoZhQIBhR9Lk",
+      "target": "n_o6FxOnuSbwerI3sZ",
+      "type": "department_contains_team"
+    },
+    {
+      "id": "e_1I_bzxZDbNjEnW9O",
+      "source": "n_XH68Swr7tO05Pyic",
+      "target": "n_iO4fgwGqBN7Nq68q",
+      "type": "metric_decomposes_into_metric"
+    },
+    {
+      "id": "e_fk8W4Ro_KnGSH3pz",
+      "source": "n_h7vclCvC24oIFr08",
+      "target": "n_XH68Swr7tO05Pyic",
+      "type": "key_result_quantified_by_metric"
+    },
+    {
+      "id": "e_6fCYGYf3ddv2PJcT",
+      "source": "n_vadwOkeIzYH8h0Mc",
+      "target": "n_E1SfYdWHVgVnPsVA",
+      "type": "strategic_theme_contains_objective"
+    }
+  ]
+}

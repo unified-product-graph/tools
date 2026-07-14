@@ -249,7 +249,7 @@ describe('get_tree (0.9.15)', () => {
   })
 
   it('reports anchor_present=true when the anchor exists but nests under the fallback root', async () => {
-    // The Content Lake case: services EXIST but every one nests under a
+    // The Content Store case: services EXIST but every one nests under a
     // bounded_context, so the most-nodes rule roots on bounded_context. The
     // fallback fired, but "No service found" would contradict the services
     // rendered below; anchor_present distinguishes present-but-nested from absent.

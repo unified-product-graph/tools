@@ -1,0 +1,69 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_X0kygj5a04s5t_ps",
+      "title": "Support Operations",
+      "stage": "mature"
+    },
+    "summary": "Customer support operating function - health scoring, renewals playbooks, escalations.",
+    "counts": {
+      "nodes": 5,
+      "edges": 0
+    },
+    "member_kind": "operating_function",
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.712Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "97d77dbc677f459d225e3d0869042e56"
+    }
+  },
+  "product": {
+    "id": "p_X0kygj5a04s5t_ps",
+    "title": "Support Operations",
+    "description": "Customer support operating function - health scoring, renewals playbooks, escalations.",
+    "stage": "mature"
+  },
+  "nodes": [
+    {
+      "id": "n_OyPLfMH4FjglbEEm",
+      "type": "churn_reason",
+      "title": "Migrated to a competing suite",
+      "slug": "migrated-to-a-competing-suite"
+    },
+    {
+      "id": "n_37tULIGrA1oCfpoT",
+      "type": "customer_health_score",
+      "title": "Account Health Score",
+      "slug": "account-health-score",
+      "status": "monitoring"
+    },
+    {
+      "id": "n_cdKOjsVEu_ietTag",
+      "type": "playbook",
+      "title": "At-Risk Renewal Playbook",
+      "slug": "at-risk-renewal-playbook",
+      "status": "drafted"
+    },
+    {
+      "id": "p_X0kygj5a04s5t_ps",
+      "type": "product",
+      "title": "Support Operations",
+      "description": "Customer support operating function - health scoring, renewals playbooks, escalations.",
+      "properties": {
+        "stage": "mature"
+      }
+    },
+    {
+      "id": "n_xO4zJ5InWgm61vTx",
+      "type": "touchpoint",
+      "title": "Quarterly Business Review",
+      "slug": "quarterly-business-review"
+    }
+  ],
+  "edges": []
+}

@@ -82,18 +82,18 @@ describe('#44 subpath discovery + create_product({ dir })', () => {
   })
 
   it('writes into the subfolder, registers the subpath, and stays discoverable', async () => {
-    const res = await parse(createProductTool({ name: 'Contentful', dir: 'competitors' }, ctx))
+    const res = await parse(createProductTool({ name: 'Larch', dir: 'competitors' }, ctx))
     expect(res.isError).toBeFalsy()
-    expect(res.body?.file).toBe('competitors/contentful.upg')
-    expect(existsSync(join(cwd, '.upg', 'competitors', 'contentful.upg'))).toBe(true)
+    expect(res.body?.file).toBe('competitors/larch.upg')
+    expect(existsSync(join(cwd, '.upg', 'competitors', 'larch.upg'))).toBe(true)
 
     const ws = JSON.parse(readFileSync(join(cwd, '.upg', 'workspace.json'), 'utf-8'))
-    expect((ws.products as Array<{ file: string }>).some((p) => p.file === 'competitors/contentful.upg')).toBe(true)
+    expect((ws.products as Array<{ file: string }>).some((p) => p.file === 'competitors/larch.upg')).toBe(true)
 
     // The filesystem scan reaches only one level into .upg/, so this is found
     // via the registry-driven half of discovery.
     const found = findWorkspaceUpgFiles(cwd)
-    expect(found.some((f) => f.endsWith('competitors/contentful.upg'))).toBe(true)
+    expect(found.some((f) => f.endsWith('competitors/larch.upg'))).toBe(true)
   })
 
   it('rejects a dir that escapes .upg/', async () => {

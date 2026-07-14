@@ -28,12 +28,12 @@ describe('portfolio-kind classification (#39)', () => {
   it('marks a product in only a watched portfolio as watched', () => {
     const cwd = makeWorkspace([
       { id: 'pf_owned', title: 'Owned', kind: 'owned', products: ['p_app'] },
-      { id: 'pf_watch', title: 'Competitive Landscape', kind: 'watched', products: ['p_contentful'] },
+      { id: 'pf_watch', title: 'Competitive Landscape', kind: 'watched', products: ['p_larch'] },
     ])
     const map = buildProductKindMap(cwd)
-    expect(map.get('p_contentful')).toBe('watched')
+    expect(map.get('p_larch')).toBe('watched')
     expect(map.get('p_app')).toBe('owned')
-    expect(classifyProductKind(cwd, 'p_contentful')).toBe('watched')
+    expect(classifyProductKind(cwd, 'p_larch')).toBe('watched')
   })
 
   it('keeps a product owned when co-listed under an owned portfolio', () => {

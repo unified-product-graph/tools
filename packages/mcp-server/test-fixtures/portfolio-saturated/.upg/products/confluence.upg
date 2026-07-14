@@ -1,0 +1,94 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_lhduCfGR_5UQxIYj",
+      "title": "Confluence",
+      "stage": "mature"
+    },
+    "summary": "Team workspace and knowledge base - docs, whiteboards, and decisions alongside the work in Jira.",
+    "counts": {
+      "nodes": 6,
+      "edges": 2
+    },
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.686Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "2328a628d3455be0132aa948bf697d27"
+    }
+  },
+  "product": {
+    "id": "p_lhduCfGR_5UQxIYj",
+    "title": "Confluence",
+    "description": "Team workspace and knowledge base - docs, whiteboards, and decisions alongside the work in Jira.",
+    "stage": "mature"
+  },
+  "nodes": [
+    {
+      "id": "n_Epkc5UItoT69NBrq",
+      "type": "feature",
+      "title": "Whiteboards",
+      "slug": "whiteboards",
+      "status": "proposed"
+    },
+    {
+      "id": "n_O8e9EUx4DXrqb9ay",
+      "type": "job",
+      "title": "Plan and track the team's sprint work",
+      "slug": "plan-and-track-the-teams-sprint-work"
+    },
+    {
+      "id": "n_rxJKp0_qVQCkBytH",
+      "type": "metric",
+      "title": "Weekly Active Spaces",
+      "slug": "weekly-active-spaces",
+      "properties": {
+        "designation": "driver"
+      }
+    },
+    {
+      "id": "n_VO4IX0zRoRldtQAl",
+      "type": "need",
+      "title": "A single source of truth for who is working on what",
+      "slug": "a-single-source-of-truth-for-who-is-working-on-what",
+      "status": "raw"
+    },
+    {
+      "id": "n_T6bJUOB4TiZC0D3M",
+      "type": "persona",
+      "title": "Software Team Lead",
+      "slug": "software-team-lead",
+      "description": "The same team lead, capturing decisions and docs in Confluence alongside the work in Jira.",
+      "properties": {
+        "audience_role": "user"
+      }
+    },
+    {
+      "id": "p_lhduCfGR_5UQxIYj",
+      "type": "product",
+      "title": "Confluence",
+      "description": "Team workspace and knowledge base - docs, whiteboards, and decisions alongside the work in Jira.",
+      "properties": {
+        "stage": "mature"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_38WXLXa35UcfUlI1",
+      "source": "n_T6bJUOB4TiZC0D3M",
+      "target": "n_O8e9EUx4DXrqb9ay",
+      "type": "persona_pursues_job"
+    },
+    {
+      "id": "e_LoclzHHRdpH9aJeS",
+      "source": "n_T6bJUOB4TiZC0D3M",
+      "target": "n_VO4IX0zRoRldtQAl",
+      "type": "persona_experiences_need"
+    }
+  ]
+}

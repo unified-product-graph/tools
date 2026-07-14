@@ -112,7 +112,7 @@ The documentation site.
 | What to check | When it matters |
 |---------------|----------------|
 | Entity type documentation pages | If new types need user-facing docs |
-| Sanity CMS content | If framework docs reference entity types |
+| Headless CMS content | If framework docs reference entity types |
 | Domain/layer overview pages | If domain composition changed |
 
 **Usually deferred**: docs update is a separate task.

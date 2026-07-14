@@ -1,0 +1,55 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_i3jIcg_z5SfdBIUr",
+      "title": "Rovo",
+      "stage": "validation"
+    },
+    "summary": "AI teammates and search across Atlassian and connected tools. Incubated in Point A; validating adoption.",
+    "counts": {
+      "nodes": 3,
+      "edges": 0
+    },
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.702Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "0ca524d6dd28a746e59a42c0c13feda0"
+    }
+  },
+  "product": {
+    "id": "p_i3jIcg_z5SfdBIUr",
+    "title": "Rovo",
+    "description": "AI teammates and search across Atlassian and connected tools. Incubated in Point A; validating adoption.",
+    "stage": "validation"
+  },
+  "nodes": [
+    {
+      "id": "n_wIYcy4jw-A-7oIeR",
+      "type": "hypothesis",
+      "title": "Teams will trust an AI teammate to triage and answer over manual search.",
+      "slug": "teams-will-trust-an-ai-teammate-to-triage-and-answer-over-manual-search",
+      "status": "untested"
+    },
+    {
+      "id": "n_pmjwrGskBXenAN31",
+      "type": "persona",
+      "title": "AI-Curious Team Lead",
+      "slug": "ai-curious-team-lead"
+    },
+    {
+      "id": "p_i3jIcg_z5SfdBIUr",
+      "type": "product",
+      "title": "Rovo",
+      "description": "AI teammates and search across Atlassian and connected tools. Incubated in Point A; validating adoption.",
+      "properties": {
+        "stage": "validation"
+      }
+    }
+  ],
+  "edges": []
+}

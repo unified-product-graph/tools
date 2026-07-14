@@ -1,64 +1,64 @@
 {
   "version": "1.0",
-  "default_product": "products/helm.upg",
+  "default_product": "atlassian-corp.upg",
   "products": [
     {
-      "file": "products/helm.upg",
-      "title": "Helm"
+      "file": "atlassian-corp.upg",
+      "title": "Atlassian (Corporate Rollup)",
+      "member_kind": "org_rollup"
     },
     {
-      "file": "products/helm-mobile.upg",
-      "title": "Helm Mobile"
+      "file": "products/jira.upg",
+      "title": "Jira"
     },
     {
-      "file": "products/conduit-sdk.upg",
-      "title": "Conduit SDK"
+      "file": "products/confluence.upg",
+      "title": "Confluence"
     },
     {
-      "file": "products/beacon.upg",
-      "title": "Beacon"
+      "file": "products/bitbucket.upg",
+      "title": "Bitbucket"
     },
     {
-      "file": "products/legacy-console.upg",
-      "title": "Legacy Console"
+      "file": "products/rovo.upg",
+      "title": "Rovo"
+    },
+    {
+      "file": "products/hipchat.upg",
+      "title": "Hipchat"
+    },
+    {
+      "file": "design-system/atlassian-design-system.upg",
+      "title": "Atlassian Design System"
+    },
+    {
+      "file": "web-ecosystem/atlassian-com.upg",
+      "title": "atlassian.com"
     },
     {
       "file": "products/revenue-ops.upg",
-      "title": "Revenue Ops",
+      "title": "Revenue Operations",
       "member_kind": "operating_function"
     },
     {
-      "file": "products/success-ops.upg",
-      "title": "Success Ops",
+      "file": "products/support-ops.upg",
+      "title": "Support Operations",
       "member_kind": "operating_function"
     },
     {
-      "file": "design-system/meridian-design-system.upg",
-      "title": "Meridian Design System"
-    },
-    {
-      "file": "web-ecosystem/meridian-website.upg",
-      "title": "Meridian Website"
-    },
-    {
-      "file": "competitors/competitor-skywire.upg",
-      "title": "SkyWire Ops — Competitor Intel",
+      "file": "competitors/competitor-gitlab.upg",
+      "title": "GitLab - Competitor Intel",
       "member_kind": "watched"
     },
     {
-      "file": "competitors/competitor-altiplane.upg",
-      "title": "Altiplane — Competitor Intel",
+      "file": "competitors/competitor-linear.upg",
+      "title": "Linear - Competitor Intel",
       "member_kind": "watched"
     },
     {
-      "file": "competitors/competitor-northstar-ops.upg",
-      "title": "Northstar Ops — Competitor Intel",
+      "file": "competitors/competitor-notion.upg",
+      "title": "Notion - Competitor Intel",
       "member_kind": "watched"
-    },
-    {
-      "file": "meridian-org.upg",
-      "title": "Meridian Flight Systems (Org)",
-      "member_kind": "org_rollup"
     }
   ]
 }

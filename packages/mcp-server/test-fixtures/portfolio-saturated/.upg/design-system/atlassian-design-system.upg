@@ -1,0 +1,83 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_ZTAcJwn5U8xyFwyG",
+      "title": "Atlassian Design System",
+      "stage": "mature"
+    },
+    "summary": "Shared design system: components, tokens, and brand identity across every Atlassian surface.",
+    "counts": {
+      "nodes": 5,
+      "edges": 2
+    },
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.705Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "a387af3e1e9a4d14efdc51067239a930"
+    }
+  },
+  "product": {
+    "id": "p_ZTAcJwn5U8xyFwyG",
+    "title": "Atlassian Design System",
+    "description": "Shared design system: components, tokens, and brand identity across every Atlassian surface.",
+    "stage": "mature"
+  },
+  "nodes": [
+    {
+      "id": "n_BMPYSa_EuBqggur8",
+      "type": "brand_identity",
+      "title": "Atlassian Brand Identity",
+      "slug": "atlassian-brand-identity",
+      "status": "exploratory"
+    },
+    {
+      "id": "n_Fd9Gta3ltL3pAfSx",
+      "type": "design_component",
+      "title": "Button (ADS)",
+      "slug": "button-ads",
+      "status": "alpha"
+    },
+    {
+      "id": "n_S9PXPfbRgTdVijj8",
+      "type": "design_component",
+      "title": "Lozenge (status badge)",
+      "slug": "lozenge-status-badge",
+      "status": "alpha"
+    },
+    {
+      "id": "n_JzQX6WKJmx2DFdbt",
+      "type": "design_system",
+      "title": "Atlassian Design System",
+      "slug": "atlassian-design-system",
+      "status": "alpha"
+    },
+    {
+      "id": "p_ZTAcJwn5U8xyFwyG",
+      "type": "product",
+      "title": "Atlassian Design System",
+      "description": "Shared design system: components, tokens, and brand identity across every Atlassian surface.",
+      "properties": {
+        "stage": "mature"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_OJruUQoEy4WRPd3P",
+      "source": "n_JzQX6WKJmx2DFdbt",
+      "target": "n_Fd9Gta3ltL3pAfSx",
+      "type": "design_system_contains_design_component"
+    },
+    {
+      "id": "e_X9WPxk4EfWfNnny9",
+      "source": "n_JzQX6WKJmx2DFdbt",
+      "target": "n_S9PXPfbRgTdVijj8",
+      "type": "design_system_contains_design_component"
+    }
+  ]
+}

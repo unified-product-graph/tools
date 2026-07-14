@@ -361,7 +361,7 @@ describe('createProduct', () => {
     await pstore.loadOrInit(portfolioPath)
     await pstore.flush()
 
-    const result = await createProduct({ cwd, store, name: 'Sanity Studio' })
+    const result = await createProduct({ cwd, store, name: 'Nimbus Studio' })
 
     // The portfolio registry — and its serialiser-derived $upg.counts.products —
     // must now track the product, not just workspace.json.
@@ -369,7 +369,7 @@ describe('createProduct', () => {
       $upg?: { counts?: { products?: number } }
       products?: Array<{ id: string; title?: string; file_path?: string }>
     }
-    expect(pdoc.products?.some((p) => p.id === result.id && p.title === 'Sanity Studio')).toBe(true)
+    expect(pdoc.products?.some((p) => p.id === result.id && p.title === 'Nimbus Studio')).toBe(true)
     expect(pdoc.$upg?.counts?.products).toBe(1)
   })
 

@@ -1,0 +1,430 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_3-6AULYmwl97I4yn",
+      "title": "Jira",
+      "stage": "growth"
+    },
+    "summary": "Flagship issue tracking and agile planning - boards, backlogs, sprints, roadmaps for software teams.",
+    "counts": {
+      "nodes": 33,
+      "edges": 22
+    },
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.652Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "3201ddba5725079a83089609a89d2660"
+    }
+  },
+  "product": {
+    "id": "p_3-6AULYmwl97I4yn",
+    "title": "Jira",
+    "description": "Flagship issue tracking and agile planning - boards, backlogs, sprints, roadmaps for software teams.",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_Gyp98Q-g0hf0s1y2",
+      "type": "api_contract",
+      "title": "Jira REST API",
+      "slug": "jira-rest-api",
+      "status": "draft",
+      "properties": {
+        "protocol": "REST",
+        "version": "v3"
+      }
+    },
+    {
+      "id": "n_HZYXxJLVF0uaOhAR",
+      "type": "capability",
+      "title": "Automatic backlog triage",
+      "slug": "automatic-backlog-triage",
+      "status": "planned"
+    },
+    {
+      "id": "n_E2kgVvT69wCv9HUB",
+      "type": "competitor",
+      "title": "GitLab (as tracked by Jira)",
+      "slug": "gitlab-as-tracked-by-jira",
+      "description": "Lightweight local mention; canonicalised into the registry via promote_to_canonical."
+    },
+    {
+      "id": "n_HV5-Lp9CADwsASrG",
+      "type": "constraint",
+      "title": "No board view may block on a slow JQL query",
+      "slug": "no-board-view-may-block-on-a-slow-jql-query",
+      "properties": {
+        "constraint_kind": "technical",
+        "constraint_origin": "internal",
+        "constraint_status": "binding",
+        "rule_strength": "must"
+      }
+    },
+    {
+      "id": "n_TG7pY2lzyG9Xsmun",
+      "type": "constraint",
+      "title": "SOC 2 audit-log retention for issue changes",
+      "slug": "soc-2-audit-log-retention-for-issue-changes",
+      "properties": {
+        "constraint_kind": "regulatory",
+        "constraint_origin": "external",
+        "constraint_status": "binding",
+        "rule_strength": "must",
+        "source": "SOC 2 Type II"
+      }
+    },
+    {
+      "id": "n_eIbfPdLGF8fxukY7",
+      "type": "dependency",
+      "title": "Waiting on Bitbucket deploy-status API for the dev panel",
+      "slug": "waiting-on-bitbucket-deploy-status-api-for-the-dev-panel",
+      "status": "identified"
+    },
+    {
+      "id": "n_Eof0eG4_z4ocAcxk",
+      "type": "feature",
+      "title": "Rovo AI issue triage",
+      "slug": "rovo-ai-issue-triage",
+      "description": "Suggests assignee, priority, and duplicates on new issues.",
+      "status": "proposed"
+    },
+    {
+      "id": "n_JW5YZ6zW6qtMnq9D",
+      "type": "feature",
+      "title": "Timeline (roadmap) view",
+      "slug": "timeline-roadmap-view",
+      "description": "Cross-team roadmap of epics on a timeline.",
+      "status": "proposed"
+    },
+    {
+      "id": "n_ZMpwPH8dTKjtZLLU",
+      "type": "initiative",
+      "title": "AI-Assisted Triage Rollout",
+      "slug": "ai-assisted-triage-rollout",
+      "status": "proposed"
+    },
+    {
+      "id": "n_6ygIqSsy7msZIesJ",
+      "type": "insight",
+      "title": "Teams fall back to manual reconciliation when the board and estimates drift apart.",
+      "slug": "teams-fall-back-to-manual-reconciliation-when-the-board-and-estimates-drift-apart",
+      "status": "proposed"
+    },
+    {
+      "id": "n_QtKFOIjt-olv8eKZ",
+      "type": "job",
+      "title": "Plan and track the team's sprint work",
+      "slug": "plan-and-track-the-teams-sprint-work",
+      "description": "Break work into issues, sequence a sprint, and keep the board current."
+    },
+    {
+      "id": "n_mLaSGMFW1676tuKh",
+      "type": "journey_phase",
+      "title": "Active Sprint Phase",
+      "slug": "active-sprint-phase"
+    },
+    {
+      "id": "n_UpO7pb-RAwk4ZlCi",
+      "type": "key_result",
+      "title": "Median cycle time drops from 6 days to 4 days",
+      "slug": "median-cycle-time-drops-from-6-days-to-4-days",
+      "status": "on_track"
+    },
+    {
+      "id": "n_-HuQk7KfUpdJjfBh",
+      "type": "metric",
+      "title": "Weekly Active Projects",
+      "slug": "weekly-active-projects",
+      "properties": {
+        "designation": "driver",
+        "metric_category": "engagement",
+        "statistical_function": "count"
+      }
+    },
+    {
+      "id": "n_j_SAhoAvRVPdxOQh",
+      "type": "mission",
+      "title": "Give every software team a live, trustworthy plan.",
+      "slug": "give-every-software-team-a-live-trustworthy-plan",
+      "status": "drafting"
+    },
+    {
+      "id": "n_kSdAWem0Zq3bXek6",
+      "type": "need",
+      "title": "A single source of truth for who is working on what",
+      "slug": "a-single-source-of-truth-for-who-is-working-on-what",
+      "status": "raw"
+    },
+    {
+      "id": "n_F-Y1xgVfbvjFwTjy",
+      "type": "objective",
+      "title": "Cut average issue cycle time by 30%",
+      "slug": "cut-average-issue-cycle-time-by-30",
+      "status": "draft"
+    },
+    {
+      "id": "n_rmrQVXLe3hX5ZCQP",
+      "type": "observation",
+      "title": "P07 manually reconciled the board against three spreadsheets before standup.",
+      "slug": "p07-manually-reconciled-the-board-against-three-spreadsheets-before-standup",
+      "properties": {
+        "source_url": "https://research.atlassian.example/studies/w12-2026/obs-04"
+      }
+    },
+    {
+      "id": "n_aZYr8Y1FgMtW1PHH",
+      "type": "operating_lifecycle",
+      "title": "Issue Lifecycle",
+      "slug": "issue-lifecycle"
+    },
+    {
+      "id": "n_oN3AVyzzBAK3MQIP",
+      "type": "operating_stage",
+      "title": "In Progress",
+      "slug": "in-progress"
+    },
+    {
+      "id": "n_Dbses-5PwxXdwaoG",
+      "type": "outcome",
+      "title": "Teams cut planning overhead and ship predictably.",
+      "slug": "teams-cut-planning-overhead-and-ship-predictably",
+      "status": "identified"
+    },
+    {
+      "id": "n_gEhWvNn100SZrLf9",
+      "type": "participant",
+      "title": "P07 - Senior Scrum Master, 6yr tenure",
+      "slug": "p07-senior-scrum-master-6yr-tenure"
+    },
+    {
+      "id": "n_kVFCyhhqhAw8Ih5N",
+      "type": "persona",
+      "title": "Engineering Manager",
+      "slug": "engineering-manager",
+      "description": "Oversees several teams; escalation point for cross-team delivery risk.",
+      "properties": {
+        "audience_role": "buyer"
+      }
+    },
+    {
+      "id": "n_8QFAoOs4YjHr0myT",
+      "type": "persona",
+      "title": "Software Team Lead",
+      "slug": "software-team-lead",
+      "description": "Plans and tracks the team's sprint work in Jira.",
+      "properties": {
+        "audience_role": "user"
+      }
+    },
+    {
+      "id": "p_3-6AULYmwl97I4yn",
+      "type": "product",
+      "title": "Jira",
+      "description": "Flagship issue tracking and agile planning - boards, backlogs, sprints, roadmaps for software teams.",
+      "properties": {
+        "stage": "growth"
+      }
+    },
+    {
+      "id": "n_BkUOhhatvPkyhVtR",
+      "type": "quote",
+      "title": "\"I rebuild half the board by hand every Monday when estimates drift.\"",
+      "slug": "i-rebuild-half-the-board-by-hand-every-monday-when-estimates-drift",
+      "properties": {
+        "source_url": "https://research.atlassian.example/studies/w12-2026/quote-11"
+      }
+    },
+    {
+      "id": "n__fzwwcVxPHS5PTqK",
+      "type": "research_question",
+      "title": "Where do teams lose the most time during sprint planning?",
+      "slug": "where-do-teams-lose-the-most-time-during-sprint-planning",
+      "status": "open"
+    },
+    {
+      "id": "n_wwyu5OJoNYeEb9DX",
+      "type": "research_study",
+      "title": "Sprint Planning Study - W12 2026",
+      "slug": "sprint-planning-study-w12-2026",
+      "status": "planned"
+    },
+    {
+      "id": "n_IpL-mf2eJs9HIWjo",
+      "type": "screen",
+      "title": "Board",
+      "slug": "board",
+      "status": "draft"
+    },
+    {
+      "id": "n_O2lNA6tsit4niamw",
+      "type": "strategic_pillar",
+      "title": "Automation over manual triage",
+      "slug": "automation-over-manual-triage",
+      "status": "proposed"
+    },
+    {
+      "id": "n_GmzYj2L-95y_DwIP",
+      "type": "strategic_question",
+      "title": "Should cycle time be measured per-assignee or per-team?",
+      "slug": "should-cycle-time-be-measured-per-assignee-or-per-team",
+      "status": "open",
+      "properties": {
+        "priority": "high",
+        "question": "Should cycle time be measured per-assignee or per-team?"
+      }
+    },
+    {
+      "id": "n_UZAaYi8eE872BHLm",
+      "type": "strategic_theme",
+      "title": "Connected Work",
+      "slug": "connected-work",
+      "status": "active"
+    },
+    {
+      "id": "n_Zs49lGgsna49Nu-t",
+      "type": "vision",
+      "title": "Every team ships with confidence.",
+      "slug": "every-team-ships-with-confidence",
+      "status": "drafting"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_4ib4RoeLq-9gyyD7",
+      "source": "n_6ygIqSsy7msZIesJ",
+      "target": "n_BkUOhhatvPkyhVtR",
+      "type": "insight_evidenced_by_quote"
+    },
+    {
+      "id": "e_UT6cpsKHXH96efaz",
+      "source": "n_8QFAoOs4YjHr0myT",
+      "target": "n_QtKFOIjt-olv8eKZ",
+      "type": "persona_pursues_job"
+    },
+    {
+      "id": "e_HSMhu5RA8qcFocpM",
+      "source": "n_8QFAoOs4YjHr0myT",
+      "target": "n_kSdAWem0Zq3bXek6",
+      "type": "persona_experiences_need"
+    },
+    {
+      "id": "e_Xfa8vSqgpih4qYbo",
+      "source": "n_Dbses-5PwxXdwaoG",
+      "target": "n_-HuQk7KfUpdJjfBh",
+      "type": "outcome_measured_by_metric"
+    },
+    {
+      "id": "e_aUS1fwaRYW_1aaIG",
+      "source": "n_F-Y1xgVfbvjFwTjy",
+      "target": "n_-HuQk7KfUpdJjfBh",
+      "type": "objective_measured_by_metric"
+    },
+    {
+      "id": "e_EM3ZK9lMspL4Yzrq",
+      "source": "n_F-Y1xgVfbvjFwTjy",
+      "target": "n_Dbses-5PwxXdwaoG",
+      "type": "objective_advances_outcome"
+    },
+    {
+      "id": "e_ybJG-llaTlNQ7tBm",
+      "source": "n_F-Y1xgVfbvjFwTjy",
+      "target": "n_GmzYj2L-95y_DwIP",
+      "type": "objective_raises_strategic_question"
+    },
+    {
+      "id": "e_fwDnLnnMf35SOapB",
+      "source": "n_F-Y1xgVfbvjFwTjy",
+      "target": "n_UpO7pb-RAwk4ZlCi",
+      "type": "objective_achieved_through_key_result"
+    },
+    {
+      "id": "e_BWJv1qCopmQZPDQ9",
+      "source": "n_F-Y1xgVfbvjFwTjy",
+      "target": "n_eIbfPdLGF8fxukY7",
+      "type": "objective_depends_on_dependency"
+    },
+    {
+      "id": "e_5cZGs4oiS69--hgQ",
+      "source": "n_UZAaYi8eE872BHLm",
+      "target": "n_Dbses-5PwxXdwaoG",
+      "type": "strategic_theme_delivers_outcome"
+    },
+    {
+      "id": "e_UUtI14f3n7DrYrTK",
+      "source": "n_UZAaYi8eE872BHLm",
+      "target": "n_F-Y1xgVfbvjFwTjy",
+      "type": "strategic_theme_contains_objective"
+    },
+    {
+      "id": "e_FmEpaT5fDXOkdmme",
+      "source": "n_UZAaYi8eE872BHLm",
+      "target": "n_ZMpwPH8dTKjtZLLU",
+      "type": "strategic_theme_pursues_initiative"
+    },
+    {
+      "id": "e_cdfkVAM_xhkjLzrL",
+      "source": "n_UpO7pb-RAwk4ZlCi",
+      "target": "n_-HuQk7KfUpdJjfBh",
+      "type": "key_result_quantified_by_metric"
+    },
+    {
+      "id": "e_oR5gAxoLiPLKyKwC",
+      "source": "n_ZMpwPH8dTKjtZLLU",
+      "target": "n_Dbses-5PwxXdwaoG",
+      "type": "initiative_drives_outcome"
+    },
+    {
+      "id": "e_05SO1ECKD1eCpIMb",
+      "source": "n_aZYr8Y1FgMtW1PHH",
+      "target": "n_oN3AVyzzBAK3MQIP",
+      "type": "operating_lifecycle_contains_operating_stage"
+    },
+    {
+      "id": "e_6Un-IUTFlCM21w6l",
+      "source": "n_gEhWvNn100SZrLf9",
+      "target": "n_BkUOhhatvPkyhVtR",
+      "type": "participant_voiced_quote"
+    },
+    {
+      "id": "e_RTQTqJXIFe8_DN_I",
+      "source": "n_mLaSGMFW1676tuKh",
+      "target": "n_oN3AVyzzBAK3MQIP",
+      "type": "journey_phase_realises_operating_stage"
+    },
+    {
+      "id": "e_aRNw9x6EO7PY0_o4",
+      "source": "n_rmrQVXLe3hX5ZCQP",
+      "target": "n_6ygIqSsy7msZIesJ",
+      "type": "observation_yields_insight"
+    },
+    {
+      "id": "e_ZvjNVqulw_xiqZ6t",
+      "source": "n_rmrQVXLe3hX5ZCQP",
+      "target": "n_BkUOhhatvPkyhVtR",
+      "type": "observation_evidenced_by_quote"
+    },
+    {
+      "id": "e_g_IsrDJFqXNUGe9Q",
+      "source": "n_wwyu5OJoNYeEb9DX",
+      "target": "n__fzwwcVxPHS5PTqK",
+      "type": "research_study_investigates_research_question"
+    },
+    {
+      "id": "e_gLKSIhnN3PIP4iSj",
+      "source": "n_wwyu5OJoNYeEb9DX",
+      "target": "n_gEhWvNn100SZrLf9",
+      "type": "research_study_enrolls_participant"
+    },
+    {
+      "id": "e_wpCMqMuljIUmGBbQ",
+      "source": "n_wwyu5OJoNYeEb9DX",
+      "target": "n_rmrQVXLe3hX5ZCQP",
+      "type": "research_study_captures_observation"
+    }
+  ]
+}

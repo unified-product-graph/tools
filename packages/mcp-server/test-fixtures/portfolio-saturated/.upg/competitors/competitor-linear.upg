@@ -1,0 +1,55 @@
+{
+  "$upg": {
+    "format_version": "1.0.0",
+    "spec_version": "0.23.0",
+    "product": {
+      "id": "p_qeecyhtudNI1zEK5",
+      "title": "Linear - Competitor Intel",
+      "stage": "growth"
+    },
+    "summary": "Competitive intelligence graph for Linear (rivals Jira).",
+    "counts": {
+      "nodes": 3,
+      "edges": 0
+    },
+    "member_kind": "watched",
+    "provenance": {
+      "tool": "upg-mcp-local",
+      "exported_at": "2026-07-14T08:39:16.716Z"
+    },
+    "integrity": {
+      "algorithm": "sha256-128",
+      "body": "ee9084f984864d9abb0c264c7eeaa5ea"
+    }
+  },
+  "product": {
+    "id": "p_qeecyhtudNI1zEK5",
+    "title": "Linear - Competitor Intel",
+    "description": "Competitive intelligence graph for Linear (rivals Jira).",
+    "stage": "growth"
+  },
+  "nodes": [
+    {
+      "id": "n_eqT0yB436g10Qa51",
+      "type": "competitor",
+      "title": "Linear",
+      "slug": "linear"
+    },
+    {
+      "id": "n_n5EdIHTagdWcD8xU",
+      "type": "competitor_feature",
+      "title": "Linear Auto-Triage",
+      "slug": "linear-auto-triage"
+    },
+    {
+      "id": "p_qeecyhtudNI1zEK5",
+      "type": "product",
+      "title": "Linear - Competitor Intel",
+      "description": "Competitive intelligence graph for Linear (rivals Jira).",
+      "properties": {
+        "stage": "growth"
+      }
+    }
+  ],
+  "edges": []
+}

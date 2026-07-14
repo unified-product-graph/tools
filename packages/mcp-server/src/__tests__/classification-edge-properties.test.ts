@@ -66,9 +66,9 @@ describe('classification edge properties + read path (0.10.4)', () => {
       upg_version: '0.10.4',
       exported_at: '2026-06-13T00:00:00Z',
       source: { tool: 'test' },
-      product: { id: 'p_comp', title: 'Contentful', stage: 'concept' },
+      product: { id: 'p_comp', title: 'Larch', stage: 'concept' },
       nodes: [
-        { id: 'n_comp', type: 'competitor', title: 'Contentful' },
+        { id: 'n_comp', type: 'competitor', title: 'Larch' },
         { id: 'n_feat', type: 'feature', title: 'A feature' },
       ],
       edges: [],
@@ -76,7 +76,7 @@ describe('classification edge properties + read path (0.10.4)', () => {
     writeFileSync(join(cwd, '.upg', 'comp.upg'), JSON.stringify(comp, null, 2))
     writeFileSync(
       join(cwd, '.upg', 'workspace.json'),
-      JSON.stringify({ version: '1.0', default_product: 'comp.upg', products: [{ file: 'comp.upg', title: 'Contentful' }] }, null, 2),
+      JSON.stringify({ version: '1.0', default_product: 'comp.upg', products: [{ file: 'comp.upg', title: 'Larch' }] }, null, 2),
     )
     process.chdir(cwd)
     store = new UPGFileStore()
