@@ -257,13 +257,17 @@ describe('IntercomAdapter: edge emission', () => {
   })
 
   it('node_informs_node fallback emitted for unrecognised parent→child pair', async () => {
+    // article (document) → conversation (support_ticket) has no canonical edge, so
+    // the resolver falls back to node_informs_node. (company/account → conversation/
+    // support_ticket is no longer a fallback case: 0.24.0 added the canonical
+    // account_raises_support_ticket edge, which the resolver now picks.)
     const items: SourceItem[] = [
-      makeItem('co1', 'Acme Corp', 'company'),
-      makeItem('conv1', 'Help request', 'conversation', { parent_id: 'co1' }),
+      makeItem('art1', 'Setup guide', 'article'),
+      makeItem('conv1', 'Help request', 'conversation', { parent_id: 'art1' }),
     ]
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'fallback edge')
-    const edge = result.edges.find((e) => e.source === result.source_map['co1'])
+    const edge = result.edges.find((e) => e.source === result.source_map['art1'])
     expect(edge).toBeDefined()
     expect(edge?.type).toBe('node_informs_node')
   })
