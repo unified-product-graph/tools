@@ -196,6 +196,12 @@ const CLOUD_NA = new Set([
   'batch_register_instance',
   'promote_to_canonical',
   'create_registry_edge',
+  // registry CRUD completion (feedback 01b21402): delete retires a canonical
+  // (referenced-guard / cascade / dry_run); merge collapses twin canonicals by
+  // repointing instance_of + registry edges onto a keeper. Local-only for the
+  // same reason as the rest of the registry surface.
+  'delete_canonical_entity',
+  'merge_canonical_entities',
   'link_area_to_audience',
   // create_parity_edge (0.10.1, spec issue #38 fast-follow): typed writer for the
   // feature_rivals_competitor_feature parity edge. Local-only for the same reason

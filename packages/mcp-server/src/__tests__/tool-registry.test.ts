@@ -86,7 +86,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 95 tools', () => {
+  it('exposes the expected 97 tools', () => {
     // 0.19.0 tool consolidation: 141 (Phase-1 additive) minus the 48 retired
     // spec-introspection + router tools = 93 (see retired-tools.json).
     // 77 from v0.3.0 +
@@ -183,7 +183,13 @@ describe('Tool registry: completeness', () => {
     //   POSTs a bug / feature request / observation to the public triage queue
     //   at unifiedproductgraph.org from any MCP client. Local-only (it stamps
     //   context from the client's own handshake + runtime; CLOUD_NA). → 95.
-    expect(TOOL_DEFINITIONS).toHaveLength(95)
+    // + delete_canonical_entity + merge_canonical_entities (feedback 01b21402):
+    //   the missing D (and collapse-twins M) of registry CRUD. delete retires a
+    //   canonical with a referenced-guard / cascade / dry_run; merge repoints
+    //   instance_of + registry edges onto a keeper, unions properties into its
+    //   gaps, and deletes the losers — one atomic portfolio flush each.
+    //   Local-only (portfolio.upg write surface). → 97.
+    expect(TOOL_DEFINITIONS).toHaveLength(97)
   })
 })
 

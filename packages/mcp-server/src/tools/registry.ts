@@ -886,3 +886,384 @@ export const createRegistryEdge: ToolHandler = async (args): Promise<ToolResult>
     ),
   )
 }
+
+/**
+ * Everything in the portfolio document that references a canonical: the
+ * `instance_of` cross-edges pointing at it, any OTHER cross-edges touching its
+ * qualified id (area_serves_persona, classification edges, …), and the
+ * registry-internal edges naming it as an endpoint. This is the blast radius a
+ * delete must guard on and a merge must repoint.
+ */
+function collectCanonicalReferences(
+  portfolioStore: UPGPortfolioStore,
+  canonicalId: string,
+): { instanceEdges: UPGCrossEdge[]; otherCrossEdges: UPGCrossEdge[]; registryEdges: UPGEdge[] } {
+  const qualified = `${REGISTRY_PRODUCT_ID}/${canonicalId}`
+  const instanceEdges: UPGCrossEdge[] = []
+  const otherCrossEdges: UPGCrossEdge[] = []
+  for (const e of portfolioStore.getAllCrossEdges()) {
+    if (e.source !== qualified && e.target !== qualified) continue
+    if (e.type === 'instance_of') instanceEdges.push(e)
+    else otherCrossEdges.push(e)
+  }
+  const registryEdges = portfolioStore
+    .listRegistryEdges()
+    .filter((e) => e.source === canonicalId || e.target === canonicalId)
+  return { instanceEdges, otherCrossEdges, registryEdges }
+}
+
+/**
+ * Delete a canonical entity from the portfolio registry — the missing D in the
+ * registry's CRUD (feedback 01b21402). Until now a canonical could be defined,
+ * updated, and promoted-to, but never retired: an obsolete or twin canonical
+ * lingered forever as a 0-instance orphan in `list_registry`, because
+ * `delete_node` only sees the ACTIVE product and the registry lives in
+ * `.upg/portfolio.upg`, which is not a product.
+ *
+ * Safe by default: refuses to delete a canonical that anything still references
+ * (instance_of edges, area/classification cross-edges, registry-internal edges)
+ * unless `cascade: true`, which deletes those references in the same flush.
+ * `dry_run: true` previews the exact blast radius without writing. For twins
+ * whose instances should SURVIVE under another canonical, use
+ * `merge_canonical_entities` instead — delete+cascade severs instances; merge
+ * repoints them.
+ *
+ * Parameters:
+ * - `canonical_id` (required): the registry entity id (bare, or `registry/{id}`).
+ * - `cascade`: also delete every referencing edge (default false).
+ * - `dry_run`: preview the blast radius; nothing is written (default false).
+ *
+ * @returns JSON: `{ deleted, cascaded: { instance_of, cross_edges, registry_edges },
+ *   portfolio_file }` — or `{ dry_run: true, would_delete, references }`.
+ * @atomicity atomic. All removals land in one portfolio flush.
+ * @see merge_canonical_entities
+ * @see list_registry
+ */
+export const deleteCanonicalEntity: ToolHandler = async (args): Promise<ToolResult> => {
+  const canonicalArg = args.canonical_id as string | undefined
+  if (!canonicalArg) return textError('Missing required parameter: canonical_id')
+  const cascade = (args.cascade as boolean | undefined) ?? false
+  const dryRun = (args.dry_run as boolean | undefined) ?? false
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return textError('No portfolio document found. Nothing to delete; see `list_registry`.')
+  }
+
+  const canonicalId = bareCanonicalId(canonicalArg)
+  const canonical = portfolioStore.getRegistryNode(canonicalId)
+  if (!canonical) {
+    return textError(`Canonical entity "${canonicalId}" not found in the registry. See \`list_registry\`.`)
+  }
+
+  const refs = collectCanonicalReferences(portfolioStore, canonicalId)
+  const refCount = refs.instanceEdges.length + refs.otherCrossEdges.length + refs.registryEdges.length
+
+  if (dryRun) {
+    return text(
+      JSON.stringify(
+        {
+          dry_run: true,
+          would_delete: { id: canonical.id, type: canonical.type, title: canonical.title },
+          references: {
+            instance_of: refs.instanceEdges.map((e) => ({ id: e.id, source: e.source })),
+            cross_edges: refs.otherCrossEdges.map((e) => ({ id: e.id, type: e.type, source: e.source, target: e.target })),
+            registry_edges: refs.registryEdges.map((e) => ({ id: e.id, type: e.type, source: e.source, target: e.target })),
+          },
+          deletable_without_cascade: refCount === 0,
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  if (refCount > 0 && !cascade) {
+    return textError(
+      `Canonical "${canonicalId}" is still referenced: ${refs.instanceEdges.length} instance_of edge(s), ` +
+        `${refs.otherCrossEdges.length} other cross-edge(s), ${refs.registryEdges.length} registry edge(s). ` +
+        `Pass cascade: true to delete the references too (severing the instances), or use ` +
+        `merge_canonical_entities to repoint the instances onto a surviving canonical first. ` +
+        `Preview the blast radius with dry_run: true.`,
+    )
+  }
+
+  try {
+    for (const e of refs.instanceEdges) portfolioStore.removeCrossEdge(e.id)
+    for (const e of refs.otherCrossEdges) portfolioStore.removeCrossEdge(e.id)
+    for (const e of refs.registryEdges) portfolioStore.removeRegistryEdge(e.id)
+    portfolioStore.removeRegistryNode(canonicalId)
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to delete canonical entity: ${(err as Error).message}`)
+  }
+
+  return text(
+    JSON.stringify(
+      {
+        deleted: { id: canonical.id, type: canonical.type, title: canonical.title },
+        cascaded: {
+          instance_of: refs.instanceEdges.length,
+          cross_edges: refs.otherCrossEdges.length,
+          registry_edges: refs.registryEdges.length,
+        },
+        portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Merge two or more canonical registry entities into one — the fix for twin
+ * canonicals (feedback 01b21402: `persona_editor` + `persona_editor_2` created
+ * across two canonicalization passes, every instance double-parented under
+ * both). Deleting a twin severs its instances; merging repoints them.
+ *
+ * In one atomic portfolio flush, for each losing canonical:
+ * 1. Repoint every cross-edge endpoint `registry/{loser}` → `registry/{keep}`.
+ *    A repoint that would duplicate an existing edge (same source/target/type —
+ *    the double-parented instance case) drops the loser's edge instead; a
+ *    sanctioned `alias` on the dropped edge is preserved on the survivor.
+ * 2. Repoint registry-internal edges the same way (self-loops and duplicates drop).
+ * 3. Union the loser's description / tags / properties into the keeper's GAPS —
+ *    the keeper always wins where both define a value.
+ * 4. Delete the loser from the registry.
+ *
+ * All canonicals must share one entity type. `dry_run: true` previews the full
+ * plan without writing.
+ *
+ * Parameters:
+ * - `keep` (required): the surviving canonical id (bare, or `registry/{id}`).
+ * - `merge` (required): 1–20 canonical ids to fold into `keep`.
+ * - `dry_run`: preview the merge plan; nothing is written (default false).
+ *
+ * @returns JSON: `{ kept, merged, repointed_cross_edges, dropped_duplicate_edges,
+ *   repointed_registry_edges, dropped_registry_edges, properties_added,
+ *   portfolio_file }` — or the same shape under `dry_run: true`.
+ * @atomicity atomic. Repoints, unions, and deletions land in one portfolio flush.
+ * @see delete_canonical_entity
+ * @see list_registry
+ */
+export const mergeCanonicalEntities: ToolHandler = async (args): Promise<ToolResult> => {
+  const keepArg = args.keep as string | undefined
+  if (!keepArg) return textError('Missing required parameter: keep (the surviving canonical id)')
+  const mergeArg = args.merge as string[] | undefined
+  if (!Array.isArray(mergeArg) || mergeArg.length === 0) {
+    return textError('Missing required parameter: merge (a non-empty array of canonical ids to fold into keep)')
+  }
+  if (mergeArg.length > 20) return textError('Merge limit is 20 canonicals per call.')
+  const dryRun = (args.dry_run as boolean | undefined) ?? false
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return textError('No portfolio document found. Nothing to merge; see `list_registry`.')
+  }
+
+  // ── Validate all up front (atomic) ─────────────────────────────────────────
+  const keepId = bareCanonicalId(keepArg)
+  const keeper = portfolioStore.getRegistryNode(keepId)
+  if (!keeper) return textError(`Keep canonical "${keepId}" not found in the registry. See \`list_registry\`.`)
+
+  const loserIds: string[] = []
+  for (const raw of mergeArg) {
+    const id = bareCanonicalId(String(raw))
+    if (id === keepId) return textError(`"${id}" cannot appear in both keep and merge.`)
+    if (loserIds.includes(id)) return textError(`Duplicate id in merge list: "${id}".`)
+    const node = portfolioStore.getRegistryNode(id)
+    if (!node) return textError(`Merge canonical "${id}" not found in the registry. See \`list_registry\`.`)
+    if (node.type !== keeper.type) {
+      return textError(
+        `Type mismatch: keep "${keepId}" is a ${keeper.type}, but merge candidate "${id}" is a ${node.type}. ` +
+          `Merging is only defined within one entity type.`,
+      )
+    }
+    loserIds.push(id)
+  }
+
+  // ── Plan (computed fully before any mutation) ──────────────────────────────
+  const keepQualified = `${REGISTRY_PRODUCT_ID}/${keepId}`
+  type CrossPlan =
+    | { action: 'repoint'; edge: UPGCrossEdge; source: string; target: string }
+    | { action: 'drop_duplicate'; edge: UPGCrossEdge; survivor: UPGCrossEdge }
+  const crossPlans: CrossPlan[] = []
+  type RegistryPlan = { action: 'repoint' | 'drop'; edge: UPGEdge; source?: string; target?: string; reason?: string }
+  const registryPlans: RegistryPlan[] = []
+  const propertiesAdded: Record<string, string[]> = {}
+  const projectedKeeperProps: Record<string, unknown> = { ...((keeper.properties ?? {}) as Record<string, unknown>) }
+  let projectedKeeperDescription = keeper.description
+  const projectedKeeperTags = [...(keeper.tags ?? [])]
+
+  // The edges that will exist after earlier plan steps apply — so a second
+  // loser's repoint correctly collides with a first loser's repointed edge.
+  const projected = portfolioStore.getAllCrossEdges().map((e) => ({ edge: e, source: e.source, target: e.target, dropped: false }))
+  const projectedRegistry = portfolioStore.listRegistryEdges().map((e) => ({ edge: e, source: e.source, target: e.target, dropped: false }))
+
+  for (const loserId of loserIds) {
+    const loserQualified = `${REGISTRY_PRODUCT_ID}/${loserId}`
+
+    for (const p of projected) {
+      if (p.dropped) continue
+      if (p.source !== loserQualified && p.target !== loserQualified) continue
+      const newSource = p.source === loserQualified ? keepQualified : p.source
+      const newTarget = p.target === loserQualified ? keepQualified : p.target
+      const collision = projected.find(
+        (q) => q !== p && !q.dropped && q.source === newSource && q.target === newTarget && q.edge.type === p.edge.type,
+      )
+      if (collision) {
+        crossPlans.push({ action: 'drop_duplicate', edge: p.edge, survivor: collision.edge })
+        p.dropped = true
+      } else {
+        crossPlans.push({ action: 'repoint', edge: p.edge, source: newSource, target: newTarget })
+        p.source = newSource
+        p.target = newTarget
+      }
+    }
+
+    for (const p of projectedRegistry) {
+      if (p.dropped) continue
+      if (p.source !== loserId && p.target !== loserId) continue
+      const newSource = p.source === loserId ? keepId : p.source
+      const newTarget = p.target === loserId ? keepId : p.target
+      if (newSource === newTarget) {
+        registryPlans.push({ action: 'drop', edge: p.edge, reason: 'self_loop' })
+        p.dropped = true
+        continue
+      }
+      const collision = projectedRegistry.find(
+        (q) => q !== p && !q.dropped && q.source === newSource && q.target === newTarget && q.edge.type === p.edge.type,
+      )
+      if (collision) {
+        registryPlans.push({ action: 'drop', edge: p.edge, reason: 'duplicate' })
+        p.dropped = true
+      } else {
+        registryPlans.push({ action: 'repoint', edge: p.edge, source: newSource, target: newTarget })
+        p.source = newSource
+        p.target = newTarget
+      }
+    }
+
+    // Property/description/tags union — keeper wins, losers fill gaps only.
+    // Track projected keeper state across losers so the preview matches the
+    // sequential apply exactly (an earlier loser's fill closes a later one's gap).
+    const loser = portfolioStore.getRegistryNode(loserId)!
+    const gaps: string[] = []
+    const loserProps = (loser.properties ?? {}) as Record<string, unknown>
+    for (const key of Object.keys(loserProps)) {
+      if (projectedKeeperProps[key] === undefined) {
+        gaps.push(key)
+        projectedKeeperProps[key] = loserProps[key]
+      }
+    }
+    if (!projectedKeeperDescription && loser.description) {
+      gaps.push('description')
+      projectedKeeperDescription = loser.description
+    }
+    if (Array.isArray(loser.tags) && loser.tags.some((t) => !projectedKeeperTags.includes(t))) {
+      gaps.push('tags')
+      for (const t of loser.tags) if (!projectedKeeperTags.includes(t)) projectedKeeperTags.push(t)
+    }
+    if (gaps.length > 0) propertiesAdded[loserId] = gaps
+  }
+
+  const summary = {
+    kept: { id: keeper.id, type: keeper.type, title: keeper.title },
+    merged: loserIds,
+    repointed_cross_edges: crossPlans.filter((p) => p.action === 'repoint').length,
+    dropped_duplicate_edges: crossPlans.filter((p) => p.action === 'drop_duplicate').length,
+    repointed_registry_edges: registryPlans.filter((p) => p.action === 'repoint').length,
+    dropped_registry_edges: registryPlans.filter((p) => p.action === 'drop').length,
+    properties_added: propertiesAdded,
+  }
+
+  if (dryRun) {
+    return text(
+      JSON.stringify(
+        {
+          dry_run: true,
+          ...summary,
+          plan: {
+            cross_edges: crossPlans.map((p) =>
+              p.action === 'repoint'
+                ? { action: 'repoint', id: p.edge.id, type: p.edge.type, source: p.source, target: p.target }
+                : { action: 'drop_duplicate', id: p.edge.id, type: p.edge.type, survivor: p.survivor.id },
+            ),
+            registry_edges: registryPlans.map((p) =>
+              p.action === 'repoint'
+                ? { action: 'repoint', id: p.edge.id, type: p.edge.type, source: p.source, target: p.target }
+                : { action: 'drop', id: p.edge.id, type: p.edge.type, reason: p.reason },
+            ),
+          },
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  // ── Apply (in-place mutations + one flush) ─────────────────────────────────
+  try {
+    for (const p of crossPlans) {
+      if (p.action === 'repoint') {
+        p.edge.source = p.source
+        p.edge.target = p.target
+        // Repointing onto the keeper does not itself sanction a title divergence;
+        // but if the loser's edge carried one, the instance's local title still
+        // diverges from the KEEPER's title too or worse — keep the sanction.
+      } else {
+        if (p.edge.alias === true && p.survivor.alias !== true) p.survivor.alias = true
+        portfolioStore.removeCrossEdge(p.edge.id)
+      }
+    }
+    for (const p of registryPlans) {
+      if (p.action === 'repoint') {
+        p.edge.source = p.source!
+        p.edge.target = p.target!
+      } else {
+        portfolioStore.removeRegistryEdge(p.edge.id)
+      }
+    }
+    for (const loserId of loserIds) {
+      const loser = portfolioStore.getRegistryNode(loserId)!
+      const patch: { description?: string; tags?: string[]; properties?: Record<string, unknown> } = {}
+      const keeperProps = (keeper.properties ?? {}) as Record<string, unknown>
+      const fill: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries((loser.properties ?? {}) as Record<string, unknown>)) {
+        if (keeperProps[key] === undefined) fill[key] = value
+      }
+      if (Object.keys(fill).length > 0) patch.properties = fill
+      if (!keeper.description && loser.description) patch.description = loser.description
+      if (Array.isArray(loser.tags) && loser.tags.length > 0) {
+        const union = [...(keeper.tags ?? [])]
+        for (const t of loser.tags) if (!union.includes(t)) union.push(t)
+        if (union.length !== (keeper.tags ?? []).length) patch.tags = union
+      }
+      if (Object.keys(patch).length > 0) portfolioStore.updateRegistryNode(keepId, patch)
+      portfolioStore.removeRegistryNode(loserId)
+    }
+    portfolioStore.markDirty()
+    await portfolioStore.flush()
+  } catch (err) {
+    return textError(`Failed to merge canonical entities: ${(err as Error).message}`)
+  }
+
+  const target = keepQualified
+  const instanceCount = portfolioStore
+    .getAllCrossEdges()
+    .filter((e) => e.type === 'instance_of' && e.target === target).length
+
+  return text(
+    JSON.stringify(
+      {
+        ...summary,
+        kept: { ...summary.kept, instance_count: instanceCount },
+        portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
+      },
+      null,
+      2,
+    ),
+  )
+}

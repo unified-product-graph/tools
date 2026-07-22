@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 95 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 97 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 95 tools exposed by `@unified-product-graph/mcp-server`. Gener
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 11 tools
-- [Workspace & Portfolios](#workspace-portfolios): 39 tools
+- [Workspace & Portfolios](#workspace-portfolios): 41 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 6 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1339,6 +1339,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`create_product`](#create-product)
 - [`create_registry_edge`](#create-registry-edge)
 - [`define_canonical_entity`](#define-canonical-entity)
+- [`delete_canonical_entity`](#delete-canonical-entity)
 - [`delete_cross_product_edge`](#delete-cross-product-edge)
 - [`detach_product_from_portfolio`](#detach-product-from-portfolio)
 - [`diff_classification`](#diff-classification)
@@ -1351,6 +1352,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`list_portfolio_cross_edges`](#list-portfolio-cross-edges)
 - [`list_portfolios`](#list-portfolios)
 - [`list_registry`](#list-registry)
+- [`merge_canonical_entities`](#merge-canonical-entities)
 - [`migrate_cross_edges`](#migrate-cross-edges)
 - [`portfolio_census`](#portfolio-census)
 - [`portfolio_digest`](#portfolio-digest)
@@ -1771,6 +1773,28 @@ JSON: `{ canonical, qualified_id, portfolio_file }`.
 **See also:** `register_instance`, `list_registry`
 
 
+### `delete_canonical_entity`
+
+Delete a canonical entity from the portfolio registry: the registry counterpart to `delete_node` (which only sees the active product). Retires an obsolete or twin canonical that would otherwise linger as a 0-instance orphan in `list_registry`. Safe by default: refuses while anything still references the canonical (instance_of edges, area/classification cross-edges, registry-internal edges) unless `cascade: true`, which deletes those references in the same atomic flush, severing the instances. When instances should SURVIVE under another canonical, use `merge_canonical_entities` instead: it repoints them. Preview the exact blast radius first with `dry_run: true`.
+
+**Atomicity:** `atomic. All removals land in one portfolio flush.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `canonical_id` | string | ✓ | The registry entity id (bare, or registry/{id}). |
+| `cascade` | boolean |  | Also delete every edge referencing the canonical (default false). Without it, a referenced canonical is refused. |
+| `dry_run` | boolean |  | Preview the canonical + every referencing edge that deletion would remove; nothing is written (default false). |
+
+**Returns:**
+
+JSON: `{ deleted, cascaded: { instance_of, cross_edges, registry_edges },
+portfolio_file }` — or `{ dry_run: true, would_delete, references }`.
+
+**See also:** `merge_canonical_entities`, `list_registry`
+
+
 ### `delete_cross_product_edge`
 
 Delete a cross-product edge from `.upg/portfolio.upg` by id. The inverse of `create_cross_product_edge`. Returns `deleted: false` (not an error) when no edge with that id exists.
@@ -2035,6 +2059,29 @@ audience_role?, instance_count?, instances? }>, total, by_type }`. Returns
 an empty registry when none exists yet.
 
 **See also:** `define_canonical_entity`, `register_instance`
+
+
+### `merge_canonical_entities`
+
+Merge two or more canonical registry entities into one surviving canonical: the fix for twin canonicals created across separate canonicalization passes (e.g. `persona_editor` + `persona_editor_2` with every instance registered under both). In one atomic flush: repoints every cross-edge from `registry/{loser}` to `registry/{keep}` (a repoint that would duplicate an existing edge, the double-parented instance case, drops the redundant edge instead, preserving any `alias` sanction), repoints registry-internal edges (self-loops and duplicates drop), unions each loser's description/tags/properties into the keeper's GAPS (the keeper always wins where both define a value), then deletes the losers. All canonicals must share one entity type. Preview the full plan with `dry_run: true`.
+
+**Atomicity:** `atomic. Repoints, unions, and deletions land in one portfolio flush.`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `dry_run` | boolean |  | Preview the merge plan (repoints, drops, property fills); nothing is written (default false). |
+| `keep` | string | ✓ | The surviving canonical id (bare, or registry/{id}). |
+| `merge` | array | ✓ | 1–20 canonical ids to fold into keep. Same type as keep. |
+
+**Returns:**
+
+JSON: `{ kept, merged, repointed_cross_edges, dropped_duplicate_edges,
+repointed_registry_edges, dropped_registry_edges, properties_added,
+portfolio_file }` — or the same shape under `dry_run: true`.
+
+**See also:** `delete_canonical_entity`, `list_registry`
 
 
 ### `migrate_cross_edges`

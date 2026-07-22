@@ -88,6 +88,8 @@ import {
   batchRegisterInstance,
   promoteToCanonical,
   createRegistryEdge,
+  deleteCanonicalEntity,
+  mergeCanonicalEntities,
 } from '../tools/registry.js'
 import { getEntitySchema } from '../tools/schema.js'
 import { applyFramework, scoreEntity } from '../tools/frameworks.js'
@@ -1564,6 +1566,34 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'delete_canonical_entity',
+    description:
+      'Delete a canonical entity from the portfolio registry: the registry counterpart to `delete_node` (which only sees the active product). Retires an obsolete or twin canonical that would otherwise linger as a 0-instance orphan in `list_registry`. Safe by default: refuses while anything still references the canonical (instance_of edges, area/classification cross-edges, registry-internal edges) unless `cascade: true`, which deletes those references in the same atomic flush, severing the instances. When instances should SURVIVE under another canonical, use `merge_canonical_entities` instead: it repoints them. Preview the exact blast radius first with `dry_run: true`.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        canonical_id: { type: 'string', description: 'The registry entity id (bare, or registry/{id}).' },
+        cascade: { type: 'boolean', description: 'Also delete every edge referencing the canonical (default false). Without it, a referenced canonical is refused.' },
+        dry_run: { type: 'boolean', description: 'Preview the canonical + every referencing edge that deletion would remove; nothing is written (default false).' },
+      },
+      required: ['canonical_id'],
+    },
+  },
+  {
+    name: 'merge_canonical_entities',
+    description:
+      'Merge two or more canonical registry entities into one surviving canonical: the fix for twin canonicals created across separate canonicalization passes (e.g. `persona_editor` + `persona_editor_2` with every instance registered under both). In one atomic flush: repoints every cross-edge from `registry/{loser}` to `registry/{keep}` (a repoint that would duplicate an existing edge, the double-parented instance case, drops the redundant edge instead, preserving any `alias` sanction), repoints registry-internal edges (self-loops and duplicates drop), unions each loser\'s description/tags/properties into the keeper\'s GAPS (the keeper always wins where both define a value), then deletes the losers. All canonicals must share one entity type. Preview the full plan with `dry_run: true`.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        keep: { type: 'string', description: 'The surviving canonical id (bare, or registry/{id}).' },
+        merge: { type: 'array', items: { type: 'string' }, description: '1–20 canonical ids to fold into keep. Same type as keep.' },
+        dry_run: { type: 'boolean', description: 'Preview the merge plan (repoints, drops, property fills); nothing is written (default false).' },
+      },
+      required: ['keep', 'merge'],
+    },
+  },
+  {
     name: 'batch_define_canonical_entity',
     description:
       'Batch-create canonical registry entities in one atomic call (the migration counterpart to `define_canonical_entity`). Validates every entity up front (valid type, unique id) then writes all and flushes once, so a registry stand-up is a handful of batches, not one call per canonical.',
@@ -2052,6 +2082,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   batch_register_instance: batchRegisterInstance,
   promote_to_canonical: promoteToCanonical,
   create_registry_edge: createRegistryEdge,
+  delete_canonical_entity: deleteCanonicalEntity,
+  merge_canonical_entities: mergeCanonicalEntities,
   portfolio_query: portfolioQuery,
   portfolio_digest: portfolioDigest,
   portfolio_census: portfolioCensus,

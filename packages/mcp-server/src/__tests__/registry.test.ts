@@ -31,8 +31,10 @@ import {
   batchRegisterInstance,
   promoteToCanonical,
   createRegistryEdge,
+  deleteCanonicalEntity,
+  mergeCanonicalEntities,
 } from '../tools/registry.js'
-import { createCrossProductEdge, linkAreaToAudience } from '../tools/workspace.js'
+import { createCrossProductEdge, linkAreaToAudience, switchProduct } from '../tools/workspace.js'
 import { getNode, getNodes } from '../tools/nodes.js'
 import { createEdge } from '../tools/edges.js'
 import { portfolioValidate } from '../tools/portfolio-read.js'
@@ -778,5 +780,196 @@ describe('canonical registry (0.9.6)', () => {
     expect(block).toBeDefined()
     const byId = Object.fromEntries(block.violations.map((v: { anti_pattern_id: string }) => [v.anti_pattern_id, v]))
     expect(byId['operating-function-without-org-link']).toBeUndefined()
+  })
+
+  // ── delete_canonical_entity / merge_canonical_entities (feedback 01b21402) ──
+  //
+  // The registry twin scenario the feedback reported: two canonicalization
+  // passes created `persona_editor` + `persona_editor_2`, every instance was
+  // registered instance_of BOTH twins, and the losing twin could never be
+  // removed (delete_node only sees the active product).
+
+  /** The twin-canonical portfolio: keeper (audience_role) + richer twin, one
+   * instance double-parented under both, one single-parented under the twin. */
+  function writeTwinPortfolio(): void {
+    writePortfolioDoc({
+      registry: {
+        nodes: [
+          { id: 'persona_editor', type: 'persona', title: 'Editor', properties: { audience_role: 'user' } },
+          {
+            id: 'persona_editor_2', type: 'persona', title: 'Editor',
+            description: 'Edits and curates content daily.',
+            tags: ['content'],
+            properties: { seniority: 'senior' },
+          },
+        ],
+      },
+      cross_edges: [
+        // m_dev is double-parented: instance_of BOTH twins.
+        { id: 'ce_keep', source: 'p_main/m_dev', target: 'registry/persona_editor', type: 'instance_of', source_product_id: 'p_main', target_product_id: 'registry' },
+        { id: 'ce_twin', source: 'p_main/m_dev', target: 'registry/persona_editor_2', type: 'instance_of', source_product_id: 'p_main', target_product_id: 'registry', alias: true },
+        // m_kpi… actually a persona-typed second instance lives only under the twin.
+        { id: 'ce_only_twin', source: 'p_other/o_writer', target: 'registry/persona_editor_2', type: 'instance_of', source_product_id: 'p_other', target_product_id: 'registry' },
+      ],
+    })
+  }
+
+  it('delete_canonical_entity deletes an unreferenced canonical and persists', async () => {
+    const ctx = await activeCtx()
+    await defineCanonicalEntity({ type: 'persona', title: 'Orphan' }, ctx)
+    const body = bodyOf(await deleteCanonicalEntity({ canonical_id: 'registry/persona_orphan' }, ctx))
+    expect(body.deleted.id).toBe('persona_orphan')
+    expect(body.cascaded).toEqual({ instance_of: 0, cross_edges: 0, registry_edges: 0 })
+    const pf = readPortfolio() as { registry?: { nodes?: Array<{ id: string }> } }
+    expect(pf.registry?.nodes?.map((n) => n.id) ?? []).not.toContain('persona_orphan')
+  })
+
+  it('delete_canonical_entity refuses a referenced canonical without cascade', async () => {
+    writeTwinPortfolio()
+    const ctx = await activeCtx()
+    const err = errOf(await deleteCanonicalEntity({ canonical_id: 'persona_editor_2' }, ctx))
+    expect(err).toMatch(/still referenced/)
+    expect(err).toMatch(/2 instance_of edge/)
+    expect(err).toMatch(/merge_canonical_entities/)
+    // Nothing was deleted.
+    const pf = readPortfolio() as { registry: { nodes: Array<{ id: string }> } }
+    expect(pf.registry.nodes.map((n) => n.id)).toContain('persona_editor_2')
+  })
+
+  it('delete_canonical_entity cascade deletes the canonical and every referencing edge in one flush', async () => {
+    writeTwinPortfolio()
+    const ctx = await activeCtx()
+    const body = bodyOf(await deleteCanonicalEntity({ canonical_id: 'persona_editor_2', cascade: true }, ctx))
+    expect(body.deleted.id).toBe('persona_editor_2')
+    expect(body.cascaded.instance_of).toBe(2)
+    const pf = readPortfolio() as { registry: { nodes: Array<{ id: string }> }; cross_edges: Array<{ id: string }> }
+    expect(pf.registry.nodes.map((n) => n.id)).toEqual(['persona_editor'])
+    expect(pf.cross_edges.map((e) => e.id)).toEqual(['ce_keep'])
+  })
+
+  it('delete_canonical_entity dry_run previews the blast radius without writing', async () => {
+    writeTwinPortfolio()
+    const before = readFileSync(join(cwd, '.upg', 'portfolio.upg'), 'utf-8')
+    const ctx = await activeCtx()
+    const body = bodyOf(await deleteCanonicalEntity({ canonical_id: 'persona_editor_2', dry_run: true }, ctx))
+    expect(body.dry_run).toBe(true)
+    expect(body.would_delete.id).toBe('persona_editor_2')
+    expect(body.references.instance_of).toHaveLength(2)
+    expect(body.deletable_without_cascade).toBe(false)
+    expect(readFileSync(join(cwd, '.upg', 'portfolio.upg'), 'utf-8')).toBe(before)
+  })
+
+  it('delete_canonical_entity rejects an unknown canonical', async () => {
+    writeTwinPortfolio()
+    const ctx = await activeCtx()
+    const err = errOf(await deleteCanonicalEntity({ canonical_id: 'persona_ghost' }, ctx))
+    expect(err).toMatch(/not found in the registry/)
+  })
+
+  it('merge_canonical_entities collapses the twin: repoints, dedups, unions gaps, deletes the loser', async () => {
+    writeTwinPortfolio()
+    const ctx = await activeCtx()
+    const body = bodyOf(
+      await mergeCanonicalEntities({ keep: 'persona_editor', merge: ['registry/persona_editor_2'] }, ctx),
+    )
+    expect(body.merged).toEqual(['persona_editor_2'])
+    // ce_twin (double-parent duplicate) drops; ce_only_twin repoints to the keeper.
+    expect(body.dropped_duplicate_edges).toBe(1)
+    expect(body.repointed_cross_edges).toBe(1)
+    // Keeper gained the loser's gap fills: seniority, description, tags.
+    expect(body.properties_added.persona_editor_2).toEqual(
+      expect.arrayContaining(['seniority', 'description', 'tags']),
+    )
+    expect(body.kept.instance_count).toBe(2)
+
+    const pf = readPortfolio() as {
+      registry: { nodes: Array<{ id: string; description?: string; tags?: string[]; properties?: Record<string, unknown> }> }
+      cross_edges: Array<{ id: string; target: string; alias?: boolean }>
+    }
+    // The loser is gone; the keeper carries the union (its own audience_role intact).
+    expect(pf.registry.nodes.map((n) => n.id)).toEqual(['persona_editor'])
+    const keeper = pf.registry.nodes[0]
+    expect(keeper.properties?.audience_role).toBe('user')
+    expect(keeper.properties?.seniority).toBe('senior')
+    expect(keeper.description).toBe('Edits and curates content daily.')
+    expect(keeper.tags).toEqual(['content'])
+    // Every surviving edge points at the keeper; the dropped duplicate's alias
+    // sanction survived on the surviving edge.
+    expect(pf.cross_edges.every((e) => e.target === 'registry/persona_editor')).toBe(true)
+    expect(pf.cross_edges.find((e) => e.id === 'ce_keep')?.alias).toBe(true)
+    expect(pf.cross_edges.map((e) => e.id).sort()).toEqual(['ce_keep', 'ce_only_twin'])
+  })
+
+  it('merge_canonical_entities dry_run previews the exact plan without writing', async () => {
+    writeTwinPortfolio()
+    const before = readFileSync(join(cwd, '.upg', 'portfolio.upg'), 'utf-8')
+    const ctx = await activeCtx()
+    const body = bodyOf(
+      await mergeCanonicalEntities({ keep: 'persona_editor', merge: ['persona_editor_2'], dry_run: true }, ctx),
+    )
+    expect(body.dry_run).toBe(true)
+    expect(body.dropped_duplicate_edges).toBe(1)
+    expect(body.repointed_cross_edges).toBe(1)
+    expect(body.plan.cross_edges).toHaveLength(2)
+    expect(readFileSync(join(cwd, '.upg', 'portfolio.upg'), 'utf-8')).toBe(before)
+  })
+
+  it('merge_canonical_entities enforces the same-type constraint and keep∉merge', async () => {
+    writePortfolioDoc({
+      registry: {
+        nodes: [
+          { id: 'persona_editor', type: 'persona', title: 'Editor' },
+          { id: 'metric_mau', type: 'metric', title: 'MAU' },
+        ],
+      },
+      cross_edges: [],
+    })
+    const ctx = await activeCtx()
+    expect(errOf(await mergeCanonicalEntities({ keep: 'persona_editor', merge: ['metric_mau'] }, ctx))).toMatch(
+      /Type mismatch/,
+    )
+    expect(errOf(await mergeCanonicalEntities({ keep: 'persona_editor', merge: ['persona_editor'] }, ctx))).toMatch(
+      /cannot appear in both/,
+    )
+  })
+
+  it('merge_canonical_entities repoints registry-internal edges and drops self-loops', async () => {
+    writePortfolioDoc({
+      registry: {
+        nodes: [
+          { id: 'spec_keep', type: 'specification', title: 'NQL' },
+          { id: 'spec_lose', type: 'specification', title: 'NQL v0' },
+          { id: 'org_std', type: 'organization', title: 'Standards Body' },
+        ],
+        edges: [
+          // loser → keeper becomes a self-loop after repoint → drops.
+          { id: 're_loop', source: 'spec_lose', target: 'spec_keep', type: 'specification_extends_specification' },
+          // loser → org repoints to keeper → org.
+          { id: 're_gov', source: 'spec_lose', target: 'org_std', type: 'specification_governed_by_organization' },
+        ],
+      },
+      cross_edges: [],
+    })
+    const ctx = await activeCtx()
+    const body = bodyOf(await mergeCanonicalEntities({ keep: 'spec_keep', merge: ['spec_lose'] }, ctx))
+    expect(body.dropped_registry_edges).toBe(1)
+    expect(body.repointed_registry_edges).toBe(1)
+    const pf = readPortfolio() as { registry: { nodes: Array<{ id: string }>; edges: Array<{ id: string; source: string }> } }
+    expect(pf.registry.nodes.map((n) => n.id).sort()).toEqual(['org_std', 'spec_keep'])
+    expect(pf.registry.edges).toHaveLength(1)
+    expect(pf.registry.edges[0]).toMatchObject({ id: 're_gov', source: 'spec_keep' })
+  })
+
+  // ── switch_product portfolio detection (feedback 01b21402 papercut) ──────────
+
+  it('switch_product on portfolio.upg returns the directed portfolio answer, not the schema error', async () => {
+    writePortfolioDoc({ cross_edges: [] })
+    const ctx = await activeCtx()
+    const err = errOf(
+      (await switchProduct({ file: 'portfolio.upg' }, ctx)) as { content: { text: string }[]; isError?: true },
+    )
+    expect(err).toMatch(/PORTFOLIO document, not a product graph/)
+    expect(err).toMatch(/delete_canonical_entity, merge_canonical_entities/)
+    expect(err).not.toMatch(/product is required/)
   })
 })

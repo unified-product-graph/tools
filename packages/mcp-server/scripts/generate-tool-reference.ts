@@ -193,6 +193,8 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   batchRegisterInstance: 'batch_register_instance',
   promoteToCanonical: 'promote_to_canonical',
   createRegistryEdge: 'create_registry_edge',
+  deleteCanonicalEntity: 'delete_canonical_entity',
+  mergeCanonicalEntities: 'merge_canonical_entities',
   migrateCrossEdges: 'migrate_cross_edges',
   // migrations
   migrateStatus: 'migrate_status',

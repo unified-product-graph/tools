@@ -389,11 +389,50 @@ export const switchProduct: ToolHandler = async (args, ctx): Promise<ToolResult>
       ),
     )
   } catch (err) {
+    // Feedback 01b21402: `switch_product portfolio.upg` used to die on the
+    // cryptic schema error "product is required" — a dead end that pushed users
+    // toward hand-editing the integrity-hashed portfolio file. The portfolio
+    // document is a different KIND of file (organization / areas / portfolios /
+    // registry / cross-edges), deliberately not loadable as a product: making it
+    // one would open a second write path onto the portfolio store's
+    // integrity-hashed serialization. Detect the case only AFTER a failed load
+    // (zero cost on the happy path) and answer with the tools that DO operate
+    // on it.
+    if (isPortfolioDocument(resolved)) {
+      return textError(
+        `"${fileArg}" is the workspace's PORTFOLIO document, not a product graph — it cannot become the ` +
+          `active product. Work on it directly with the portfolio tools instead:\n` +
+          `- registry canonicals: list_registry, define_canonical_entity, update_canonical_entity, ` +
+          `delete_canonical_entity, merge_canonical_entities, promote_to_canonical\n` +
+          `- cross-product edges: list_portfolio_cross_edges, batch_delete_cross_product_edges\n` +
+          `- structure & health: get_portfolio_tree, portfolio_census, portfolio_validate\n` +
+          `The previous product (${activeRel}) is no longer watched — call reload_product to restore it.`,
+      )
+    }
     return textError(
       `Failed to load the requested product "${fileArg}" (${resolved}): ${(err as Error).message}. ` +
         `The previous product (${activeRel}) is no longer watched — call get_workspace_info to confirm the ` +
         `active product, or reload_product to restore it.`,
     )
+  }
+}
+
+/**
+ * True when the file at `p` parses as a UPG PORTFOLIO document (canonical
+ * `$upg.kind: "portfolio"` envelope, or the legacy flat `type: "portfolio"`).
+ * Used by `switch_product` to turn the dead-end "product is required" schema
+ * error into a directed answer. Any read/parse failure returns false — the
+ * caller then falls through to the generic load error.
+ */
+function isPortfolioDocument(p: string): boolean {
+  try {
+    const json = JSON.parse(fs.readFileSync(p, 'utf-8')) as {
+      $upg?: { kind?: string }
+      type?: string
+    }
+    return json?.$upg?.kind === 'portfolio' || json?.type === 'portfolio'
+  } catch {
+    return false
   }
 }
 
