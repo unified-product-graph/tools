@@ -247,6 +247,20 @@ export const getNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
           ? { properties: (e as { properties?: Record<string, unknown> }).properties }
           : {}),
       }))
+    // Registry-INTERNAL edges (feedback: registry-edge read path). Without these
+    // the canonical's reach was reported from `instance_of` alone, so a canonical
+    // held in place by spine or metric-bridge edges still read as unreferenced —
+    // even on a correctly-qualified `registry/{id}` call.
+    const registryEdges = portfolioStore!
+      .listRegistryEdges()
+      .filter((e) => e.source === bareId || e.target === bareId)
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        direction: e.source === bareId ? 'outbound' : 'inbound',
+      }))
     return text(
       JSON.stringify(
         {
@@ -254,6 +268,8 @@ export const getNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
           registry: true,
           instance_count: instances.length,
           instances,
+          registry_edge_count: registryEdges.length,
+          ...(registryEdges.length > 0 ? { registry_edges: registryEdges } : {}),
           ...(classifiedBy.length > 0 ? { classified_by_count: classifiedBy.length, classified_by: classifiedBy } : {}),
         },
         null,
@@ -266,7 +282,23 @@ export const getNode: ToolHandler = async (args, ctx): Promise<ToolResult> => {
     node_id: nodeId,
     compact_edges: (args.compact_edges as boolean) ?? false,
   })
-  if (!result) return textError(`Node not found: ${nodeId}`)
+  if (!result) {
+    // Scope-mismatch honesty (feedback: registry-edge read path). A bare id that
+    // misses in the active product may still be a registry canonical — the
+    // registry branch above only fires on a `registry/{id}`-qualified id. Saying
+    // "Node not found" for one reads as *does not exist*, which is how a
+    // canonical with live registry edges gets planned around as absent.
+    const portfolioStore = await openPortfolioStoreIfExists(process.cwd())
+    const canonical = portfolioStore?.getRegistryNode(nodeId)
+    if (canonical) {
+      return textError(
+        `"${nodeId}" is a registry canonical (type: ${canonical.type}), not a node in the active product. ` +
+        `This tool is product-scoped. Re-run it as \`registry/${nodeId}\` to read the canonical, ` +
+        `or see \`list_registry\` / \`list_registry_edges\`.`,
+      )
+    }
+    return textError(`Node not found: ${nodeId}`)
+  }
 
   // Surface unknown-property warnings on read, matching the shape
   // used by write paths (create_node / update_node). Nodes with deprecated

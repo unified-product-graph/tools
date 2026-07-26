@@ -86,7 +86,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 97 tools', () => {
+  it('exposes the expected 98 tools', () => {
     // 0.19.0 tool consolidation: 141 (Phase-1 additive) minus the 48 retired
     // spec-introspection + router tools = 93 (see retired-tools.json).
     // 77 from v0.3.0 +
@@ -189,7 +189,14 @@ describe('Tool registry: completeness', () => {
     //   instance_of + registry edges onto a keeper, unions properties into its
     //   gaps, and deletes the losers — one atomic portfolio flush each.
     //   Local-only (portfolio.upg write surface). → 97.
-    expect(TOOL_DEFINITIONS).toHaveLength(97)
+    // + list_registry_edges (feedback: registry edge read path): the R of
+    //   registry-edge CRUD. create_registry_edge wrote `registry.edges` that no
+    //   tool read back, so a canonical held in place by spine / metric-bridge
+    //   edges still reported instance_count: 0 and read as safe to retire —
+    //   export_edges and get_node are product-scoped and answered empty. Returns
+    //   the export_edges shape against the registry store. Local-only
+    //   (portfolio.upg read surface). → 98.
+    expect(TOOL_DEFINITIONS).toHaveLength(98)
   })
 })
 

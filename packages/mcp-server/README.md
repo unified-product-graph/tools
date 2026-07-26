@@ -2,7 +2,7 @@
 
 A local [Model Context Protocol](https://modelcontextprotocol.io) server that reads and writes `.upg` files. The `.upg` file is a portable JSON document holding your product graph: entities (personas, features, hypotheses, OKRs) and the relationships between them.
 
-The server exposes 97 tools. They cover graph reads and writes plus introspection of everything `@unified-product-graph/core` ships: entity types, edges, frameworks, regions, playbooks, lenses, anti-patterns, benchmarks.
+The server exposes 98 tools. They cover graph reads and writes plus introspection of everything `@unified-product-graph/core` ships: entity types, edges, frameworks, regions, playbooks, lenses, anti-patterns, benchmarks.
 
 See [CHANGELOG.md](./CHANGELOG.md) for the release history.
 
@@ -73,7 +73,7 @@ UPG ships five collaborating primitives. The MCP server exposes all five.
 
 ## MCP Tools
 
-97 tools across nine domains. Full reference: [TOOLS.md](./TOOLS.md), generated from `src/tools/*.ts` and shipped on npm.
+98 tools across nine domains. Full reference: [TOOLS.md](./TOOLS.md), generated from `src/tools/*.ts` and shipped on npm.
 
 | Domain | Count | What it covers |
 |---|---|---|

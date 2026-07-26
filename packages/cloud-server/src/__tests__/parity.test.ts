@@ -202,6 +202,11 @@ const CLOUD_NA = new Set([
   // same reason as the rest of the registry surface.
   'delete_canonical_entity',
   'merge_canonical_entities',
+  // registry-edge read path (0.25.1): the read counterpart to
+  // create_registry_edge, enumerating `registry.edges` from the portfolio
+  // document. Local-only for the same reason as its writer and the rest of the
+  // registry surface.
+  'list_registry_edges',
   'link_area_to_audience',
   // create_parity_edge (0.10.1, spec issue #38 fast-follow): typed writer for the
   // feature_rivals_competitor_feature parity edge. Local-only for the same reason

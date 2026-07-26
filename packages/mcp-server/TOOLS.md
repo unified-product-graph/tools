@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 97 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 98 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 97 tools exposed by `@unified-product-graph/mcp-server`. Gener
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 11 tools
-- [Workspace & Portfolios](#workspace-portfolios): 41 tools
+- [Workspace & Portfolios](#workspace-portfolios): 42 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 6 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1352,6 +1352,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`list_portfolio_cross_edges`](#list-portfolio-cross-edges)
 - [`list_portfolios`](#list-portfolios)
 - [`list_registry`](#list-registry)
+- [`list_registry_edges`](#list-registry-edges)
 - [`merge_canonical_entities`](#merge-canonical-entities)
 - [`migrate_cross_edges`](#migrate-cross-edges)
 - [`portfolio_census`](#portfolio-census)
@@ -2041,7 +2042,7 @@ parent_portfolio_id?, hierarchy_model?, products? }>, total }`.
 
 ### `list_registry`
 
-List the canonical shared entities in the portfolio registry. Each row carries id, type, title, optional audience_role, and instance_count. With `include_instances`, attaches the product instances (the `instance_of` edges) pointing at each canonical. Empty when no registry exists yet.
+List the canonical shared entities in the portfolio registry. Each row carries id, type, title, optional audience_role, and TWO counts that answer different questions: `instance_count` (inbound `instance_of` edges from PRODUCT graphs) and `registry_edge_count` (the registry's own internal edges on either endpoint, written by `create_registry_edge`). A canonical with `instance_count: 0` is NOT necessarily unreferenced, so check `registry_edge_count` before treating one as safe to retire or re-point. With `include_instances` / `include_edges`, attaches the instances / registry-internal edges themselves. Empty when no registry exists yet.
 
 **Atomicity:** `atomic (read-only).`
 
@@ -2049,16 +2050,40 @@ List the canonical shared entities in the portfolio registry. Each row carries i
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `include_edges` | boolean |  | Attach each canonical's registry-internal edges, each tagged inbound/outbound (default false). |
 | `include_instances` | boolean |  | Attach each canonical's product instances (default false). |
 | `type` | string |  | Filter to one entity type (e.g. persona). |
 
 **Returns:**
 
 JSON: `{ registry: Array<{ id, type, title, description?,
-audience_role?, instance_count?, instances? }>, total, by_type }`. Returns
-an empty registry when none exists yet.
+audience_role?, instance_count, registry_edge_count, instances?, edges? }>,
+total, by_type }`. Returns an empty registry when none exists yet.
 
-**See also:** `define_canonical_entity`, `register_instance`
+**See also:** `list_registry_edges`, `define_canonical_entity`, `register_instance`
+
+
+### `list_registry_edges`
+
+Enumerate the registry's INTERNAL edges: the read counterpart to `create_registry_edge`. These edges live in `registry.edges` in the portfolio document and never touch a product graph, which is why the product-scoped readers miss them. `export_edges` enumerates the ACTIVE PRODUCT's edges and returns an empty array for registry-only types, and an empty array meaning *wrong scope* is indistinguishable from one meaning *no such edges*. Ask this tool "what points at this canonical" before planning any migration that retires or re-points registry entities, because `list_registry`'s `instance_count` counts only inbound `instance_of` edges from product graphs, not these. Returns the same `{ id, source, target, type }` shape as `export_edges`, with bare (unqualified) registry endpoint ids.
+
+**Atomicity:** `atomic (read-only).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `endpoint_id` | string |  | Filter to edges touching this registry node in EITHER direction (bare or registry/{id}). |
+| `source_id` | string |  | Filter to edges leaving this registry node (bare or registry/{id}). |
+| `target_id` | string |  | Filter to edges arriving at this registry node (bare or registry/{id}). |
+| `types` | array |  | Filter to these catalog edge types (omit to enumerate all registry edges). |
+
+**Returns:**
+
+JSON: `{ edges: Array<{ id, source, target, type }>, total, by_type }`.
+Returns an empty enumeration when no portfolio/registry exists yet.
+
+**See also:** `create_registry_edge`, `list_registry`, `export_edges`
 
 
 ### `merge_canonical_entities`

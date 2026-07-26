@@ -364,15 +364,28 @@ export const registerInstance: ToolHandler = async (args, ctx): Promise<ToolResu
 /**
  * List the canonical shared entities in the portfolio registry.
  *
+ * Every row carries TWO counts, and they answer different questions
+ * (feedback: registry-edge read path). `instance_count` counts only the
+ * `instance_of` edges arriving from PRODUCT graphs. `registry_edge_count`
+ * counts the registry's own internal edges on either endpoint — the spine
+ * edges (`operating_lifecycle_contains_operating_stage`) and cross-domain
+ * bridges (`operating_stage_measured_by_metric`) that `create_registry_edge`
+ * writes. A canonical with `instance_count: 0` is NOT necessarily unreferenced,
+ * and reading it as "safe to retire" is how a migration plan silently drops
+ * the judgment those edges encode.
+ *
  * Parameters:
  * - `type`: filter to one entity type (e.g. `persona`).
  * - `include_instances`: when true, attach each canonical's product instances
  *   (the `instance_of` edges pointing at it).
+ * - `include_edges`: when true, attach each canonical's registry-internal edges
+ *   the way `include_instances` attaches its instances.
  *
  * @returns JSON: `{ registry: Array<{ id, type, title, description?,
- *   audience_role?, instance_count?, instances? }>, total, by_type }`. Returns
- *   an empty registry when none exists yet.
+ *   audience_role?, instance_count, registry_edge_count, instances?, edges? }>,
+ *   total, by_type }`. Returns an empty registry when none exists yet.
  * @atomicity atomic (read-only).
+ * @see list_registry_edges
  * @see define_canonical_entity
  * @see register_instance
  */
@@ -380,6 +393,7 @@ export const listRegistry: ToolHandler = async (args): Promise<ToolResult> => {
   const cwd = process.cwd()
   const typeFilter = args.type as string | undefined
   const includeInstances = (args.include_instances as boolean) ?? false
+  const includeEdges = (args.include_edges as boolean) ?? false
 
   const portfolioStore = await openPortfolioStoreIfExists(cwd)
   if (!portfolioStore) {
@@ -388,6 +402,7 @@ export const listRegistry: ToolHandler = async (args): Promise<ToolResult> => {
 
   const nodes = portfolioStore.listRegistryNodes(typeFilter)
   const crossEdges = portfolioStore.getAllCrossEdges()
+  const registryEdges = portfolioStore.listRegistryEdges()
 
   const byType: Record<string, number> = {}
   const rows = nodes.map((n) => {
@@ -401,6 +416,20 @@ export const listRegistry: ToolHandler = async (args): Promise<ToolResult> => {
     row.instance_count = instances.length
     if (includeInstances) {
       row.instances = instances.map((e) => ({ source: e.source, product_id: e.source_product_id }))
+    }
+    // Registry-internal edges on either endpoint. Counted always, attached on
+    // request: the count is what stops a zero `instance_count` reading as
+    // "nothing depends on this".
+    const ownEdges = registryEdges.filter((e) => e.source === n.id || e.target === n.id)
+    row.registry_edge_count = ownEdges.length
+    if (includeEdges) {
+      row.edges = ownEdges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        direction: e.source === n.id ? 'outbound' : 'inbound',
+      }))
     }
     return row
   })
@@ -879,6 +908,90 @@ export const createRegistryEdge: ToolHandler = async (args): Promise<ToolResult>
         edge,
         source: { id: sourceId, type: source.type, title: source.title },
         target: { id: targetId, type: target.type, title: target.title },
+        portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+/**
+ * Enumerate the registry's internal edges — the read counterpart to
+ * `create_registry_edge`, which until now wrote edges nothing could read back.
+ *
+ * These edges live in `registry.edges` in the portfolio document and never touch
+ * a product graph, which is exactly why the product-scoped readers miss them:
+ * `export_edges` enumerates the ACTIVE PRODUCT's edges and returns an empty
+ * array for registry-only types, and an empty array that means *wrong scope* is
+ * indistinguishable from one that means *no such edges*. That ambiguity produced
+ * a migration plan against five canonicals reported as unreferenced while nine
+ * registry edges — including four `operating_stage_measured_by_metric` bridges
+ * carrying real modelling judgment — sat on them.
+ *
+ * Returns the same `{ id, source, target, type }` shape as `export_edges`,
+ * against the registry store instead of the product store, so a migration pass
+ * can consume both without reshaping. Endpoint ids are bare registry ids (not
+ * `registry/{id}`-qualified), matching how they are stored.
+ *
+ * Parameters:
+ * - `types`: filter to these catalog edge types (omit to enumerate all).
+ * - `endpoint_id`: filter to edges touching this registry node in EITHER
+ *   direction (bare or `registry/{id}`). The "what points at this canonical"
+ *   question.
+ * - `source_id` / `target_id`: filter by one endpoint in a fixed direction.
+ *
+ * @returns JSON: `{ edges: Array<{ id, source, target, type }>, total, by_type }`.
+ *   Returns an empty enumeration when no portfolio/registry exists yet.
+ * @atomicity atomic (read-only).
+ * @see create_registry_edge
+ * @see list_registry
+ * @see export_edges
+ */
+export const listRegistryEdges: ToolHandler = async (args): Promise<ToolResult> => {
+  const typesArg = args.types as unknown
+  let types: string[] | undefined
+  if (typesArg !== undefined && typesArg !== null) {
+    if (!Array.isArray(typesArg) || typesArg.some((t) => typeof t !== 'string')) {
+      return textError('`types` must be an array of strings (or omitted to enumerate all registry edges).')
+    }
+    types = typesArg as string[]
+  }
+
+  const endpointArg = args.endpoint_id as string | undefined
+  const sourceArg = args.source_id as string | undefined
+  const targetArg = args.target_id as string | undefined
+
+  const cwd = process.cwd()
+  const portfolioStore = await openPortfolioStoreIfExists(cwd)
+  if (!portfolioStore) {
+    return text(JSON.stringify({ edges: [], total: 0, by_type: {} }, null, 2))
+  }
+
+  const endpointId = endpointArg ? bareCanonicalId(endpointArg) : undefined
+  const sourceId = sourceArg ? bareCanonicalId(sourceArg) : undefined
+  const targetId = targetArg ? bareCanonicalId(targetArg) : undefined
+
+  const filtered = portfolioStore.listRegistryEdges().filter((e) => {
+    if (types && types.length > 0 && !types.includes(e.type)) return false
+    if (endpointId && e.source !== endpointId && e.target !== endpointId) return false
+    if (sourceId && e.source !== sourceId) return false
+    if (targetId && e.target !== targetId) return false
+    return true
+  })
+
+  const byType: Record<string, number> = {}
+  const edges = filtered.map((e) => {
+    byType[e.type] = (byType[e.type] ?? 0) + 1
+    return { id: e.id, source: e.source, target: e.target, type: e.type }
+  })
+
+  return text(
+    JSON.stringify(
+      {
+        edges,
+        total: edges.length,
+        by_type: byType,
         portfolio_file: path.relative(cwd, portfolioStore.getFilePath() ?? ''),
       },
       null,

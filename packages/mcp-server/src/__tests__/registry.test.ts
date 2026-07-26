@@ -31,12 +31,13 @@ import {
   batchRegisterInstance,
   promoteToCanonical,
   createRegistryEdge,
+  listRegistryEdges,
   deleteCanonicalEntity,
   mergeCanonicalEntities,
 } from '../tools/registry.js'
 import { createCrossProductEdge, linkAreaToAudience, switchProduct } from '../tools/workspace.js'
 import { getNode, getNodes } from '../tools/nodes.js'
-import { createEdge } from '../tools/edges.js'
+import { createEdge, exportEdges } from '../tools/edges.js'
 import { portfolioValidate } from '../tools/portfolio-read.js'
 
 function doc(over: Partial<UPGDocument> & { product: UPGDocument['product'] }): UPGDocument {
@@ -654,6 +655,143 @@ describe('canonical registry (0.9.6)', () => {
     expect(body.edge.target).toBe('classification_value_oss_self_host')
     const pf = readPortfolio() as { registry?: { edges?: Array<{ type: string }> } }
     expect(pf.registry?.edges?.map((e) => e.type)).toContain('classification_axis_includes_classification_value')
+  })
+
+  // ── registry-edge READ path (0.25.1, feedback: write path with no read path) ──
+  //
+  // The regression these guard: `create_registry_edge` wrote edges that no tool
+  // read back, so a canonical held in place by registry-internal edges reported
+  // `instance_count: 0` and read as "safe to retire". A migration planned on that
+  // number silently drops whatever the invisible edges encoded.
+
+  it('list_registry_edges enumerates registry.edges in export_edges shape', async () => {
+    const ctx = await withSpecAndOrg()
+    await createRegistryEdge(
+      { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+      ctx,
+    )
+    const body = bodyOf(await listRegistryEdges({}, ctx))
+    expect(body.total).toBe(1)
+    expect(body.edges[0]).toMatchObject({
+      source: 'specification_upg',
+      target: 'organization_arkheiev',
+      type: 'specification_governed_by_organization',
+    })
+    expect(body.edges[0].id).toBeTruthy()
+    expect(body.by_type).toEqual({ specification_governed_by_organization: 1 })
+  })
+
+  it('list_registry_edges returns an empty enumeration when no portfolio exists', async () => {
+    const ctx = await activeCtx()
+    const body = bodyOf(await listRegistryEdges({}, ctx))
+    expect(body).toMatchObject({ edges: [], total: 0 })
+  })
+
+  it('list_registry_edges filters by types and by endpoint in either direction', async () => {
+    const ctx = await withSpecAndOrg()
+    await batchDefineCanonicalEntity(
+      { entities: [{ type: 'primitive', title: 'Node', canonical_id: 'primitive_node' }] },
+      ctx,
+    )
+    await createRegistryEdge(
+      { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+      ctx,
+    )
+    await createRegistryEdge(
+      { source_id: 'primitive_node', target_id: 'specification_upg', type: 'primitive_defined_by_specification' },
+      ctx,
+    )
+
+    expect(bodyOf(await listRegistryEdges({ types: ['primitive_defined_by_specification'] }, ctx)).total).toBe(1)
+
+    // `specification_upg` is the SOURCE of one edge and the TARGET of the other;
+    // endpoint_id must catch both, which is the "what points at this canonical" question.
+    expect(bodyOf(await listRegistryEdges({ endpoint_id: 'specification_upg' }, ctx)).total).toBe(2)
+    expect(bodyOf(await listRegistryEdges({ source_id: 'specification_upg' }, ctx)).total).toBe(1)
+    expect(bodyOf(await listRegistryEdges({ target_id: 'specification_upg' }, ctx)).total).toBe(1)
+
+    // Qualified ids resolve the same as bare ones.
+    expect(bodyOf(await listRegistryEdges({ endpoint_id: 'registry/specification_upg' }, ctx)).total).toBe(2)
+  })
+
+  it('list_registry_edges rejects a malformed types filter', async () => {
+    const ctx = await withSpecAndOrg()
+    expect(errOf(await listRegistryEdges({ types: 'not_an_array' }, ctx))).toMatch(/must be an array of strings/i)
+  })
+
+  it('list_registry carries registry_edge_count so instance_count: 0 cannot read as unreferenced', async () => {
+    const ctx = await withSpecAndOrg()
+    await createRegistryEdge(
+      { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+      ctx,
+    )
+    const rows = bodyOf(await listRegistry({}, ctx)).registry as Array<Record<string, unknown>>
+    const spec = rows.find((r) => r.id === 'specification_upg')!
+    // The exact shape of the original defect: no product instances, but NOT unreferenced.
+    expect(spec.instance_count).toBe(0)
+    expect(spec.registry_edge_count).toBe(1)
+    // Not requested, so not attached.
+    expect(spec.edges).toBeUndefined()
+  })
+
+  it('list_registry include_edges attaches registry-internal edges with direction', async () => {
+    const ctx = await withSpecAndOrg()
+    await createRegistryEdge(
+      { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+      ctx,
+    )
+    const rows = bodyOf(await listRegistry({ include_edges: true }, ctx)).registry as Array<Record<string, unknown>>
+    const spec = rows.find((r) => r.id === 'specification_upg')!
+    const org = rows.find((r) => r.id === 'organization_arkheiev')!
+    expect((spec.edges as Array<Record<string, unknown>>)[0].direction).toBe('outbound')
+    expect((org.edges as Array<Record<string, unknown>>)[0].direction).toBe('inbound')
+  })
+
+  it('get_node on a registry/{id} attaches registry-internal edges, not just instances', async () => {
+    const ctx = await withSpecAndOrg()
+    await createRegistryEdge(
+      { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+      ctx,
+    )
+    const body = bodyOf(await getNode({ node_id: 'registry/specification_upg' }, ctx))
+    expect(body.registry).toBe(true)
+    expect(body.instance_count).toBe(0)
+    expect(body.registry_edge_count).toBe(1)
+    expect(body.registry_edges[0]).toMatchObject({
+      target: 'organization_arkheiev',
+      direction: 'outbound',
+    })
+  })
+
+  it('get_node on a BARE registry id names the scope mismatch instead of saying not found', async () => {
+    const ctx = await withSpecAndOrg()
+    const err = errOf(await getNode({ node_id: 'specification_upg' }, ctx))
+    expect(err).toMatch(/registry canonical/i)
+    expect(err).toMatch(/registry\/specification_upg/)
+    // The old answer read as *does not exist*; it must not be the answer any more.
+    expect(err).not.toMatch(/^Node not found/)
+  })
+
+  it('get_node still reports a genuinely absent id as not found', async () => {
+    const ctx = await withSpecAndOrg()
+    expect(errOf(await getNode({ node_id: 'nothing_anywhere' }, ctx))).toMatch(/Node not found/i)
+  })
+
+  it('export_edges stays product-scoped but names the registry edges it did not return', async () => {
+    const ctx = await withSpecAndOrg()
+    await createRegistryEdge(
+      { source_id: 'specification_upg', target_id: 'organization_arkheiev', type: 'specification_governed_by_organization' },
+      ctx,
+    )
+    const body = bodyOf(
+      await exportEdges({ types: ['specification_governed_by_organization'] }, ctx),
+    )
+    // Contract unchanged: the product store is what was enumerated.
+    expect(body.edges).toEqual([])
+    expect(body.total).toBe(0)
+    // But the empty array is no longer the whole answer.
+    expect(body._registry_scope_note.registry_edge_count).toBe(1)
+    expect(body._registry_scope_note.message).toMatch(/list_registry_edges/)
   })
 
   // ── portfolio_validate foundations anti-patterns (0.9.13, scope:'portfolio') ──

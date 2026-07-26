@@ -88,6 +88,7 @@ import {
   batchRegisterInstance,
   promoteToCanonical,
   createRegistryEdge,
+  listRegistryEdges,
   deleteCanonicalEntity,
   mergeCanonicalEntities,
 } from '../tools/registry.js'
@@ -1539,12 +1540,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'list_registry',
     description:
-      'List the canonical shared entities in the portfolio registry. Each row carries id, type, title, optional audience_role, and instance_count. With `include_instances`, attaches the product instances (the `instance_of` edges) pointing at each canonical. Empty when no registry exists yet.',
+      'List the canonical shared entities in the portfolio registry. Each row carries id, type, title, optional audience_role, and TWO counts that answer different questions: `instance_count` (inbound `instance_of` edges from PRODUCT graphs) and `registry_edge_count` (the registry\'s own internal edges on either endpoint, written by `create_registry_edge`). A canonical with `instance_count: 0` is NOT necessarily unreferenced, so check `registry_edge_count` before treating one as safe to retire or re-point. With `include_instances` / `include_edges`, attaches the instances / registry-internal edges themselves. Empty when no registry exists yet.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         type: { type: 'string', description: 'Filter to one entity type (e.g. persona).' },
         include_instances: { type: 'boolean', description: 'Attach each canonical\'s product instances (default false).' },
+        include_edges: { type: 'boolean', description: 'Attach each canonical\'s registry-internal edges, each tagged inbound/outbound (default false).' },
       },
     },
   },
@@ -1672,6 +1674,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         type: { type: 'string', description: 'A UPG_EDGE_CATALOG edge type whose endpoint types match the two registry nodes (see resolve_edge_for_pair).' },
       },
       required: ['source_id', 'target_id', 'type'],
+    },
+  },
+  {
+    name: 'list_registry_edges',
+    description:
+      'Enumerate the registry\'s INTERNAL edges: the read counterpart to `create_registry_edge`. These edges live in `registry.edges` in the portfolio document and never touch a product graph, which is why the product-scoped readers miss them. `export_edges` enumerates the ACTIVE PRODUCT\'s edges and returns an empty array for registry-only types, and an empty array meaning *wrong scope* is indistinguishable from one meaning *no such edges*. Ask this tool "what points at this canonical" before planning any migration that retires or re-points registry entities, because `list_registry`\'s `instance_count` counts only inbound `instance_of` edges from product graphs, not these. Returns the same `{ id, source, target, type }` shape as `export_edges`, with bare (unqualified) registry endpoint ids.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        types: { type: 'array', items: { type: 'string' }, description: 'Filter to these catalog edge types (omit to enumerate all registry edges).' },
+        endpoint_id: { type: 'string', description: 'Filter to edges touching this registry node in EITHER direction (bare or registry/{id}).' },
+        source_id: { type: 'string', description: 'Filter to edges leaving this registry node (bare or registry/{id}).' },
+        target_id: { type: 'string', description: 'Filter to edges arriving at this registry node (bare or registry/{id}).' },
+      },
     },
   },
   {
@@ -2082,6 +2098,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   batch_register_instance: batchRegisterInstance,
   promote_to_canonical: promoteToCanonical,
   create_registry_edge: createRegistryEdge,
+  list_registry_edges: listRegistryEdges,
   delete_canonical_entity: deleteCanonicalEntity,
   merge_canonical_entities: mergeCanonicalEntities,
   portfolio_query: portfolioQuery,

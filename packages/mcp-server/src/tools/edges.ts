@@ -6,7 +6,7 @@
 
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
-import { edgeId } from '@unified-product-graph/sdk'
+import { edgeId, openPortfolioStoreIfExists } from '@unified-product-graph/sdk'
 import type { UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
 import { UPG_EDGE_CATALOG, UPG_EDGE_TYPES, resolveContainmentEdge, validateEdgeProperties } from '@unified-product-graph/core'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
@@ -671,7 +671,7 @@ export const repairDanglingEdges: ToolHandler = (args, ctx): ToolResult => {
  * @see query
  * @see list_nodes
  */
-export const exportEdges: ToolHandler = (args, ctx): ToolResult => {
+export const exportEdges: ToolHandler = async (args, ctx): Promise<ToolResult> => {
   const { store } = ctx
   const ifChangedSince = args.if_changed_since as string | undefined
   const currentHash = store.getContentHash()
@@ -728,6 +728,37 @@ export const exportEdges: ToolHandler = (args, ctx): ToolResult => {
   // contract; merge as a side-channel via Object.assign through unknown.
   const wireResponse: Record<string, unknown> = { ...response }
   if (guardOutcome.kind === 'warn') Object.assign(wireResponse, guardOutcome.fields)
+
+  // Registry-scope note (feedback: registry-edge read path). This tool is
+  // PRODUCT-scoped by contract and stays that way — migration passes depend on
+  // knowing exactly which store they enumerated, so quietly folding in registry
+  // edges would break the callers this tool exists to serve. What it must not do
+  // is stay silent: an empty (or short) result that means *wrong scope* is
+  // otherwise indistinguishable from one that means *no such edges*. When the
+  // portfolio registry holds internal edges matching this call's type filter, say
+  // so and name the tool that reads them.
+  try {
+    const portfolioStore = await openPortfolioStoreIfExists(process.cwd())
+    if (portfolioStore) {
+      const registryMatches = portfolioStore
+        .listRegistryEdges()
+        .filter((e) => !types || types.length === 0 || types.includes(e.type))
+      if (registryMatches.length > 0) {
+        const byType: Record<string, number> = {}
+        for (const e of registryMatches) byType[e.type] = (byType[e.type] ?? 0) + 1
+        wireResponse._registry_scope_note = {
+          message:
+            `${registryMatches.length} registry-internal edge(s) also match this filter and are NOT included: ` +
+            `export_edges enumerates the ACTIVE PRODUCT only. Read them with \`list_registry_edges\`.`,
+          registry_edge_count: registryMatches.length,
+          by_type: byType,
+        }
+      }
+    }
+  } catch {
+    // A missing or unreadable portfolio is not an error for a product-scoped
+    // read; the note is advisory and its absence must never fail the export.
+  }
 
   return text(JSON.stringify(wireResponse, null, 2))
 }
