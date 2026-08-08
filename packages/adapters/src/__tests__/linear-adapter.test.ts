@@ -209,16 +209,30 @@ describe('LinearAdapter: status normalisation (validated against the target life
     expect(result.nodes[0].status).toBeUndefined()
   })
 
-  it('"Cancelled" on a task is omitted (archived is not a task phase)', async () => {
+  it('"Cancelled" on a task maps to the cancelled phase (0.25.1: WORK_ITEM gained the off-ramp)', async () => {
     const result = await adapter.convert([makeIssue('i-1', 'Cancelled', undefined, { state: 'Cancelled' })])
-    expect(result.nodes[0].status).toBeUndefined()
+    expect(result.nodes[0].status).toBe('cancelled')
+  })
+
+  it('"Canceled" (Linear\'s default US spelling) on a task also maps to cancelled', async () => {
+    const result = await adapter.convert([makeIssue('i-1', 'Canceled', undefined, { state: 'Canceled' })])
+    expect(result.nodes[0].status).toBe('cancelled')
+  })
+
+  it('"Canceled" on a bug falls back through the cancel family to closed', async () => {
+    const result = await adapter.convert([
+      makeIssue('i-1', 'Canceled', undefined, { state: 'Canceled', issue_type: 'Bug' }),
+    ])
+    expect(result.nodes[0].type).toBe('bug')
+    expect(result.nodes[0].status).toBe('closed')
   })
 
   it('normalizeLinearStatus maps to UPG delivery phase ids', () => {
     expect(normalizeLinearStatus('Done')).toBe('done')
     expect(normalizeLinearStatus('Backlog')).toBe('proposed')
     expect(normalizeLinearStatus('In Progress')).toBe('in_progress')
-    expect(normalizeLinearStatus('Cancelled')).toBe('archived')
+    expect(normalizeLinearStatus('Cancelled')).toBe('cancelled')
+    expect(normalizeLinearStatus('Canceled')).toBe('cancelled')
     expect(normalizeLinearStatus('Todo')).toBe('todo')
   })
 })

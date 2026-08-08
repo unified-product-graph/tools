@@ -68,10 +68,11 @@ const LINEAR_ENTITY_TYPE_MAP: Record<string, string | null> = {
  * lowercase substring to handle common naming variants.
  *
  * Spec normalisation:
- * - "Backlog" / "Triage" → draft
- * - "Todo" / "In Progress" → active
- * - "Done" / "Completed" → complete
- * - "Cancelled" → abandoned
+ * - "Backlog" / "Triage" → proposed
+ * - "In Progress" / "Started" → in_progress
+ * - "Done" / "Completed" → done
+ * - "Cancelled" / "Canceled" → cancelled (Linear's default states use the
+ *   US spelling; the spec phase id is `cancelled`)
  */
 export function normalizeLinearStatus(state: string): string {
   const lower = state.toLowerCase().trim()
@@ -80,10 +81,19 @@ export function normalizeLinearStatus(state: string): string {
   if (lower === 'backlog' || lower === 'triage' || lower.includes('backlog') || lower.includes('triage')) return 'proposed'
   if (lower === 'in progress' || lower === 'started' || lower.includes('progress') || lower.includes('started')) return 'in_progress'
   if (lower === 'done' || lower === 'completed' || lower.includes('done') || lower.includes('complet')) return 'done'
-  if (lower === 'cancelled' || lower === 'canceled' || lower.includes('cancel')) return 'archived'
+  if (lower === 'cancelled' || lower === 'canceled' || lower.includes('cancel')) return 'cancelled'
   if (lower === 'todo' || lower === 'to do' || lower.includes('todo')) return 'todo'
   return lower
 }
+
+/**
+ * Per-lifecycle stand-ins for the cancel family. `cancelled` is the canonical
+ * phase id (WORK_ITEM family: task, epic, deliverable, …), but lifecycles that
+ * predate it spell their won't-do off-ramp differently — try those in order so
+ * a Linear "Canceled" still lands on the closest valid phase (feature →
+ * archived, bug → closed, investigation → abandoned).
+ */
+const CANCEL_FALLBACKS = ['archived', 'closed', 'wont_fix', 'abandoned'] as const
 
 /** Valid status values for a UPG entity type, or null when lifecycle-free. */
 function validStatusesForType(type: string): ReadonlySet<string> | null {
@@ -108,7 +118,11 @@ function resolveLinearStatusForType(rawState: string, upgType: string): string |
   const raw = rawState.toLowerCase().trim()
   if (valid.has(raw)) return raw
   const normalised = normalizeLinearStatus(rawState)
-  return valid.has(normalised) ? normalised : undefined
+  if (valid.has(normalised)) return normalised
+  if (normalised === 'cancelled') {
+    for (const alias of CANCEL_FALLBACKS) if (valid.has(alias)) return alias
+  }
+  return undefined
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
