@@ -181,12 +181,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: npx @unified-product-graph/cli@latest fmt --check .upg/*.upg
       - run: npx @unified-product-graph/cli@latest health --min-score=50
       - run: npx @unified-product-graph/cli@latest verify --no-orphans --max-orphan-rate=0.15
       - run: npx @unified-product-graph/cli@latest diff --since=origin/main --summary
 ```
 
 Governance commands read the `.upg` file directly. CI runs skip MCP setup.
+
+### Branching and merging `.upg` files
+
+Branch and merge them like any other file in the repo. `upg fmt` gives every
+writer byte-identical output, so diffs stay small and conflicts land on the
+entities that actually changed.
+
+The `$upg` header at the top of the file is **derived data** — element counts
+and a checksum over the body. On a header conflict, take either side; `upg fmt`
+recomputes both from the body it writes.
+
+Worth knowing: the dangerous merge is the one with *no* conflict. If two
+branches each add an entity, git merges the bodies cleanly but sees the same
+`"nodes": 41 → 42` header change on both sides and applies it once, leaving a
+file that declares 42 while holding 43. Nothing is lost, but the header is now
+lying. `upg fmt` reseals it, and `upg fmt --check` is what catches it in CI —
+which is why the recipe above runs it first.
 
 ### Git hook (pre-commit)
 

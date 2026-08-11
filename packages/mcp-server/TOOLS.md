@@ -2826,7 +2826,8 @@ Walk the loaded graph and return a per-class, per-node report of schema drift pl
 
 JSON: `{ valid, structurally_valid?, summary, entity_drift?,
 edge_drift?, property_drift?, top_level_drift?, lifecycle_drift?,
-self_referential?, anti_pattern_violations?, notes?, _hash }`. Per-class
+self_referential?, counts_drift?, integrity_drift?, header_seal_note?,
+anti_pattern_violations?, notes?, _hash }`. Per-class
 drift arrays appear only when the requested `scope` includes that class.
 Each array is capped at `limit` (default 100). `structurally_valid` is
 omitted when `skip_drift: true`.
@@ -2843,6 +2844,11 @@ violations fired — it conflates structure and product-health. For a pure
 spec-conformance check read `structurally_valid` (or set
 `skip_anti_patterns: true`, which makes `valid` track structure alone).
 `skip_drift: true` gives a catalog-only run and omits `structurally_valid`.
+- `counts_drift` / `integrity_drift` describe the `.upg` file ON DISK,
+not the in-memory graph — they re-read the file and compare its header to
+its own body. Unsaved writes therefore never show up as seal drift (the
+last-written file is still self-consistent), and a seal defect is repaired
+by `upg fmt`, not by any of the `migrate_*` tools.
 
 **Examples:**
 
@@ -2894,6 +2900,17 @@ spec-conformance check read `structurally_valid` (or set
     { "anti_pattern_id": "features-without-hypotheses", "severity": "high", "remediation": "Add hypothesis_claim nodes linked to features via feature_tests_hypothesis" }
   ],
   "_hash": "sha256-abc123"
+}
+
+// A graph whose header no longer matches its body (the classic bad git merge)
+// Input:
+{ "scope": "counts_drift" }
+// Output (truncated):
+{
+  "valid": false,
+  "structurally_valid": false,
+  "summary": { "counts_drift": 1, "scope": "counts_drift" },
+  "counts_drift": [ { "field": "nodes", "declared": 1274, "actual": 1275 } ]
 }
 
 **See also:** `migrate_type`, `migrate_properties`, `rename_edge_type`, `get_anti_pattern_violations_for`, `list_anti_patterns`, `list_type_migrations`, `list_edge_migrations`, `inspect`

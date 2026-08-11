@@ -31,9 +31,13 @@ import {
   walkMigrationChainToCanonical,
   migrateStatusValue,
   validateEdgeProperties,
+  checkHeaderSealText,
   type UPGAntiPatternSeverity,
   type UPGProductStage,
+  type UPGHeaderCountsMismatch,
+  type UPGHeaderIntegrityMismatch,
 } from '@unified-product-graph/core'
+import { readFileSync } from 'node:fs'
 import type { UPGSplitMigration, UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
@@ -84,6 +88,8 @@ type LocalScope =
   | 'edge_type_pair_drift'
   | 'graph_topology_self_loops'
   | 'property_type_drift'
+  | 'counts_drift'
+  | 'integrity_drift'
 
 const SCOPES: readonly LocalScope[] = [
   'all',
@@ -96,6 +102,8 @@ const SCOPES: readonly LocalScope[] = [
   'edge_type_pair_drift',
   'graph_topology_self_loops',
   'property_type_drift',
+  'counts_drift',
+  'integrity_drift',
 ] as const
 type Scope = LocalScope
 
@@ -134,6 +142,14 @@ interface PropertyTypeDriftEntry {
   actual_type: string
   reason: string
 }
+
+// Header-seal drift classes (feedback 1bb903bf). Unlike every other class here,
+// these two describe the on-disk ARTIFACT rather than the loaded graph: they ask
+// whether the `.upg` file's `$upg` header is true to that same file's body.
+// Entry shapes come straight from the spec-side checker so the MCP surface and
+// `upg verify` can never describe the same defect two different ways.
+type CountsDriftEntry = UPGHeaderCountsMismatch
+type IntegrityDriftEntry = UPGHeaderIntegrityMismatch
 
 //: polymorphic upgrade hints (opt-in via include_polymorphic_upgrades).
 // One entry per polymorphic edge that has a typed alternative for its
@@ -198,12 +214,26 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  *     that has a more-specific typed alternative for its actual source/target
  *     pair. Advisory only; does not affect `valid`. Omitted by default.
  *
+ * Header-seal classes (feedback 1bb903bf) — the only two classes that judge the
+ * on-disk FILE rather than the loaded graph. `$upg.counts` and
+ * `$upg.integrity.body` are derived from the body at write time; these compare
+ * a file's header against that same file's body:
+ *   - `counts_drift` — a declared `$upg.counts` field disagrees with the actual
+ *     array length. Entries: `{ field, declared, actual }`.
+ *   - `integrity_drift` — the declared body checksum does not match a
+ *     recomputation. Entries: `{ algorithm, declared, computed }`.
+ * The reachable cause is an ordinary git merge: two branches each add a node,
+ * git merges the bodies cleanly but takes the identical `counts` hunk once, and
+ * the file silently declares one fewer node than it holds. `upg fmt` reseals
+ * both fields; `upg fmt --check` gates it in CI. Both classes are empty for
+ * legacy flat files, which declare no header to drift from.
+ *
  * Two top-level verdicts, on two different axes (N4):
- *   - `structurally_valid` — true iff EVERY schema-drift class is empty. This
- *     is the spec-conformance signal, independent of product-health linting.
- *     A well-formed graph that merely lacks a hypothesis is structurally
- *     valid. CI conformance gates should read THIS. Omitted when
- *     `skip_drift: true` (structure was not assessed).
+ *   - `structurally_valid` — true iff EVERY schema-drift class is empty,
+ *     header-seal classes included. This is the spec-conformance signal,
+ *     independent of product-health linting. A well-formed graph that merely
+ *     lacks a hypothesis is structurally valid. CI conformance gates should
+ *     read THIS. Omitted when `skip_drift: true` (structure was not assessed).
  *   - `valid` — true iff drift is empty AND no anti-pattern violations fired.
  *     A COMBINED structure-plus-health verdict; stricter than structural
  *     conformance. (Unchanged from prior behaviour.)
@@ -261,9 +291,22 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  *   "_hash": "sha256-abc123"
  * }
  *
+ * @example
+ * // A graph whose header no longer matches its body (the classic bad git merge)
+ * // Input:
+ * { "scope": "counts_drift" }
+ * // Output (truncated):
+ * {
+ *   "valid": false,
+ *   "structurally_valid": false,
+ *   "summary": { "counts_drift": 1, "scope": "counts_drift" },
+ *   "counts_drift": [ { "field": "nodes", "declared": 1274, "actual": 1275 } ]
+ * }
+ *
  * @returns JSON: `{ valid, structurally_valid?, summary, entity_drift?,
  *   edge_drift?, property_drift?, top_level_drift?, lifecycle_drift?,
- *   self_referential?, anti_pattern_violations?, notes?, _hash }`. Per-class
+ *   self_referential?, counts_drift?, integrity_drift?, header_seal_note?,
+ *   anti_pattern_violations?, notes?, _hash }`. Per-class
  *   drift arrays appear only when the requested `scope` includes that class.
  *   Each array is capped at `limit` (default 100). `structurally_valid` is
  *   omitted when `skip_drift: true`.
@@ -275,6 +318,11 @@ const VALID_SEVERITIES: ReadonlySet<UPGAntiPatternSeverity> = new Set([
  *   spec-conformance check read `structurally_valid` (or set
  *   `skip_anti_patterns: true`, which makes `valid` track structure alone).
  *   `skip_drift: true` gives a catalog-only run and omits `structurally_valid`.
+ * @warning `counts_drift` / `integrity_drift` describe the `.upg` file ON DISK,
+ *   not the in-memory graph — they re-read the file and compare its header to
+ *   its own body. Unsaved writes therefore never show up as seal drift (the
+ *   last-written file is still self-consistent), and a seal defect is repaired
+ *   by `upg fmt`, not by any of the `migrate_*` tools.
  * @see migrate_type
  * @see migrate_properties
  * @see rename_edge_type
@@ -416,6 +464,8 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   const graphTopologySelfLoops: GraphTopologySelfLoopEntry[] = []
   const propertyTypeDrift: PropertyTypeDriftEntry[] = []
   const polymorphicUpgradeHints: PolymorphicUpgradeHintEntry[] = []
+  const countsDrift: CountsDriftEntry[] = []
+  const integrityDrift: IntegrityDriftEntry[] = []
 
   // Node lookup for the new edge walks (built once).
   const nodeById = new Map<string, (typeof doc.nodes)[number]>()
@@ -868,6 +918,50 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     }
   }
 
+  // ── Header seal: counts_drift + integrity_drift (feedback 1bb903bf) ───────
+  //
+  // `$upg.counts` and `$upg.integrity.body` are derived data the serialiser
+  // stamps from the body it writes. Nothing ever read them back, so a `.upg`
+  // whose header had fallen out of step with its body passed every drift class
+  // clean. The reachable path is an ordinary git merge: two branches each append
+  // one node, git merges the bodies without conflict but takes the identical
+  // `"nodes": 1273 → 1274` header hunk once, and the merged file declares 1274
+  // while holding 1275. No conflict marker, no warning, a silently wrong graph.
+  //
+  // We check the FILE against ITSELF, re-reading it rather than comparing the
+  // header to the in-memory store. That is deliberate:
+  //
+  //   - Self-consistency is a property of the artifact. Asking "does this file's
+  //     header match this file's body?" has one right answer regardless of
+  //     session state, and it is the question a corrupted merge gets wrong.
+  //   - Comparing a load-time header against the LIVE store would misfire on
+  //     every unsaved edit — create a node and the counts legitimately differ.
+  //     There is no honest way to distinguish "stale seal" from "unflushed
+  //     write" on that axis, so we do not put the two on the same axis.
+  //   - The read is inert: no lock, no baseline update, no mtime write. It
+  //     cannot manufacture a CONFLICT, and a pending debounced save simply means
+  //     we assess the last-written file, which is itself self-consistent.
+  //
+  // A legacy flat file (no `$upg` block) declares nothing and so can drift in
+  // neither class — `checkHeaderSeal` reports both empty for it.
+  let headerSealNote: string | undefined
+  if (includes('counts_drift') || includes('integrity_drift')) {
+    try {
+      const raw = readFileSync(store.getFilePath(), 'utf-8')
+      const seal = checkHeaderSealText(raw)
+      if (includes('counts_drift')) countsDrift.push(...seal.counts_drift.slice(0, limit))
+      if (includes('integrity_drift')) integrityDrift.push(...seal.integrity_drift.slice(0, limit))
+      if (seal.skipped_reason) headerSealNote = seal.skipped_reason
+    } catch (err) {
+      // The file moved, was deleted, or stopped being JSON since load. That is
+      // worth SAYING rather than reporting as a clean seal — but it is also not
+      // header drift, so it must not silently flip the structural verdict.
+      headerSealNote =
+        `header seal not checked: could not re-read ${store.getFilePath()} ` +
+        `(${err instanceof Error ? err.message : String(err)}).`
+    }
+  }
+
   // ── Anti-pattern evaluation ─────────────────────────────────────
   // Pure evaluator over pre-computed inputs. The collector walks the store
   // once and returns the 7-field stats shape consumed by `evaluateAntiPatterns`.
@@ -936,6 +1030,8 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     propertyTypeDrift.length +
     polymorphicUpgradeHints.length +
     parityDivergence.length +
+    countsDrift.length +
+    integrityDrift.length +
     (antiPatternViolations?.length ?? 0)
   const guardOutcome = preflightPayload({
     toolName: 'validate_graph',
@@ -973,7 +1069,23 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     summary.property_drift === 0 &&
     edgeTypePairDrift.length === 0 &&
     graphTopologySelfLoops.length === 0 &&
-    propertyTypeDrift.length === 0
+    propertyTypeDrift.length === 0 &&
+    // Header seal (feedback 1bb903bf). These two DO gate `structurally_valid`,
+    // on the existing contract's own terms: it promises "every drift class is
+    // empty", and a header that lies about its body is not spec-shaped — the
+    // spec defines `$upg.counts` / `$upg.integrity` as derivations OF the body,
+    // so a file where the derivation no longer holds violates the format.
+    //
+    // Worth stating plainly, because it widens what the flag ranges over: every
+    // other class judges the loaded GRAPH, these two judge the FILE. A stale
+    // seal after a hand-merge is a different failure from a deprecated entity
+    // type — the graph content may be perfectly fine and only the header wrong.
+    // We fold them in anyway, because the CI conformance gate that reads
+    // `structurally_valid` is exactly the thing that must catch a corrupted
+    // merge, and a signal that stays green through one is worth little. The
+    // repair is also unusually cheap and total: `upg fmt` reseals both fields.
+    countsDrift.length === 0 &&
+    integrityDrift.length === 0
   const driftClean = skipDrift || structurallyClean
   // Anti-pattern gating is member-kind-profile-driven (0.17.0, supersedes the
   // hard-coded `watched` branch of spec #39). Only GATING violations — those whose
@@ -1028,6 +1140,8 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       edge_type_pair_drift: edgeTypePairDrift.length,
       graph_topology_self_loops: graphTopologySelfLoops.length,
       property_type_drift: propertyTypeDrift.length,
+      counts_drift: countsDrift.length,
+      integrity_drift: integrityDrift.length,
       polymorphic_upgrade_hints: includePolymorphicUpgrades ? polymorphicUpgradeHints.length : undefined,
       parity_divergence: parityDivergence.length > 0 ? parityDivergence.length : undefined,
     },
@@ -1039,6 +1153,9 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     property_type_drift?: PropertyTypeDriftEntry[]
     polymorphic_with_typed_alternative?: PolymorphicUpgradeHintEntry[]
     parity_divergence?: ParityDivergenceEntry[]
+    counts_drift?: CountsDriftEntry[]
+    integrity_drift?: IntegrityDriftEntry[]
+    header_seal_note?: string
   }
   if (!skipDrift) {
     if (includes('entity_drift')) response.entity_drift = entityDrift
@@ -1050,6 +1167,12 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     if (includes('edge_type_pair_drift')) response.edge_type_pair_drift = edgeTypePairDrift
     if (includes('graph_topology_self_loops')) response.graph_topology_self_loops = graphTopologySelfLoops
     if (includes('property_type_drift')) response.property_type_drift = propertyTypeDrift
+    if (includes('counts_drift')) response.counts_drift = countsDrift
+    if (includes('integrity_drift')) response.integrity_drift = integrityDrift
+    // Why a seal check was skipped (unrecognised format_version / algorithm, or
+    // an unreadable file). Surfaced only when there is something to say, so a
+    // normal clean run stays quiet.
+    if (headerSealNote) response.header_seal_note = headerSealNote
   }
   // Polymorphic upgrade hints are independent of skip_drift; they are advisory
   // suggestions, not schema-drift errors, and are controlled solely by
