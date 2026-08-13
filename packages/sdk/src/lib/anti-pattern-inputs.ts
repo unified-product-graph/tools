@@ -12,6 +12,8 @@ import {
   type AntiPatternInputs,
   type UPGProductStage,
   getDomainForType,
+  presenceExceptKey,
+  UPG_PRESENCE_EXCEPT_SPECS,
 } from '@unified-product-graph/core'
 import type { UPGFileStore } from '../store.js'
 
@@ -44,6 +46,25 @@ export function collectAntiPatternInputs(
   // Lets an anti-pattern key on a field nobody filled in: the evaluator derives
   // the absent count as countsByType - this, so absences are never enumerated.
   const countsByTypeAndPropertyPresence: Record<string, Record<string, number>> = {}
+  // type → presenceExceptKey(...) → count of nodes of that type CARRYING the
+  // property, counted only over nodes that do NOT declare the exemption
+  // (0.28.0). Driven by UPG_PRESENCE_EXCEPT_SPECS rather than by indexing every
+  // property pair, which would be quadratic in properties-per-node to serve the
+  // one detector that asks. One spec today, so this costs a handful of lookups
+  // per node.
+  const countsByTypeAndPropertyPresenceExcept: Record<string, Record<string, number>> = {}
+  // Seed every declared spec at zero BEFORE the walk. Without this, "no entry"
+  // would be ambiguous between "this collector predates the spec" and "no node
+  // matched", and the evaluator could not tell a stale collector from an honest
+  // zero. Seeded, an absent entry means exactly one thing: stale collector.
+  for (const spec of UPG_PRESENCE_EXCEPT_SPECS) {
+    let byKey = countsByTypeAndPropertyPresenceExcept[spec.entity_type]
+    if (!byKey) {
+      byKey = {}
+      countsByTypeAndPropertyPresenceExcept[spec.entity_type] = byKey
+    }
+    byKey[presenceExceptKey(spec.property, spec.except_property, spec.except_value)] = 0
+  }
   // Per-type → set of domain ids; collapsed to domainPopulation/domainCount.
   const domainsWithEntities = new Set<string>()
   const domainPopulation: Record<string, boolean> = {}
@@ -83,6 +104,19 @@ export function collectAntiPatternInputs(
           countsByTypeAndPropertyPresence[type] = presence
         }
         presence[k] = (presence[k] ?? 0) + 1
+      }
+
+      // Except-qualified presence (0.28.0). A node counts toward a spec only if
+      // it carries the property AND does not declare the exemption; the
+      // evaluator derives the absent-and-not-exempt figure from this.
+      for (const spec of UPG_PRESENCE_EXCEPT_SPECS) {
+        if (spec.entity_type !== type) continue
+        const value = props[spec.property]
+        if (typeof value !== 'string' || value.length === 0) continue
+        if (props[spec.except_property] === spec.except_value) continue
+        const byKey = countsByTypeAndPropertyPresenceExcept[type]!
+        const key = presenceExceptKey(spec.property, spec.except_property, spec.except_value)
+        byKey[key] = (byKey[key] ?? 0) + 1
       }
     }
 
@@ -125,6 +159,7 @@ export function collectAntiPatternInputs(
     countsByTypeAndStatus,
     countsByTypeAndProperty,
     countsByTypeAndPropertyPresence,
+    countsByTypeAndPropertyPresenceExcept,
     edgePresence,
     domainPopulation,
     totalEntityCount: nodes.length,
