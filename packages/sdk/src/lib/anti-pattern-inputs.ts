@@ -40,6 +40,10 @@ export function collectAntiPatternInputs(
   // filter an entity_count on a property value, e.g. metric where designation ==
   // 'north_star'. Built for every string-valued property; bounded by the data.
   const countsByTypeAndProperty: Record<string, Record<string, Record<string, number>>> = {}
+  // type → property key → count of nodes of that type CARRYING a value (0.27.0).
+  // Lets an anti-pattern key on a field nobody filled in: the evaluator derives
+  // the absent count as countsByType - this, so absences are never enumerated.
+  const countsByTypeAndPropertyPresence: Record<string, Record<string, number>> = {}
   // Per-type → set of domain ids; collapsed to domainPopulation/domainCount.
   const domainsWithEntities = new Set<string>()
   const domainPopulation: Record<string, boolean> = {}
@@ -72,6 +76,13 @@ export function collectAntiPatternInputs(
           byProp[k] = byVal
         }
         byVal[val] = (byVal[val] ?? 0) + 1
+
+        let presence = countsByTypeAndPropertyPresence[type]
+        if (!presence) {
+          presence = {}
+          countsByTypeAndPropertyPresence[type] = presence
+        }
+        presence[k] = (presence[k] ?? 0) + 1
       }
     }
 
@@ -113,6 +124,7 @@ export function collectAntiPatternInputs(
     countsByType,
     countsByTypeAndStatus,
     countsByTypeAndProperty,
+    countsByTypeAndPropertyPresence,
     edgePresence,
     domainPopulation,
     totalEntityCount: nodes.length,
