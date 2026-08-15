@@ -280,7 +280,7 @@ longer than 50, or any ID does not resolve.
 
 ### `batch_update_nodes`
 
-Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing.
+Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing; pass `unset_properties` per entry to remove keys rather than writing a literal null.
 
 **Atomicity:** `atomic. Validation pass rejects the entire batch before any
 mutation lands.`
@@ -294,8 +294,9 @@ mutation lands.`
 
 **Returns:**
 
-JSON: `{ updated, count, warnings? }`. `warnings` carries
-lifecycle-phase hints aggregated across the batch.
+JSON: `{ updated, count, unset?, warnings? }`. `unset` maps node id
+to the keys actually removed. `warnings` carries lifecycle-phase hints
+aggregated across the batch.
 
 **Throws:**
 
@@ -2737,7 +2738,7 @@ _Schema-drift detection, full per-node drift reports, and source-vs-deployed int
 
 ### `get_anti_pattern_violations_for`
 
-Reverse lookup: given an entity id, return anti-pattern violations whose `target_entities` include the entity's type. Use after `validate_graph` to drill into one entity's implicated patterns. Matches by entity type today; tightens to specific ids in a future revision. Underpins the Inspect approach.
+Reverse lookup: given an entity id, return the anti-pattern violations that implicate it. Use after `validate_graph` to drill into one entity's implicated patterns. Matches by node id where the detector can name nodes and by entity type otherwise; each violation carries `matched_by` saying which, so a type match can be read as the approximation it is. Underpins the Inspect approach.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -2749,7 +2750,8 @@ Reverse lookup: given an entity id, return anti-pattern violations whose `target
 
 **Returns:**
 
-JSON: `{ entity_id, type, violations: [...] }`.
+JSON: `{ entity_id, type, violations: [...] }`, each violation
+carrying `matched_by: 'node' | 'type'`.
 
 **Throws:**
 
@@ -2757,9 +2759,10 @@ JSON: `{ entity_id, type, violations: [...] }`.
 
 **Warnings (non-error surfaces):**
 
-- Phase 1 matches by entity TYPE, not specific id. Every entity of
-the same type shares the same violation set. Phase 1.x will tighten to
-per-id matching once `target_entities` carries ids.
+- A `matched_by: 'type'` violation is an approximation: the detector
+is a whole-graph check that cannot name nodes, so every entity of that type
+shares the result. Treat those as "worth looking at", and `matched_by:
+'node'` as "this entity specifically".
 
 **Examples:**
 

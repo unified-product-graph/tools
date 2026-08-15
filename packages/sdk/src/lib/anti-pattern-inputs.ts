@@ -13,9 +13,45 @@ import {
   type UPGProductStage,
   getDomainForType,
   presenceExceptKey,
+  edgeCountSpecKey,
+  entityFilterKey,
   UPG_PRESENCE_EXCEPT_SPECS,
+  UPG_EDGE_COUNT_SPECS,
+  UPG_ENTITY_FILTER_SPECS,
 } from '@unified-product-graph/core'
 import type { UPGFileStore } from '../store.js'
+
+/**
+ * Does this property value count as PRESENT for a per-node predicate?
+ *
+ * The general reading, and the one to reach for when asking a single node
+ * directly: only `undefined`, `null` and the empty string are absent.
+ * `capacity: 0` is a real cap (a reserved place) and `mutates_content: false`
+ * is a real answer, so neither is an omission. This also makes an explicitly
+ * unset property read as absent, which is exactly what clearing it intends.
+ *
+ * Pairs with `isStringPropertyPresent`, and the two exist separately on
+ * purpose: the aggregate indexes below can only see string values, so a
+ * predicate written against them has to agree with THAT, not with this. Naming
+ * both stops the next check author from copying whichever line they happened to
+ * read first.
+ */
+export function isPropertyPresent(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== ''
+}
+
+/**
+ * Does this property value count as present for the STRING-indexed aggregates?
+ *
+ * Narrower than `isPropertyPresent` by construction, not by oversight:
+ * `countsByTypeAndProperty` and `countsByTypeAndPropertyPresence` index string
+ * values only, so an attribution predicate that must agree with those counts
+ * has to apply the same restriction. Using the broad helper here would let an
+ * attributed id set disagree with the count that fired the violation.
+ */
+export function isStringPropertyPresent(value: unknown): boolean {
+  return typeof value === 'string' && value.length > 0
+}
 
 /**
  * Build the per-graph statistics consumed by `evaluateAntiPatterns`.
@@ -154,12 +190,128 @@ export function collectAntiPatternInputs(
     if (!connected.has(node.id)) orphanCount++
   }
 
+  // ── Per-node edge-count checks (0.29.0) ────────────────────────────────────
+  // The one input whose arithmetic is per-node rather than aggregate: for each
+  // declared spec, tally the edges on each node of the type and compare against
+  // that same node's numeric property. Driven by UPG_EDGE_COUNT_SPECS, so the
+  // cost is one pass over the relevant edges per declared spec (one today).
+  //
+  // Seeded at empty for every declared spec, for the same reason the
+  // except-presence map is: an absent key must mean "stale collector" and
+  // nothing else, so an honest zero is recorded as an empty array.
+  const nodesByEdgeCountSpec: Record<string, string[]> = {}
+  for (const spec of UPG_EDGE_COUNT_SPECS) {
+    const key = edgeCountSpecKey(spec)
+    const matched: string[] = []
+
+    // Tally this spec's edge type onto the endpoint the spec cares about.
+    const tally = new Map<string, number>()
+    for (const edge of edges) {
+      if (edge.type !== spec.edge_type) continue
+      const endpoint = spec.direction === 'outbound' ? edge.source : edge.target
+      if (typeById.get(endpoint) !== spec.entity_type) continue
+      tally.set(endpoint, (tally.get(endpoint) ?? 0) + 1)
+    }
+
+    for (const node of nodes) {
+      if ((node.type as string) !== spec.entity_type) continue
+      const props = (node as { properties?: Record<string, unknown> }).properties ?? {}
+
+      // Exemption first: an exempt node is not evaluated and not attributed.
+      if (
+        spec.except_property !== undefined &&
+        props[spec.except_property] === spec.except_value
+      ) {
+        continue
+      }
+
+      // Optional extra per-node presence requirement. Uses the BROAD reading:
+      // this is a question asked of one node directly, not a predicate that has
+      // to agree with a string-only aggregate.
+      if (spec.node_filter) {
+        if (isPropertyPresent(props[spec.node_filter.property]) !== spec.node_filter.present) {
+          continue
+        }
+      }
+
+      // Absent (or non-numeric) property falls back to the declared default.
+      // On `surface.capacity` that default is 1, which is what makes an
+      // unbounded surface with several occupants fire rather than escape.
+      const rawValue = props[spec.property]
+      const threshold =
+        typeof rawValue === 'number' && Number.isFinite(rawValue)
+          ? rawValue
+          : spec.property_absent_default
+
+      const count = tally.get(node.id) ?? 0
+      let hit = false
+      switch (spec.node_comparison) {
+        case 'gt':
+          hit = count > threshold
+          break
+        case 'gte':
+          hit = count >= threshold
+          break
+        case 'lt':
+          hit = count < threshold
+          break
+        case 'lte':
+          hit = count <= threshold
+          break
+        case 'eq':
+          hit = count === threshold
+          break
+      }
+      if (hit) matched.push(node.id)
+    }
+    nodesByEdgeCountSpec[key] = matched
+  }
+
+  // ── Attribution ids for declared entity-count filters (0.29.0) ─────────────
+  // Attribution ONLY. Every count above is untouched, so a bug here can cost a
+  // violation its node list but can never change a verdict.
+  const nodesByEntityFilter: Record<string, string[]> = {}
+  for (const spec of UPG_ENTITY_FILTER_SPECS) {
+    const key = entityFilterKey(spec.entity_type, spec.filter)
+    const matched: string[] = []
+    const f = spec.filter
+    for (const node of nodes) {
+      if ((node.type as string) !== spec.entity_type) continue
+      const props = (node as { properties?: Record<string, unknown> }).properties ?? {}
+
+      // Exhaustive over a CLOSED set. `kind` was resolved when the spec was
+      // derived, and an unrecognised shape threw there, so there is no silent
+      // skip branch here for a shape this collector was never taught: such a
+      // shape cannot reach a shipped build.
+      //
+      // These predicates use the STRING-only reading, because they must agree
+      // with the aggregate counts that decide whether the violation fires. An
+      // attributed id set that disagreed with its own count would be worse than
+      // no attribution.
+      switch (spec.kind) {
+        case 'presence':
+          if (isStringPropertyPresent(props[f.property as string]) !== f.present) continue
+          break
+        case 'value':
+          if (props[f.property as string] !== f.value) continue
+          break
+        case 'status':
+          if (node.status !== f.status) continue
+          break
+      }
+      matched.push(node.id)
+    }
+    nodesByEntityFilter[key] = matched
+  }
+
   return {
     countsByType,
     countsByTypeAndStatus,
     countsByTypeAndProperty,
     countsByTypeAndPropertyPresence,
     countsByTypeAndPropertyPresenceExcept,
+    nodesByEdgeCountSpec,
+    nodesByEntityFilter,
     edgePresence,
     domainPopulation,
     totalEntityCount: nodes.length,

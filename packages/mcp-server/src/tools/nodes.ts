@@ -1206,8 +1206,16 @@ export const batchCreateNodes: ToolHandler = (args, ctx): ToolResult => {
  * Update up to 50 entities in a single call. Unspecified fields are preserved.
  * Properties are merged with existing. Atomic: all succeed or all fail.
  *
- * @returns JSON: `{ updated, count, warnings? }`. `warnings` carries
- *   lifecycle-phase hints aggregated across the batch.
+ * Pass `unset_properties: ["key", ...]` on an entry to DELETE keys from that
+ * node (0.29.0), applied after the merge. Because the merge preserves
+ * unspecified keys, omitting a key never removes it; removal has to be asked
+ * for. Writing `{ key: null }` stores a literal null, which on a numeric
+ * property is a third state distinct from both a value and absence, so it is
+ * rarely what a caller means.
+ *
+ * @returns JSON: `{ updated, count, unset?, warnings? }`. `unset` maps node id
+ *   to the keys actually removed. `warnings` carries lifecycle-phase hints
+ *   aggregated across the batch.
  * @throws Returns a textError when `updates` is missing/non-array, the array
  *   is empty, longer than 50, or any item references a missing node.
  * @atomicity atomic. Validation pass rejects the entire batch before any
@@ -1245,6 +1253,7 @@ export const batchUpdateNodes: ToolHandler = (args, ctx): ToolResult => {
   const updatedNodes: Array<{ id: string; type: string; title: string; status?: string }> = []
   const updateWarnings: string[] = []
 
+  const unsetByNode: Record<string, string[]> = {}
   for (const u of updates) {
     const patch: Record<string, unknown> = {}
     if (u.title !== undefined) patch.title = u.title
@@ -1270,11 +1279,25 @@ export const batchUpdateNodes: ToolHandler = (args, ctx): ToolResult => {
     })
     for (const w of lengthWarnings) updateWarnings.push(`Node "${u.node_id}": ${w}`)
 
-    const updated = store.updateNode(u.node_id as string, patch)
+    let updated = store.updateNode(u.node_id as string, patch)
+    // 0.29.0: `unset_properties` reaches the batch path. It has worked on
+    // `update_node` since, and the asymmetry was invisible from the
+    // outside: a caller clearing one key per node across a graph had to fall
+    // back to writing literal nulls, which is a different state from absent and
+    // means something different again on a numeric property. Same semantics as
+    // the single-node path, applied AFTER the merge so one entry can set some
+    // keys and drop others.
+    const unsetArg = u.unset_properties
+    if (Array.isArray(unsetArg) && unsetArg.length > 0) {
+      const r = store.unsetNodeProperties(u.node_id as string, unsetArg as string[])
+      updated = r.node
+      if (r.removed.length > 0) unsetByNode[u.node_id as string] = r.removed
+    }
     updatedNodes.push({ id: updated.id, type: updated.type, title: updated.title, status: updated.status })
   }
 
   const batchUpdateResult: Record<string, unknown> = { updated: updatedNodes, count: updatedNodes.length }
+  if (Object.keys(unsetByNode).length > 0) batchUpdateResult.unset = unsetByNode
   if (updateWarnings.length > 0) batchUpdateResult.warnings = updateWarnings
   return text(JSON.stringify(batchUpdateResult, null, 2))
 }

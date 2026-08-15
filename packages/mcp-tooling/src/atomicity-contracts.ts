@@ -266,6 +266,18 @@ export interface ValidateGraphAntiPatternViolation {
    *  validation profile (0.17.0). false = reported but advisory. */
   gating?: boolean
   target_entities: string[]
+  /**
+   * The specific nodes this violation is about (0.29.0), when the fired
+   * condition could name them.
+   *
+   * Additive and optional: a consumer that ignores it behaves exactly as
+   * before, and a violation without it is not thereby about nothing. Most
+   * detectors here are whole-graph approximations of per-node rules, so they
+   * can report a problem without locating it; only per-node checks and declared
+   * filters attribute. Narrow work with this when it is present, and keep
+   * falling back to `target_entities` when it is not.
+   */
+  target_node_ids?: string[]
   description: string
   why_it_matters: string
   remediation: string

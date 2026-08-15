@@ -31,7 +31,7 @@ import type {
   UPGEntityType,
 } from '@unified-product-graph/core'
 import { createEdge, batchCreateEdges } from '../tools/edges.js'
-import { createNode, updateNode } from '../tools/nodes.js'
+import { createNode, updateNode, batchUpdateNodes } from '../tools/nodes.js'
 import { updateSessionContext } from '../tools/context.js'
 import {
   createSessionContext,
@@ -225,6 +225,97 @@ describe(' — update_node({ unset_properties }) removes the key', () => {
     expect(result.isError).toBeUndefined()
     const body = JSON.parse(result.content[0].text)
     expect(body.unset).toBeUndefined()
+  })
+})
+
+// ── 0.29.0: batch_update_nodes reaches the same affordance ───────────────────
+// The single↔batch asymmetry this file exists to catch, one more instance of
+// it. `unset_properties` has worked on update_node since and was
+// silently absent from the batch schema, so a caller clearing one key across
+// many nodes had to fall back to writing literal nulls. On a numeric property
+// that is a third state distinct from both a value and absence, which is how a
+// gap in a write path turns into wrong data rather than an error.
+describe('0.29.0 — batch_update_nodes({ unset_properties }) matches update_node', () => {
+  let store: UPGFileStore
+  let ctx: ToolContext
+  beforeEach(async () => {
+    store = await loadStore(
+      makeDoc(
+        [
+          {
+            ...node('surface_1', 'surface', 'Detail panel'),
+            properties: { capacity: 1, arbitration_rule: 'Most recent wins' },
+          },
+          {
+            ...node('surface_2', 'surface', 'Banner stack'),
+            properties: { capacity: 4, arbitration_rule: 'Priority order' },
+          },
+        ],
+        [],
+      ),
+    )
+    ctx = makeCtx(store)
+  })
+
+  it('removes keys per entry and reports what it removed', async () => {
+    const result = await dispatch(
+      batchUpdateNodes,
+      {
+        updates: [
+          { node_id: 'surface_1', unset_properties: ['capacity'] },
+          { node_id: 'surface_2', unset_properties: ['arbitration_rule'] },
+        ],
+      },
+      ctx,
+    )
+    expect(result.isError).toBeUndefined()
+    const body = JSON.parse(result.content[0].text)
+    expect(body.unset).toEqual({
+      surface_1: ['capacity'],
+      surface_2: ['arbitration_rule'],
+    })
+
+    const s1 = store.getNode('surface_1')!
+    const s2 = store.getNode('surface_2')!
+    // Removed, not nulled: the key is gone, which is what returns `capacity`
+    // to its documented ABSENT reading of unbounded.
+    expect(Object.prototype.hasOwnProperty.call(s1.properties!, 'capacity')).toBe(false)
+    expect(s1.properties!.arbitration_rule).toBe('Most recent wins')
+    expect(Object.prototype.hasOwnProperty.call(s2.properties!, 'arbitration_rule')).toBe(false)
+    expect(s2.properties!.capacity).toBe(4)
+  })
+
+  it('applies unset AFTER the merge within one entry, as the single path does', async () => {
+    const result = await dispatch(
+      batchUpdateNodes,
+      {
+        updates: [
+          {
+            node_id: 'surface_1',
+            properties: { composition_mode: 'exclusive' },
+            unset_properties: ['arbitration_rule'],
+          },
+        ],
+      },
+      ctx,
+    )
+    expect(result.isError).toBeUndefined()
+    const after = store.getNode('surface_1')!
+    expect(after.properties!.composition_mode).toBe('exclusive')
+    expect(Object.prototype.hasOwnProperty.call(after.properties!, 'arbitration_rule')).toBe(false)
+    expect(after.properties!.capacity).toBe(1)
+  })
+
+  it('ignores unknown keys without erroring the batch', async () => {
+    const result = await dispatch(
+      batchUpdateNodes,
+      { updates: [{ node_id: 'surface_1', unset_properties: ['does_not_exist'] }] },
+      ctx,
+    )
+    expect(result.isError).toBeUndefined()
+    const body = JSON.parse(result.content[0].text)
+    expect(body.unset).toBeUndefined()
+    expect(body.count).toBe(1)
   })
 })
 

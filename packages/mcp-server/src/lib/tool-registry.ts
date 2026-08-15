@@ -431,7 +431,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'batch_update_nodes',
     description:
-      'Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing.',
+      'Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing; pass `unset_properties` per entry to remove keys rather than writing a literal null.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -446,6 +446,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               status: { type: 'string' },
               tags: { type: 'array', items: { type: 'string' } },
               properties: { type: 'object', description: 'Merged with existing properties' },
+              unset_properties: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Property keys to DELETE from this node. Applied after the `properties` merge, so one entry can set some keys and drop others. Writing `{ key: null }` only stores a literal null; use this to actually remove a key. Unknown keys are ignored.',
+              },
             },
             required: ['node_id'],
           },
@@ -1049,7 +1054,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'get_anti_pattern_violations_for',
     description:
-      'Reverse lookup: given an entity id, return anti-pattern violations whose `target_entities` include the entity\'s type. Use after `validate_graph` to drill into one entity\'s implicated patterns. Matches by entity type today; tightens to specific ids in a future revision. Underpins the Inspect approach.',
+      'Reverse lookup: given an entity id, return the anti-pattern violations that implicate it. Use after `validate_graph` to drill into one entity\'s implicated patterns. Matches by node id where the detector can name nodes and by entity type otherwise; each violation carries `matched_by` saying which, so a type match can be read as the approximation it is. Underpins the Inspect approach.',
     inputSchema: {
       type: 'object' as const,
       properties: {

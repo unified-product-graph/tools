@@ -1005,6 +1005,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
         concern: v.concern,
         gating,
         target_entities: v.target_entities,
+        ...(v.target_node_ids ? { target_node_ids: v.target_node_ids } : {}),
         description: v.description,
         why_it_matters: v.why_it_matters,
         remediation: v.remediation,
@@ -1323,6 +1324,7 @@ function previewPendingDelta(
       name: v.name,
       severity: v.severity,
       target_entities: v.target_entities,
+      ...(v.target_node_ids ? { target_node_ids: v.target_node_ids } : {}),
       remediation: v.remediation,
     })),
   }
@@ -1333,11 +1335,13 @@ function previewPendingDelta(
 
 /**
  * Reverse-lookup helper: given an entity id, return the anti-pattern
- * violations whose `target_entities` include that entity's TYPE.
+ * violations that implicate it.
  *
- * Phase 1 keeps `target_entities` as type strings (see evaluator JSDoc), so
- * the lookup matches by type. Phase 1.x will promote to specific ids and the
- * matcher will tighten accordingly.
+ * Matching is per-id where the detector could name nodes (0.29.0) and per-type
+ * otherwise, with `matched_by` on each returned violation saying which. The
+ * distinction matters: a type match means every entity of that type gets the
+ * same answer, which is why a graph could once be modelled correctly and still
+ * show its whole roster as implicated.
  *
  * Use case: `/upg-show-entity <entity>` displays "this entity is implicated in
  * N violations." Tightens the Inspect approach.
@@ -1361,12 +1365,14 @@ function previewPendingDelta(
  *   ]
  * }
  *
- * @returns JSON: `{ entity_id, type, violations: [...] }`.
+ * @returns JSON: `{ entity_id, type, violations: [...] }`, each violation
+ *   carrying `matched_by: 'node' | 'type'`.
  * @throws textError when `entity_id` is missing or unknown.
  * @atomicity atomic (read-only)
- * @warning Phase 1 matches by entity TYPE, not specific id. Every entity of
- *   the same type shares the same violation set. Phase 1.x will tighten to
- *   per-id matching once `target_entities` carries ids.
+ * @warning A `matched_by: 'type'` violation is an approximation: the detector
+ *   is a whole-graph check that cannot name nodes, so every entity of that type
+ *   shares the result. Treat those as "worth looking at", and `matched_by:
+ *   'node'` as "this entity specifically".
  * @see validate_graph
  * @see list_anti_patterns
  * @see get_anti_pattern
@@ -1385,17 +1391,59 @@ export const getAntiPatternViolationsFor: ToolHandler = (args, ctx): ToolResult 
   const allViolations = evaluateAntiPatterns(inputs)
 
   const nodeType = node.type as string
-  const matched = allViolations.filter((v) => v.target_entities.includes(nodeType))
+  // 0.29.0: ids narrow the answer for the types they actually cover, and
+  // change nothing for the types they do not.
+  //
+  // Attribution is PARTIAL by nature. The contention detector names surfaces,
+  // never the features occupying them, even though `feature` is in
+  // `target_entities` because the condition references it. So "the violation
+  // names ids, therefore match by id alone" silently drops every feature that
+  // used to match, which is a reachability regression rather than precision.
+  //
+  // The rule that gives precision where precision exists, and costs nothing
+  // where it does not: work out which TYPES this violation actually attributed
+  // (by resolving its ids), and treat the id list as authoritative for those
+  // types only. Everything else keeps matching by type exactly as before.
+  //
+  //   surface (attributed)     → in the id list?  yes: matched. no: cleared.
+  //   feature (not attributed) → matches by type, as it always did.
+  //
+  // The clearing half is the point of the feature: 14 correctly-declared
+  // chained slots kept the entire surface roster lit, and no amount of correct
+  // modelling could clear it. The keeping half is what stops that fix from
+  // quietly making features unreachable.
+  const matched: Array<{ v: (typeof allViolations)[number]; matchedBy: 'id' | 'type' }> = []
+  for (const v of allViolations) {
+    const ids = v.target_node_ids ?? []
+    if (ids.includes(entityId)) {
+      matched.push({ v, matchedBy: 'id' })
+      continue
+    }
+    // Types this violation named at least one node of. Resolved through the
+    // store because a violation carries ids, not the types behind them.
+    const attributedTypes = new Set<string>()
+    for (const id of ids) {
+      const t = store.getNode(id)?.type as string | undefined
+      if (t) attributedTypes.add(t)
+    }
+    if (attributedTypes.has(nodeType)) continue // id list is authoritative here
+    if (v.target_entities.includes(nodeType)) matched.push({ v, matchedBy: 'type' })
+  }
 
   return text(
     JSON.stringify(
       {
         entity_id: entityId,
         type: nodeType,
-        violations: matched.map((v) => ({
+        violations: matched.map(({ v, matchedBy }) => ({
           anti_pattern_id: v.anti_pattern_id,
           name: v.name,
           severity: v.severity,
+          // How this violation reached this entity. `id` means the detector
+          // named this node specifically. `type` means it could only name the
+          // type, so the match is an approximation over every entity of that
+          // type and should be read as "worth looking at", not "at fault".
+          matched_by: matchedBy,
           why_it_matters: v.why_it_matters,
           remediation: v.remediation,
         })),
