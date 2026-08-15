@@ -480,6 +480,7 @@ Assemble a canonical tree pattern (ost, okr, user, product, validation, strategy
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `configuration` | object |  | Read ONE configuration instead of the union. Maps a configuration_axis (by node id, or by title when unambiguous) to a single one of its values. Surfaces absent under that value are dropped, composition edges qualified to other values are dropped, and edges left dangling go with them. An unknown axis or value is an error, never a silent no-op. Omit to read the union, which is the default and unchanged behaviour. |
 | `depth` | number |  | Max levels (default = the pattern natural depth; max 12). |
 | `from_id` | string |  | Explicit root node id; otherwise the pattern canonical anchor. |
 | `include_properties` | array |  | Node property keys to inline on each tree node. |
@@ -656,8 +657,9 @@ Traverse the graph following typed edges. Returns a subgraph (nodes + edges) in 
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `configuration` | object |  | Read ONE configuration instead of the union. Maps a configuration_axis (by node id, or by title when unambiguous) to a single one of its values. Surfaces absent under that value are dropped, composition edges qualified to other values are dropped, and edges left dangling go with them. An unknown axis or value is an error, never a silent no-op. Omit to read the union, which is the default and unchanged behaviour. |
 | `depth` | number |  | Max traversal depth (default 3, max 10) |
-| `diff_from` | string |  | Result ID from a previous query. Returns only added/removed nodes since that result. |
+| `diff_from` | string |  | Result ID from a previous query. Returns added/removed NODES, plus added/removed EDGES when `edge_include` asks for edges. Two calls that differ only by `configuration` therefore diff one configuration against another. |
 | `edge_include` | array |  | Edge fields to return: "id", "type", "source", "target". Empty array = no edges. Default: all fields. |
 | `from` | string |  | Start from all nodes of this type |
 | `from_id` | string |  | Start from a specific node ID (alternative to from) |
@@ -2815,12 +2817,13 @@ Walk the loaded graph and return a per-class, per-node report of schema drift pl
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `anti_pattern_ids` | array |  | Restrict anti-pattern evaluation to a subset of catalog ids (e.g. ["features-without-hypotheses"]). |
+| `configuration` | object |  | Evaluate ANTI-PATTERNS against one configuration instead of across the family. Maps a configuration_axis (by node id, or by title when unambiguous) to a single one of its values. Configuration drift is NOT narrowed: the declarations it checks are facts about the whole family, so they are always validated on the union, by design. Omit this and anti-patterns are still evaluated per projection automatically: findings true everywhere report unqualified, findings true in only some report annotated with where they hold, and findings true only of the superposed union are suppressed and counted. Rejected with an error alongside skip_anti_patterns: true, since it would then have no effect. |
 | `if_changed_since` | string |  | Hash from a previous response. Returns { changed: false } if graph unchanged. |
 | `include_polymorphic_upgrades` | boolean |  | When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only; omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions. |
 | `limit` | number |  | Max entries per class (default 100, max 1000) |
 | `pending_edges` | array |  | Pre-commit preview edges (paired with pending_nodes). Each item: `{ from, to, type? }`, where from/to is an existing node id OR a `$N` index into pending_nodes; type is inferred from endpoints when omitted. |
 | `pending_nodes` | array |  | Batch-4 #18 pre-commit preview: nodes you are ABOUT to create. When supplied (with/without pending_edges), validate_graph evaluates anti-patterns against the CURRENT graph PLUS this delta WITHOUT writing, and returns which violations the delta would newly trigger or resolve. Each item: `{ type, title?, status?, tags?, properties? }`. |
-| `scope` | `all` \| `entity_drift` \| `edge_drift` \| `property_drift` \| `top_level_drift` \| `lifecycle_drift` \| `self_referential` |  | Which drift class(es) to include in the response (default "all"). Counts in `summary` are always returned for every class. |
+| `scope` | `all` \| `entity_drift` \| `edge_drift` \| `property_drift` \| `top_level_drift` \| `lifecycle_drift` \| `self_referential` \| `configuration_drift` |  | Which drift class(es) to include in the response (default "all"). Counts in `summary` are always returned for every class. |
 | `severity` | `high` \| `medium` \| `low` |  | Filter anti-pattern violations to one severity tier. |
 | `skip_anti_patterns` | boolean |  | Skip anti-pattern evaluation. Only returns schema drift. |
 | `skip_drift` | boolean |  | Skip the schema-drift block. Only returns anti-pattern violations. |

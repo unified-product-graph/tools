@@ -12,6 +12,7 @@ import type { UPGFileStore } from '@unified-product-graph/sdk'
 import {
   TOOL_DEFINITIONS,
   getToolHandler,
+  rejectUnsupportedConfiguration,
 } from './lib/tool-registry.js'
 import {
   createSessionContext,
@@ -371,6 +372,12 @@ export function createDispatcher(ctx: ToolContext, opts: { logFile?: string } = 
       // The handler execution (+ active-product echo + log). Shared by the
       // direct path and the content-dedup path so both run identical logic.
       const exec = async (): Promise<CallResult> => {
+        // 0.30.0: a `configuration` argument on a tool that does not implement
+        // it is refused here rather than dropped. Enforced at dispatch so the
+        // guarantee covers every tool at once, including tools added later,
+        // instead of resting on each handler remembering to check.
+        const unsupported = rejectUnsupportedConfiguration(name, args)
+        if (unsupported) return textError(unsupported) as CallResult
         const handler = getToolHandler(name)
         let result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
         if (isActiveWrite && !result.isError) result = withActiveProductEcho(result, ctx.store)

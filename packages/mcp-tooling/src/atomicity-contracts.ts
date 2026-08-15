@@ -159,6 +159,27 @@ export type ValidateGraphScope =
   | 'top_level_drift'
   | 'lifecycle_drift'
   | 'self_referential'
+  | 'configuration_drift'
+
+/**
+ * One configuration-drift finding, surfaced by `validate_graph` (0.30.0).
+ *
+ * Contradictions inside the configuration declarations themselves: an axis that
+ * declares no values, a `present_under` naming a value the axis does not have,
+ * the `active_when` qualifier on an edge type it is not legal on, a declared
+ * alternation whose endpoints can both be present at once. Errors mean a
+ * projection of this graph cannot be trusted; the single warning
+ * (`orphaned_under_projection`) means the graph is coherent but one of its
+ * projections has a gap.
+ */
+export interface ValidateGraphConfigurationDrift {
+  kind: string
+  severity: 'error' | 'warning'
+  node_id?: string
+  edge_id?: string
+  axis_id?: string
+  message: string
+}
 
 export interface ValidateGraphSummary {
   /** UPG spec version the validation ran against. */
@@ -278,6 +299,16 @@ export interface ValidateGraphAntiPatternViolation {
    * falling back to `target_entities` when it is not.
    */
   target_node_ids?: string[]
+  /**
+   * The configurations this finding holds in (0.30.0).
+   *
+   * Present only when the graph declares configuration axes AND the finding is
+   * not universal. A finding true in every configuration reports unqualified,
+   * which is what keeps an unqualified graph's output identical to earlier
+   * releases. Absent therefore means "true everywhere, or this graph has no
+   * axes", never "true nowhere".
+   */
+  configurations?: Array<{ axis: string; value: string }>
   description: string
   why_it_matters: string
   remediation: string
@@ -335,6 +366,25 @@ export interface ValidateGraphResult {
   lifecycle_drift?: ValidateGraphLifecycleDrift[]
   self_referential?: ValidateGraphSelfReferential[]
   property_drift?: ValidateGraphPropertyDrift[]
+  /**
+   * Configuration-declaration contradictions (0.30.0). Emitted whenever the
+   * requested scope includes it, empty or not, like every sibling drift class.
+   * ERROR-severity entries gate `valid` and `structurally_valid`; the single
+   * warning class does not.
+   */
+  configuration_drift?: ValidateGraphConfigurationDrift[]
+  /**
+   * How many findings fired ONLY against the superposed union and in no single
+   * configuration (0.30.0). Those are artifacts of reading every configuration
+   * at once, so they are suppressed rather than reported; the count is here so
+   * the suppression is visible rather than silent.
+   */
+  suppressed_union_artifacts?: number
+  /**
+   * The configuration actually applied to this run, echoed back (0.30.0).
+   * Absent when the whole family was evaluated.
+   */
+  applied_configuration?: Record<string, string>
   /** Anti-pattern violations from `UPG_ANTI_PATTERNS`. */
   anti_pattern_violations?: ValidateGraphAntiPatternViolation[]
   /** Graph content hash. Supports the `if_changed_since` cache. */

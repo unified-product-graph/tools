@@ -9,6 +9,7 @@ import type { ToolHandler, ToolResult } from '../lib/server-context.js'
 import { text, textError } from '../lib/server-context.js'
 import { getTreePattern, UPG_TREE_PATTERNS } from '@unified-product-graph/core'
 import { assembleTree } from '../lib/tree-assemble.js'
+import { resolveConfiguration } from '../lib/configuration-view.js'
 
 /**
  * Assemble a canonical tree pattern from the active product graph, server-side.
@@ -59,7 +60,11 @@ export const getTree: ToolHandler = (args, ctx): ToolResult => {
     ? (args.include_properties as string[])
     : undefined
 
-  const result = assembleTree(ctx.store, pattern, {
+  const configResolution = resolveConfiguration(args.configuration, ctx.store)
+  if (configResolution.error) return textError(configResolution.error)
+  const treeReader = configResolution.reader ?? ctx.store
+
+  const result = assembleTree(treeReader, pattern, {
     from_id: args.from_id as string | undefined,
     depth: args.depth as number | undefined,
     include_properties: includeProperties,

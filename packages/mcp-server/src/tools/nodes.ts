@@ -51,6 +51,7 @@ import {
   renderPropertyTypeWarning,
 } from '@unified-product-graph/sdk'
 import { checkLengthCaps } from '@unified-product-graph/sdk'
+import { resolveConfiguration } from '../lib/configuration-view.js'
 
 // ── Unknown-property guard ─────────────────────────────────────────
 
@@ -541,7 +542,13 @@ export const searchNodes: ToolHandler = (args, ctx): ToolResult => {
  * @see get_area_graph
  */
 export const query: ToolHandler = (args, ctx): ToolResult => {
-  const { store, queryCache } = ctx
+  const { store: unprojectedStore, queryCache } = ctx
+  // 0.30.0: read one member of the configuration family instead of the union.
+  // Resolving to a projected READER rather than mutating anything keeps the
+  // union on disk untouched: a projection is a way of looking, never a write.
+  const configResolution = resolveConfiguration(args.configuration, unprojectedStore)
+  if (configResolution.error) return textError(configResolution.error)
+  const store = (configResolution.reader ?? unprojectedStore) as typeof unprojectedStore
   const fromType = args.from as string | undefined
   const fromId = args.from_id as string | undefined
   if (!fromType && !fromId)
@@ -746,7 +753,45 @@ export const query: ToolHandler = (args, ctx): ToolResult => {
     const currNodeIds = new Set(cacheEntry.nodes.map((n) => n.id))
     const added = projectedNodes.filter((n) => !prevNodeIds.has(n.id as string))
     const removed = prev.nodes.filter((n) => !currNodeIds.has(n.id))
-    response.diff = { added, removed, added_count: added.length, removed_count: removed.length }
+    const diff: Record<string, unknown> = {
+      added,
+      removed,
+      added_count: added.length,
+      removed_count: removed.length,
+    }
+
+    // 0.30.0: edge deltas, when the caller asked for edges at all.
+    //
+    // This is what makes two `query` calls that differ only by `configuration`
+    // a configuration DIFF, with no new tool. Node deltas alone answer "which
+    // surfaces exist differently" but not the case the field report opened
+    // with: an occupant that MOVES between rows while the rows and the occupant
+    // all persist. That difference is entirely in the edges.
+    //
+    // Gated on what the CALLER ASKED FOR, not on how many edges came back.
+    // `edge_include: []` means "do not send me edges", and reading that as
+    // "the edges are gone" reports every edge in the previous result as
+    // removed: a diff that invents a deletion from a display preference. The
+    // two states are only distinguishable from the argument, so the argument is
+    // what the gate reads.
+    const edgesExcluded = edgeInclude !== undefined && edgeInclude.length === 0
+    if (!edgesExcluded && (edgeArray.length > 0 || (prev.edges?.length ?? 0) > 0)) {
+      const prevEdgeIds = new Set((prev.edges ?? []).map((e) => e.id).filter(Boolean))
+      const currEdgeIds = new Set(cacheEntry.edges.map((e) => e.id).filter(Boolean))
+      const edgesAdded = edgeArray.filter(
+        (e) => e.id !== undefined && e.id !== '' && !prevEdgeIds.has(e.id as string),
+      )
+      const edgesRemoved = (prev.edges ?? []).filter(
+        (e) => e.id !== '' && !currEdgeIds.has(e.id),
+      )
+      if (edgesAdded.length > 0 || edgesRemoved.length > 0) {
+        diff.edges_added = edgesAdded
+        diff.edges_removed = edgesRemoved
+        diff.edges_added_count = edgesAdded.length
+        diff.edges_removed_count = edgesRemoved.length
+      }
+    }
+    response.diff = diff
   }
 
   queryCache.entries.set(resultId, cacheEntry)

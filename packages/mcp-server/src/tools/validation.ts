@@ -44,6 +44,12 @@ import { text, textError } from '../lib/server-context.js'
 import { preflightPayload } from '../lib/payload-guard.js'
 import { computeSchemaDriftSummary } from '@unified-product-graph/sdk'
 import { collectAntiPatternInputs } from '@unified-product-graph/sdk'
+import { resolveConfiguration } from '../lib/configuration-view.js'
+import {
+  checkConfigurationDrift,
+  enumerateProjections,
+  projectGraph,
+} from '@unified-product-graph/core'
 import { validateEdgeTypePair } from '@unified-product-graph/sdk'
 import { classifyProductKind } from '../lib/portfolio-kind.js'
 import { checkPropertyTypes } from '@unified-product-graph/sdk'
@@ -104,6 +110,7 @@ const SCOPES: readonly LocalScope[] = [
   'property_type_drift',
   'counts_drift',
   'integrity_drift',
+  'configuration_drift',
 ] as const
 type Scope = LocalScope
 
@@ -352,6 +359,12 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   }
 
   const scope = ((args.scope as string) ?? 'all') as Scope
+  // 0.30.0: an explicit configuration narrows the whole report to one member of
+  // the family. Without it, anti-patterns are still evaluated per projection
+  // (see below) and drift is checked on the union, which is where declarations
+  // live.
+  const explicitConfiguration = resolveConfiguration(args.configuration, store)
+  if (explicitConfiguration.error) return textError(explicitConfiguration.error)
   if (!SCOPES.includes(scope)) {
     return textError(
       `Unknown scope: "${scope}". Valid: ${SCOPES.join(', ')}.`,
@@ -361,6 +374,18 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
 
   const skipDrift = args.skip_drift === true
   const skipAntiPatterns = args.skip_anti_patterns === true
+
+  // `configuration` narrows the ANTI-PATTERN pass and nothing else, so asking
+  // for one while skipping anti-patterns asks for nothing. Refused rather than
+  // ignored, on the same bar the parameter sets for itself elsewhere: an
+  // argument that cannot take effect must never be silently accepted.
+  if (explicitConfiguration.reader && skipAntiPatterns) {
+    return textError(
+      '`configuration` narrows the anti-pattern pass, so it has no effect with `skip_anti_patterns: true`. ' +
+        'Drop one of the two. Configuration drift is checked on the union by design, because the declarations ' +
+        'it validates are facts about the whole configuration family rather than about any one member.',
+    )
+  }
   const includePolymorphicUpgrades = args.include_polymorphic_upgrades === true
 
   const severityArg = args.severity as string | undefined
@@ -466,6 +491,18 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   const polymorphicUpgradeHints: PolymorphicUpgradeHintEntry[] = []
   const countsDrift: CountsDriftEntry[] = []
   const integrityDrift: IntegrityDriftEntry[] = []
+  // Configuration drift (0.30.0). Computed from the spec's pure checker over
+  // the UNION: the declarations are facts about the whole configuration family,
+  // so they are checked once rather than once per projection. Returns an empty
+  // array for a graph that declares no axes, which is every graph written
+  // before this release.
+  const configurationDrift = skipDrift
+    ? []
+    : checkConfigurationDrift(
+        doc.nodes as unknown as Parameters<typeof checkConfigurationDrift>[0],
+        doc.edges as unknown as Parameters<typeof checkConfigurationDrift>[1],
+      )
+  const configurationDriftErrorCount = configurationDrift.filter((d) => d.severity === 'error').length
 
   // Node lookup for the new edge walks (built once).
   const nodeById = new Map<string, (typeof doc.nodes)[number]>()
@@ -971,6 +1008,10 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // kind when a non-product profile demoted at least one fired violation.
   let antiPatternGatingCount = 0
   let advisoryProfile: string | undefined
+  // 0.30.0: findings that fired only in the union, suppressed as superposition
+  // artifacts. Counted rather than dropped silently, so the suppression itself
+  // is visible in the response.
+  let suppressedUnionArtifacts = 0
   if (!skipAntiPatterns) {
     const productStage = store.getProduct().stage as UPGProductStage | undefined
     // The graph's own $upg.member_kind wins; a product listed in a `watched`
@@ -982,13 +1023,146 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
         : classifyProductKind(process.cwd(), store.getProduct().id) === 'watched'
           ? 'watched'
           : 'product'
-    const inputs = collectAntiPatternInputs(store, productStage)
+    // When the caller named a configuration, evaluate THAT one and report it
+    // plainly. The per-projection sweep below exists to stop the union from
+    // inventing findings; a caller who already chose a member of the family
+    // does not need it, and annotating every finding with the configuration
+    // they just asked for would be noise.
+    const antiPatternSource = explicitConfiguration.reader
+      ? ({
+          getAllNodes: () => explicitConfiguration.reader!.getAllNodes(),
+          getAllEdges: () => {
+            // Deduplicate by identity through a Map. The reader exposes edges
+            // per node, so every edge is seen from both endpoints; a findIndex
+            // scan here is quadratic in edge count on a graph large enough to
+            // have configurations worth projecting.
+            const seen = new Map<string, ReturnType<typeof store.getAllEdges>[number]>()
+            for (const n of explicitConfiguration.reader!.getAllNodes()) {
+              for (const e of explicitConfiguration.reader!.getEdgesForNode(n.id)) {
+                const key = e.id ?? `${e.source}|${e.type}|${e.target}`
+                if (!seen.has(key)) seen.set(key, e)
+              }
+            }
+            return [...seen.values()]
+          },
+          getProduct: () => store.getProduct(),
+        } as unknown as Parameters<typeof collectAntiPatternInputs>[0])
+      : store
+    const inputs = collectAntiPatternInputs(antiPatternSource, productStage)
     inputs.memberKind = effectiveKind
     const totalNodeCount = store.getAllNodes().length
-    const violations = evaluateAntiPatterns(inputs, {
+    const evalOptions = {
       severity: severityArg as UPGAntiPatternSeverity | undefined,
       anti_pattern_ids: antiPatternIds,
-    })
+    }
+    const unionViolations = evaluateAntiPatterns(inputs, evalOptions)
+
+    // ── Per-projection evaluation (0.30.0, D4) ────────────────────────────
+    // In the UNION, alternatives double-count: a surface that exists only under
+    // one value and its alternative that exists only under another BOTH carry
+    // their occupancy edges, so a contention check reading the union sees a
+    // place holding more than any configuration ever renders. That is exactly
+    // the false-positive class 0.29.0 spent a release removing, and it would
+    // come straight back the moment anyone declared an axis.
+    //
+    // The fix is cheap because the evaluator never sees nodes or edges: it
+    // reads pre-aggregated inputs from a duck-typed collector. So a projection
+    // pass is the same collector over a filtered node/edge set, which is what
+    // §5.3 of the design bought by insisting 0.29.0's capacity check go through
+    // the collector rather than walking the live store.
+    const projections = enumerateProjections(
+      store.getAllNodes() as unknown as Parameters<typeof enumerateProjections>[0],
+    )
+    const hasAxes = projections.length > 1 && !explicitConfiguration.reader
+
+    // Per anti-pattern: WHERE it fired, and the violation each projection
+    // produced. Keeping the whole violation rather than just the id is what
+    // lets a projection-only finding be reported at all, and what lets a
+    // qualified finding carry node ids derived from the projections it holds
+    // in rather than from the superposed union.
+    interface ProjectionFiring {
+      configurations: Array<{ axis: string; value: string }>
+      violations: ReturnType<typeof evaluateAntiPatterns>
+    }
+    const firedIn = new Map<string, ProjectionFiring>()
+    let projectionCount = 0
+    if (hasAxes) {
+      for (const p of projections) {
+        if (!p.axis || !p.value) continue // the union entry, already evaluated
+        projectionCount++
+        const projected = projectGraph(
+          store.getAllNodes() as never[],
+          store.getAllEdges() as never[],
+          p.configuration,
+        )
+        const projectedInputs = collectAntiPatternInputs(
+          {
+            getAllNodes: () => projected.nodes,
+            getAllEdges: () => projected.edges,
+            getProduct: () => store.getProduct(),
+          } as unknown as Parameters<typeof collectAntiPatternInputs>[0],
+          productStage,
+        )
+        projectedInputs.memberKind = effectiveKind
+        for (const v of evaluateAntiPatterns(projectedInputs, evalOptions)) {
+          const entry = firedIn.get(v.anti_pattern_id) ?? { configurations: [], violations: [] }
+          entry.configurations.push({ axis: p.axis, value: p.value })
+          entry.violations.push(v)
+          firedIn.set(v.anti_pattern_id, entry)
+        }
+      }
+    }
+
+    // Reporting model. A finding that fires in EVERY projection is invariant
+    // and reports unqualified, exactly as it always did. One that fires in SOME
+    // is reported once, annotated with where it holds. One that fires ONLY in
+    // the union is an artifact of superposition: it is suppressed, and counted,
+    // because surfacing it recreates the bug, and suppressing it silently would
+    // hide a real one.
+    // THE PROJECTIONS DECIDE, NOT THE UNION. Once a graph declares axes the
+    // reported set is built FROM the per-projection firings, not filtered out of
+    // the union list. Filtering could only ever remove, which silently lost
+    // every finding that fires in a configuration but not in the superposed
+    // graph: the catalog has eleven `not_exists` patterns, and those are exactly
+    // non-monotone. A job edge riding a surface that exists only under one value
+    // makes `surface-without-job` true under the other value and false in the
+    // union, and the caller heard nothing.
+    //
+    //   fires in every projection  -> invariant, reported unqualified
+    //   fires in some projections  -> reported once, annotated with where
+    //   fires only in the union    -> superposition artifact, suppressed + counted
+    //
+    // Node ids come from the projections the finding actually holds in, so a
+    // qualified finding can never carry the union's double-counted ids.
+    let violations: ReturnType<typeof evaluateAntiPatterns>
+    const configurationsById = new Map<string, Array<{ axis: string; value: string }>>()
+    if (hasAxes) {
+      const merged: ReturnType<typeof evaluateAntiPatterns> = []
+      for (const [id, entry] of firedIn) {
+        const ids = new Set<string>()
+        for (const v of entry.violations) for (const nid of v.target_node_ids ?? []) ids.add(nid)
+        const representative = { ...entry.violations[0]! }
+        representative.target_node_ids = ids.size > 0 ? [...ids].sort() : undefined
+        merged.push(representative)
+        // Qualified only when it does NOT hold everywhere. A finding true in
+        // every configuration is reported plainly, which is what keeps an
+        // unqualified graph's output identical to the previous release.
+        if (entry.configurations.length < projectionCount) {
+          configurationsById.set(id, entry.configurations)
+        }
+      }
+      merged.sort((a, b) => {
+        const order = { high: 0, medium: 1, low: 2 } as const
+        const d = order[a.severity] - order[b.severity]
+        return d !== 0 ? d : a.anti_pattern_id.localeCompare(b.anti_pattern_id)
+      })
+      violations = merged
+      const suppressed = unionViolations.filter((v) => !firedIn.has(v.anti_pattern_id)).length
+      if (suppressed > 0) suppressedUnionArtifacts = suppressed
+    } else {
+      violations = unionViolations
+    }
+
     antiPatternViolations = violations.map((v) => {
       // A fired violation gates `valid` iff its concern is gated by the member-kind
       // profile AND it is not a coverage pattern softened on a still-thin graph
@@ -1006,6 +1180,12 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
         gating,
         target_entities: v.target_entities,
         ...(v.target_node_ids ? { target_node_ids: v.target_node_ids } : {}),
+        // Which configurations this finding actually holds in. Present only
+        // when the graph declares axes AND the finding is not universal: a
+        // violation true everywhere is reported unqualified, as before.
+        ...(configurationsById.has(v.anti_pattern_id)
+          ? { configurations: configurationsById.get(v.anti_pattern_id) }
+          : {}),
         description: v.description,
         why_it_matters: v.why_it_matters,
         remediation: v.remediation,
@@ -1086,7 +1266,14 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     // merge, and a signal that stays green through one is worth little. The
     // repair is also unusually cheap and total: `upg fmt` reseals both fields.
     countsDrift.length === 0 &&
-    integrityDrift.length === 0
+    integrityDrift.length === 0 &&
+    // Configuration drift, ERRORS only (0.30.0). A graph whose declarations
+    // contradict each other cannot be projected reliably, and the checks say so
+    // in their own messages, so returning valid:true to a CI gate would be the
+    // signal contradicting its own text. The single WARNING class
+    // (orphaned_under_projection) deliberately does not gate: the graph is
+    // coherent there, one of its projections just has a gap.
+    configurationDriftErrorCount === 0
   const driftClean = skipDrift || structurallyClean
   // Anti-pattern gating is member-kind-profile-driven (0.17.0, supersedes the
   // hard-coded `watched` branch of spec #39). Only GATING violations — those whose
@@ -1124,6 +1311,18 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     valid,
     ...(watchedGraph ? { watched_intelligence_graph: true } : {}),
     ...(advisoryProfile ? { advisory_profile: advisoryProfile } : {}),
+    // 0.30.0: findings that fired only in the union and in no single
+    // configuration. Suppressed because reporting them recreates the
+    // double-count false positive; counted because suppressing silently
+    // would hide a real one.
+    ...(suppressedUnionArtifacts > 0
+      ? { suppressed_union_artifacts: suppressedUnionArtifacts }
+      : {}),
+    // Echo what was actually applied, so a reader never has to infer from the
+    // findings which member of the family they are looking at.
+    ...(explicitConfiguration.configuration
+      ? { applied_configuration: explicitConfiguration.configuration }
+      : {}),
     // N4 (UPG QA 0.8.7): additive structural-conformance signal. true ⟺ every
     // drift class is 0, independent of anti-pattern health. Omitted when
     // `skip_drift` is true (structure was not assessed). A CI gate that wants
@@ -1143,6 +1342,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       property_type_drift: propertyTypeDrift.length,
       counts_drift: countsDrift.length,
       integrity_drift: integrityDrift.length,
+      configuration_drift: skipDrift ? undefined : configurationDrift.length,
       polymorphic_upgrade_hints: includePolymorphicUpgrades ? polymorphicUpgradeHints.length : undefined,
       parity_divergence: parityDivergence.length > 0 ? parityDivergence.length : undefined,
     },
@@ -1170,6 +1370,11 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     if (includes('property_type_drift')) response.property_type_drift = propertyTypeDrift
     if (includes('counts_drift')) response.counts_drift = countsDrift
     if (includes('integrity_drift')) response.integrity_drift = integrityDrift
+    // Emitted whenever the scope includes it, empty or not, exactly like every
+    // sibling drift class. An array that appears only when something is wrong
+    // makes "no configuration drift" indistinguishable from "this server does
+    // not check for it".
+    if (includes('configuration_drift')) response.configuration_drift = configurationDrift
     // Why a seal check was skipped (unrecognised format_version / algorithm, or
     // an unreadable file). Surfaced only when there is something to say, so a
     // normal clean run stays quiet.

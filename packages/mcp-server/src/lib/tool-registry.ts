@@ -276,7 +276,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: { type: 'string' },
           description: 'When "properties" is in include, only return these property keys (e.g. ["severity", "importance"])',
         },
-        diff_from: { type: 'string', description: 'Result ID from a previous query. Returns only added/removed nodes since that result.' },
+        diff_from: { type: 'string', description: 'Result ID from a previous query. Returns added/removed NODES, plus added/removed EDGES when `edge_include` asks for edges. Two calls that differ only by `configuration` therefore diff one configuration against another.' },
+        configuration: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'Read ONE configuration instead of the union. Maps a configuration_axis (by node id, or by title when unambiguous) to a single one of its values. Surfaces absent under that value are dropped, composition edges qualified to other values are dropped, and edges left dangling go with them. An unknown axis or value is an error, never a silent no-op. Omit to read the union, which is the default and unchanged behaviour.',
+        },
       },
     },
   },
@@ -292,6 +297,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         depth: { type: 'number', description: 'Max levels (default = the pattern natural depth; max 12).' },
         include_properties: { type: 'array', items: { type: 'string' }, description: 'Node property keys to inline on each tree node.' },
         max_nodes: { type: 'number', description: 'Cap on nodes; the tree is summarised (stats.truncated) rather than silently cut (default 400, max 2000).' },
+        configuration: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'Read ONE configuration instead of the union. Maps a configuration_axis (by node id, or by title when unambiguous) to a single one of its values. Surfaces absent under that value are dropped, composition edges qualified to other values are dropped, and edges left dangling go with them. An unknown axis or value is an error, never a silent no-op. Omit to read the union, which is the default and unchanged behaviour.',
+        },
       },
       required: ['pattern'],
     },
@@ -1002,7 +1012,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         scope: {
           type: 'string',
-          enum: ['all', 'entity_drift', 'edge_drift', 'property_drift', 'top_level_drift', 'lifecycle_drift', 'self_referential'],
+          enum: ['all', 'entity_drift', 'edge_drift', 'property_drift', 'top_level_drift', 'lifecycle_drift', 'self_referential', 'configuration_drift'],
           description: 'Which drift class(es) to include in the response (default "all"). Counts in `summary` are always returned for every class.',
         },
         limit: { type: 'number', description: 'Max entries per class (default 100, max 1000)' },
@@ -1018,6 +1028,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         skip_drift: { type: 'boolean', description: 'Skip the schema-drift block. Only returns anti-pattern violations.' },
         skip_anti_patterns: { type: 'boolean', description: 'Skip anti-pattern evaluation. Only returns schema drift.' },
+        configuration: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'Evaluate ANTI-PATTERNS against one configuration instead of across the family. Maps a configuration_axis (by node id, or by title when unambiguous) to a single one of its values. Configuration drift is NOT narrowed: the declarations it checks are facts about the whole family, so they are always validated on the union, by design. Omit this and anti-patterns are still evaluated per projection automatically: findings true everywhere report unqualified, findings true in only some report annotated with where they hold, and findings true only of the superposed union are suppressed and counted. Rejected with an error alongside skip_anti_patterns: true, since it would then have no effect.',
+        },
         if_changed_since: { type: 'string', description: 'Hash from a previous response. Returns { changed: false } if graph unchanged.' },
         include_polymorphic_upgrades: { type: 'boolean', description: 'When true, include a `polymorphic_with_typed_alternative` array listing polymorphic edges (e.g. node_owned_by_person, node_constrains_node) that have a more-specific typed alternative for their actual source/target pair. Opt-in only; omitted by default to avoid cluttering routine validation output. Does not affect `valid`; these are advisory suggestions.' },
         pending_nodes: {
@@ -2121,6 +2136,43 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_sync_state: getSyncState,
   apply_pull_changeset: applyPullChangeset,
   push_to_cloud: pushToCloud,
+}
+
+/**
+ * Tools that honour the `configuration` read parameter (0.30.0).
+ *
+ * The seam is deliberately narrow. Every other tool must REFUSE the argument
+ * rather than ignore it: a caller who passes `configuration` to a tool that
+ * drops it believes they are looking at one member of the configuration family
+ * while reading the superposed union, which is precisely the confusion this
+ * release exists to remove. Silence is the one response that cannot be right.
+ *
+ * Widening the seam is a scope decision, not a convenience: it is banked as a
+ * candidate for a later release, on field demand.
+ */
+export const CONFIGURATION_AWARE_TOOLS: readonly string[] = [
+  'query',
+  'get_tree',
+  'validate_graph',
+]
+
+/**
+ * Reject `configuration` on a tool that does not implement it.
+ *
+ * Applied at dispatch so the guarantee holds for every tool at once, including
+ * tools added later, rather than depending on each handler remembering.
+ */
+export function rejectUnsupportedConfiguration(
+  name: string,
+  args: Record<string, unknown>,
+): string | undefined {
+  if (args.configuration === undefined || args.configuration === null) return undefined
+  if (CONFIGURATION_AWARE_TOOLS.includes(name)) return undefined
+  return (
+    `"${name}" does not support the \`configuration\` parameter and will not silently ignore it. ` +
+    `Reading one configuration is implemented on: ${CONFIGURATION_AWARE_TOOLS.join(', ')}. ` +
+    `Remove the argument to read the union, which is every configuration at once.`
+  )
 }
 
 /** Combined registry: definition + handler for each tool. */
