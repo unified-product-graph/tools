@@ -1,6 +1,6 @@
 # Unified Product Graph: Tools
 
-> 🧪 **Early alpha.** UPG v0.30.0. APIs and packages are still evolving and breaking changes can land between versions. Pin a version if you need stability. Issues and feedback are welcome.
+> 🧪 **Early alpha.** UPG v0.31.0. APIs and packages are still evolving and breaking changes can land between versions. Pin a version if you need stability. Issues and feedback are welcome.
 
 The reference implementation of the [UPG standard](https://github.com/unified-product-graph/spec): a programmatic SDK, a CLI, local and cloud MCP servers, import adapters, and the `.upg.md` renderer.
 
