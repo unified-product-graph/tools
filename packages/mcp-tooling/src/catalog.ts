@@ -33,6 +33,8 @@ import {
   type UPGEntityType,
 } from '@unified-product-graph/core'
 
+import type { ToolDefinition } from './tool-definition.js'
+
 // Re-export the shared entity-type resolution surface (defined in core) so
 // existing mcp-tooling consumers keep importing it from `mcp-tooling`.
 export { resolveEntityType, UnknownEntityTypeError }
@@ -107,6 +109,62 @@ export interface BuildEntitySchemaOptions {
    * a smaller response shape (e.g. legacy embedders) can pass `false`.
    */
   include_domain_guide?: boolean
+  /**
+   * Include the LONGFORM half of each property doc (`notes`). Default `false`.
+   *
+   * The two-tier convention (0.30.x) splits a property doc into the contract
+   * (`description`, two or three sentences) and the rationale, edge cases and
+   * recipes (`notes`). An agent orienting in a type needs the contract; it does
+   * not need the design history on every call, and paying for it on every call
+   * is a real cost at this catalog's size.
+   *
+   * Additive in both directions: `description` keeps its meaning exactly, and a
+   * caller that wants the whole story asks for it once.
+   *
+   * Canonical statement of the two-tier convention:
+   * packages/upg-spec/src/properties/PROPERTIES.md. Restated here for the reader
+   * in front of it; if the two disagree, PROPERTIES.md wins.
+   */
+  include_notes?: boolean
+}
+
+/**
+ * The `get_entity_schema` wire definition, shared by local and cloud.
+ *
+ * Lives here rather than in each server's `tool-registry.ts` for the same
+ * reason `LIST_CATALOG_DEF` does: the two hand-maintained copies drifted. The
+ * cloud copy carried a shorter description and never grew the `include_notes`
+ * parameter added locally in 0.30.x, so cloud clients could not reach content
+ * they had previously received inline. One definition makes that class of drift
+ * impossible rather than repeatedly detectable.
+ *
+ * Scope is deliberately this tool alone. The registries are not otherwise
+ * unified, and unifying them is a separate decision.
+ */
+export const GET_ENTITY_SCHEMA_DEF: ToolDefinition = {
+  name: 'get_entity_schema',
+  description:
+    'Return expected properties, valid statuses, valid edge types, and domain for an entity type. Lets agents construct valid entities without skill prompts. Each property carries its contract in `description`; pass `include_notes` for the longform rationale. Optional `include` folds in valid child types / super-domain region; optional `resolve_edge_to` folds in the canonical edge for this type → that target.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      type: { type: 'string', description: 'Entity type (e.g. "hypothesis", "persona", "opportunity")' },
+      include: {
+        type: 'array',
+        items: { type: 'string', enum: ['valid_children', 'region'] },
+        description: 'Optional extra blocks: "valid_children" (folds get_valid_children), "region" (folds get_region_for_entity_type).',
+      },
+      include_notes: {
+        type: 'boolean',
+        description: 'Fold the longform half of each property doc (`notes`: rationale, edge cases, workflow recipes) into `expected_properties`. Default false, because `description` already carries the contract and the longform is rarely needed while constructing an entity. Ask for it when a property\'s exact semantics matter.',
+      },
+      resolve_edge_to: {
+        type: 'string',
+        description: 'Optional target entity type. Folds resolve_edge_for_pair(type → target) into a `resolve_edge` block.',
+      },
+    },
+    required: ['type'],
+  },
 }
 
 /**
@@ -126,6 +184,7 @@ export function buildEntitySchema(
   options: BuildEntitySchemaOptions = {},
 ): EntitySchema {
   const includeDomainGuide = options.include_domain_guide ?? true
+  const includeNotes = options.include_notes ?? false
 
   const resolved = resolveEntityType(rawType)
   const entityType = resolved.canonical
@@ -163,7 +222,7 @@ export function buildEntitySchema(
     type: entityType,
     ...(resolved.alias ? { alias_of: resolved.alias } : {}),
     domain: domain ? { id: domain.id, label: domain.label } : null,
-    expected_properties: propertySchema ?? {},
+    expected_properties: stripNotes(propertySchema, includeNotes),
     ...(modifierSummary ? { property_modifiers: modifierSummary } : {}),
     edges_out: edgesOut,
     edges_in: edgesIn,
@@ -212,6 +271,32 @@ export function buildEntitySchema(
 /* ---------------------------------------------------------------------------
  * Entity-fields builder: `get_entity_fields` shared response shape
  * ------------------------------------------------------------------------- */
+
+/**
+ * Drop the `notes` half of every property unless the caller asked for it.
+ *
+ * Shallow by design: `notes` is only defined on top-level property entries, and
+ * a deep clone of the whole schema on every call would cost more than the field
+ * saves. Returns the original object untouched when notes are requested, so the
+ * common path allocates nothing.
+ */
+function stripNotes(
+  schema: Record<string, unknown> | undefined,
+  includeNotes: boolean,
+): Record<string, unknown> {
+  if (!schema) return {}
+  if (includeNotes) return schema
+  const out: Record<string, unknown> = {}
+  for (const [key, def] of Object.entries(schema)) {
+    if (!def || typeof def !== 'object' || !('notes' in (def as object))) {
+      out[key] = def
+      continue
+    }
+    const { notes: _dropped, ...rest } = def as Record<string, unknown>
+    out[key] = rest
+  }
+  return out
+}
 
 /**
  * Format a single property entry from `UPG_PROPERTY_SCHEMA` into the

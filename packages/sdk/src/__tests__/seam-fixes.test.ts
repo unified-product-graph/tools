@@ -31,10 +31,11 @@ import {
   InvalidProductStageError,
 } from '../index.js'
 // Frameworks are asserted against the CANONICAL public surface (core), the
-// surface the mcp-server/CLI actually serve at runtime — not the raw internal
-// @unified-product-graph/frameworks research catalog. 0.8.6 broadened RICE/ICE/
-// WSJF/cost-of-delay declared targets here; the tests must verify that surface.
-import { UPG_FRAMEWORKS_BY_ID, validateProductStageStrict } from '@unified-product-graph/core'
+// surface the mcp-server/CLI actually serve at runtime — not core's raw
+// internal `frameworks/definitions/` research catalog. 0.8.6 broadened RICE/
+// ICE/WSJF/cost-of-delay declared targets here; the tests must verify that
+// surface.
+import { UPG_ENTITY_COUNT, UPG_FRAMEWORKS_BY_ID, validateProductStageStrict } from '@unified-product-graph/core'
 // inferEdgeTypeWithTier is an internal lib (not on the public SDK surface); the
 // deliberate-only auto-nest tests exercise it directly at the inference seam.
 import { inferEdgeTypeWithTier } from '../lib/edge-inference.js'
@@ -233,7 +234,10 @@ describe(' plan scope', () => {
 
   it('exhaustive opt-in scores the full universe', async () => {
     const store = await freshStore()
-    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(322)
+    // Derived, not pinned. The point of this assertion is that `exhaustive`
+    // widens scope to EVERY active type, and a hardcoded total only restates
+    // the catalog size while breaking on every additive release.
+    expect(executePlan(store, { exhaustive: true }).expected_count).toBe(UPG_ENTITY_COUNT)
   })
 
   it('accepts a canonical region id AND an atomic-domain id', async () => {

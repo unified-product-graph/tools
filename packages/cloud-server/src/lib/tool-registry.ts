@@ -4,7 +4,7 @@
  */
 
 import type { ToolBinding, ToolDefinition } from '@unified-product-graph/mcp-tooling'
-import { LIST_CATALOG_DEF, GET_CATALOG_ENTRY_DEF } from '@unified-product-graph/mcp-tooling'
+import { LIST_CATALOG_DEF, GET_CATALOG_ENTRY_DEF, GET_ENTITY_SCHEMA_DEF } from '@unified-product-graph/mcp-tooling'
 import type { CloudContext } from './server-context.js'
 import { listProducts, createProduct, getAuditLog } from '../tools/products.js'
 import { getProductContext, getGraphDigest, query, getChanges } from '../tools/context.js'
@@ -759,31 +759,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       ]
     }
   },
-  {
-    "name": "get_entity_schema",
-    "description": "Returns the schema for a UPG entity type: valid parent→child edges, properties, lifecycle phases. Optional `include` folds in valid child types / super-domain region; optional `resolve_edge_to` folds in the canonical edge for this type → that target.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "description": "The UPG entity type (e.g. \"feature\", \"persona\")"
-        },
-        "include": {
-          "type": "array",
-          "items": { "type": "string", "enum": ["valid_children", "region"] },
-          "description": "Optional extra blocks: \"valid_children\" (folds get_valid_children), \"region\" (folds get_region_for_entity_type)."
-        },
-        "resolve_edge_to": {
-          "type": "string",
-          "description": "Optional target entity type. Folds resolve_edge_for_pair(type → target) into a `resolve_edge` block."
-        }
-      },
-      "required": [
-        "type"
-      ]
-    }
-  },
+  // Shared with local (0.30.x). This copy had drifted from local's on the
+  // description text and never grew `include_notes`, so cloud clients could not
+  // reach content they previously received inline. See GET_ENTITY_SCHEMA_DEF.
+  GET_ENTITY_SCHEMA_DEF,
   // Faceted spec-catalog surface (0.19.0). Definitions sourced from the shared
   // `@unified-product-graph/mcp-tooling` module so local + cloud are byte-identical.
   LIST_CATALOG_DEF,

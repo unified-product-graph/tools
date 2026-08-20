@@ -176,6 +176,55 @@ describe('catalog-parity (cloud): folds into get_entity_schema', () => {
   })
 })
 
+// Cloud's `get_entity_schema` was hand-maintained alongside local's and drifted:
+// it never grew `include_notes`, so after the two-tier split (which moved
+// longform prose out of `description` and into `notes`) a cloud client could no
+// longer reach content it had previously received inline. Both halves are
+// covered here — the wire definition must declare the parameter, and the handler
+// must honour it — because a param that is declared but not threaded, or
+// threaded but not declared, is just as unreachable.
+describe('catalog-parity (cloud): get_entity_schema include_notes round-trip', () => {
+  const TYPES = ['surface', 'persona', 'hypothesis', 'metric', 'configuration_axis']
+
+  const notesFound = async (args: Record<string, unknown>): Promise<string[]> => {
+    const found: string[] = []
+    for (const t of TYPES) {
+      const schema = (await call('get_entity_schema', { type: t, ...args })).body as Record<string, unknown>
+      const props = (schema.expected_properties ?? {}) as Record<string, { notes?: unknown }>
+      for (const [name, def] of Object.entries(props)) {
+        if (typeof def?.notes === 'string' && def.notes.length > 0) found.push(`${t}.${name}`)
+      }
+    }
+    return found
+  }
+
+  it('the wire definition declares include_notes', () => {
+    const def = TOOL_DEFINITIONS.find((d) => d.name === 'get_entity_schema')
+    expect(def, 'get_entity_schema must be registered').toBeTruthy()
+    const props = def!.inputSchema.properties as Record<string, unknown>
+    expect(Object.keys(props).sort()).toEqual(['include', 'include_notes', 'resolve_edge_to', 'type'])
+  })
+
+  it('omits notes by default and folds them in on request', async () => {
+    expect(await notesFound({}), 'default response must not carry notes').toEqual([])
+    const withNotes = await notesFound({ include_notes: true })
+    expect(withNotes.length, 'include_notes:true must fold the longform tier in').toBeGreaterThan(0)
+  })
+
+  it('folding notes leaves every contract description untouched', async () => {
+    const descriptions = async (args: Record<string, unknown>): Promise<Record<string, unknown>> => {
+      const out: Record<string, unknown> = {}
+      for (const t of TYPES) {
+        const schema = (await call('get_entity_schema', { type: t, ...args })).body as Record<string, unknown>
+        const props = (schema.expected_properties ?? {}) as Record<string, { description?: unknown }>
+        for (const [name, def] of Object.entries(props)) out[`${t}.${name}`] = def?.description
+      }
+      return out
+    }
+    expect(await descriptions({ include_notes: true })).toEqual(await descriptions({}))
+  })
+})
+
 describe('catalog-parity (cloud): get_spec_version changelog fold', () => {
   it('default has no changelog; changelog:true adds an array', async () => {
     const base = (await call('get_spec_version', {})).body as Record<string, unknown>

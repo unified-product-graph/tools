@@ -68,7 +68,15 @@ export const getEntitySchema: ToolHandler = async (args) => {
   if (!rawType) return textError('Missing required parameter: type')
 
   try {
-    const schema = buildEntitySchema(rawType)
+    // 0.30.x two-tier docs: `expected_properties` carries the CONTRACT by
+    // default. `include_notes` folds in the longform half (rationale, edge
+    // cases, recipes) for a caller that wants the whole story. Opt-in because
+    // an agent orienting in a type pays for every character it did not ask for.
+    // Threaded here as well as locally: before the two-tier split the longform
+    // WAS the description, so a cloud client that could not ask for notes had
+    // silently lost content it used to receive.
+    // Convention: packages/upg-spec/src/properties/PROPERTIES.md (canonical).
+    const schema = buildEntitySchema(rawType, { include_notes: args.include_notes === true })
 
     const includeRaw = args.include
     const include = new Set(Array.isArray(includeRaw) ? (includeRaw as unknown[]).map(String) : [])

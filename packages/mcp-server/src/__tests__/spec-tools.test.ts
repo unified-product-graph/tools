@@ -543,9 +543,18 @@ describe('list_frameworks / get_framework', () => {
 
  it('list_frameworks returns lightweight summaries, not full records (H1)', () => {
  const { body } = call(listFrameworks, {})
- const b = body as { count: number; frameworks: Array<Record<string, unknown>> }
- // default limit (50) >= 42 frameworks, so the natural discovery call lists all
- expect(b.count).toBe(UPG_FRAMEWORKS.length)
+ const b = body as {
+   total: number
+   count: number
+   next_cursor?: string
+   frameworks: Array<Record<string, unknown>>
+ }
+ // `total` is the semantic answer to "how many frameworks exist"; `count` is
+ // the page size. The catalog passed the default limit of 50 (now 53), so the
+ // natural discovery call is truncated — and must say so via next_cursor.
+ expect(b.total).toBe(UPG_FRAMEWORKS.length)
+ expect(b.count).toBe(Math.min(50, UPG_FRAMEWORKS.length))
+ expect(b.next_cursor).toBeDefined()
  const f = b.frameworks[0]
  expect(f).toHaveProperty('id')
  expect(f).toHaveProperty('name')

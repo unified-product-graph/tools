@@ -557,11 +557,16 @@ export interface UpdateProductResult {
 }
 
 /**
- * Update the product header (`$upg.product`): the canonical home of a product's
- * lifecycle `stage` (the value `get_graph_digest` reads), plus title /
- * description / health_status / url, and the workspace `member_kind`. Strict
- * stage / member_kind validation mirrors createProduct. Mutates the header in
- * place + marks the store dirty; the caller flushes the product file.
+ * Update the product header (`$upg.product`): the product's lifecycle `stage`
+ * (the value `get_graph_digest` reads), plus title / description /
+ * health_status / url, and the workspace `member_kind`. Strict stage /
+ * member_kind validation mirrors createProduct. Mutates the header in place +
+ * marks the store dirty; the caller flushes the product file.
+ *
+ * The header is NOT the canonical home of `stage` — the `type:'product'` node
+ * sharing the product id is, and the header is its projection (see the stage
+ * block below and canonical.ts `effectiveRootProduct`). `stage`, `title` and
+ * `description` therefore write the node as well as the header.
  *
  * When `cwd` is given, the denormalised workspace caches are reconciled so reads
  * never go stale: a `title` rename and a `member_kind` re-kind both update the
@@ -608,16 +613,38 @@ export async function updateProduct(args: UpdateProductArgs): Promise<UpdateProd
   }
   // The product also lives as a `type:'product'` node sharing the product id; on
   // serialize the canonical form reconciles the summary against that node and the
-  // NODE's title/description win (canonical.ts `effectiveRootProduct`). So a rename
-  // must update the node too, or the flush overrides the summary back to the node's
-  // stale value — the half of the rename that never landed pre-0.17.0. (stage is
-  // unaffected: the product node carries no `status`, so the summary stage wins.)
-  if (title !== undefined || description !== undefined) {
+  // NODE wins (canonical.ts `effectiveRootProduct`). So a rename must update the
+  // node too, or the flush overrides the summary back to the node's stale value —
+  // the half of the rename that never landed pre-0.17.0.
+  //
+  // THE SAME IS TRUE OF `stage`, and the comment that used to stand here said the
+  // opposite: *"stage is unaffected: the product node carries no `status`, so the
+  // summary stage wins."* That is false for any graph a graph tool has touched —
+  // `update_node(product, { status })` / batch ops put a `status` on the node, and
+  // from then on `effectiveRootProduct` overlaid it over whatever this function
+  // wrote. The result was a SILENT no-op: `updateProduct({ stage })` set the
+  // summary, `flush()` re-derived the summary from the untouched node, and the
+  // read-back returned the OLD value with exit 0 (found 2026-08-16, Geordi).
+  //
+  // The invariant, stated once and enforced here: **the product NODE is the
+  // authoritative store of stage; the summary is its projection.** Reads resolve
+  // `properties.stage ?? status ?? summary` (canonical.ts, tools.ts §B,
+  // get_graph_digest). A writer must therefore leave every PRESENT carrier
+  // agreeing — so we write both node carriers, not just the summary. Writing both
+  // (rather than only the one today's overlay happens to read) also means the
+  // invariant survives a future change of precedence, and a legacy graph whose
+  // carriers already disagree self-heals on its first stage write.
+  if (title !== undefined || description !== undefined || stage !== undefined) {
     const pid = typeof product.id === 'string' ? product.id : undefined
     const productNode = pid ? store.getNode(pid) : undefined
     if (productNode && (productNode as { type?: string }).type === 'product') {
       if (title !== undefined) (productNode as { title?: string }).title = title
       if (description !== undefined) (productNode as { description?: string }).description = description
+      if (stage !== undefined) {
+        const n = productNode as { status?: string; properties?: Record<string, unknown> }
+        n.status = stage
+        n.properties = { ...(n.properties ?? {}), stage }
+      }
     }
   }
   if (member_kind !== undefined) {

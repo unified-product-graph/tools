@@ -111,9 +111,9 @@ import {
   type UPGLifecycle,
   type UPGScaleDefinition,
   type UPGDomainRing,
-  // Framework catalog; sourced from core's CANONICAL surface (34), not the
-  // internal @unified-product-graph/frameworks research library (216). The
-  // public tool surface advertises only the curated canonical set; research
+  // Framework catalog; sourced from core's CANONICAL surface (canonical.ts),
+  // not core's fuller internal research catalog in `frameworks/definitions/`.
+  // The public tool surface advertises only the curated canonical set; research
   // frameworks are promoted into canonical.ts incrementally as reviewed.
   UPG_FRAMEWORKS,
   UPG_FRAMEWORKS_BY_ID,
@@ -818,8 +818,10 @@ export const listFrameworks: ToolHandler = (args): ToolResult => {
 
   // Lightweight summary projection. The full four-layer record (data,
   // structure, presentation, education) averages ~3.7KB; returning all of it
-  // for the default list call (limit 50 >= 42 frameworks) overflows the
-  // tool-result token cap. Callers fetch the full object via get_framework(id).
+  // for the default list call overflows the tool-result token cap. Callers
+  // fetch the full object via get_framework(id). Note the catalog (53) has
+  // passed the default limit of 50, so the default call now paginates —
+  // `total` still reports the true catalog size and `next_cursor` is set.
   const frameworks = slice.map((f) => ({
     id: f.id,
     name: f.name,

@@ -625,11 +625,35 @@ export function computeGraphDigest(
   // `stage_summary` aggregate distinguish counted from informational.
   // Node-first, header fallback ( §B): a product node's own stage is the
   // live value; the $upg.product.stage header can lag in legacy/desynced files.
-  // update_node now syncs the header, so for fresh writes they agree.
+  // update_node / update_product now write every carrier, so for fresh writes
+  // they agree. Resolution order matches canonical.ts `effectiveRootProduct`
+  // exactly — `properties.stage`, then `status`, then the header — because two
+  // different precedence orders in one system is how the 2026-08-16 silent
+  // stage no-op survived.
+  //
+  // Only the ROOT product node — the one whose id equals `product.id` — is
+  // authoritative. A graph may hold other `type:'product'` nodes (portfolio
+  // siblings, watched competitors, a decoy created by hand), and `find` by type
+  // alone can return one of those. `status` in particular must never be read off
+  // a non-root product node: `createNode` seeds a product's status with the
+  // lifecycle's `initial_phase` (`concept`), so any unrelated product node in the
+  // graph would silently drag a launch-stage product back to concept. The
+  // by-type fallback is kept for `properties.stage` ALONE, preserving the exact
+  // pre-0.30.1 behaviour for graphs whose product node was minted with an
+  // unrelated id.
+  const rootProductNode = nodes.find((n) => n.type === 'product' && n.id === product.id)
+  const legacyProductNode = rootProductNode ?? nodes.find((n) => n.type === 'product')
+  // `status` is only consulted when it IS a stage: a product node may legitimately
+  // carry a non-stage status in a legacy graph, and coercing that to `concept`
+  // would under-grade a product whose header knows better.
+  const nodeStatusStage =
+    typeof rootProductNode?.status === 'string' && coerceProductStage(rootProductNode.status).canonical
+      ? rootProductNode.status
+      : undefined
   const rawStage =
-    ((nodes.find((n) => n.type === 'product')?.properties as Record<string, unknown> | undefined)?.stage as
-      | string
-      | undefined) ?? product.stage
+    ((legacyProductNode?.properties as Record<string, unknown> | undefined)?.stage as string | undefined) ??
+    nodeStatusStage ??
+    product.stage
   const resolvedStage = resolveCoverageStage(rawStage)
   const countedRegions = new Set(STAGE_COVERAGE_TARGETS[resolvedStage] ?? [])
 
@@ -711,9 +735,8 @@ export function computeGraphDigest(
   return {
     product: {
       title: product.title,
-      stage: (((nodes.find((n) => n.type === 'product')?.properties as Record<string, unknown> | undefined)?.stage as string | undefined)
-        ?? product.stage
-        ?? 'unknown'),
+      // Same resolution as `rawStage` above — one order, one answer.
+      stage: rawStage ?? 'unknown',
     },
     counts: { total_nodes: nodes.length, total_edges: edges.length, by_type: byType },
     health: {
@@ -2394,6 +2417,60 @@ export function migrateNodeType(
   }
 }
 
+/**
+ * §B (hardened 0.30.1): keep a product's stage SINGLE-VALUED across all
+ * three of its carriers, so no reader can disagree with any other.
+ *
+ * A product's stage lives on the `type:'product'` node — in `properties.stage`
+ * (the spec's declared carrier; the `properties.stage → status` lift was
+ * deliberately retired in 0.9.10 #33 because product stage is its own 9-phase
+ * axis) and in `status` (the grammar's product-lifecycle phase, the same axis) —
+ * and is PROJECTED into `$upg.product.stage`, which `get_graph_digest` reads and
+ * which canonical.ts `effectiveRootProduct` re-derives from the node on every
+ * serialize. The node is authoritative; the header is its projection.
+ *
+ * Precedence is **"the carrier the caller just wrote wins"**: a caller passing
+ * `status: "growth"` means growth, even when a stale `properties.stage` sits
+ * beside it. The old block preferred `properties.stage` unconditionally, which
+ * both clobbered such a write and left the two node carriers disagreeing — and
+ * since the serialiser then overlaid `status` back over the header, an
+ * `update_node(product, { properties: { stage } })` was a SILENT no-op on disk:
+ * the same defect `updateProduct({ stage })` carried (found 2026-08-16, Geordi).
+ * Writing the resolved value to every carrier removes the class — there is
+ * nothing left to disagree.
+ *
+ * Sibling carriers are written ONLY when the call actually wrote a stage
+ * carrier. An unrelated edit (a title change) must not resurrect a carrier the
+ * graph does not have, and an explicit `unset_properties: ['stage']` must stay
+ * unset; both would be a write the caller never asked for. The header sync runs
+ * either way, as it always has. Callers have already scheduled a save, so these
+ * mutations ride the same flush.
+ */
+function reconcileProductStageCarriers(
+  store: UPGFileStore,
+  node: UPGBaseNode,
+  written: {
+    patchedProperties?: Record<string, unknown>
+    patchedStatus?: string
+    unsetProperties?: string[]
+  },
+): void {
+  const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
+  const patchedProp = written.patchedProperties?.stage
+  const nodeProp = (node.properties as Record<string, unknown> | undefined)?.stage
+  const candidate = str(patchedProp) ?? str(written.patchedStatus) ?? str(nodeProp) ?? str(node.status)
+  if (candidate === undefined || validateProductStageStrict(candidate) !== null) return
+
+  const header = store.getProduct() as { stage?: string } | undefined
+  if (header && header.stage !== candidate) header.stage = candidate
+
+  const unsetStage = written.unsetProperties?.includes('stage') === true
+  const wroteStageCarrier = patchedProp !== undefined || written.patchedStatus !== undefined
+  if (!wroteStageCarrier || unsetStage) return
+  if (node.status !== candidate) node.status = candidate
+  if (nodeProp !== candidate) node.properties = { ...(node.properties ?? {}), stage: candidate }
+}
+
 // ── update_node ( unified validation + property unset) ─────────
 
 export interface UpdateNodeArgs {
@@ -2467,21 +2544,12 @@ export function updateNode(
     if (r.removed.length > 0) removed = r.removed
   }
 
-  // §B: keep $upg.product.stage in sync with a product node's stage so
-  // get_graph_digest never reports a stale header. Sync from the node's
-  // properties.stage (preferred), or a `status` that is itself a canonical stage
-  // (the form the bug report used: update_node(product, status:"growth")). The
-  // surrounding store.updateNode already scheduled a save, so the header
-  // mutation rides the same flush.
   if (existing.type === 'product') {
-    const nodeStage = (node.properties as Record<string, unknown> | undefined)?.stage
-    const candidate =
-      (typeof nodeStage === 'string' ? nodeStage : undefined) ??
-      (typeof node.status === 'string' ? node.status : undefined)
-    if (candidate !== undefined && validateProductStageStrict(candidate) === null) {
-      const header = store.getProduct() as { stage?: string } | undefined
-      if (header && header.stage !== candidate) header.stage = candidate
-    }
+    reconcileProductStageCarriers(store, node, {
+      patchedProperties: args.properties,
+      patchedStatus: args.status,
+      unsetProperties: args.unset_properties,
+    })
   }
 
   const warning = validation.warnings.length > 0 ? validation.warnings.join(' | ') : undefined
@@ -2565,11 +2633,25 @@ export function batchUpdateNodes(
     if (u.status !== undefined) patch.status = u.status
     if (u.properties !== undefined) patch.properties = u.properties
     try {
-      store.updateNode(u.node_id, patch)
+      let node = store.updateNode(u.node_id, patch)
       let removed: string[] | undefined
       if (u.unset_properties && u.unset_properties.length > 0) {
         const r = store.unsetNodeProperties(u.node_id, u.unset_properties)
+        node = r.node
         if (r.removed.length > 0) removed = r.removed
+      }
+      // Same §B reconcile as the single-node path. The batch door had NO header
+      // sync at all, so a batched product-stage write left the header stale until
+      // the serializer's overlay happened to re-derive it — and once the overlay
+      // prefers `properties.stage`, a batched `status` write beside a stale
+      // `properties.stage` would have been discarded outright. One helper, both
+      // doors, so they cannot drift apart again.
+      if (node.type === 'product') {
+        reconcileProductStageCarriers(store, node, {
+          patchedProperties: u.properties,
+          patchedStatus: u.status,
+          unsetProperties: u.unset_properties,
+        })
       }
       updated.push({ id: u.node_id, ...(removed ? { unset: removed } : {}) })
     } catch (err) {

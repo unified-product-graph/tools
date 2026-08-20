@@ -957,7 +957,7 @@ _Per-type spec contract: properties, edges in and out, lifecycle._
 
 ### `get_entity_schema`
 
-Returns the schema for a UPG entity type: valid parent→child edges, properties, lifecycle phases. Optional `include` folds in valid child types / super-domain region; optional `resolve_edge_to` folds in the canonical edge for this type → that target.
+Return expected properties, valid statuses, valid edge types, and domain for an entity type. Lets agents construct valid entities without skill prompts. Each property carries its contract in `description`; pass `include_notes` for the longform rationale. Optional `include` folds in valid child types / super-domain region; optional `resolve_edge_to` folds in the canonical edge for this type → that target.
 
 **Atomicity:** `atomic (read-only)`
 
@@ -966,8 +966,9 @@ Returns the schema for a UPG entity type: valid parent→child edges, properties
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
 | `include` | array |  | Optional extra blocks: "valid_children" (folds get_valid_children), "region" (folds get_region_for_entity_type). |
+| `include_notes` | boolean |  | Fold the longform half of each property doc (`notes`: rationale, edge cases, workflow recipes) into `expected_properties`. Default false, because `description` already carries the contract and the longform is rarely needed while constructing an entity. Ask for it when a property's exact semantics matter. |
 | `resolve_edge_to` | string |  | Optional target entity type. Folds resolve_edge_for_pair(type → target) into a `resolve_edge` block. |
-| `type` | string | ✓ | The UPG entity type (e.g. "feature", "persona") |
+| `type` | string | ✓ | Entity type (e.g. "hypothesis", "persona", "opportunity") |
 
 **Returns:**
 

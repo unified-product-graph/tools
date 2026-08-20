@@ -72,6 +72,7 @@ export {
   type EntitySchemaDomainGuide,
   type EntitySchemaDomainGuideAntiPattern,
   type BuildEntitySchemaOptions,
+  GET_ENTITY_SCHEMA_DEF,
   buildEntitySchema,
   buildEntityFields,
   buildAllEntityFields,

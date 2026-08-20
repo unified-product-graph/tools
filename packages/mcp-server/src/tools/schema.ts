@@ -69,7 +69,12 @@ export const getEntitySchema: ToolHandler = (args, _ctx): ToolResult => {
   if (!rawType) return textError('Missing required parameter: type')
 
   try {
-    const schema = buildEntitySchema(rawType)
+    // 0.30.x two-tier docs: `expected_properties` carries the CONTRACT by
+    // default. `include_notes` folds in the longform half (rationale, edge
+    // cases, recipes) for a caller that wants the whole story. Opt-in because
+    // an agent orienting in a type pays for every character it did not ask for.
+    // Convention: packages/upg-spec/src/properties/PROPERTIES.md (canonical).
+    const schema = buildEntitySchema(rawType, { include_notes: args.include_notes === true })
 
     // Opt-in folds (0.19.0). Default output (no include / resolve_edge_to) is
     // byte-identical to the pre-consolidation shape — nothing added unless asked.

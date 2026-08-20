@@ -22,6 +22,7 @@ import type { UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
 import {
   UPG_MIGRATIONS,
   UPG_EDGE_CATALOG,
+  UPG_VALID_CHILDREN,
   UPG_VERSION,
   REGISTRY_PRODUCT_ID,
   migrateEdge,
@@ -857,9 +858,16 @@ function buildFirstUseHints(canonicalType: string): Record<string, unknown> | un
  * (orphan warning). When a node is created with no parent, warn if its
  * type is one the spec expects to hang off a parent. The signal is the domain
  * guide's creation sequence: a type at `position_in_sequence > 0` is a child of
- * its domain anchor (anchors / roots sit at position 0 and legitimately stand
- * alone). Returns `undefined` for anchors, roots, and types with no guide, so
- * standalone entities never get a spurious warning.
+ * some parent. Returns `undefined` for anchors, roots, and types with no guide,
+ * so standalone entities never get a spurious warning.
+ *
+ * Parent resolution: the domain anchor is a reasonable default, but for types
+ * whose real containment parent is a mid-cascade level it names the wrong node —
+ * e.g. `strategic_theme` nests under `strategic_pillar`, not the strategy-domain
+ * anchor `outcome`, which has no containment edge to it. So we name the anchor
+ * only when it is genuinely a containment parent of this type; otherwise we
+ * resolve the actual parent from `UPG_VALID_CHILDREN`, preferring one that has a
+ * canonical containment edge. This fixes the whole class, not just one type.
  */
 function buildOrphanWarning(canonicalType: string): string | undefined {
   let schema: ReturnType<typeof buildEntitySchema>
@@ -870,11 +878,22 @@ function buildOrphanWarning(canonicalType: string): string | undefined {
   }
   const guide = schema.domain_guide
   if (!guide || guide.position_in_sequence <= 0) return undefined
+
   const anchor = guide.anchor_entity
-  if (!anchor || anchor === canonicalType) return undefined
-  const edge = resolveContainmentEdge(anchor, canonicalType)
+  let target: string | undefined
+  if (anchor && anchor !== canonicalType && resolveContainmentEdge(anchor, canonicalType)) {
+    target = anchor
+  } else {
+    const parents = Object.entries(UPG_VALID_CHILDREN)
+      .filter(([, children]) => children.includes(canonicalType))
+      .map(([parent]) => parent)
+    target = parents.find((parent) => resolveContainmentEdge(parent, canonicalType)) ?? parents[0]
+  }
+  if (!target || target === canonicalType) return undefined
+
+  const edge = resolveContainmentEdge(target, canonicalType)
   const via = edge ? ` (canonical edge: ${edge})` : ''
-  return `Orphan: created ${canonicalType} with no parent. ${canonicalType} typically attaches under ${anchor}${via}. Pass parent_id on create, or wire it later with create_edge.`
+  return `Orphan: created ${canonicalType} with no parent. ${canonicalType} typically attaches under ${target}${via}. Pass parent_id on create, or wire it later with create_edge.`
 }
 
 /**

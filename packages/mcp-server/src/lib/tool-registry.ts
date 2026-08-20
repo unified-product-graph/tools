@@ -4,7 +4,7 @@
  */
 
 import type { ToolDefinition } from '@unified-product-graph/mcp-tooling'
-import { LIST_CATALOG_DEF, GET_CATALOG_ENTRY_DEF } from '@unified-product-graph/mcp-tooling'
+import { LIST_CATALOG_DEF, GET_CATALOG_ENTRY_DEF, GET_ENTITY_SCHEMA_DEF } from '@unified-product-graph/mcp-tooling'
 import type { ToolHandler } from './server-context.js'
 import { CANONICAL_LENS_IDS } from './server-context.js'
 import {
@@ -930,27 +930,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
-  {
-    name: 'get_entity_schema',
-    description:
-      'Return expected properties, valid statuses, valid edge types, and domain for an entity type. Lets agents construct valid entities without skill prompts. Optional `include` folds in valid child types / super-domain region; optional `resolve_edge_to` folds in the canonical edge for this type → that target.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        type: { type: 'string', description: 'Entity type (e.g. "hypothesis", "persona", "opportunity")' },
-        include: {
-          type: 'array',
-          items: { type: 'string', enum: ['valid_children', 'region'] },
-          description: 'Optional extra blocks: "valid_children" (folds get_valid_children), "region" (folds get_region_for_entity_type).',
-        },
-        resolve_edge_to: {
-          type: 'string',
-          description: 'Optional target entity type. Folds resolve_edge_for_pair(type → target) into a `resolve_edge` block.',
-        },
-      },
-      required: ['type'],
-    },
-  },
+  // Shared with cloud (0.30.x): the two hand-maintained copies had already
+  // drifted before `include_notes` widened the gap. See GET_ENTITY_SCHEMA_DEF.
+  GET_ENTITY_SCHEMA_DEF,
   // Faceted spec-catalog surface (0.19.0). Definitions sourced from the shared
   // `@unified-product-graph/mcp-tooling` module so local + cloud are byte-identical.
   LIST_CATALOG_DEF,
