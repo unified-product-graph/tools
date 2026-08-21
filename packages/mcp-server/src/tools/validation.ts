@@ -22,6 +22,7 @@ import {
   UPG_VERSION,
   UPG_EDGE_PAIR_MAP,
   UPG_POLYMORPHIC_EDGE_KEYS,
+  UPG_BASE_NODE_FIELD_SET,
   getUPGEdgeMigrations,
   getLifecycleForType,
   getReplacementType,
@@ -66,23 +67,16 @@ import type {
   ValidateGraphAntiPatternViolation,
 } from '@unified-product-graph/mcp-tooling'
 
-const CANONICAL_NODE_FIELDS = new Set<string>([
-  'id',
-  'type',
-  'title',
-  'slug',
-  'aliases',
-  'description',
-  'tags',
-  'status',
-  'source_id',
-  'source_type',
-  'mapping_confidence',
-  'external_tool',
-  'external_ref',
-  'external_id',
-  'properties',
-])
+/**
+ * Canonical top-level node fields, DERIVED from the `UPGBaseNode` shape.
+ *
+ * `validate_graph` reports the per-node breakdown behind `top_level_drift`, so
+ * this must agree exactly with the counter in
+ * `packages/upg-sdk/src/lib/schema-drift.ts`, which derives from the same
+ * export. It was a second hand-maintained copy of the same fifteen names and
+ * went stale in the same release for the same reason.
+ */
+const CANONICAL_NODE_FIELDS = UPG_BASE_NODE_FIELD_SET
 
 // New drift classes added by the 2026-05-20 audit hardening
 //. Kept as a local extension because the canonical

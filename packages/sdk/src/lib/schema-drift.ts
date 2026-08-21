@@ -35,6 +35,7 @@ import {
   UPG_PROPERTY_MIGRATIONS,
   getLifecycleForType,
   getReplacementType,
+  UPG_BASE_NODE_FIELD_SET,
 } from '@unified-product-graph/core'
 import type { UPGDocument } from '@unified-product-graph/core'
 
@@ -53,26 +54,15 @@ export interface SchemaDriftSummary {
  * Canonical top-level node fields per `UPGBaseNode` shape. Anything outside
  * this set on a node is counted under `top_level_drift`.
  *
- * Synced manually with `packages/upg-spec/src/shapes/base-node.ts`. If the
- * UPGBaseNode interface gains a field, add it here too.
+ * DERIVED from the shape, not copied from it. This was a hand-maintained list
+ * carrying a comment asking the next editor to keep it in sync, and that is
+ * precisely what did not happen: 0.32.0 added `key`, `archived` and
+ * `archived_at` to `UPGBaseNode` and left this list at fifteen entries, so
+ * every node holding a minted key was reported as carrying a non-spec
+ * top-level field. The lock now lives in the compiler; see
+ * `UPG_BASE_NODE_FIELDS` in `packages/upg-spec/src/shapes/base-node.ts`.
  */
-const CANONICAL_NODE_FIELDS = new Set<string>([
-  'id',
-  'type',
-  'title',
-  'slug',
-  'aliases',
-  'description',
-  'tags',
-  'status',
-  'source_id',
-  'source_type',
-  'mapping_confidence',
-  'external_tool',
-  'external_ref',
-  'external_id',
-  'properties',
-])
+const CANONICAL_NODE_FIELDS = UPG_BASE_NODE_FIELD_SET
 
 const validTypes = new Set<string>(UPG_TYPES)
 const canonicalEdgeKeys = new Set<string>(Object.keys(UPG_EDGE_CATALOG))

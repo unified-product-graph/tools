@@ -30,6 +30,8 @@ export type {
 export {
   UPGFileStore,
   UPGPortfolioStore,
+  UnknownNodeFieldError,
+  ImmutableNodeFieldError,
   type IntegrityReport,
   type ChangeEntry,
   type MergeResult,

@@ -17,6 +17,11 @@ import {
   crossProductScope,
 } from '@unified-product-graph/core'
 import { UPG_TYPES, rotateSlug, migrateEdge, migrateNodeProperties, UPG_VERSION, type UPGPropertyMigrationChange } from '@unified-product-graph/core'
+import {
+  UPG_BASE_NODE_FIELDS,
+  UPG_BASE_NODE_FIELD_SET,
+  UPG_BASE_NODE_SPECIAL_MERGE_FIELDS,
+} from '@unified-product-graph/core'
 import { serializeCanonical, normalizeDocument } from '@unified-product-graph/core'
 import { coerceProductStage } from '@unified-product-graph/core'
 import type { UPGEdgeType, UPGEntityType, UPGCrossEdgeType } from '@unified-product-graph/core'
@@ -235,6 +240,51 @@ function mergeEntityFields(
   }
 
   return { merged, conflicts, changedFromDisk }
+}
+
+/**
+ * A patch carried a top-level key that `UPGBaseNode` does not declare.
+ *
+ * Thrown rather than dropped: `updateNode` used to merge a hand-maintained
+ * field list and return the unchanged node as a success for anything outside
+ * it, which made a lost write indistinguishable from a landed one.
+ *
+ * If the field is a legitimate type-specific value it belongs under
+ * `properties`; if it is a new spec field it belongs on `UPGBaseNode`, from
+ * which the accepted set is derived.
+ */
+export class UnknownNodeFieldError extends Error {
+  constructor(
+    readonly nodeId: string,
+    readonly fields: string[],
+  ) {
+    super(
+      `Unknown top-level field(s) on node ${nodeId}: ${fields.join(', ')}. ` +
+        `Accepted: ${UPG_BASE_NODE_FIELDS.join(', ')}. ` +
+        `Type-specific values belong under "properties".`,
+    )
+    this.name = 'UnknownNodeFieldError'
+  }
+}
+
+/**
+ * A patch tried to change a field that is identity rather than content.
+ * Re-stating the current value is allowed, so spreading a whole node into a
+ * patch keeps working; only an actual change is refused.
+ */
+export class ImmutableNodeFieldError extends Error {
+  constructor(
+    readonly nodeId: string,
+    readonly field: string,
+    readonly current: unknown,
+    readonly attempted: unknown,
+  ) {
+    super(
+      `Cannot change immutable field "${field}" on node ${nodeId}: ` +
+        `${String(current)} -> ${String(attempted)}.`,
+    )
+    this.name = 'ImmutableNodeFieldError'
+  }
 }
 
 export class UPGFileStore {
@@ -1620,16 +1670,53 @@ export class UPGFileStore {
     this.scheduleSave()
   }
 
+  /**
+   * Merge a patch into a node's top-level fields.
+   *
+   * EVERY field declared by `UPGBaseNode` round-trips. The mergeable set is
+   * DERIVED from `UPG_BASE_NODE_FIELDS` rather than enumerated here, because
+   * the hand-maintained list this replaced is exactly how the bug it fixes
+   * happened: 0.32.0 added `key`, `archived` and `archived_at` to the shape and
+   * did not add them to the list, so a patch carrying any of the three was
+   * merged into nothing and returned the unchanged node as a success. A caller
+   * had no way to tell that apart from a write that landed. One of them, the
+   * key-minting contention loop in the local graph-service adapter, burned its
+   * whole retry budget re-minting a key that never moved.
+   *
+   * Unknown top-level keys now THROW `UnknownNodeFieldError` instead of being
+   * dropped. Silently discarding a caller's field under a success envelope is
+   * the failure mode above; a typed refusal is recoverable, a silent drop is
+   * not. Type-level callers cannot reach this path (`Partial<UPGBaseNode>`
+   * rejects an undeclared key at compile time), so in practice it fires on
+   * runtime-shaped input such as an MCP argument bag or parsed JSON.
+   *
+   * `properties` is deep-merged; use `unsetNodeProperties` to remove keys.
+   */
   updateNode(id: string, patch: Partial<UPGBaseNode>): UPGBaseNode {
     const node = this.nodeMap.get(id)
     if (!node) throw new Error(`Node not found: ${id}`)
 
-    // Shallow merge top-level fields
+    const unknownFields = Object.keys(patch).filter((k) => !UPG_BASE_NODE_FIELD_SET.has(k))
+    if (unknownFields.length > 0) throw new UnknownNodeFieldError(id, unknownFields)
+
+    // `id` is identity: re-stating it is allowed (callers spread a whole node
+    // into a patch), changing it is refused. A silent no-op here would orphan
+    // every edge in the caller's mental model while reporting success.
+    if (patch.id !== undefined && patch.id !== node.id) {
+      throw new ImmutableNodeFieldError(id, 'id', node.id, patch.id)
+    }
+
+    // Shallow-merge every base field with no special handling, derived from the
+    // shape. A field added to `UPGBaseNode` round-trips here with no edit.
+    const patchRecord = patch as Record<string, unknown>
+    const nodeRecord = node as unknown as Record<string, unknown>
+    for (const field of UPG_BASE_NODE_FIELDS) {
+      if (UPG_BASE_NODE_SPECIAL_MERGE_FIELDS.has(field)) continue
+      if (patchRecord[field] !== undefined) nodeRecord[field] = patchRecord[field]
+    }
+
+    // ── The special-merge fields, in order ──────────────────────────────────
     if (patch.type !== undefined) node.type = patch.type as UPGEntityType
-    if (patch.title !== undefined) node.title = patch.title
-    if (patch.description !== undefined) node.description = patch.description
-    if (patch.tags !== undefined) node.tags = patch.tags
-    if (patch.status !== undefined) node.status = patch.status
 
     // Slug change → rotate the old slug into aliases[]. Aliases
     // patched directly by the caller win; they replace the field outright.
