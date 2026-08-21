@@ -100,7 +100,7 @@ describe('resolveContainmentEdgeInferrable', () => {
       'insight_informs_opportunity',
       'objective_defers_capability',
       'objective_defers_feature',
-      'planning_cycle_schedules_user_story',
+      'planning_cycle_schedules_work_item',
       'work_item_blocks_work_item',
       'work_item_duplicates_work_item',
       'work_item_relates_to_work_item',

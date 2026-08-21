@@ -154,34 +154,48 @@ describe('LinearAdapter: non-issue entity types', () => {
   })
 })
 
-// ─── Cycle skipping ───────────────────────────────────────────────────────────
+// ─── Cycles: imported since 0.32.0, skipped before it ────────────────────────
 
-describe('LinearAdapter: cycle skipping', () => {
-  it('cycle item is skipped with warning', async () => {
+describe('LinearAdapter: cycles import as planning_cycle', () => {
+  // These three tests previously asserted that every cycle was DROPPED with a
+  // warning saying cycles had "no UPG equivalent". `planning_cycle` shipped at
+  // spec 0.20.0 and that line was stale for eleven releases; the 0.32.0
+  // scheduling widening made the round trip possible, so the assertions invert.
+  it('a cycle converts to a planning_cycle node, with no warning', async () => {
     const result = await adapter.convert([makeCycle('cy-1', 'Sprint 42')])
-    expect(result.nodes).toHaveLength(0)
-    expect(result.edges).toHaveLength(0)
-    expect(result.warnings?.some((w) => w.includes('Cycle'))).toBe(true)
+    expect(result.nodes).toHaveLength(1)
+    expect(result.nodes[0].type).toBe('planning_cycle')
+    expect(result.nodes[0].title).toBe('Sprint 42')
+    expect(result.warnings?.some((w) => w.includes('no UPG equivalent'))).toBeFalsy()
   })
 
-  it('multiple cycles all skipped, summary warning emitted', async () => {
+  it('carries the required cadence_kind and the source term it was called by', async () => {
+    const result = await adapter.convert([makeCycle('cy-1', 'Sprint 1')])
+    const props = result.nodes[0].properties as Record<string, unknown>
+    // `cadence_kind` is REQUIRED on planning_cycle, and a Linear Cycle is an
+    // execution box rather than a coarse period or a buffer.
+    expect(props.cadence_kind).toBe('iteration')
+    // Dual-band, the same idea as workflow_state: the canonical granularity is
+    // reasoned over, the source's own word is preserved beside it.
+    expect(props.cadence_label).toBe('cycle')
+  })
+
+  it('multiple cycles all convert', async () => {
     const result = await adapter.convert([
       makeCycle('cy-1', 'Sprint 1'),
       makeCycle('cy-2', 'Sprint 2'),
     ])
-    expect(result.nodes).toHaveLength(0)
-    // Summary warning mentions count
-    const summary = result.warnings?.find((w) => w.includes('Cycles were'))
-    expect(summary).toBeDefined()
+    expect(result.nodes).toHaveLength(2)
+    expect(result.nodes.every((n) => n.type === 'planning_cycle')).toBe(true)
   })
 
-  it('cycles are skipped but other items in the same batch convert normally', async () => {
+  it('cycles and issues in one batch both convert', async () => {
     const result = await adapter.convert([
       makeCycle('cy-1', 'Sprint 1'),
       makeIssue('i-1', 'Auth feature', 'feature'),
     ])
-    expect(result.nodes).toHaveLength(1)
-    expect(result.nodes[0].type).toBe('feature')
+    expect(result.nodes).toHaveLength(2)
+    expect(result.nodes.map((n) => n.type).sort()).toEqual(['feature', 'planning_cycle'])
   })
 })
 
@@ -204,9 +218,32 @@ describe('LinearAdapter: status normalisation (validated against the target life
     expect(result.nodes[0].status).toBe('todo')
   })
 
-  it('"Backlog" on a task is omitted (proposed is not a task phase)', async () => {
+  it('"Backlog" on a task maps to the backlog phase (0.32.0: WORK_ITEM gained it)', async () => {
+    // This test previously asserted the status was OMITTED, and that assertion
+    // was correct about the code and wrong about the world: "Backlog" is the
+    // single largest state on a real board (183 of a measured 1,032-issue
+    // corpus), and every one of those issues was arriving with no status.
     const result = await adapter.convert([makeIssue('i-1', 'Backlog', undefined, { state: 'Backlog' })])
-    expect(result.nodes[0].status).toBeUndefined()
+    expect(result.nodes[0].status).toBe('backlog')
+  })
+
+  it('"In Review" on a task maps to in_review rather than falling through', async () => {
+    // The normaliser had no review branch, so "In Review" survived as the
+    // literal string "in review", failed the lifecycle check, and was dropped.
+    const result = await adapter.convert([makeIssue('i-1', 'In Review', undefined, { state: 'In Review' })])
+    expect(result.nodes[0].status).toBe('in_review')
+  })
+
+  it('"Duplicate" on a task maps to cancelled, which names duplicate explicitly', async () => {
+    const result = await adapter.convert([makeIssue('i-1', 'Dup', undefined, { state: 'Duplicate' })])
+    expect(result.nodes[0].status).toBe('cancelled')
+  })
+
+  it('the raw source label always survives on workflow_state, mapped or not', async () => {
+    const result = await adapter.convert([makeIssue('i-1', 'Backlog', undefined, { state: 'Backlog' })])
+    const props = result.nodes[0].properties as Record<string, unknown>
+    expect(props.workflow_state).toBe('Backlog')
+    expect(props.workflow_state_category).toBe('backlog')
   })
 
   it('"Cancelled" on a task maps to the cancelled phase (0.25.1: WORK_ITEM gained the off-ramp)', async () => {
@@ -229,7 +266,10 @@ describe('LinearAdapter: status normalisation (validated against the target life
 
   it('normalizeLinearStatus maps to UPG delivery phase ids', () => {
     expect(normalizeLinearStatus('Done')).toBe('done')
-    expect(normalizeLinearStatus('Backlog')).toBe('proposed')
+    expect(normalizeLinearStatus('Backlog')).toBe('backlog')
+    expect(normalizeLinearStatus('Triage')).toBe('triage')
+    expect(normalizeLinearStatus('In Review')).toBe('in_review')
+    expect(normalizeLinearStatus('Duplicate')).toBe('cancelled')
     expect(normalizeLinearStatus('In Progress')).toBe('in_progress')
     expect(normalizeLinearStatus('Cancelled')).toBe('cancelled')
     expect(normalizeLinearStatus('Canceled')).toBe('cancelled')
@@ -323,14 +363,60 @@ describe('LinearAdapter: edge cases', () => {
     expect(result.warnings?.some((w) => w.includes('No items were converted'))).toBe(true)
   })
 
-  it('source_map has one entry per converted node', async () => {
+  it('source_map has one entry per converted node, cycles included', async () => {
+    // The cycle used to be excluded here because it was dropped. Now it
+    // converts, so it earns a source_map entry — and it MUST have one, or the
+    // deferred planning_cycle_schedules_work_item edge has nothing to resolve
+    // its source against and the scheduling link is silently lost.
     const result = await adapter.convert([
       makeIssue('i-1', 'Feature', 'feature'),
       makeIssue('i-2', 'Bug', 'bug'),
-      makeCycle('cy-1', 'Sprint'), // skipped; should NOT be in source_map
+      makeCycle('cy-1', 'Sprint'),
     ])
-    expect(Object.keys(result.source_map)).toHaveLength(2)
-    expect(result.source_map['cy-1']).toBeUndefined()
+    expect(Object.keys(result.source_map)).toHaveLength(3)
+    expect(result.source_map['cy-1']).toBeDefined()
+  })
+
+  it('an issue in a cycle gets a scheduling edge from the cycle, not a property', async () => {
+    // cycle_id was an undeclared stringly-typed stand-in for this edge.
+    const result = await adapter.convert([
+      makeCycle('cy-1', 'Sprint 42'),
+      makeIssue('i-1', 'Ship it', undefined, { cycle_id: 'cy-1' }),
+    ])
+    const cycleNode = result.nodes.find((n) => n.type === 'planning_cycle')!
+    const issueNode = result.nodes.find((n) => n.type !== 'planning_cycle')!
+    const sched = result.edges.find((e) => e.type === 'planning_cycle_schedules_work_item')
+    expect(sched, 'the scheduling edge must exist').toBeDefined()
+    // Direction matters: the cycle SCHEDULES the item.
+    expect(sched!.source).toBe(cycleNode.id)
+    expect(sched!.target).toBe(issueNode.id)
+    expect((issueNode.properties as Record<string, unknown>)?.cycle_id).toBeUndefined()
+  })
+
+  it('the citable key survives on the node, not as a vendor property', async () => {
+    const result = await adapter.convert([
+      makeIssue('i-1', 'Ship it', undefined, { identifier: 'LTN-311' }),
+    ])
+    expect(result.nodes[0].key).toBe('LTN-311')
+    expect((result.nodes[0].properties as Record<string, unknown>)?.linear_identifier).toBeUndefined()
+  })
+
+  it('priority is translated from Linear\'s integer to the string enum', async () => {
+    // Was written through raw: a live type violation on 958 of 1,032 issues.
+    const cases: Array<[number, string]> = [
+      [0, 'none'], [1, 'urgent'], [2, 'high'], [3, 'medium'], [4, 'low'],
+    ]
+    for (const [raw, expected] of cases) {
+      const result = await adapter.convert([makeIssue(`i-${raw}`, 'P', undefined, { priority: raw })])
+      expect((result.nodes[0].properties as Record<string, unknown>).priority).toBe(expected)
+    }
+  })
+
+  it('estimate lands on `effort` with its unit, not on an undeclared field', async () => {
+    const result = await adapter.convert([makeIssue('i-1', 'Sized', undefined, { estimate: 3 })])
+    const props = result.nodes[0].properties as Record<string, unknown>
+    expect(props.effort).toBe('3 points')
+    expect(props.estimate).toBeUndefined()
   })
 
   it('tags come from metadata.labels', async () => {

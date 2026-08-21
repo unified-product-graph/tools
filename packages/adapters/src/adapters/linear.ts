@@ -55,7 +55,10 @@ const LINEAR_ENTITY_TYPE_MAP: Record<string, string | null> = {
   project: 'project',
   milestone: 'milestone',
   document: 'document',
-  cycle: null, // No UPG equivalent: emit warning and skip
+  // 0.32.0: `planning_cycle` has existed since 0.20.0 and this line was stale
+  // for eleven releases. It now maps, and issues link to it via
+  // planning_cycle_schedules_work_item.
+  cycle: 'planning_cycle',
   initiative: 'initiative',
 }
 
@@ -68,19 +71,39 @@ const LINEAR_ENTITY_TYPE_MAP: Record<string, string | null> = {
  * lowercase substring to handle common naming variants.
  *
  * Spec normalisation:
- * - "Backlog" / "Triage" → proposed
+ * - "Backlog" → backlog (0.32.0: WORK_ITEM gained the phase. Before it existed
+ *   this mapped to `proposed`, which is not a WORK_ITEM phase, so
+ *   resolveLinearStatusForType omitted it — and Backlog is typically the single
+ *   largest group on a real board. Measured on a 1,032-issue corpus: 183 issues
+ *   imported with no status at all.)
+ * - "Triage" → open where the target lifecycle has it (INCIDENT: bug), falling
+ *   back to `backlog`. Triage and backlog are DIFFERENT buckets and were
+ *   previously collapsed onto one word.
  * - "In Progress" / "Started" → in_progress
+ * - "In Review" / "Review" / "QA" → in_review (0.32.0: the normaliser had no
+ *   review branch, so "In Review" fell through as the literal string "in review"
+ *   and was dropped as invalid.)
  * - "Done" / "Completed" → done
  * - "Cancelled" / "Canceled" → cancelled (Linear's default states use the
  *   US spelling; the spec phase id is `cancelled`)
+ * - "Duplicate" → cancelled (0.32.0: the WORK_ITEM `cancelled` description
+ *   names duplicate explicitly. Previously dropped.)
+ *
+ * The raw label always survives regardless, on `workflow_state`.
  */
 export function normalizeLinearStatus(state: string): string {
   const lower = state.toLowerCase().trim()
   // Map to real UPG delivery-lifecycle phase ids; resolveLinearStatusForType()
   // then keeps only those valid for the target type's lifecycle.
-  if (lower === 'backlog' || lower === 'triage' || lower.includes('backlog') || lower.includes('triage')) return 'proposed'
+  // Order matters: the more specific states are tested before the substrings
+  // that would swallow them ("in review" contains neither "progress" nor
+  // "done", but "ready for review" would match a naive review check late).
+  if (lower === 'triage' || lower.includes('triage')) return 'triage'
+  if (lower === 'backlog' || lower.includes('backlog')) return 'backlog'
+  if (lower === 'in review' || lower === 'review' || lower.includes('review') || lower === 'qa') return 'in_review'
   if (lower === 'in progress' || lower === 'started' || lower.includes('progress') || lower.includes('started')) return 'in_progress'
   if (lower === 'done' || lower === 'completed' || lower.includes('done') || lower.includes('complet')) return 'done'
+  if (lower === 'duplicate' || lower.includes('duplicate')) return 'cancelled'
   if (lower === 'cancelled' || lower === 'canceled' || lower.includes('cancel')) return 'cancelled'
   if (lower === 'todo' || lower === 'to do' || lower.includes('todo')) return 'todo'
   return lower
@@ -94,6 +117,61 @@ export function normalizeLinearStatus(state: string): string {
  * archived, bug → closed, investigation → abandoned).
  */
 const CANCEL_FALLBACKS = ['archived', 'closed', 'wont_fix', 'abandoned'] as const
+
+/**
+ * Per-lifecycle stand-ins for the triage family (0.32.0). INCIDENT names `open`
+ * and `triaged`; WORK_ITEM names neither and takes `backlog`, which is the
+ * honest landing spot for un-accepted work.
+ */
+const TRIAGE_FALLBACKS = ['open', 'triaged', 'backlog', 'proposed'] as const
+
+/**
+ * Linear's priority is an INTEGER 0-4; UPG's `Priority` is a string enum.
+ *
+ * Before 0.32.0 the adapter wrote the raw integer straight into the string
+ * slot — a live type violation on every issue that carried a priority, which on
+ * a measured corpus was 958 of 1,032. The mapping itself is 1:1 and always was;
+ * only the translation was missing.
+ *
+ * Linear: 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low.
+ * `0` is a REAL value, not an absence — a deliberate "no priority" — so it maps
+ * to the enum's explicit `none` rather than being dropped.
+ */
+export function mapLinearPriority(raw: unknown): string | undefined {
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN
+  if (!Number.isFinite(n)) {
+    // Already a valid enum string (a caller that pre-mapped): pass it through.
+    if (typeof raw === 'string' && ['urgent', 'high', 'medium', 'low', 'none'].includes(raw)) return raw
+    return undefined
+  }
+  switch (n) {
+    case 0: return 'none'
+    case 1: return 'urgent'
+    case 2: return 'high'
+    case 3: return 'medium'
+    case 4: return 'low'
+    default: return undefined
+  }
+}
+
+/**
+ * The six-bucket category of a resolved phase, for the dual-band pair.
+ *
+ * `workflow_state` keeps the source's raw label; this gives a consumer the
+ * canonical bucket to reason over without promoting that label to `status`.
+ * Narrowed to `StatusCategory` in the spec at 0.32.0, so an unmapped phase
+ * yields undefined rather than a free string.
+ */
+function statusCategoryFor(upgType: string, phaseId: string | undefined): string | undefined {
+  if (!phaseId) return undefined
+  const lc = getLifecycleForType(upgType)
+  if (!lc) return undefined
+  for (const p of lc.phases) {
+    if (p.id === phaseId) return p.status_category
+    for (const st of p.core_states ?? []) if (st.id === phaseId) return p.status_category
+  }
+  return undefined
+}
 
 /** Valid status values for a UPG entity type, or null when lifecycle-free. */
 function validStatusesForType(type: string): ReadonlySet<string> | null {
@@ -122,6 +200,15 @@ function resolveLinearStatusForType(rawState: string, upgType: string): string |
   if (normalised === 'cancelled') {
     for (const alias of CANCEL_FALLBACKS) if (valid.has(alias)) return alias
   }
+  // Triage is a real bucket but only some lifecycles name a phase for it
+  // (INCIDENT gives `bug` open/triaged). WORK_ITEM deliberately has no triage
+  // phase — a task nobody has accepted is a task in `backlog` — so a source
+  // "Triage" lands there rather than being dropped.
+  if (normalised === 'triage') {
+    for (const alias of TRIAGE_FALLBACKS) if (valid.has(alias)) return alias
+  }
+  // A review state on a lifecycle with no review phase is still in flight.
+  if (normalised === 'in_review' && valid.has('in_progress')) return 'in_progress'
   return undefined
 }
 
@@ -203,7 +290,7 @@ export class LinearAdapter implements UPGAdapter {
           source_id: `cycle-${cycle.id}`,
           source_type: 'cycle',
           title: cycle.name ?? `Cycle ${cycle.number}`,
-          metadata: { entity_kind: 'cycle', status: cycle.completedAt ? 'completed' : cycle.startsAt && new Date(cycle.startsAt) <= new Date() ? 'active' : 'future', team_id: team.id },
+          metadata: { entity_kind: 'cycle', status: cycle.completedAt ? 'completed' : cycle.startsAt && new Date(cycle.startsAt) <= new Date() ? 'active' : 'future', team_id: team.id, starts_at: cycle.startsAt ?? undefined, ends_at: cycle.endsAt ?? undefined, number: cycle.number },
         })
       }
     }
@@ -230,9 +317,13 @@ export class LinearAdapter implements UPGAdapter {
           status: state?.name ?? 'Backlog',
           parent_id: parent ? `issue-${parent.id}` : undefined,
           project_id: project ? `project-${project.id}` : undefined,
-          milestone_id: cycle ? `cycle-${cycle.id}` : undefined,
+          // An issue's CYCLE was being reported as its milestone_id, which then
+          // resolved to a project_targets_milestone edge or to nothing. They are
+          // different axes: a cycle is a time-box, a milestone is a gate.
+          cycle_id: cycle ? `cycle-${cycle.id}` : undefined,
           estimate: issue.estimate ?? undefined,
           priority: issue.priority,
+          identifier: issue.identifier ?? undefined,
         },
       })
     }
@@ -250,16 +341,15 @@ export class LinearAdapter implements UPGAdapter {
    * - entity_type "milestone"  → milestone
    * - entity_type "document"   → document
    * - entity_type "initiative" → initiative
-   * - entity_type "cycle"      → SKIPPED with warning
+   * - entity_type "cycle"      → planning_cycle (0.32.0; was SKIPPED)
    *
    * Parent-child hierarchy edges: resolved via catalogue-aware resolver.
    * Cross-domain edges: emitted when metadata relation IDs are present.
    *
-   * Status normalisation:
-   * - "Backlog" / "Triage"       → draft
-   * - "Todo" / "In Progress"     → active
-   * - "Done" / "Completed"       → complete
-   * - "Cancelled"                → abandoned
+   * Status normalisation: see `normalizeLinearStatus` for the mapping table and
+   * `resolveLinearStatusForType` for the per-lifecycle validation. The raw
+   * source label always survives on `workflow_state` regardless of how it maps,
+   * which is what makes the round trip lossless rather than merely successful.
    */
   async convert(items: SourceItem[], _config?: AdapterConfig): Promise<ImportResult> {
     const nodes: UPGBaseNode[] = []
@@ -268,7 +358,6 @@ export class LinearAdapter implements UPGAdapter {
     const warnings: string[] = []
 
     let counter = 0
-    let skippedCycles = 0
 
     // Deferred cross-domain edges: resolved after all nodes are built so
     // source IDs referenced in metadata can be looked up in sourceMap.
@@ -282,18 +371,13 @@ export class LinearAdapter implements UPGAdapter {
       const meta = item.metadata ?? {}
       const entityType = meta.entity_type as string | undefined
 
-      // ── Cycle: skip with warning ─────────────────────────────────────────
-      if (
-        item.source_type === 'cycle' ||
-        entityType === 'cycle'
-      ) {
-        skippedCycles++
-        warnings.push(
-          `"${item.title}" is a Linear Cycle. Cycles are ` +
-            `delivery-layer sprint constructs outside UPG scope. Skipped.`,
-        )
-        return
-      }
+      // ── Cycle: a real entity since spec 0.20.0 ───────────────────────────
+      // This branch used to skip every cycle with a warning that they were
+      // "outside UPG scope". `planning_cycle` shipped at 0.20.0 and the line was
+      // stale for eleven releases; at 0.32.0 the scheduling edge widened past
+      // `user_story`, so a cycle can finally hold the `task` that tracker
+      // imports actually produce. Cycles now import as nodes and issues link to
+      // them. Handled inline below rather than here.
 
       counter++
       const nodeId = `linear-import-${Date.now()}-${counter}`
@@ -338,16 +422,57 @@ export class LinearAdapter implements UPGAdapter {
       const rawState = (meta.status ?? meta.state) as string | undefined
       const status = rawState ? resolveLinearStatusForType(rawState, resolvedType) : undefined
 
+      // ── Cycle lifecycle: Linear's own three states map 1:1 ───────────────
+      // planned -> active -> closed is the planning_cycle lifecycle, and
+      // list() already computes future/active/completed from the dates.
+      const cycleStatus =
+        resolvedType === 'planning_cycle'
+          ? ({ completed: 'closed', active: 'active', future: 'planned' } as Record<string, string>)[
+              String(meta.status ?? '')
+            ]
+          : undefined
+
       // ── Tags from labels ─────────────────────────────────────────────────
       const labels = (meta.labels as string[] | undefined) ?? []
 
       // ── Properties ───────────────────────────────────────────────────────
+      // Four fixes at 0.32.0. Three of these were UNDECLARED properties — the
+      // adapter was inventing schema — and all three now have declared homes
+      // that this release created or already had.
       const properties: Record<string, unknown> = {}
-      if (meta.priority !== undefined) properties.priority = meta.priority
-      if (meta.estimate !== undefined) properties.estimate = meta.estimate
-      if (meta.identifier) properties.linear_identifier = meta.identifier
+      // `priority` was declared but written as Linear's raw integer 0-4 into a
+      // string enum: a live type violation on every issue that had one.
+      if (resolvedType === 'planning_cycle') {
+        // `cadence_kind` is REQUIRED, and a Linear Cycle is an execution box
+        // rather than a coarse period or a buffer. `cadence_label` keeps what
+        // the team calls it — the same dual-band idea as workflow_state.
+        properties.cadence_kind = 'iteration'
+        properties.cadence_label = 'cycle'
+        if (meta.starts_at) properties.starts_on = meta.starts_at
+        if (meta.ends_at) properties.ends_on = meta.ends_at
+        if (meta.number !== undefined) properties.sequence = meta.number
+      }
+      const priority = mapLinearPriority(meta.priority)
+      if (priority) properties.priority = priority
+      // `estimate` was undeclared on every target type — it was removed from
+      // `task` at 0.14.0 in favour of `effort`, the family-uniform name. Linear
+      // points are numeric, `effort` is a string by design ("3 points", "2d"),
+      // so the unit travels with the number instead of being guessed later.
+      if (meta.estimate !== undefined) properties.effort = `${meta.estimate} points`
       if (meta.due_date) properties.due_date = meta.due_date
-      if (meta.cycle_id) properties.cycle_id = meta.cycle_id
+      // The raw workflow state always survives, even when it mapped cleanly:
+      // that is what the dual-band pair is for, and it is what makes a
+      // round-trip lossless rather than merely successful.
+      if (rawState) {
+        properties.workflow_state = rawState
+        const bucket = statusCategoryFor(resolvedType, status)
+        if (bucket) properties.workflow_state_category = bucket
+      }
+      // `linear_identifier` was undeclared and vendor-namespaced. The citable
+      // key is now a base-node field, so it lands there — see the node build.
+      // `cycle_id` was an undeclared stringly-typed stand-in for the edge that
+      // did not exist; it is now a real planning_cycle_schedules_work_item edge,
+      // deferred below. Neither survives as a property.
 
       // ── Build node ────────────────────────────────────────────────────────
       const node: UPGBaseNode = {
@@ -356,7 +481,12 @@ export class LinearAdapter implements UPGAdapter {
         title: item.title,
         ...(item.content ? { description: item.content } : {}),
         ...(labels.length > 0 ? { tags: labels } : {}),
-        ...(status ? { status } : {}),
+        ...(cycleStatus ? { status: cycleStatus } : status ? { status } : {}),
+        // The externally-cited key (ENG-123). It survives the import verbatim
+        // because the corpus cites it from outside the tracker — repo docs,
+        // commit messages, other issues — and renumbering would silently break
+        // every one of those references.
+        ...(meta.identifier ? { key: meta.identifier as string } : {}),
         source_id: item.source_id,
         source_type: item.source_type,
         mapping_confidence: mappingConfidence,
@@ -390,6 +520,19 @@ export class LinearAdapter implements UPGAdapter {
           fromSourceId: item.source_id,
           toSourceId: initiativeId,
           edgeType: 'project_implements_initiative' as UPGEdgeType,
+        })
+      }
+
+      // planning_cycle → work item (0.32.0)
+      // Was an undeclared `cycle_id` string on the node: a stand-in for the edge
+      // that did not exist. Direction matters — the cycle SCHEDULES the item, so
+      // the cycle is the source, and the item keeps its feature/epic parent.
+      const cycleSourceId = meta.cycle_id as string | undefined
+      if (cycleSourceId && resolvedType !== 'planning_cycle') {
+        deferredEdges.push({
+          fromSourceId: cycleSourceId,
+          toSourceId: item.source_id,
+          edgeType: 'planning_cycle_schedules_work_item' as UPGEdgeType,
         })
       }
 
@@ -493,13 +636,6 @@ export class LinearAdapter implements UPGAdapter {
         type: edgeType,
         mapping_confidence: 'medium',
       })
-    }
-
-    if (skippedCycles > 0) {
-      warnings.push(
-        `${skippedCycles} Linear Cycle${skippedCycles > 1 ? 's were' : ' was'} not exported. ` +
-          `Cycles are sprint-layer constructs with no UPG equivalent.`,
-      )
     }
 
     if (nodes.length === 0) {

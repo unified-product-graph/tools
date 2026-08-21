@@ -256,7 +256,12 @@ export const CODA_STATUS_MAP: Record<string, string> = {
   'not started yet': 'todo',
   todo: 'todo',
   'to-do': 'todo',
-  backlog: 'todo',
+  // 0.32.0: WORK_ITEM gained a real `backlog` phase, so a source 'Backlog'
+  // maps to itself instead of being flattened into `todo`. It was only ever
+  // `todo` because there was nowhere else to put it, and the two mean different
+  // things — `todo` is committed and not started, `backlog` is not committed.
+  // The resolver falls back per-lifecycle for types that have no backlog phase.
+  backlog: 'backlog',
   open: 'open',
   planned: 'planned',
   proposed: 'proposed',

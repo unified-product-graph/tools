@@ -18,6 +18,8 @@ import {
   UPG_PRESENCE_EXCEPT_SPECS,
   UPG_EDGE_COUNT_SPECS,
   UPG_ENTITY_FILTER_SPECS,
+  UPG_EDGE_CATALOG,
+  UPG_WILDCARD_ENDPOINT,
 } from '@unified-product-graph/core'
 import type { UPGFileStore } from '../store.js'
 
@@ -180,8 +182,32 @@ export function collectAntiPatternInputs(
     // Skip dangling edges (endpoint not in node set); they don't tell us
     // anything about (source_type, edge_type, target_type) presence.
     if (!sourceType || !targetType) continue
-    const key = `${sourceType}|${edge.type}|${targetType}`
-    edgePresence[key] = true
+    edgePresence[`${sourceType}|${edge.type}|${targetType}`] = true
+
+    // Polymorphic edges are ALSO recorded under the wildcard endpoint (0.32.0).
+    //
+    // This index is keyed by the CONCRETE endpoint types of each instance, so
+    // without this a check declaring `target_type: 'node'` — the only honest
+    // declaration for an edge whose catalog target IS the wildcard — would
+    // match nothing. For a `not_exists` comparison that means firing on every
+    // graph, including the correct ones, which is the false-positive class the
+    // labeled-fixture doctrine exists to catch. Found at compile time when
+    // planning_cycle_schedules_work_item widened and the narrow type refused
+    // the wildcard; the type was right and the collector was incomplete.
+    //
+    // Both keys are written, never one: concrete checks keep working unchanged.
+    const def = UPG_EDGE_CATALOG[edge.type as keyof typeof UPG_EDGE_CATALOG] as
+      | { source_type?: string; target_type?: string }
+      | undefined
+    if (def?.target_type === UPG_WILDCARD_ENDPOINT) {
+      edgePresence[`${sourceType}|${edge.type}|${UPG_WILDCARD_ENDPOINT}`] = true
+    }
+    if (def?.source_type === UPG_WILDCARD_ENDPOINT) {
+      edgePresence[`${UPG_WILDCARD_ENDPOINT}|${edge.type}|${targetType}`] = true
+      if (def?.target_type === UPG_WILDCARD_ENDPOINT) {
+        edgePresence[`${UPG_WILDCARD_ENDPOINT}|${edge.type}|${UPG_WILDCARD_ENDPOINT}`] = true
+      }
+    }
   }
 
   // ── Orphan count: nodes with no incoming AND no outgoing edge ──────────────

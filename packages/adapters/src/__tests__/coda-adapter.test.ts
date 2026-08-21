@@ -192,11 +192,14 @@ describe('CodaAdapter: status normalisation (per-type, lifecycle-validated)', ()
     expect(result.nodes[0].status).toBe('in_progress')
   })
 
-  it("'Backlog' on Tasks resolves to 'todo' (valid task phase)", async () => {
-    // task lifecycle: todo | in_progress | in_review | done
+  it("'Backlog' on Tasks resolves to 'backlog' (0.32.0: WORK_ITEM gained the phase)", async () => {
+    // task lifecycle: backlog | todo | in_progress | in_review | done | cancelled
+    // Previously flattened to `todo`, because there was nowhere else to put it.
+    // The two are not the same claim: `todo` is committed and not started,
+    // `backlog` is not committed at all.
     const items: SourceItem[] = [makeRow('r1', 'Backlog item', 'Tasks', { status: 'Backlog' })]
     const result = await adapter.convert(items)
-    expect(result.nodes[0].status).toBe('todo')
+    expect(result.nodes[0].status).toBe('backlog')
   })
 
   it("'Cancelled' on Opportunities is omitted (opportunity lifecycle has no terminal cancel)", async () => {
@@ -534,8 +537,8 @@ describe('CODA_STATUS_MAP: spot checks (intermediate candidates, validated per-t
     expect(CODA_STATUS_MAP['done']).toBe('done')
   })
 
-  it("maps 'backlog' to candidate 'todo'", () => {
-    expect(CODA_STATUS_MAP['backlog']).toBe('todo')
+  it("maps 'backlog' to candidate 'backlog' (0.32.0, was 'todo')", () => {
+    expect(CODA_STATUS_MAP['backlog']).toBe('backlog')
   })
 
   it("maps 'cancelled' to candidate 'abandoned'", () => {
