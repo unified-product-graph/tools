@@ -283,7 +283,16 @@ export {
 } from './adapters/slack.js'
 
 // Delivery layer: Linear, GitHub, GitLab.
-export { LinearAdapter } from './adapters/linear.js'
+// The two normalisers ship alongside the adapter, matching every other adapter
+// in this barrel (Notion's `normalizeStatus`, GitLab's `GITLAB_STATUS_MAP`, and
+// so on). Linear's were the exception, which meant an importer doing its own
+// fetching had to reimplement the status and priority mapping or reach past the
+// package boundary for it. Both are pure functions over a raw Linear value.
+export {
+  LinearAdapter,
+  normalizeLinearStatus,
+  mapLinearPriority,
+} from './adapters/linear.js'
 export { GitHubAdapter } from './adapters/github.js'
 export {
   GitLabAdapter,

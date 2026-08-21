@@ -435,3 +435,20 @@ describe('LinearAdapter: edge cases', () => {
     expect(result.nodes[0].external_tool).toBe('linear')
   })
 })
+
+// ─── Public surface ───────────────────────────────────────────────────────────
+
+describe('barrel exports', () => {
+  // Regression pin for G4 (Linear-parity Phase 3 importer dry-run, 2026-08-21).
+  // Both normalisers existed and were tested, but only via the deep path above.
+  // The package barrel exported LinearAdapter alone, so an importer doing its
+  // own fetching had to reimplement the status and priority mapping or reach
+  // past the package boundary. Every other adapter exports its normaliser; this
+  // asserts Linear is no longer the exception.
+  it('exposes the Linear normalisers from the package entry point', async () => {
+    const barrel = await import('../index.js')
+    expect(typeof barrel.normalizeLinearStatus).toBe('function')
+    expect(typeof barrel.mapLinearPriority).toBe('function')
+    expect(barrel.normalizeLinearStatus).toBe(normalizeLinearStatus)
+  })
+})
