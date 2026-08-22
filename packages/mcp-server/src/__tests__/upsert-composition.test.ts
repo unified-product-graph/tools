@@ -180,7 +180,7 @@ describe('the input schema declares the view shapes inline', () => {
 // ── Argument plumbing: omitted vs [] ────────────────────────────────────────
 
 describe('omitted members vs an explicit empty array survive the argument bag', () => {
-  it('omitting members preserves the stored arrangement across a retire', async () => {
+  it('omitting members preserves the stored arrangement across a withdrawal', async () => {
     await call({
       slug: 'depot-board',
       title: 'Depot board',
@@ -196,7 +196,9 @@ describe('omitted members vs an explicit empty array survive the argument bag', 
     expect(retired.isError).toBeUndefined()
 
     const stored = readComposition(store, 'depot-board')
-    expect(stored?.lifecycle).toBe('retired')
+    // 0.34.1: `retired` is a deprecated alias, stored and read back as the
+    // spec's terminal phase for a composition.
+    expect(stored?.lifecycle).toBe('archived')
     expect(stored?.members.map((m) => m.id)).toEqual(['blk_1', 'blk_2'])
   })
 
@@ -334,9 +336,11 @@ describe('argument refusals', () => {
     expect((await call({ slug: 'x', lifecycle: 'draft' })).isError).toBe(true)
     expect((await call({ slug: 'x', title: 'X' })).isError).toBe(true)
 
-    const badPhase = await call({ slug: 'x', title: 'X', lifecycle: 'archived' })
+    // `archived` became a CANONICAL phase at 0.34.1, so the invalid value here
+    // is one the composition lifecycle genuinely does not have.
+    const badPhase = await call({ slug: 'x', title: 'X', lifecycle: 'sunset' })
     expect(badPhase.isError).toBe(true)
-    expect(badPhase.content[0].text).toContain('draft, published, retired')
+    expect(badPhase.content[0].text).toContain('draft, published, archived, retired')
   })
 
   it('rejects a negative or fractional rev rather than coercing it', async () => {

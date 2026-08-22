@@ -307,7 +307,9 @@ describe('omitting members preserves the arrangement; [] clears it', () => {
     expect(retired.status).toBe('ok')
 
     const stored = readComposition(store, 'depot-board')
-    expect(stored?.lifecycle).toBe('retired')
+    // 0.34.1: `retired` is a deprecated alias for the composition lifecycle's
+    // terminal phase, stored and read back as `archived`.
+    expect(stored?.lifecycle).toBe('archived')
     expect(stored?.members.map((m) => m.id)).toEqual(['blk_1', 'blk_2'])
     // Retiring is not a publish, so the revision does not move.
     expect(stored?.rev).toBe(1)

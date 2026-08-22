@@ -2018,6 +2018,8 @@ export function batchCreateNodes(
   const resolvedTypes: string[] = []
   const parentIndexOf: Array<number | null> = []
   const aliasWarnings: string[] = []
+  /** Keys claimed by EARLIER entries of this batch: key → index. */
+  const batchKeys = new Map<string, number>()
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i]
     parentIndexOf.push(null)
@@ -2041,6 +2043,30 @@ export function batchCreateNodes(
     }
     if (n.parent_id !== undefined && !store.getNode(n.parent_id)) {
       errors.push(`Node at index ${i}: parent_id "${n.parent_id}" not found in graph`)
+    }
+    // Within-product key uniqueness, checked UP FRONT so the caller gets every
+    // collision in one `errors` list rather than one per rolled-back attempt.
+    // `addNode` refuses the same thing at the store; this is the batch's
+    // promise that nothing is even attempted, not a second source of truth.
+    if (n.key !== undefined) {
+      const holder = store.getNodeByKey(n.key)
+      if (holder) {
+        errors.push(
+          `Node at index ${i}: key "${n.key}" is already held by node ${holder.id} ("${holder.title}"). ` +
+            `A key identifies one node within a product across entity types and is never reused.`,
+        )
+      } else {
+        // Two entries of THIS batch naming one key. Nothing on disk holds it,
+        // so only the batch can see this collision.
+        const twin = batchKeys.get(n.key)
+        if (twin !== undefined) {
+          errors.push(
+            `Node at index ${i}: key "${n.key}" is already claimed by node at index ${twin} in this batch.`,
+          )
+        } else {
+          batchKeys.set(n.key, i)
+        }
+      }
     }
   }
 

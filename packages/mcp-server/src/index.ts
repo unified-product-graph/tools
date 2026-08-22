@@ -17,7 +17,7 @@ import { parseArgs } from 'node:util'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { UPGFileStore } from '@unified-product-graph/sdk'
-import { createServer, SERVER_VERSION } from './server.js'
+import { createServer, createUnavailableServer, SERVER_VERSION } from './server.js'
 import { UPG_VERSION, isDeprecatedType, getReplacementType, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
 import { nanoid } from 'nanoid'
 
@@ -177,7 +177,24 @@ export async function runMcpServer() {
   // matches the blank-doc + store default and distinguishes the local server
   // from the cloud one.
   store.setWriter('upg-mcp-local', SERVER_VERSION)
-  await store.load(resolvedPath)
+  try {
+    await store.load(resolvedPath)
+  } catch (err) {
+    // An unloadable graph must be DIAGNOSABLE, not merely fatal.
+    //
+    // The load already threw, printed to stderr and exited non-zero, which is
+    // correct and which almost no MCP client can show its user: clients do not
+    // surface a server's stderr. What the user saw was a server that connected
+    // and went quiet, with the reason somewhere they could not reach. So the
+    // diagnosis goes to stderr for a supervisor AND to the wire for the client,
+    // and the process still exits non-zero once the client disconnects.
+    const diagnosis =
+      `UPG MCP server: cannot load ${resolvedPath}\n\n${(err as Error).message}\n`
+    process.stderr.write(`\n${diagnosis}\n`)
+    process.exitCode = 1
+    await createUnavailableServer(diagnosis).start()
+    return
+  }
 
   // Check for deprecated types and warn. Detection AND the suggested replacement
   // both come from entity-meta (the source of truth for current maturity), NOT the
@@ -271,7 +288,10 @@ function isEntrypoint(): boolean {
 
 if (isEntrypoint()) {
   runMcpServer().catch((err) => {
-    process.stderr.write(`Fatal: ${err}\n`)
+    // `err.message`, not `${err}`: template-stringifying an Error prefixes
+    // "Error: " onto text that already reads as a sentence, so the first line a
+    // user sees was `Fatal: Error: Invalid UPG document:`.
+    process.stderr.write(`\nUPG MCP server failed to start:\n${(err as Error).message ?? err}\n`)
     process.exit(1)
   })
 }

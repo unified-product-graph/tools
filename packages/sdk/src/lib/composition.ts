@@ -45,6 +45,19 @@
  *      apply. The publication gate that matters lives in the publishing
  *      application and is not duplicated here.
  *
+ * ── One behaviour NOT mirrored, corrected at 0.34.1 ─────────────────────────
+ * The adapter parked the lifecycle in `properties.lifecycle` and this module
+ * copied it. Mirroring was the right instinct and this was the wrong thing to
+ * mirror: `composition` declares no `lifecycle` property, the spec's rule for an
+ * undeclared bag key is to namespace it `<tool>:<key>`, and a node written that
+ * way carried no `status` at all — so a view that had just been published could
+ * not be found by `list_nodes({ status: 'published' })`, and `get_node` reported
+ * both `lifecycle` and `updated_at` as unknown properties on every composition
+ * this module had ever written. The phase now goes to `status`, whose vocabulary
+ * is the bespoke `composition` lifecycle already in the spec, and `updated_at`
+ * goes to the declared base field of that name. Both stale bag keys are cleared
+ * on the next publish, so a graph written by 0.34.0 heals itself.
+ *
  * ── Wire naming ────────────────────────────────────────────────────────────
  * Fields are snake_case throughout, matching the on-disk property names and the
  * MCP argument bag. That is not cosmetic: it keeps the tool handler a straight
@@ -64,21 +77,58 @@ export const COMPOSITION_TYPE = 'composition'
 export const COMPOSITION_FOCUS_EDGE = 'composition_focuses_node'
 
 /**
- * The bespoke 3-phase lifecycle of a published view, as the publishing
- * application stores it (`properties.lifecycle`).
+ * The lifecycle of a published view: being prepared, live, or withdrawn.
  *
- * NOT the generic node lifecycle: a published view is either being prepared,
- * live, or withdrawn, and the generic vocabulary has no word for the middle one
- * that means what this means.
+ * STORED ON `status`, THE BASE FIELD (corrected 0.34.1). This used to be written
+ * to `properties.lifecycle`, and the module header used to describe that as
+ * deliberate. It was wrong in three ways at once and each of them was visible
+ * from outside: `composition` declares no `lifecycle` property, so `get_node`
+ * reported it as unknown; the spec's rule for an undeclared bag key is to
+ * namespace it `<tool>:<key>`, which this was not; and a node written this way
+ * carried NO `status` at all, so a view that had just been published could not
+ * be found by `list_nodes({ status: 'published' })`. A lifecycle the
+ * lifecycle-aware reads cannot see is not a lifecycle.
+ *
+ * There was never a need for a private vocabulary: `composition` has a bespoke
+ * lifecycle in the spec (`grammar/lifecycles.ts`) whose three phases are exactly
+ * these three things.
+ *
+ * `retired` IS `archived`, and `archived` is the spec's word (0.34.1). The
+ * lifecycle's terminal phase is `archived`, described there as "withdrawn from
+ * the published set but retained, so an existing link resolves to a view marked
+ * out of date rather than to nothing" — which is precisely what this tool meant
+ * by `retired`. Two names for one state is the kind of thing that reads as two
+ * states six months later, so the spec's name wins and `retired` is kept as a
+ * DEPRECATED input alias that maps to `archived`. Nothing that passed `retired`
+ * breaks; reads report `archived`.
  */
-export type CompositionLifecycle = 'draft' | 'published' | 'retired'
+export type CompositionLifecycle = 'draft' | 'published' | 'archived' | 'retired'
 
-/** Runtime membership set for `CompositionLifecycle`, for argument validation. */
+/** The lifecycle values actually STORED. `retired` is an input alias and never
+ *  appears on a node. */
+export type CompositionPhase = 'draft' | 'published' | 'archived'
+
+/** Runtime membership set for `CompositionLifecycle`, for argument validation.
+ *  Accepts the deprecated `retired` alias; see `normalizeCompositionLifecycle`. */
 export const COMPOSITION_LIFECYCLES: readonly CompositionLifecycle[] = Object.freeze([
   'draft',
   'published',
+  'archived',
   'retired',
 ])
+
+/**
+ * Resolve a caller's lifecycle argument to the phase that is stored.
+ *
+ * The only mapping is the deprecated `retired` alias onto the spec's
+ * `archived`. Exported so a surface can report what it will actually write
+ * before writing it.
+ */
+export function normalizeCompositionLifecycle(
+  lifecycle: CompositionLifecycle,
+): CompositionPhase {
+  return lifecycle === 'retired' ? 'archived' : lifecycle
+}
 
 /**
  * A composition as read back from the store.
@@ -243,7 +293,15 @@ export function readComposition(store: UPGFileStore, id: string): UPGComposition
     slug: node.id,
     title: node.title ?? 'Untitled',
     ...(node.description ? { description: node.description } : {}),
-    lifecycle: (props.lifecycle as CompositionLifecycle | undefined) ?? 'draft',
+    // `status` first, `properties.lifecycle` second. The fallback reads a
+    // composition written by 0.34.0, the one release that parked the phase in
+    // the bag; it costs one `??` and saves those graphs a migration. A stale
+    // bag key is cleared the next time the view is published.
+    lifecycle: normalizeCompositionLifecycle(
+      (node.status as CompositionLifecycle | undefined) ??
+        (props.lifecycle as CompositionLifecycle | undefined) ??
+        'draft',
+    ),
     focus_node_ids: focus,
     members: Array.isArray(props.members) ? (props.members as CompositionMember[]) : [],
     ...(props.member_query ? { member_query: props.member_query as UPGViewQuery } : {}),
@@ -337,19 +395,25 @@ function writeComposition(s: UPGFileStore, input: UpsertCompositionInput): void 
   // Re-derived, never taken from the caller. Two publishers racing produce N+1
   // then N+2; neither can regress the count or land on it twice.
   const publishing = input.lifecycle === 'published'
+  const phase = normalizeCompositionLifecycle(input.lifecycle)
   const now = new Date().toISOString()
   const props: Record<string, unknown> = {
     ...(existing?.properties ?? {}),
-    lifecycle: input.lifecycle,
-    // An omitted field leaves the stored one alone. Retiring a view must not
+    // An omitted field leaves the stored one alone. Withdrawing a view must not
     // erase what it looked like, nor what selects into it.
     ...(input.members !== undefined ? { members: input.members } : {}),
     ...(input.member_query !== undefined ? { member_query: input.member_query } : {}),
     ...(input.presentation !== undefined ? { presentation: input.presentation } : {}),
     rev: publishing ? storedRev + 1 : storedRev,
     ...(input.published_by ? { published_by: input.published_by } : {}),
-    updated_at: now,
   }
+  // Both keys this writer used to park in the bag, cleared off any node that
+  // carries them. `lifecycle` now lives on `status` and `updated_at` is a
+  // declared base field, so leaving either behind would keep a node reporting
+  // unknown properties forever. A composition written by 0.34.0 self-heals on
+  // its next publish rather than needing a migration.
+  delete props.lifecycle
+  delete props.updated_at
   // Every (re)publish restamps this. It is the timestamp of the most recent
   // print, not of the first one.
   if (publishing) props.published_at = now
@@ -357,14 +421,21 @@ function writeComposition(s: UPGFileStore, input: UpsertCompositionInput): void 
   if (existing) {
     s.updateNode(input.slug, {
       title: input.title,
+      status: phase,
+      updated_at: now,
       ...(input.description !== undefined ? { description: input.description } : {}),
       properties: props,
     } as Partial<UPGBaseNode>)
+    // `updateNode` deep-MERGES properties, so the two deletes above would be
+    // undone by the stored copy. Applied explicitly afterwards.
+    s.unsetNodeProperties(input.slug, ['lifecycle', 'updated_at'])
   } else {
     s.addNode({
       id: input.slug,
       type: COMPOSITION_TYPE as UPGEntityType,
       title: input.title,
+      status: phase,
+      updated_at: now,
       ...(input.description ? { description: input.description } : {}),
       properties: props,
     } as UPGBaseNode)

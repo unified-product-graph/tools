@@ -753,8 +753,11 @@ unknown properties instead of warning.
 
 - Returns a textError when `node_id` is missing, the type migration
 fails, the `status` is not a valid lifecycle phase for the type, when
-`strict: true` and unknown properties are present, or when the underlying
-store rejects the patch.
+`strict: true` and unknown properties are present, when the bag carries a
+top-level field `UPGBaseNode` does not declare (`UnknownNodeFieldError`),
+when it tries to CHANGE `id` (`ImmutableNodeFieldError`), or when the
+underlying store rejects the patch. The two field refusals are checked
+BEFORE the type migration, so a refused call mutates nothing.
 
 **See also:** `migrate_type`, `batch_update_nodes`
 
@@ -2434,7 +2437,7 @@ or when `stage` is non-canonical (same strict validation as create_product).
 
 ### `upsert_composition`
 
-Create or republish a composition (a named, published view) at `slug`, writing the node and its `composition_focuses_node` edges in ONE atomic commit. Use this instead of create_node/update_node for any composition write, because `rev` is DERIVED: it is re-read inside the write and incremented only on a transition into `published`, so update_node({ properties: { rev: N } }) writes whatever number you happen to be holding and is silently wrong. Reads stay generic: list_nodes({ type: "composition" }) enumerates views, and the id IS the slug so get_node({ id: slug }) returns the view and its focus edges together. Pass `rev` to make the write conditional on the revision you last read; a mismatch refuses with `stored_rev` and leaves the file byte-unchanged rather than overwriting a print you never saw. Omitting `members` PRESERVES the stored arrangement (so retiring or renaming a view does not erase what it looked like) while `[]` clears it. A `focus_node_ids` entry that does not resolve in this graph is dropped rather than written as a dangling edge. To withdraw a view, write lifecycle "retired" rather than deleting it, so existing links resolve to something honest.
+Create or republish a composition (a named, published view) at `slug`, writing the node and its `composition_focuses_node` edges in ONE atomic commit. Use this instead of create_node/update_node for any composition write, because `rev` is DERIVED: it is re-read inside the write and incremented only on a transition into `published`, so update_node({ properties: { rev: N } }) writes whatever number you hold and is silently wrong. Reads stay generic: list_nodes({ type: "composition" }) enumerates views and `status` filters them by lifecycle, and the id IS the slug so get_node({ id: slug }) returns the view and its focus edges together. Pass `rev` to make the write conditional on the revision you last read; a mismatch refuses with `stored_rev` and leaves the file byte-unchanged rather than overwriting a print you never saw. Omitting `members` PRESERVES the stored arrangement (so withdrawing or renaming a view keeps what it looked like) while `[]` clears it. A `focus_node_ids` entry that does not resolve here is dropped rather than written as a dangling edge. To withdraw a view, write lifecycle "archived" rather than deleting it, so old links resolve to something honest.
 
 **Atomicity:** `atomic (node + focus edges in a single flush; a refused write
 never touches the file).`
@@ -2445,7 +2448,7 @@ never touches the file).`
 | ---- | ---- | -------- | ----------- |
 | `description` | string |  | What this view is for. Omit to leave any stored description alone. |
 | `focus_node_ids` | array |  | Nodes this view is ABOUT, written as `composition_focuses_node` edges. This is what makes "which published views show this persona?" answerable to a tool that cannot parse the URLs of whichever tool published the view. An empty set is valid: a view scoped by query rather than enumeration focuses nothing in particular. Ids that do not resolve here are dropped. |
-| `lifecycle` | `draft` \| `published` \| `retired` | ✓ | Where the view stands: "draft" while it is being arranged and has never been live, "published" once it resolves at its slug, "retired" when withdrawn but kept so old links resolve. Only a write with "published" increments `rev`. |
+| `lifecycle` | `draft` \| `published` \| `archived` \| `retired` | ✓ | Where the view stands: "draft" while it is being arranged and has never been live, "published" once it resolves at its slug, "archived" when withdrawn but kept so old links resolve. Written to the node's `status`, using the phases the spec declares for a composition. "retired" is a DEPRECATED alias for "archived" and is accepted, stored as "archived". Only a write with "published" increments `rev`. |
 | `member_query` | object |  | A declarative, portable SELECTION over the graph: which nodes the view shows. Selection only; what it looks like is `presentation`. `clauses` is authoritative and the named fields are a positive-only shorthand for it, so a reader that finds `clauses` uses it and ignores the named fields. Holds no node references except `classified_as`, and relative selections walk from the focused set via `from_focus` rather than naming ids. |
 | `members` | array |  | The frozen block arrangement. OMIT to leave the stored arrangement untouched; pass [] to clear it. The two are different instructions. |
 | `presentation` | object |  | Advisory rendering intent. A consumer MAY ignore every field here and stay conformant, because every default it then applies is the safe one. |

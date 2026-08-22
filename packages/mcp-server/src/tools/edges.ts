@@ -8,7 +8,13 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId, openPortfolioStoreIfExists } from '@unified-product-graph/sdk'
 import type { UPGEdge, UPGEdgeType } from '@unified-product-graph/core'
-import { UPG_EDGE_CATALOG, UPG_EDGE_TYPES, resolveContainmentEdge, validateEdgeProperties } from '@unified-product-graph/core'
+import {
+  UPG_EDGE_CATALOG,
+  UPG_EDGE_TYPES,
+  UPG_EDGE_MIGRATIONS,
+  resolveContainmentEdge,
+  validateEdgeProperties,
+} from '@unified-product-graph/core'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
 import { validateExplicitEdgeType } from '@unified-product-graph/sdk'
 import { preflightPayload } from '../lib/payload-guard.js'
@@ -153,14 +159,56 @@ function closestEdgeType(type: string): string | null {
 }
 
 /**
- * Batch-5/6 #28: enrich an unknown explicit edge type with a `did_you_mean`.
- * Prefers the canonical edge for the resolved endpoint types (what
- * `resolve_edge_for_pair` returns); falls back to the closest catalogue key by
- * name when the endpoints don't resolve or the pair has no canonical edge — so
- * a typo'd type always gets a concrete suggestion, not just a pointer to
- * resolve_edge_for_pair.
+ * The registered rename for an edge type, if this type was renamed.
+ *
+ * `UPG_EDGE_MIGRATIONS` is keyed by the release that made the change; a type
+ * appears at most once, so the first match across releases is the answer.
+ * Authoritative in a way the fuzzy name match below is not: a rename is a fact
+ * the spec recorded, not a guess from an edit distance.
  */
-function unknownEdgeTypeHint(type: string, sourceType?: string, targetType?: string): string {
+function renamedEdgeType(type: string): string | null {
+  for (const entries of Object.values(UPG_EDGE_MIGRATIONS)) {
+    for (const m of entries) {
+      if (m.kind === 'rename' && m.from === type) return m.to
+    }
+  }
+  return null
+}
+
+/**
+ * Enrich an unknown explicit edge type with a `did_you_mean` (Batch-5/6 #28,
+ * migration tier added 0.34.1).
+ *
+ * Three tiers, in order of how much they know:
+ *
+ *   1. A REGISTERED RENAME. The spec recorded that this exact type became that
+ *      exact type, so nothing else can be more right.
+ *   2. The canonical edge for the resolved endpoint types (what
+ *      `resolve_edge_for_pair` returns).
+ *   3. The closest catalogue key by name, so a typo always gets a concrete
+ *      suggestion rather than a pointer to another tool.
+ *
+ * Tier 1 is new. Before it, a renamed type reached tier 3 and was answered by
+ * edit distance — which happened to land on the right name for both renames in
+ * the catalogue and would not have, for a rename that widened a verb rather
+ * than a noun. More to the point, `get_catalog_entry` did not consult the
+ * migrations either and so answered "Unknown edge type" flat: the server's own
+ * instructions tell an agent to introspect before writing, and the agent that
+ * obeyed hit a dead end while the one that wrote blind got the hint. Both
+ * surfaces now call THIS function, so they cannot answer differently.
+ */
+export function unknownEdgeTypeHint(
+  type: string,
+  sourceType?: string,
+  targetType?: string,
+): string {
+  const renamed = renamedEdgeType(type)
+  if (renamed) {
+    return (
+      `Edge type "${type}" is not in UPG_EDGE_CATALOG. ` +
+      `did_you_mean: "${renamed}" (renamed in UPG_EDGE_MIGRATIONS; see list_catalog({kind:"edge_migrations"})).`
+    )
+  }
   const byPair = sourceType && targetType ? resolveContainmentEdge(sourceType, targetType) : null
   const suggestion = byPair ?? closestEdgeType(type)
   if (suggestion) {

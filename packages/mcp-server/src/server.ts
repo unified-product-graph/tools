@@ -423,6 +423,67 @@ export function createDispatcher(ctx: ToolContext, opts: { logFile?: string } = 
   return { dispatch, requestLedger, contentLedger }
 }
 
+/**
+ * A server for a graph that could not be loaded.
+ *
+ * WHY THIS EXISTS. Point the server at a `.upg` that fails envelope validation
+ * and it writes the reason to stderr and exits non-zero — correct, and invisible
+ * to almost every MCP client, because clients do not surface a server's stderr.
+ * What the user sees is a server that connected and went quiet, with the
+ * diagnosis in a place they cannot reach. A regression audit reported it as a
+ * hang; it is not a hang, it is a dead server whose last words nobody hears.
+ *
+ * So the handshake is answered. `tools/list` still returns the full surface, so
+ * the client renders normally, and every `tools/call` returns the same
+ * diagnosis the stderr line carries — naming the file and the fields. The
+ * process still exits non-zero when the client disconnects (`process.exitCode`
+ * is set by the caller), so a supervisor still sees a failure.
+ *
+ * Deliberately NOT `createServer`. That one reads `store.getDocument()` while
+ * building its context, which throws on a store that never loaded, and threading
+ * a degraded mode through the real dispatcher would put a "is the graph
+ * missing?" branch in front of all 99 tools. This shares nothing with the
+ * healthy path and therefore cannot affect it.
+ */
+export function createUnavailableServer(diagnosis: string) {
+  // THE HANDSHAKE ITSELF SAYS IT IS DEGRADED (0.34.1, on QA's reading).
+  //
+  // The first cut answered `initialize` with byte-identical `serverInfo` and
+  // `instructions` to a healthy server, which trades one silent failure for a
+  // quieter one: a client that renders the handshake shows a server that looks
+  // completely normal, and only a tool CALL reveals otherwise. Anything that
+  // reads capabilities without calling a tool — a picker, a status line, a
+  // health check — reports green.
+  //
+  // So the degradation is stated in the two places a client displays without
+  // calling anything: the server NAME and the top of the instructions, both
+  // carrying the file path and the fields that are missing. A caller that never
+  // makes a tool call still learns the graph did not load.
+  const banner =
+    `UPG MCP SERVER IS DEGRADED: the graph could not be loaded, so every tool ` +
+    `call will fail until it is fixed.\n\n${diagnosis}\n` +
+    `${'─'.repeat(60)}\n\n`
+  const server = new Server(
+    { name: 'unified-product-graph (DEGRADED: graph failed to load)', version: SERVER_VERSION },
+    { capabilities: { tools: {} }, instructions: banner + SERVER_INSTRUCTIONS },
+  )
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: TOOL_DEFINITIONS }
+  })
+
+  server.setRequestHandler(CallToolRequestSchema, async () => {
+    return { isError: true, content: [{ type: 'text' as const, text: diagnosis }] }
+  })
+
+  return {
+    async start() {
+      const transport = new StdioServerTransport()
+      await server.connect(transport)
+    },
+  }
+}
+
 export function createServer(store: UPGFileStore) {
   const server = new Server(
     { name: 'unified-product-graph', version: SERVER_VERSION },

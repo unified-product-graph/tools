@@ -10,7 +10,12 @@ import { text, textError } from '../lib/server-context.js'
 import { preflightPayload, getSoftLimit } from '../lib/payload-guard.js'
 import { degradeProgressively } from '../lib/payload-degrader.js'
 import path from 'node:path'
-import { edgeId, UPGFileStore } from '@unified-product-graph/sdk'
+import {
+  edgeId,
+  UPGFileStore,
+  buildNodePatch,
+  checkUndeclaredProperties,
+} from '@unified-product-graph/sdk'
 import {
   isPortfolioScopedType,
   writePortfolioScopedNode,
@@ -58,35 +63,16 @@ import { resolveConfiguration } from '../lib/configuration-view.js'
 // ── Unknown-property guard ─────────────────────────────────────────
 
 /**
- * Validate `properties` against the entity type's property schema.
+ * Property-bag keys the entity type does not declare.
  *
- * @returns `unknown_properties` (keys not in the schema) and a `warning`
- *   string suitable for embedding in the tool response. Both are empty/undefined
- *   when all properties are canonical.
- *
- * Entity types with no registered schema (no typed properties) are treated as
- * fully permissive: no unknowns reported.
+ * A thin alias over the SDK helper, kept so the many call sites in this file
+ * read unchanged. The implementation moved OUT of this module at 0.34.1 because
+ * it was the reason the server's two surfaces could disagree about one node:
+ * `get_node` asked "is this key declared?" while `validate_graph` asked "is
+ * this key covered by a migration rule?" and reported `property_drift: 0` for
+ * the same node. Both now ask this.
  */
-function checkUnknownProperties(
-  entityType: string,
-  properties: Record<string, unknown> | undefined,
-): { unknown_properties: string[]; warning: string | undefined } {
-  if (!properties || Object.keys(properties).length === 0) {
-    return { unknown_properties: [], warning: undefined }
-  }
-  const schema = getPropertySchema(entityType)
-  if (!schema) {
-    // No schema registered for this type; all properties are allowed.
-    return { unknown_properties: [], warning: undefined }
-  }
-  const unknown = Object.keys(properties).filter((k) => !(k in schema))
-  if (unknown.length === 0) return { unknown_properties: [], warning: undefined }
-  const warning =
-    `Unknown properties for type "${entityType}": [${unknown.map((k) => `"${k}"`).join(', ')}]. ` +
-    `These will be stored but are not part of the canonical UPG schema. ` +
-    `Check get_entity_schema("${entityType}") for the canonical property list.`
-  return { unknown_properties: unknown, warning }
-}
+const checkUnknownProperties = checkUndeclaredProperties
 
 /**
  * List entities in the graph with filtering, edge inclusion, and count-only
@@ -1079,6 +1065,33 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
 }
 
 /**
+ * `update_node` argument names that are NOT node fields.
+ *
+ * Everything an update bag carries is either one of these or a declared
+ * `UPGBaseNode` field; anything else is refused by `buildNodePatch`. Stated as
+ * data because the accepted set is DERIVED from the shape rather than listed
+ * here: only the names that are the tool's own have to be written down, and a
+ * field added to `UPGBaseNode` becomes patchable with no edit to this file.
+ */
+const UPDATE_NODE_CONTROL_ARGS: ReadonlySet<string> = new Set([
+  'node_id',
+  'strict',
+  'unset_properties',
+  // Not on this tool's schema: the dispatcher reads it off EVERY active write
+  // (`server.ts`, the Batch-4 #20 guard) before the handler is called, so it
+  // arrives in the bag of any tool a caller guards. Undeclared here would make
+  // the guard itself an unknown field.
+  'expect_product',
+])
+
+/** The same set for one entry of a `batch_update_nodes` payload. `strict` and
+ *  `expect_product` are batch-level rather than per-entry, so neither appears. */
+const BATCH_UPDATE_CONTROL_ARGS: ReadonlySet<string> = new Set([
+  'node_id',
+  'unset_properties',
+])
+
+/**
  * Update an existing entity. Unspecified fields are preserved. Passing `type`
  * performs a single-node migration (delegates to `migrateNodeType`): every
  * incident edge is re-inferred against the catalog and the change is atomic
@@ -1096,8 +1109,11 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
  *   unknown properties instead of warning.
  * @throws Returns a textError when `node_id` is missing, the type migration
  *   fails, the `status` is not a valid lifecycle phase for the type, when
- *   `strict: true` and unknown properties are present, or when the underlying
- *   store rejects the patch.
+ *   `strict: true` and unknown properties are present, when the bag carries a
+ *   top-level field `UPGBaseNode` does not declare (`UnknownNodeFieldError`),
+ *   when it tries to CHANGE `id` (`ImmutableNodeFieldError`), or when the
+ *   underlying store rejects the patch. The two field refusals are checked
+ *   BEFORE the type migration, so a refused call mutates nothing.
  * @atomicity atomic-with-rollback (when `type` is changed); atomic for
  *   shallow-merge patches.
  * @see migrate_type
@@ -1119,6 +1135,24 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
     properties: args.properties as Record<string, unknown> | undefined,
   })
   if (keyRefusal !== null) return textError(keyRefusal)
+
+  // The patch is DERIVED from the argument bag against `UPG_BASE_NODE_FIELDS`,
+  // not hand-built from the fields this handler happens to name. Built HERE,
+  // before the type migration below, so a bag carrying an undeclared or
+  // immutable field mutates nothing at all — the atomicity 0.32.2 promised.
+  // See `buildNodePatch` for why the guard was unreachable until 0.34.1.
+  let patch: Record<string, unknown>
+  try {
+    patch = buildNodePatch(nid, args, {
+      control: UPDATE_NODE_CONTROL_ARGS,
+      currentId: store.getNode(nid)?.id,
+    }) as Record<string, unknown>
+  } catch (err) {
+    return textError((err as Error).message)
+  }
+  // Normalised after derivation, not instead of it.
+  if (patch.tags !== undefined) patch.tags = normalizeTags(patch.tags) ?? []
+
   const warnings: string[] = []
   const strict = (args.strict as boolean) ?? false
 
@@ -1133,16 +1167,9 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
     if (migrationResult.warning) warnings.push(migrationResult.warning)
   }
 
-  const patch: Record<string, unknown> = {}
-  if (args.title !== undefined) patch.title = args.title
-  if (args.description !== undefined) patch.description = args.description
-  if (args.tags !== undefined) patch.tags = normalizeTags(args.tags) ?? []
-  if (args.status !== undefined) patch.status = args.status
-  if (args.properties !== undefined) patch.properties = args.properties
-  // The archive axis is a DECLARED base-node field (0.32.0 C3), writable on
-  // create AND on update. `key` is the asymmetric one, refused above.
-  if (args.archived !== undefined) patch.archived = args.archived
-  if (args.archived_at !== undefined) patch.archived_at = args.archived_at
+  // `type` is a base field but never a merged one: it routed through the
+  // migration above and must not also be assigned here.
+  delete patch.type
 
   if (args.status !== undefined) {
     const existingNode = store.getNode(nid)
@@ -1341,6 +1368,32 @@ export const batchUpdateNodes: ToolHandler = (args, ctx): ToolResult => {
     const existing = store.getNode(u.node_id as string)
     if (!existing) return textError(`Update at index ${i}: node "${u.node_id}" not found`)
 
+    // A type change carries an edge re-inference and a property migration that
+    // this loop does not perform, and `batch_update_nodes` does not declare
+    // `type` for that reason. It used to be dropped in silence; say so instead
+    // and name the two doors that DO migrate.
+    if (u.type !== undefined) {
+      return textError(
+        `Update at index ${i}: "type" is not updatable through batch_update_nodes. ` +
+          `Changing a type re-infers every incident edge and migrates properties, which this batch does not do. ` +
+          `Use update_node({ node_id, type }) or migrate_type for one node at a time.`,
+      )
+    }
+
+    // Undeclared / immutable top-level fields, refused in the PRE-PASS. The
+    // batch writes in a loop below, so a guard that fired at the write would
+    // leave every earlier entry landed — a half-applied batch, which is the
+    // one thing a batch promises cannot happen. Derived, not hand-listed;
+    // see `buildNodePatch`.
+    try {
+      buildNodePatch(u.node_id as string, u, {
+        control: BATCH_UPDATE_CONTROL_ARGS,
+        currentId: existing.id,
+      })
+    } catch (err) {
+      return textError(`Update at index ${i}: ${(err as Error).message}`)
+    }
+
     // Property type validation up-front, before any mutation. Reject the
     // whole batch on the first violation. F4 (2026-05-20).
     if (u.properties !== undefined) {
@@ -1361,15 +1414,13 @@ export const batchUpdateNodes: ToolHandler = (args, ctx): ToolResult => {
 
   const unsetByNode: Record<string, string[]> = {}
   for (const u of updates) {
-    const patch: Record<string, unknown> = {}
-    if (u.title !== undefined) patch.title = u.title
-    if (u.description !== undefined) patch.description = u.description
-    if (u.status !== undefined) patch.status = u.status
-    if (u.tags !== undefined) patch.tags = normalizeTags(u.tags) ?? []
-    if (u.properties !== undefined) patch.properties = u.properties
-    // Same archive axis as the single-node door. One posture, both doors.
-    if (u.archived !== undefined) patch.archived = u.archived
-    if (u.archived_at !== undefined) patch.archived_at = u.archived_at
+    // Derived from the entry against `UPG_BASE_NODE_FIELDS`, exactly as the
+    // single-node door derives it. Re-run rather than carried from the
+    // pre-pass so the two cannot drift; it threw there if it were going to.
+    const patch = buildNodePatch(u.node_id as string, u, {
+      control: BATCH_UPDATE_CONTROL_ARGS,
+    }) as Record<string, unknown>
+    if (patch.tags !== undefined) patch.tags = normalizeTags(patch.tags) ?? []
 
     if (u.status !== undefined) {
       const existingNode = store.getNode(u.node_id as string)

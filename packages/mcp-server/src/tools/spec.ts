@@ -66,6 +66,7 @@ import {
   UPG_ENTITY_META,
   UPG_ENTITY_META_BY_NAME,
   UPG_ENTITY_TO_DOMAIN,
+  getEntityDescription,
   UPG_ANTI_PATTERNS,
   UPG_COUNT_BENCHMARKS,
   UPG_RELATIONSHIP_BENCHMARKS,
@@ -133,6 +134,7 @@ import {
   executeReflect,
   type ValidateGraphBody,
 } from '@unified-product-graph/sdk'
+import { unknownEdgeTypeHint } from './edges.js'
 import { validateGraph } from './validation.js'
 import { readSpecChangelog } from '@unified-product-graph/mcp-tooling'
 
@@ -934,7 +936,12 @@ export const getEdgeType: ToolHandler = (args): ToolResult => {
   const type = args.type as string | undefined
   if (!type) return textError('Missing required parameter: type')
   const def = (UPG_EDGE_CATALOG as Record<string, UPGEdgeDefinition>)[type]
-  if (!def) return textError(`Unknown edge type: ${type}`)
+  // The same hint `create_edge` gives, from the same function, so the read
+  // surface and the write surface cannot disagree about a renamed type. This
+  // used to answer "Unknown edge type: X" flat while create_edge named the
+  // replacement, which is backwards: the server's instructions tell an agent to
+  // introspect BEFORE writing, so the agent that obeyed hit the dead end.
+  if (!def) return textError(unknownEdgeTypeHint(type))
   return text(JSON.stringify({ type, ...def }, null, 2))
 }
 
@@ -1485,8 +1492,20 @@ export const getEntityMeta: ToolHandler = (args): ToolResult => {
   const meta = UPG_ENTITY_META_BY_NAME.get(name)
   if (!meta) return textError(`Unknown entity type: ${name}`)
   const typeToDomain = UPG_ENTITY_TO_DOMAIN as Readonly<Record<string, string>>
+  // Same addition as `get_entity_schema`, for the same reason: this returned
+  // name, type_id, maturity, since and domain_id, and nothing that said what
+  // the type is. See `UPG_ENTITY_DESCRIPTIONS`.
+  const description = getEntityDescription(name)
   return text(
-    JSON.stringify({ ...meta, domain_id: typeToDomain[name] ?? null }, null, 2),
+    JSON.stringify(
+      {
+        ...meta,
+        ...(description ? { description } : {}),
+        domain_id: typeToDomain[name] ?? null,
+      },
+      null,
+      2,
+    ),
   )
 }
 

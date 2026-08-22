@@ -32,6 +32,8 @@ export {
   UPGPortfolioStore,
   UnknownNodeFieldError,
   ImmutableNodeFieldError,
+  DuplicateNodeKeyError,
+  buildNodePatch,
   type IntegrityReport,
   type ChangeEntry,
   type MergeResult,

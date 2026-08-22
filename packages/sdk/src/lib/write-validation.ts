@@ -35,6 +35,7 @@ import {
   type UPGEdgeType,
 } from '@unified-product-graph/core'
 import { validateStatusAgainstLifecycle } from './tools.js'
+import { checkUndeclaredProperties } from './property-type-validator.js'
 import { validateEdgeTypePair } from './edge-pair-validator.js'
 
 export interface WriteValidationOptions {
@@ -148,11 +149,18 @@ export function unknownPropertyKeys(
   entityType: string,
   properties: Record<string, unknown>,
 ): string[] {
-  const schema = getPropertySchema(entityType)
-  // No declared schema → fully permissive; nothing to flag.
-  if (!schema) return []
-  const known = new Set(Object.keys(schema))
-  return Object.keys(properties).filter((k) => !known.has(k))
+  // Delegates, and the delegation is the point. This was the THIRD independent
+  // implementation of "is this bag key declared?" — the read surface had one,
+  // the graph-wide validator had another, and this one backed the write path.
+  // 0.34.1 collapsed the first two into `checkUndeclaredProperties` and gave it
+  // the `<tool>:<key>` namespace exemption the spec requires; this copy kept its
+  // own answer, so `create_node` went on warning about a correctly-namespaced
+  // extension that `get_node` and `validate_graph` had just stopped warning
+  // about. One call could carry both verdicts about one key.
+  //
+  // Three implementations of one question will disagree eventually; the only
+  // question is which release notices.
+  return checkUndeclaredProperties(entityType, properties).unknown_properties
 }
 
 export interface EdgeWriteValidation {

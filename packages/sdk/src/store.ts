@@ -322,6 +322,121 @@ export class ImmutableNodeFieldError extends Error {
   }
 }
 
+/**
+ * A create named a `key` that another node in this product already holds.
+ *
+ * WHY THIS IS AN ERROR AND NOT A SILENT NO-KEY. The minting rules do refuse in
+ * silence in one place — a portfolio-shared team's prefix mints nothing in a
+ * second product, and "refusal is NO-KEY and never an exception". That rule is
+ * about a key nobody asked for, chosen by inference. This is the opposite case:
+ * the caller NAMED the key. Dropping it would hand back a success envelope for a
+ * node that has no citation, which is the failure mode `UnknownNodeFieldError`
+ * exists to end, and a key parked nowhere reads as a key to a human and to
+ * nothing else.
+ *
+ * WHY ONLY ON CREATE. `key` is immutable once assigned, so create is the only
+ * moment a collision can be introduced. A graph that already holds one keeps
+ * loading (see `rebuildIndexes`): refusing to open it would leave its owner no
+ * way to repair it.
+ *
+ * SCOPE. Within the product, across entity types, exactly as `UPGBaseNode.key`
+ * declares. The portfolio-wide case is a different check with a different
+ * answer — `duplicate-key-across-products`, a `scope: 'portfolio'` anti-pattern
+ * shipped in 0.34.0, which rests on THIS invariant holding per product.
+ */
+export class DuplicateNodeKeyError extends Error {
+  constructor(
+    readonly key: string,
+    readonly existingNodeId: string,
+    readonly existingTitle?: string,
+  ) {
+    super(
+      `Key "${key}" is already held by node ${existingNodeId}` +
+        `${existingTitle ? ` ("${existingTitle}")` : ''} in this product. ` +
+        `A key identifies one node within a product across entity types, is immutable once assigned, ` +
+        `and is never reused. Choose an unused key, or omit "key" to create the node without one.`,
+    )
+    this.name = 'DuplicateNodeKeyError'
+  }
+}
+
+/**
+ * Turn a RUNTIME argument bag into a `Partial<UPGBaseNode>` patch, refusing
+ * what `updateNode` refuses, with the same errors, BEFORE anything is written.
+ *
+ * WHY THIS EXISTS, and why it is exported rather than kept private to the
+ * store. 0.32.2 shipped `UnknownNodeFieldError` / `ImmutableNodeFieldError` on
+ * `updateNode` and described them as firing "on runtime-shaped input such as a
+ * parsed argument bag". They did not, because no runtime-shaped input ever
+ * reached them: the MCP tool layer hand-built its patch by naming the fields it
+ * knew, so an undeclared key was discarded one frame ABOVE the guard and the
+ * caller got a success envelope holding an unchanged node. The guard was real
+ * and unreachable — the same class of defect the derived field list was
+ * introduced to end, one layer up.
+ *
+ * A hand-built patch cannot be fixed by remembering harder. The mergeable set
+ * is derived from `UPG_BASE_NODE_FIELDS`, so the ACCEPTED set has to be derived
+ * from it too, at the boundary where runtime input first arrives. That is this
+ * function.
+ *
+ * WHY IT REFUSES BEFORE THE WRITE RATHER THAN AT IT. `updateNode`'s guards fire
+ * inside the mutation, which is atomic for one node but not for a caller that
+ * does other work first — an MCP `update_node` carrying a `type` change runs
+ * the type migration, THEN patches. A refusal at the patch would leave the
+ * migration landed, which is exactly the half-applied state the atomicity
+ * promise rules out. Callers run this first and mutate nothing when it throws.
+ *
+ * CONTROL KEYS are the caller's own argument names that are not node fields
+ * (`node_id`, `strict`, `unset_properties` on the MCP surface). They are named
+ * by the caller because only the caller knows them; everything else in the bag
+ * must be a declared base field or it is refused. `type` belongs in this set
+ * for surfaces that route a type change through a migration rather than a
+ * merge.
+ *
+ * @param nodeId  the node being patched, for the error messages
+ * @param bag     the runtime argument bag
+ * @param opts.control  argument names to ignore (not node fields)
+ * @param opts.currentId  the node's stored id; when given, a `bag.id` that
+ *   differs from it is refused. Re-stating the same id is allowed, so a caller
+ *   spreading a whole node into a patch keeps working.
+ * @throws {UnknownNodeFieldError} the bag holds a key `UPGBaseNode` does not declare
+ * @throws {ImmutableNodeFieldError} the bag tries to CHANGE `id`
+ */
+export function buildNodePatch(
+  nodeId: string,
+  bag: Record<string, unknown>,
+  opts: { control: ReadonlySet<string>; currentId?: string },
+): Partial<UPGBaseNode> {
+  const unknownFields: string[] = []
+  const patch: Record<string, unknown> = {}
+
+  for (const [k, v] of Object.entries(bag)) {
+    if (opts.control.has(k)) continue
+    if (!UPG_BASE_NODE_FIELD_SET.has(k)) {
+      unknownFields.push(k)
+      continue
+    }
+    // An explicitly-absent field is not a patch. Preserved from the hand-built
+    // builders this replaces: `undefined` meant "not supplied" there and means
+    // the same here, so an argument bag that spells out every optional field as
+    // undefined still patches nothing.
+    if (v !== undefined) patch[k] = v
+  }
+
+  // Reported together, so a caller with three typos fixes three typos.
+  if (unknownFields.length > 0) throw new UnknownNodeFieldError(nodeId, unknownFields)
+
+  if (
+    opts.currentId !== undefined &&
+    patch.id !== undefined &&
+    patch.id !== opts.currentId
+  ) {
+    throw new ImmutableNodeFieldError(nodeId, 'id', opts.currentId, patch.id)
+  }
+
+  return patch as Partial<UPGBaseNode>
+}
+
 export class UPGFileStore {
   private doc!: UPGDocument
   private filePath!: string
@@ -335,6 +450,13 @@ export class UPGFileStore {
   private nodeMap = new Map<string, UPGBaseNode>()
   private edgeMap = new Map<string, UPGEdge>()
   private edgesByNode = new Map<string, Set<string>>() // nodeId → Set<edgeId>
+  /**
+   * `node.key` → node id, the index that makes within-product key uniqueness
+   * checkable. Built TOLERANTLY at load (see `rebuildIndexes`) and enforced
+   * only on the create path, because a graph that already holds a collision
+   * must still open.
+   */
+  private keyIndex = new Map<string, string>()
 
   // Session change log
   private changeLog: ChangeEntry[] = []
@@ -554,8 +676,11 @@ export class UPGFileStore {
     // block supplies; their absence means the file is not a UPG document.
     const STRUCTURAL_ROOT_PATHS = new Set<string>([
       '$',
-      '$.upg_version',
-      '$.exported_at',
+      // On-disk envelope paths (0.34.1). These used to be the post-normalisation
+      // flat names `$.upg_version` / `$.exported_at`, which named nothing a
+      // reader could find in their file.
+      '$upg.spec_version',
+      '$upg.provenance.exported_at',
       '$.source',
       '$.source.tool',
       '$.product',
@@ -720,17 +845,28 @@ export class UPGFileStore {
         const msgs = structural
           .map((e) => `  ${e.path}: ${e.message}`)
           .join('\n')
-        // (S-12): the validator reports the envelope-internal path (e.g.
-        // `$.exported_at`), but in the on-disk canonical envelope that field
-        // lives at `$upg.provenance.exported_at`. A hand-authored `{ product,
-        // nodes, edges }` is missing the whole `$upg` block. Point there.
-        const missingEnvelope = structural.some((e) => /exported_at|provenance|\$upg|format_version/.test(`${e.path} ${e.message}`))
-        const hint = missingEnvelope
-          ? `\n\nThe \`$upg\` provenance envelope is required (real field path: ` +
-            `\`$upg.provenance.exported_at\`). Don't hand-author a bare ` +
-            `{ product, nodes, edges } file — scaffold via the CLI (\`upg init\`) ` +
+        // The advice is chosen from what the FILE actually has, not from what
+        // the error text happens to mention (0.34.1).
+        //
+        // It used to be gated on a regex over the error strings — any structural
+        // error merely MENTIONING `exported_at` turned on "Don't hand-author a
+        // bare { product, nodes, edges } file". Both envelope errors mention it
+        // by construction, so every envelope failure got that advice, including
+        // a file with a complete `$upg` block, 2,158 nodes and an integrity
+        // hash that was missing exactly two fields. Being told to rebuild a file
+        // that needs two lines added is worse than no advice: it sends the
+        // reader away from a repair they could have made in a minute.
+        const envelope =
+          json && typeof json === 'object' && !Array.isArray(json)
+            ? (json as Record<string, unknown>)['$upg']
+            : undefined
+        const hasEnvelope = !!envelope && typeof envelope === 'object'
+        const hint = hasEnvelope
+          ? `\n\nThis file HAS a \`$upg\` envelope; the fields named above are missing from it. ` +
+            `Add them to the \`$upg\` block and reload — no rebuild is needed.`
+          : `\n\nThe \`$upg\` envelope is required and this file has none. ` +
+            `Don't hand-author a bare { product, nodes, edges } file: scaffold via the CLI (\`upg init\`) ` +
             `or clone an existing \`.upg\` file's \`$upg\` block.`
-          : ''
         throw new Error(`Invalid UPG document:\n${msgs}${hint}`)
       }
 
@@ -1549,9 +1685,18 @@ export class UPGFileStore {
     this.nodeMap.clear()
     this.edgeMap.clear()
     this.edgesByNode.clear()
+    this.keyIndex.clear()
 
     for (const node of this.doc.nodes) {
       this.nodeMap.set(node.id, node)
+      // FIRST WINS, and a collision already on disk is NOT an error here.
+      // Loading is not the place to refuse: a graph minted before the check
+      // existed may hold a duplicate, and a store that will not open it leaves
+      // the owner no way to fix it. The invariant is enforced where it can
+      // still be honoured, on the create path in `addNode`.
+      if (node.key !== undefined && !this.keyIndex.has(node.key)) {
+        this.keyIndex.set(node.key, node.id)
+      }
     }
     for (const edge of this.doc.edges) {
       this.edgeMap.set(edge.id, edge)
@@ -1698,11 +1843,41 @@ export class UPGFileStore {
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
+  /**
+   * Add a node to the graph.
+   *
+   * The single store-level chokepoint every node-create flows through, which is
+   * why the within-product `key` uniqueness check lives here rather than on
+   * each calling surface: `create_node`, `batch_create_nodes`, the sync
+   * applier, the composition writer and the workspace scaffolder all arrive
+   * here, and a check on one of them is a check on one of them.
+   *
+   * @throws {DuplicateNodeKeyError} `node.key` is already held by a different
+   *   node in this product. Nothing is written.
+   */
   addNode(node: UPGBaseNode): void {
+    if (node.key !== undefined) {
+      const holder = this.keyIndex.get(node.key)
+      if (holder !== undefined && holder !== node.id) {
+        throw new DuplicateNodeKeyError(node.key, holder, this.nodeMap.get(holder)?.title)
+      }
+    }
     this.doc.nodes.push(node)
     this.nodeMap.set(node.id, node)
+    if (node.key !== undefined) this.keyIndex.set(node.key, node.id)
     this.logChange('create', 'node', node.id, node.type, node.title)
     this.scheduleSave()
+  }
+
+  /**
+   * The node holding this citable key, or `undefined`.
+   *
+   * Backs the uniqueness check and gives a caller the same lookup the check
+   * uses, so "is this key free?" is answerable without catching an exception.
+   */
+  getNodeByKey(key: string): UPGBaseNode | undefined {
+    const id = this.keyIndex.get(key)
+    return id === undefined ? undefined : this.nodeMap.get(id)
   }
 
   /**
@@ -1819,6 +1994,12 @@ export class UPGFileStore {
     // Remove the node
     this.doc.nodes = this.doc.nodes.filter((n) => n.id !== id)
     this.nodeMap.delete(id)
+    // Drop the key index entry only when it still points AT this node: a graph
+    // that loaded with a collision has one holder indexed and the others not,
+    // and deleting a non-holder must not free the key the holder still uses.
+    if (node.key !== undefined && this.keyIndex.get(node.key) === id) {
+      this.keyIndex.delete(node.key)
+    }
 
     this.logChange('delete', 'node', node.id, node.type, node.title)
     for (const eid of removedEdgeIds) {

@@ -1553,7 +1553,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'upsert_composition',
     description:
-      'Create or republish a composition (a named, published view) at `slug`, writing the node and its `composition_focuses_node` edges in ONE atomic commit. Use this instead of create_node/update_node for any composition write, because `rev` is DERIVED: it is re-read inside the write and incremented only on a transition into `published`, so update_node({ properties: { rev: N } }) writes whatever number you happen to be holding and is silently wrong. Reads stay generic: list_nodes({ type: "composition" }) enumerates views, and the id IS the slug so get_node({ id: slug }) returns the view and its focus edges together. Pass `rev` to make the write conditional on the revision you last read; a mismatch refuses with `stored_rev` and leaves the file byte-unchanged rather than overwriting a print you never saw. Omitting `members` PRESERVES the stored arrangement (so retiring or renaming a view does not erase what it looked like) while `[]` clears it. A `focus_node_ids` entry that does not resolve in this graph is dropped rather than written as a dangling edge. To withdraw a view, write lifecycle "retired" rather than deleting it, so existing links resolve to something honest.',
+      'Create or republish a composition (a named, published view) at `slug`, writing the node and its `composition_focuses_node` edges in ONE atomic commit. Use this instead of create_node/update_node for any composition write, because `rev` is DERIVED: it is re-read inside the write and incremented only on a transition into `published`, so update_node({ properties: { rev: N } }) writes whatever number you hold and is silently wrong. Reads stay generic: list_nodes({ type: "composition" }) enumerates views and `status` filters them by lifecycle, and the id IS the slug so get_node({ id: slug }) returns the view and its focus edges together. Pass `rev` to make the write conditional on the revision you last read; a mismatch refuses with `stored_rev` and leaves the file byte-unchanged rather than overwriting a print you never saw. Omitting `members` PRESERVES the stored arrangement (so withdrawing or renaming a view keeps what it looked like) while `[]` clears it. A `focus_node_ids` entry that does not resolve here is dropped rather than written as a dangling edge. To withdraw a view, write lifecycle "archived" rather than deleting it, so old links resolve to something honest.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -1565,9 +1565,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         description: { type: 'string', description: 'What this view is for. Omit to leave any stored description alone.' },
         lifecycle: {
           type: 'string',
-          enum: ['draft', 'published', 'retired'],
+          enum: ['draft', 'published', 'archived', 'retired'],
           description:
-            'Where the view stands: "draft" while it is being arranged and has never been live, "published" once it resolves at its slug, "retired" when withdrawn but kept so old links resolve. Only a write with "published" increments `rev`.',
+            'Where the view stands: "draft" while it is being arranged and has never been live, "published" once it resolves at its slug, "archived" when withdrawn but kept so old links resolve. Written to the node\'s `status`, using the phases the spec declares for a composition. "retired" is a DEPRECATED alias for "archived" and is accepted, stored as "archived". Only a write with "published" increments `rev`.',
         },
         focus_node_ids: {
           type: 'array',

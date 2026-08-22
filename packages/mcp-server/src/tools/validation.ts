@@ -53,7 +53,7 @@ import {
 } from '@unified-product-graph/core'
 import { validateEdgeTypePair } from '@unified-product-graph/sdk'
 import { classifyProductKind } from '../lib/portfolio-kind.js'
-import { checkPropertyTypes } from '@unified-product-graph/sdk'
+import { checkPropertyTypes, checkUndeclaredProperties } from '@unified-product-graph/sdk'
 import { inferEdgeTypeWithTier } from '@unified-product-graph/sdk'
 import type {
   ValidateGraphResult,
@@ -90,6 +90,7 @@ type LocalScope =
   | 'property_type_drift'
   | 'counts_drift'
   | 'integrity_drift'
+  | 'undeclared_property_drift'
 
 const SCOPES: readonly LocalScope[] = [
   'all',
@@ -104,6 +105,7 @@ const SCOPES: readonly LocalScope[] = [
   'property_type_drift',
   'counts_drift',
   'integrity_drift',
+  'undeclared_property_drift',
   'configuration_drift',
 ] as const
 type Scope = LocalScope
@@ -482,6 +484,20 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   const edgeTypePairDrift: EdgeTypePairDriftEntry[] = []
   const graphTopologySelfLoops: GraphTopologySelfLoopEntry[] = []
   const propertyTypeDrift: PropertyTypeDriftEntry[] = []
+  const undeclaredPropertyDrift: Array<{ id: string; type: string; property: string }> = []
+  /**
+   * TRUE total, counted independently of the capped entry array.
+   *
+   * `summary.<class>` is the graph's whole count and does NOT move with
+   * `limit` — `summary.top_level_drift` reports 1,032 beside a 100-entry list,
+   * because the summary answers "how much is there" and the array answers "here
+   * is a page of it". This class shipped counting `array.length`, so at the
+   * default limit it reported 100 on a graph holding 5,956 and the number moved
+   * when a caller changed the page size. It was the first local drift class
+   * whose real population exceeds the cap, which is why the same shape in its
+   * siblings has never been visible.
+   */
+  let undeclaredPropertyDriftTotal = 0
   const polymorphicUpgradeHints: PolymorphicUpgradeHintEntry[] = []
   const countsDrift: CountsDriftEntry[] = []
   const integrityDrift: IntegrityDriftEntry[] = []
@@ -645,10 +661,56 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       }
     }
 
+    // New drift class; undeclared_property_drift (0.34.1, audit R7).
+    //
+    // The class that closes the gap between this tool and `get_node`. Until
+    // 0.34.1 no drift class here could see an UNDECLARED bag key at all:
+    // `property_drift` asks whether a key is covered by a migration RULE, and
+    // for a key nobody ever wrote a rule for the honest answer is zero. So
+    // `get_node` warned about `properties.lifecycle` on a composition while
+    // this tool reported `property_drift: 0` for the same node, and whichever
+    // a consumer trusted, the other contradicted it.
+    //
+    // Namespaced `<tool>:<key>` extensions are NOT drift; see
+    // `checkUndeclaredProperties`.
+    //
+    // DELIBERATELY NOT GATING `structurally_valid`, and the estate says how
+    // firmly. Turning this class on measures 5,956 undeclared keys across 15
+    // shapes on the 1,118-node tracker and 219 across 35 shapes on the dogfood
+    // graph. Gating on it would flip both to structurally invalid on a release
+    // that changed nothing about them — the exact failure this audit reported
+    // against 0.33.0, where a status migration flipped `structurally_valid`
+    // true to false and broke every consumer gating on it. The class REPORTS.
+    // Making it gate is a separate decision that needs a migration path and a
+    // deprecation window, and it belongs in a minor, not here.
+    //
+    // Worth knowing before that decision: 5,779 of the tracker's 5,956 are one
+    // importer's `linear_*` keys, which are undeclared AND unnamespaced. Under
+    // the spec's own rule they should be `linear:...`, and they are the reason
+    // that rule exists — an underscore key is indistinguishable from a
+    // misspelled spec property. That is a migration, not a validator change.
+    if (includes('undeclared_property_drift') && node.properties) {
+      const effectiveTypeForUndeclared = (getReplacementType(node.type as string) ?? node.type) as string
+      const { unknown_properties } = checkUndeclaredProperties(
+        effectiveTypeForUndeclared,
+        node.properties as Record<string, unknown>,
+      )
+      for (const key of unknown_properties) {
+        // Counted ALWAYS; pushed only while the page has room.
+        undeclaredPropertyDriftTotal++
+        if (undeclaredPropertyDrift.length >= limit) continue
+        undeclaredPropertyDrift.push({
+          id: node.id,
+          type: node.type as string,
+          property: key,
+        })
+      }
+    }
+
     // New drift class; property_type_drift. F4 (2026-05-20).
     // Reports declared properties on the node whose value type doesn't match
-    // the schema's declared type. Undeclared properties remain
-    // out of scope (covered by the read-time unknown-properties warning).
+    // the schema's declared type. Undeclared properties are covered by
+    // `undeclared_property_drift` above.
     if (includes('property_type_drift') && node.properties) {
       const effectiveTypeForTypes = (getReplacementType(node.type as string) ?? node.type) as string
       const { violations } = checkPropertyTypes(
@@ -1203,6 +1265,12 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     edgeTypePairDrift.length +
     graphTopologySelfLoops.length +
     propertyTypeDrift.length +
+    // The PAGE, not the true total. This estimates bytes about to go on the
+    // wire, and only the capped array is sent — feeding the uncapped count here
+    // made the guard refuse `validate_graph` outright on the 1,118-node tracker,
+    // whose true count is 5,956 against a 100-entry page. A summary figure and a
+    // payload estimate answer different questions and must not share a variable.
+    undeclaredPropertyDrift.length +
     polymorphicUpgradeHints.length +
     parityDivergence.length +
     countsDrift.length +
@@ -1334,6 +1402,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       edge_type_pair_drift: edgeTypePairDrift.length,
       graph_topology_self_loops: graphTopologySelfLoops.length,
       property_type_drift: propertyTypeDrift.length,
+      undeclared_property_drift: undeclaredPropertyDriftTotal,
       counts_drift: countsDrift.length,
       integrity_drift: integrityDrift.length,
       configuration_drift: skipDrift ? undefined : configurationDrift.length,
@@ -1346,6 +1415,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     edge_type_pair_drift?: EdgeTypePairDriftEntry[]
     graph_topology_self_loops?: GraphTopologySelfLoopEntry[]
     property_type_drift?: PropertyTypeDriftEntry[]
+    undeclared_property_drift?: Array<{ id: string; type: string; property: string }>
     polymorphic_with_typed_alternative?: PolymorphicUpgradeHintEntry[]
     parity_divergence?: ParityDivergenceEntry[]
     counts_drift?: CountsDriftEntry[]
@@ -1362,6 +1432,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     if (includes('edge_type_pair_drift')) response.edge_type_pair_drift = edgeTypePairDrift
     if (includes('graph_topology_self_loops')) response.graph_topology_self_loops = graphTopologySelfLoops
     if (includes('property_type_drift')) response.property_type_drift = propertyTypeDrift
+    if (includes('undeclared_property_drift')) response.undeclared_property_drift = undeclaredPropertyDrift
     if (includes('counts_drift')) response.counts_drift = countsDrift
     if (includes('integrity_drift')) response.integrity_drift = integrityDrift
     // Emitted whenever the scope includes it, empty or not, exactly like every

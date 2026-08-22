@@ -24,6 +24,7 @@ import {
   getGuideForDomain,
   getLifecycleForType,
   getPropertySchema,
+  getEntityDescription,
   resolveEntityType,
   crossProductScope,
   UnknownEntityTypeError,
@@ -84,6 +85,14 @@ export interface EntitySchemaDomainGuide {
 export interface EntitySchema {
   type: string
   alias_of?: { from: string; to: string }
+  /**
+   * The authored one-line description of the type, from
+   * `UPG_ENTITY_DESCRIPTIONS`. Prose for a human reader, carrying no contract:
+   * the normative statements about a type are its properties, its edges and its
+   * lifecycle. Optional only because a type could in principle lack one;
+   * `check:editorial` fails a release in which any does.
+   */
+  description?: string
   domain: { id: string; label: string } | null
   expected_properties: Record<string, unknown>
   /**
@@ -221,6 +230,12 @@ export function buildEntitySchema(
   const schema: EntitySchema = {
     type: entityType,
     ...(resolved.alias ? { alias_of: resolved.alias } : {}),
+    // The sentence saying what this type IS, second only to its name. It was
+    // absent from this shape until 0.34.1 because the only authored copy lived
+    // in the documentation site's build script, so the call the server's own
+    // instructions tell an agent to make before creating an entity returned
+    // everything about the type except what it means.
+    ...(getEntityDescription(entityType) ? { description: getEntityDescription(entityType) } : {}),
     domain: domain ? { id: domain.id, label: domain.label } : null,
     expected_properties: stripNotes(propertySchema, includeNotes),
     ...(modifierSummary ? { property_modifiers: modifierSummary } : {}),

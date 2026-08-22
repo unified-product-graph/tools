@@ -150,3 +150,64 @@ export function renderPropertyTypeWarning(
     `Check get_entity_schema("${entityType}") for the canonical property types.`
   )
 }
+
+// ─── Undeclared property keys ─────────────────────────────────────────────────
+
+/**
+ * Property-bag keys the entity type does not declare.
+ *
+ * SINGLE SOURCE for "is this bag key declared?", answering the question the
+ * type-checker above deliberately does not. It was previously answered by a
+ * module-local helper inside the MCP node tools, which is why the server's two
+ * surfaces could disagree about one node: `get_node` asked THIS question and
+ * `validate_graph` asked a different one (is this key covered by a migration
+ * rule?), reported the answer as `property_drift: 0`, and so had no drift class
+ * of any kind that could see an undeclared key. Whichever a consumer trusted,
+ * the other contradicted it. One helper, both surfaces.
+ *
+ * NAMESPACED KEYS ARE EXEMPT, which the module-local version got wrong. The
+ * spec's rule for a key a tool owns and the spec does not declare is to write it
+ * `<tool>:<key>` with a colon (`UPGBaseNode.properties`, the 0.31.0 rule
+ * extended to the node bag at 0.33.0), precisely so a validator can tell a
+ * deliberate extension apart from a misspelled spec property. Reporting a
+ * correctly-namespaced key as unknown punishes the convention that exists to
+ * make this answerable, so a key containing a colon is a declared extension and
+ * passes.
+ *
+ * A type with no registered schema is fully permissive: nothing is reported,
+ * because there is nothing to be undeclared against.
+ */
+export function checkUndeclaredProperties(
+  entityType: string,
+  properties: Record<string, unknown> | undefined,
+): { unknown_properties: string[]; warning: string | undefined } {
+  if (!properties || Object.keys(properties).length === 0) {
+    return { unknown_properties: [], warning: undefined }
+  }
+  const schema = getPropertySchema(entityType)
+  if (!schema) return { unknown_properties: [], warning: undefined }
+
+  const unknown = Object.keys(properties).filter(
+    (k) => !(k in schema) && !isNamespacedPropertyKey(k),
+  )
+  if (unknown.length === 0) return { unknown_properties: [], warning: undefined }
+
+  const warning =
+    `Unknown properties for type "${entityType}": [${unknown.map((k) => `"${k}"`).join(', ')}]. ` +
+    `These will be stored but are not part of the canonical UPG schema. ` +
+    `Check get_entity_schema("${entityType}") for the canonical property list.`
+  return { unknown_properties: unknown, warning }
+}
+
+/**
+ * True for a key written under the spec's extension convention, `<tool>:<key>`.
+ *
+ * Deliberately shallow. It asks only whether the key claims a namespace, not
+ * whether the namespace is one anybody recognises: the convention exists so an
+ * extension is DISTINGUISHABLE from a typo, and a registry of permitted tool
+ * names would be a different rule with a different cost.
+ */
+export function isNamespacedPropertyKey(key: string): boolean {
+  const i = key.indexOf(':')
+  return i > 0 && i < key.length - 1
+}
