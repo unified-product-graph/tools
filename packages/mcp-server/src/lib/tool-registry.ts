@@ -76,6 +76,7 @@ import {
   detachProductFromPortfolioTool,
   listPortfolioCrossEdges,
   migrateCrossEdges,
+  upsertCompositionTool,
 } from '../tools/workspace.js'
 import { portfolioQuery, portfolioDigest, portfolioCensus, portfolioValidate, getPortfolioTree, auditPropertyCoverage, diffClassification, compareClassifications, aggregateEdgePropertiesTool, auditAxisOverlap } from '../tools/portfolio-read.js'
 import { cloneStructure } from '../tools/clone-structure.js'
@@ -133,6 +134,216 @@ const DEDICATED_CROSS_EDGE_TYPES = new Set<string>([
 const GENERIC_CROSS_EDGE_TYPES: string[] = UPG_CROSS_EDGE_TYPES.filter(
   (t) => !DEDICATED_CROSS_EDGE_TYPES.has(t),
 )
+
+// ── Composition view shapes, declared INLINE ───────────────────────────────
+//
+// `member_query` and `presentation` are `type: 'object'` in the runtime
+// property registry and `members` is `object[]`, so `get_entity_schema(
+// 'composition')` hands an agent three opaque blobs and a sentence of prose.
+// Teaching the property-registry generator to nest interface shapes would
+// ripple through five generated mirrors and three gates; a tool whose own JSON
+// schema declares the shapes costs one file and is the surface an agent
+// actually reads before calling.
+//
+// Kept faithful to `UPGViewQuery` / `UPGViewPresentation` / `CompositionMember`
+// in the spec's workspace property domain, including the 0.34.0 changes:
+// `orphan_disposition` on presentation, and a clause list discriminated on
+// `dimension` so the `type` axis carries entity types rather than free strings.
+
+/** Six-bucket status categories. Mirrors `StatusCategory`, which has no runtime export. */
+const STATUS_CATEGORIES = ['triage', 'backlog', 'unstarted', 'started', 'completed', 'cancelled']
+
+const TIME_WINDOW_SCHEMA = {
+  type: 'object',
+  description:
+    'A relative or absolute time window, DECLARED rather than resolved. Evaluated at read time in the reader session, never frozen at save, so a view that says "this quarter" means this quarter to whoever opens it. A team cadence is NOT a window: use an edge clause with target_status ["active"] instead.',
+  properties: {
+    kind: { type: 'string', enum: ['calendar', 'rolling', 'absolute'], description: 'Which window form this is.' },
+    anchor: {
+      type: 'string',
+      enum: ['current', 'previous', 'next', 'last_n', 'next_n'],
+      description: 'For kind "calendar": current, previous or next. For kind "rolling": last_n or next_n.',
+    },
+    unit: {
+      type: 'string',
+      enum: ['day', 'week', 'month', 'quarter', 'year'],
+      description: 'Unit of the window. "day" applies to rolling windows only; "year" to calendar windows only.',
+    },
+    count: { type: 'integer', description: 'How many units, for kind "rolling".' },
+    from: { type: 'string', description: 'ISO date, for kind "absolute".' },
+    to: { type: 'string', description: 'ISO date, for kind "absolute".' },
+  },
+  required: ['kind'],
+}
+
+const EDGE_CLAUSE_SCHEMA = {
+  type: 'object',
+  description:
+    'A condition on the edges of a candidate node. Names a moving target without holding an id: target_status ["active"] selects the current planning cycle, and target_designation "viewer" selects whoever is reading.',
+  properties: {
+    edge_type: { type: 'string', description: 'Canonical edge type (see list_catalog({ kind: "edge_types" })).' },
+    direction: { type: 'string', enum: ['out', 'in', 'both'], description: 'Which way to walk it from the candidate node.' },
+    target_ids: { type: 'array', items: { type: 'string' }, description: 'Admitted endpoint ids. Omit so any edge of this type satisfies the clause.' },
+    target_status: { type: 'array', items: { type: 'string' }, description: 'Admitted endpoint phase ids. The designation form on the cadence axis.' },
+    target_designation: {
+      type: 'string',
+      enum: ['viewer'],
+      description:
+        'Selects the endpoint by ROLE rather than identity. "viewer" resolves in the reader session at read time. Use this for "assigned to me": storing an id would make the view permanently about one colleague.',
+    },
+  },
+  required: ['edge_type', 'direction'],
+}
+
+const VIEW_CLAUSE_SCHEMA = {
+  description:
+    'One clause of the selection. A DISCRIMINATED UNION on `dimension` since 0.34.0: on the `type` axis `values` are canonical entity types, on every other axis they are strings.',
+  oneOf: [
+    {
+      type: 'object',
+      description: 'A clause on the `type` axis.',
+      properties: {
+        dimension: { type: 'string', enum: ['type'] },
+        values: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Admitted canonical entity types (see list_catalog({ kind: "entity_types" })). Not free strings.',
+        },
+        negate: { type: 'boolean', description: 'Negates this clause and only this clause.' },
+      },
+      required: ['dimension'],
+    },
+    {
+      type: 'object',
+      description: 'A clause on any axis other than `type`, whose admitted values are strings.',
+      properties: {
+        dimension: {
+          type: 'string',
+          enum: ['status', 'status_category', 'tag', 'classification', 'property', 'date', 'edge'],
+        },
+        values: { type: 'array', items: { type: 'string' }, description: 'Admitted values.' },
+        field: { type: 'string', description: 'Property name when `dimension` is "property"; the date field when "date".' },
+        window: TIME_WINDOW_SCHEMA,
+        edge: EDGE_CLAUSE_SCHEMA,
+        negate: { type: 'boolean', description: 'Negates this clause and only this clause.' },
+      },
+      required: ['dimension'],
+    },
+  ],
+}
+
+const VIEW_QUERY_SCHEMA = {
+  type: 'object',
+  description:
+    'A declarative, portable SELECTION over the graph: which nodes the view shows. Selection only; what it looks like is `presentation`. `clauses` is authoritative and the named fields are a positive-only shorthand for it, so a reader that finds `clauses` uses it and ignores the named fields. Holds no node references except `classified_as`, and relative selections walk from the focused set via `from_focus` rather than naming ids.',
+  properties: {
+    types: { type: 'array', items: { type: 'string' }, description: 'Canonical entity types admitted. Omit to admit every type.' },
+    status: { type: 'array', items: { type: 'string' }, description: 'Canonical phase ids admitted, for example ["todo", "in_progress"].' },
+    status_category: {
+      type: 'array',
+      items: { type: 'string', enum: STATUS_CATEGORIES },
+      description: 'Six-bucket categories admitted. The portable form when phase ids differ per type but the reading is the same.',
+    },
+    tags: { type: 'array', items: { type: 'string' }, description: 'Freeform tags. `match` governs all-of versus any-of.' },
+    classified_as: { type: 'array', items: { type: 'string' }, description: 'Ids of `classification_value` nodes admitted: the grouped-label clause.' },
+    properties: {
+      type: 'array',
+      description: 'Predicates over type-specific properties.',
+      items: {
+        type: 'object',
+        properties: {
+          property: { type: 'string', description: 'Property name, resolved against the `properties` bag of the node.' },
+          in: { type: 'array', items: { type: 'string' }, description: 'Admitted values. A node matches when its value is one of these.' },
+          present: { type: 'boolean', description: 'Match on presence rather than value: true admits nodes carrying the property at all, false admits those that do not.' },
+        },
+        required: ['property'],
+      },
+    },
+    include_archived: { type: 'boolean', description: 'Whether archived nodes are admitted. Absent means false.' },
+    match: { type: 'string', enum: ['all', 'any'], description: 'How the clauses combine. Absent means "all".' },
+    from_focus: {
+      type: 'object',
+      description:
+        'Walk outward from the nodes this composition focuses, for a selection that is relative rather than absolute. The anchor is the `composition_focuses_node` edge set, never an id held here.',
+      properties: {
+        edge_types: { type: 'array', items: { type: 'string' }, description: 'Canonical edge types to traverse.' },
+        direction: { type: 'string', enum: ['out', 'in', 'both'], description: 'Which way to walk them.' },
+        depth: {
+          description:
+            'Hops. Absent means 1. Pass the string "unbounded" to walk the relation transitively until it stops producing new nodes: a tree selection has no correct finite depth, and picking a large number silently truncates the first graph deeper than the guess.',
+          oneOf: [{ type: 'integer' }, { type: 'string', enum: ['unbounded'] }],
+        },
+      },
+      required: ['edge_types', 'direction'],
+    },
+    clauses: {
+      type: 'array',
+      items: VIEW_CLAUSE_SCHEMA,
+      description:
+        'The faithful representation of the selection: every clause, including the negations, declared windows and edge conditions the named fields above cannot hold. Authoritative when present.',
+    },
+  },
+}
+
+const VIEW_PRESENTATION_SCHEMA = {
+  type: 'object',
+  description:
+    'Advisory rendering intent. A consumer MAY ignore every field here and stay conformant, because every default it then applies is the safe one.',
+  properties: {
+    group_by: { type: 'string', description: 'Property name, base field, or "status_category", to group lanes by.' },
+    sort: {
+      type: 'array',
+      description: 'Sort keys in precedence order.',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'Property name or base field to sort on.' },
+          direction: { type: 'string', enum: ['asc', 'desc'], description: 'Sort direction.' },
+        },
+        required: ['key', 'direction'],
+      },
+    },
+    layout: {
+      type: 'string',
+      enum: ['board', 'table', 'list', 'cards', 'timeline', 'gallery', 'tree'],
+      description: 'Requested layout family. Advisory.',
+    },
+    nest_by: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Edge types to nest by, outermost first, when `layout` is "tree". Naming the edge types keeps the nesting portable: `group_by` partitions a flat set on a value and cannot express nesting, because the levels of a tree are edges rather than property values.',
+    },
+    orphan_disposition: {
+      type: 'string',
+      enum: ['root', 'hide'],
+      description:
+        'What to do with a selected member the nest relation does not reach. Absent means "root", which is the safe reading: everything the scope admits stays visible somewhere. Pay for hiding explicitly, because a consumer that ignores this field must never silently drop a node the scope admitted.',
+    },
+  },
+}
+
+const COMPOSITION_MEMBER_SCHEMA = {
+  type: 'object',
+  description:
+    'One block in the frozen arrangement. THE ARRANGEMENT IS FROZEN, THE CONTENT IS NOT: a member carries layout and a POINTER captured at publish, never resolved data, and `href` is re-resolved against current graph data at render. Do not treat a member as cached content.',
+  properties: {
+    id: { type: 'string', description: 'Stable id of the block within this composition.' },
+    href: { type: 'string', description: 'Tool-namespaced view reference. Opaque to every other tool and preserved verbatim.' },
+    title: { type: 'string', description: 'Display title captured at publish, shown as a fallback while the target resolves.' },
+    x: { type: 'number', description: 'Horizontal position of the block.' },
+    y: { type: 'number', description: 'Vertical position of the block.' },
+    width: { type: 'number', description: 'Width of the block.' },
+    height: { type: 'number', description: 'Height of the block.' },
+    collapsed: { type: 'boolean', description: 'Whether the block is drawn collapsed.' },
+    derived: {
+      type: 'boolean',
+      description:
+        'True when this member arrived by running `member_query` rather than by a person placing it. Membership is derived, position is authored, and both are real.',
+    },
+  },
+  required: ['id', 'href', 'title', 'x', 'y', 'width', 'height'],
+}
 
 /** Wire-shape definitions passed to `tools/list`. */
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -1340,6 +1551,50 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'upsert_composition',
+    description:
+      'Create or republish a composition (a named, published view) at `slug`, writing the node and its `composition_focuses_node` edges in ONE atomic commit. Use this instead of create_node/update_node for any composition write, because `rev` is DERIVED: it is re-read inside the write and incremented only on a transition into `published`, so update_node({ properties: { rev: N } }) writes whatever number you happen to be holding and is silently wrong. Reads stay generic: list_nodes({ type: "composition" }) enumerates views, and the id IS the slug so get_node({ id: slug }) returns the view and its focus edges together. Pass `rev` to make the write conditional on the revision you last read; a mismatch refuses with `stored_rev` and leaves the file byte-unchanged rather than overwriting a print you never saw. Omitting `members` PRESERVES the stored arrangement (so retiring or renaming a view does not erase what it looked like) while `[]` clears it. A `focus_node_ids` entry that does not resolve in this graph is dropped rather than written as a dangling edge. To withdraw a view, write lifecycle "retired" rather than deleting it, so existing links resolve to something honest.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        slug: {
+          type: 'string',
+          description: 'The slug, which IS the node id. A composition is addressed by what appears in its URL, so no surrogate id is minted. Reusing an existing slug republishes that view.',
+        },
+        title: { type: 'string', description: 'Display title of the view.' },
+        description: { type: 'string', description: 'What this view is for. Omit to leave any stored description alone.' },
+        lifecycle: {
+          type: 'string',
+          enum: ['draft', 'published', 'retired'],
+          description:
+            'Where the view stands: "draft" while it is being arranged and has never been live, "published" once it resolves at its slug, "retired" when withdrawn but kept so old links resolve. Only a write with "published" increments `rev`.',
+        },
+        focus_node_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Nodes this view is ABOUT, written as `composition_focuses_node` edges. This is what makes "which published views show this persona?" answerable to a tool that cannot parse the URLs of whichever tool published the view. An empty set is valid: a view scoped by query rather than enumeration focuses nothing in particular. Ids that do not resolve here are dropped.',
+        },
+        members: {
+          type: 'array',
+          items: COMPOSITION_MEMBER_SCHEMA,
+          description:
+            'The frozen block arrangement. OMIT to leave the stored arrangement untouched; pass [] to clear it. The two are different instructions.',
+        },
+        member_query: VIEW_QUERY_SCHEMA,
+        presentation: VIEW_PRESENTATION_SCHEMA,
+        published_by: { type: 'string', description: 'Publisher handle or email. A display scalar.' },
+        rev: {
+          type: 'integer',
+          minimum: 0,
+          description:
+            'The revision you last read, as an optimistic PRECONDITION. Never the value written: the stored revision is re-derived inside the write, so two publishers racing produce N+1 then N+2. Supplying it turns "I am publishing" into "I am publishing what I saw at rev N", and a mismatch returns status "stale_revision" with `stored_rev`. Omit to publish unconditionally.',
+        },
+      },
+      required: ['slug', 'title', 'lifecycle'],
+    },
+  },
+  {
     name: 'list_portfolios',
     description:
       'List portfolios from the portfolio document (`.upg/portfolio.upg`). Portfolios represent the strategic axis (where we invest). Returns an empty list when no portfolio document exists yet.',
@@ -2116,6 +2371,7 @@ const HANDLERS: Record<string, ToolHandler> = {
   batch_delete_cross_product_edges: batchDeleteCrossProductEdgesTool,
   attach_product_to_portfolio: attachProductToPortfolioTool,
   detach_product_from_portfolio: detachProductFromPortfolioTool,
+  upsert_composition: upsertCompositionTool,
   list_portfolio_cross_edges: listPortfolioCrossEdges,
   define_canonical_entity: defineCanonicalEntity,
   register_instance: registerInstance,

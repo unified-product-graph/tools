@@ -7,6 +7,7 @@
 export { parse } from './parse.js'
 export { buildIndex } from './index-builder.js'
 export { validate } from './validate.js'
+export { buildTransclusionEdges } from './transclude.js'
 export { toPlainMarkdown, updateRefs } from './export.js'
 export type { TitleResolver, RefResolution, RefResolver, ExportOptions } from './export.js'
 export { toTipTapJSON } from './to-tiptap.js'
@@ -29,6 +30,13 @@ export type {
   // Index
   ReferenceIndex,
   IndexEntry,
+
+  // Transclusion
+  TransclusionEdge,
+  TransclusionSkipReason,
+  SkippedAnchor,
+  TransclusionOptions,
+  TransclusionResult,
 
   // Validation
   ValidationOptions,

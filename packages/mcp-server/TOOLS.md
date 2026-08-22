@@ -1,6 +1,6 @@
 # UPG MCP Server: Tool Reference
 
-Reference for the 98 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
+Reference for the 99 tools exposed by `@unified-product-graph/mcp-server`. Generated from JSDoc on `src/tools/*.ts` (do not edit by hand).
 
 ## Contents
 
@@ -8,7 +8,7 @@ Reference for the 98 tools exposed by `@unified-product-graph/mcp-server`. Gener
 - [Nodes](#nodes): 17 tools
 - [Edges](#edges): 9 tools
 - [Areas & Change Log](#areas-change-log): 11 tools
-- [Workspace & Portfolios](#workspace-portfolios): 42 tools
+- [Workspace & Portfolios](#workspace-portfolios): 43 tools
 - [Schema](#schema): 1 tool
 - [Spec Introspection](#spec-introspection): 6 tools
 - [Cloud Sync](#cloud-sync): 3 tools
@@ -1373,6 +1373,7 @@ _Multi-product discovery, switching, init, cross-product edges._
 - [`switch_product`](#switch-product)
 - [`update_canonical_entity`](#update-canonical-entity)
 - [`update_product`](#update-product)
+- [`upsert_composition`](#upsert-composition)
 
 ### `aggregate_edge_properties`
 
@@ -2267,7 +2268,11 @@ a missing canonical, dangle, mismatch type, or were renamed off-canon
 foundations tier (a registry specification / primitive or a foundations
 cross-edge), a `portfolio_anti_patterns` block reports the portfolio-scoped
 (`scope: 'portfolio'`) anti-patterns: specification-without-implementer,
-primitive-scattered-without-canonical, product-reimplements-specification (0.9.13).
+primitive-scattered-without-canonical, product-reimplements-specification (0.9.13),
+operating-function-without-org-link (0.17.0), and duplicate-key-across-products
+(0.34.0). The last also makes the block relevant on its own: a portfolio whose
+products mint citable keys gets the report even with no foundations tier and no
+operating functions.
 
 **See also:** `validate_graph`, `portfolio_digest`, `portfolio_query`, `list_registry`
 
@@ -2425,6 +2430,52 @@ JSON: `{ product, updated: string[] }` (the fields changed).
 or when `stage` is non-canonical (same strict validation as create_product).
 
 **See also:** `create_product`
+
+
+### `upsert_composition`
+
+Create or republish a composition (a named, published view) at `slug`, writing the node and its `composition_focuses_node` edges in ONE atomic commit. Use this instead of create_node/update_node for any composition write, because `rev` is DERIVED: it is re-read inside the write and incremented only on a transition into `published`, so update_node({ properties: { rev: N } }) writes whatever number you happen to be holding and is silently wrong. Reads stay generic: list_nodes({ type: "composition" }) enumerates views, and the id IS the slug so get_node({ id: slug }) returns the view and its focus edges together. Pass `rev` to make the write conditional on the revision you last read; a mismatch refuses with `stored_rev` and leaves the file byte-unchanged rather than overwriting a print you never saw. Omitting `members` PRESERVES the stored arrangement (so retiring or renaming a view does not erase what it looked like) while `[]` clears it. A `focus_node_ids` entry that does not resolve in this graph is dropped rather than written as a dangling edge. To withdraw a view, write lifecycle "retired" rather than deleting it, so existing links resolve to something honest.
+
+**Atomicity:** `atomic (node + focus edges in a single flush; a refused write
+never touches the file).`
+
+**Arguments:**
+
+| Name | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `description` | string |  | What this view is for. Omit to leave any stored description alone. |
+| `focus_node_ids` | array |  | Nodes this view is ABOUT, written as `composition_focuses_node` edges. This is what makes "which published views show this persona?" answerable to a tool that cannot parse the URLs of whichever tool published the view. An empty set is valid: a view scoped by query rather than enumeration focuses nothing in particular. Ids that do not resolve here are dropped. |
+| `lifecycle` | `draft` \| `published` \| `retired` | ✓ | Where the view stands: "draft" while it is being arranged and has never been live, "published" once it resolves at its slug, "retired" when withdrawn but kept so old links resolve. Only a write with "published" increments `rev`. |
+| `member_query` | object |  | A declarative, portable SELECTION over the graph: which nodes the view shows. Selection only; what it looks like is `presentation`. `clauses` is authoritative and the named fields are a positive-only shorthand for it, so a reader that finds `clauses` uses it and ignores the named fields. Holds no node references except `classified_as`, and relative selections walk from the focused set via `from_focus` rather than naming ids. |
+| `members` | array |  | The frozen block arrangement. OMIT to leave the stored arrangement untouched; pass [] to clear it. The two are different instructions. |
+| `presentation` | object |  | Advisory rendering intent. A consumer MAY ignore every field here and stay conformant, because every default it then applies is the safe one. |
+| `published_by` | string |  | Publisher handle or email. A display scalar. |
+| `rev` | integer |  | The revision you last read, as an optimistic PRECONDITION. Never the value written: the stored revision is re-derived inside the write, so two publishers racing produce N+1 then N+2. Supplying it turns "I am publishing" into "I am publishing what I saw at rev N", and a mismatch returns status "stale_revision" with `stored_rev`. Omit to publish unconditionally. |
+| `slug` | string | ✓ | The slug, which IS the node id. A composition is addressed by what appears in its URL, so no surrogate id is minted. Reusing an existing slug republishes that view. |
+| `title` | string | ✓ | Display title of the view. |
+
+**Returns:**
+
+JSON `{ status: 'ok', composition }` on success. Refusals are
+returned as errors carrying a structured body: `{ status: 'stale_revision',
+stored_rev, reason }` when a supplied `rev` did not match, `{ status:
+'conflict', reason }` when the file moved under us or the slug belongs to a
+node of another type, `{ status: 'not_found' }` when no graph is loaded.
+
+**Throws:**
+
+- textError on a missing or malformed argument, and on every refusal
+above.
+
+**Warnings (non-error surfaces):**
+
+- `rev` is never written from the argument. Supplying it makes the
+write conditional (publish what I saw at rev N); a mismatch refuses and the
+file is left BYTE-UNCHANGED. Omitting `members` PRESERVES the stored
+arrangement, while `[]` clears it. A `focus_node_ids` entry that does not
+resolve in this graph is dropped rather than written as a dangling edge.
+
+**See also:** `get_node`, `list_nodes`
 
 
 ## Schema

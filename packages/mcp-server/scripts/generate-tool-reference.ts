@@ -173,6 +173,7 @@ const SYMBOL_TO_TOOL_NAME: Record<string, string> = {
   batchDeleteCrossProductEdgesTool: 'batch_delete_cross_product_edges',
   attachProductToPortfolioTool: 'attach_product_to_portfolio',
   detachProductFromPortfolioTool: 'detach_product_from_portfolio',
+  upsertCompositionTool: 'upsert_composition',
   listPortfolioCrossEdges: 'list_portfolio_cross_edges',
   portfolioQuery: 'portfolio_query',
   portfolioDigest: 'portfolio_digest',

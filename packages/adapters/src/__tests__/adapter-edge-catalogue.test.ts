@@ -98,9 +98,20 @@ describe('resolveContainmentEdgeInferrable', () => {
     // 0.33.0 added project_delivers_work_item (renamed and widened from
     // project_delivers_epic), so project membership is never derived from mere
     // co-occurrence. The three adapters that read an explicit project field
-    // (jira, gitlab, shortcut) emit it explicitly instead. The adapters pick the
-    // set up for free from core, with no local copy beyond this expectation.
+    // (jira, gitlab, shortcut) emit it explicitly instead. 0.34.0 added
+    // document_transcludes_node: a `[[type:id]]` anchor is an authored fact
+    // rather than an inferred one, so the markdown emitter writes the edge from
+    // the ANCHOR and no generic pair-resolution path may ever produce one. The
+    // adapters pick the set up for free from core, with no local copy beyond this
+    // expectation.
+    //
+    // THIS LIST IS THE GUARD, and it fired as designed. Flagging a widened edge
+    // deliberate_only silently switched five adapters off in 0.33.0, two of them
+    // under a green suite. A red here on an edge you just minted means the set
+    // moved and every adapter reading it changed behaviour: confirm that is what
+    // you meant before adding the name.
     expect([...UPG_DELIBERATE_ONLY_EDGE_TYPES].sort()).toEqual([
+      'document_transcludes_node',
       'insight_informs_opportunity',
       'objective_defers_capability',
       'objective_defers_feature',

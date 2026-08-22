@@ -2,7 +2,7 @@
 
 A local [Model Context Protocol](https://modelcontextprotocol.io) server that reads and writes `.upg` files. The `.upg` file is a portable JSON document holding your product graph: entities (personas, features, hypotheses, OKRs) and the relationships between them.
 
-The server exposes 98 tools. They cover graph reads and writes plus introspection of everything `@unified-product-graph/core` ships: entity types, edges, frameworks, regions, playbooks, lenses, anti-patterns, benchmarks.
+The server exposes 99 tools. They cover graph reads and writes plus introspection of everything `@unified-product-graph/core` ships: entity types, edges, frameworks, regions, playbooks, lenses, anti-patterns, benchmarks.
 
 See [CHANGELOG.md](./CHANGELOG.md) for the release history.
 
@@ -73,7 +73,7 @@ UPG ships five collaborating primitives. The MCP server exposes all five.
 
 ## MCP Tools
 
-98 tools across nine domains. Full reference: [TOOLS.md](./TOOLS.md), generated from `src/tools/*.ts` and shipped on npm.
+99 tools across nine domains. Full reference: [TOOLS.md](./TOOLS.md), generated from `src/tools/*.ts` and shipped on npm.
 
 | Domain | Count | What it covers |
 |---|---|---|
@@ -81,7 +81,7 @@ UPG ships five collaborating primitives. The MCP server exposes all five.
 | Nodes | 17 | Read, write, batch, search, migrate, deduplicate entities |
 | Edges | 9 | Create, delete, batch, rename, repair, export edges |
 | Areas & Change Log | 11 | Sub-graph scoping, canonical registry, mutation audit log |
-| Workspace & Portfolios | 39 | Multi-product workspace, portfolios, cross-edges, classification |
+| Workspace & Portfolios | 40 | Multi-product workspace, portfolios, cross-edges, classification |
 | Schema | 1 | `get_entity_schema` — per-type expected properties + valid children + edges |
 | **Spec Introspection** | **6** | Faceted catalog reads via `list_catalog` / `get_catalog_entry`, spec version, import recipe, framework application, entity scoring |
 | Cloud Sync | 3 | Push / pull / sync state (cloud server is a separate package) |

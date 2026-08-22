@@ -707,6 +707,12 @@ async function portfolioAntiPatternReport(
   }
   // 0.17.0: operating_function members, for the org-link portfolio check below.
   const operatingFunctionMembers: Array<{ id: string; title: string }> = []
+  // 0.34.0: citable keys per product, for the duplicate-key portfolio check below.
+  // Collected in this same pass rather than in a second walk, because a second
+  // walk over every .upg in the workspace is the expensive part and this one is
+  // already paying for it.
+  const productsByKey = new Map<string, Array<{ product: string; node: string; title: string }>>()
+  const keyedProducts = new Set<string>()
   for (const absPath of findWorkspaceUpgFiles(cwd)) {
     try {
       const doc = JSON.parse(fs.readFileSync(absPath, 'utf-8')) as {
@@ -730,6 +736,17 @@ async function portfolioAntiPatternReport(
           : doc.nodes ?? []
       for (const node of nodes) {
         if (node.type === 'primitive' && node.title) recordPrimitive(node.title, productId)
+        const key = (node as { key?: unknown }).key
+        if (typeof key === 'string' && key.length > 0) {
+          keyedProducts.add(productId)
+          const holders = productsByKey.get(key) ?? []
+          holders.push({
+            product: productId,
+            node: (node as { id?: string }).id ?? '',
+            title: node.title ?? '',
+          })
+          productsByKey.set(key, holders)
+        }
       }
     } catch {
       // skip malformed
@@ -742,8 +759,14 @@ async function portfolioAntiPatternReport(
     localPrimitiveCount > 0 ||
     crossEdges.some((e) => FOUNDATIONS_CROSS_EDGES.has(e.type))
   // The org-link check (0.17.0) also makes this report relevant for an
-  // operating-layer portfolio that has no foundations usage.
-  if (!foundationsPresent && operatingFunctionMembers.length === 0) return undefined
+  // operating-layer portfolio that has no foundations usage, and the duplicate-key
+  // check (0.34.0) makes it relevant for any portfolio whose products mint citable
+  // keys. Widening this gate is not optional: the block returns undefined when it
+  // fires, so a keyed portfolio with no foundations and no operating functions
+  // would have carried a registered detector that never ran.
+  if (!foundationsPresent && operatingFunctionMembers.length === 0 && keyedProducts.size < 2) {
+    return undefined
+  }
 
   const violations: Array<Record<string, unknown>> = []
 
@@ -823,6 +846,50 @@ async function portfolioAntiPatternReport(
     })
   }
 
+  // 5 · duplicate-key-across-products (0.34.0)
+  // A citable key is minted per product and uniqueness is enforced by a
+  // (product_id, key) index, so two products minting under one prefix run two
+  // independent sequences under one name. Each product reports its own key as
+  // valid; only the portfolio can see that the citation is ambiguous, which is
+  // why this check lives here and not in validate_graph.
+  //
+  // MECHANICALLY DECIDABLE, and that is why it can ship enforced: one key string
+  // held by two distinct products, with no judgement about intent. Every other
+  // check in this block approximates a per-node rule; this one is exact.
+  //
+  // THE KEY IS THE PAIR. `(prefix, number)` is what the anti-pattern names, and
+  // `UPGBaseNode.key` stores it as one string ("LTN-311"), so comparing key
+  // strings compares pairs. Splitting and recombining would add a parse that can
+  // disagree with the stored value.
+  //
+  // SCOPE IS THE PORTFOLIO, deliberately, and it has a cost worth stating: a
+  // collision between two products in a workspace folder with NO portfolio
+  // document is not reported, because this whole block returns early without one.
+  // That is the ratified reading of a `scope: 'portfolio'` anti-pattern, and it is
+  // exactly why attaching a keyed product to a portfolio was made a condition of
+  // shipping this check rather than left as hygiene. It is also the reason the
+  // labeled corpus carries an unattached-folder case: the limit is recorded where
+  // it can be re-graded, not left to be rediscovered.
+  const duplicateKeys = [...productsByKey.entries()]
+    .map(([key, holders]) => {
+      const products = [...new Set(holders.map((h) => h.product))].sort()
+      return { key, products, holders }
+    })
+    .filter((row) => row.products.length > 1)
+    .sort((a, b) => a.key.localeCompare(b.key))
+  if (duplicateKeys.length > 0) {
+    violations.push({
+      anti_pattern_id: 'duplicate-key-across-products',
+      severity: 'high',
+      count: duplicateKeys.length,
+      instances: duplicateKeys.slice(0, limit).map((row) => ({
+        key: row.key,
+        products: row.products,
+        nodes: row.holders.map((h) => ({ product: h.product, node: h.node, title: h.title })),
+      })),
+    })
+  }
+
   const issuesTotal = violations.reduce((sum, v) => sum + (v.count as number), 0)
   return {
     evaluated: [
@@ -830,6 +897,7 @@ async function portfolioAntiPatternReport(
       'primitive-scattered-without-canonical',
       'product-reimplements-specification',
       'operating-function-without-org-link',
+      'duplicate-key-across-products',
     ],
     specifications: specs.length,
     violations,
@@ -858,7 +926,11 @@ async function portfolioAntiPatternReport(
  *   foundations tier (a registry specification / primitive or a foundations
  *   cross-edge), a `portfolio_anti_patterns` block reports the portfolio-scoped
  *   (`scope: 'portfolio'`) anti-patterns: specification-without-implementer,
- *   primitive-scattered-without-canonical, product-reimplements-specification (0.9.13).
+ *   primitive-scattered-without-canonical, product-reimplements-specification (0.9.13),
+ *   operating-function-without-org-link (0.17.0), and duplicate-key-across-products
+ *   (0.34.0). The last also makes the block relevant on its own: a portfolio whose
+ *   products mint citable keys gets the report even with no foundations tier and no
+ *   operating functions.
  * @remarks Cross-product eligibility (0.18.0): `portfolio_validate` does NOT
  *   re-check the 3-state cross-edge gate and does NOT re-surface the `provisional`
  *   cross-edge warning. That warning is a WRITE-TIME signal only, emitted once at

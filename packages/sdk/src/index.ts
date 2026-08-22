@@ -61,6 +61,12 @@ export { nodeId, edgeId, productId } from './lib/id.js'
 export * from './lib/workspace.js'
 export * from './lib/portfolio-routing.js'
 
+// ── Composition writes (0.34.0) ─────────────────────────────────────────────
+// The one composition operation the generic node tools cannot serve: `rev` is
+// DERIVED, so a caller writing it through update_node writes whatever number it
+// happens to be holding. Reads stay generic (list_nodes / get_node).
+export * from './lib/composition.js'
+
 // ── Validators + diagnostics ────────────────────────────────────────────────
 export * from './lib/dangling-edges.js'
 export * from './lib/schema-drift.js'

@@ -364,6 +364,14 @@ describe('Item H - the create/update asymmetry IS the contract', () => {
   })
 
   it('widening these schemas added no tools', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(98)
+    // SECOND COUNT SITE. The canonical tool count and its rationale ledger live
+    // in `tool-registry.test.ts`; this assertion exists to say the key/archive
+    // surface was widened rather than grown a tool of its own, and it happens to
+    // spell the total to do it. A tool added by a LATER release therefore lands
+    // here too, and the failure reads as if this work added one. It did not:
+    // 0.34.0 added `upsert_composition` (see the ledger in tool-registry.test.ts
+    // for why), and nothing in the key/archive surface moved.
+    expect(TOOL_DEFINITIONS).toHaveLength(99)
+    expect(TOOL_DEFINITIONS.filter((t) => /key|archive/.test(t.name))).toHaveLength(0)
   })
 })

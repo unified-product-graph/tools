@@ -133,6 +133,16 @@ const CLOUD_NA = new Set([
   // the portfolio write surface (portfolio.upg is a .upg-file workspace concept);
   // cloud parity is a tracked follow-up.
   'batch_delete_cross_product_edges',
+  // upsert_composition (0.34.0): create or republish a composition, writing the
+  // node and its composition_focuses_node edges in one commit. A composition IS
+  // an ordinary .upg node, so the generic readers already serve it; what earns
+  // the tool is that `rev` is DERIVED inside the write. Local-only in this
+  // increment because the derivation and its optimistic precondition are written
+  // against the single-file store's read-modify-write and bounded reload, which
+  // the Postgres-backed cloud server would have to implement as a row-level CAS
+  // rather than mirror. Not a category error: cloud parity is a tracked
+  // follow-up once that transaction shape is designed.
+  'upsert_composition',
   // create_portfolio (0.17.x, gap G2 / #39): first-class portfolio creation in
   // portfolio.upg. Local-only for the same reason as the rest of the portfolio
   // write surface (portfolio.upg is a .upg-file workspace concept); cloud parity

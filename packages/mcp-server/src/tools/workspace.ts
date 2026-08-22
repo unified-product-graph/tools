@@ -11,6 +11,7 @@ import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context
 import { text, textError } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType, UPGEntityType } from '@unified-product-graph/core'
+import type { CompositionMember, UPGViewQuery, UPGViewPresentation } from '@unified-product-graph/core'
 import { REGISTRY_PRODUCT_ID, edgeCarriesProperties, validateEdgeProperties, friendlyToAssessment, crossProductScope } from '@unified-product-graph/core'
 import { UPGPortfolioStore, UPGFileStore } from '@unified-product-graph/sdk'
 import { buildPortfolioNodeIndex } from '@unified-product-graph/sdk'
@@ -36,6 +37,12 @@ import {
   WorkspaceNotInitialisedError,
 } from '@unified-product-graph/sdk'
 import { coerceProductStage } from '@unified-product-graph/core'
+// The composition write primitive. It lives in the SDK rather than here because
+// the same semantics are needed by every local writer, and the app-side
+// reference implementation it mirrors is in a private package this server
+// cannot depend on.
+import { upsertComposition, COMPOSITION_LIFECYCLES } from '@unified-product-graph/sdk'
+import type { CompositionLifecycle, CompositionWriteOutcome } from '@unified-product-graph/sdk'
 import { createEdge } from './edges.js'
 
 /**
@@ -2006,6 +2013,132 @@ export const batchCreateCrossProductEdges: ToolHandler = async (args, _ctx): Pro
       2,
     ),
   )
+}
+
+// ── Compositions (published views) ─────────────────────────────────────────
+
+/** Shape-check one argument that must be an array of member objects. */
+function invalidMembers(value: unknown): string | null {
+  if (!Array.isArray(value)) return '`members` must be an array of member objects.'
+  for (const m of value) {
+    if (typeof m !== 'object' || m === null || Array.isArray(m)) {
+      return '`members` must be an array of member objects.'
+    }
+  }
+  return null
+}
+
+/**
+ * Create or republish a composition (a named, published view) at `slug`, writing
+ * the node and its `composition_focuses_node` edges in one atomic commit.
+ *
+ * The one composition write the generic node tools cannot do correctly. A
+ * composition is an ordinary node, so `list_nodes({ type: 'composition' })` and
+ * `get_node({ id: slug })` already serve every read. What they cannot serve is
+ * `rev`: it is DERIVED, so `update_node({ properties: { rev: N } })` writes
+ * whatever number the caller happens to hold, which is silently wrong rather
+ * than merely unhelpful.
+ *
+ * @returns JSON `{ status: 'ok', composition }` on success. Refusals are
+ *   returned as errors carrying a structured body: `{ status: 'stale_revision',
+ *   stored_rev, reason }` when a supplied `rev` did not match, `{ status:
+ *   'conflict', reason }` when the file moved under us or the slug belongs to a
+ *   node of another type, `{ status: 'not_found' }` when no graph is loaded.
+ * @throws textError on a missing or malformed argument, and on every refusal
+ *   above.
+ * @warning `rev` is never written from the argument. Supplying it makes the
+ *   write conditional (publish what I saw at rev N); a mismatch refuses and the
+ *   file is left BYTE-UNCHANGED. Omitting `members` PRESERVES the stored
+ *   arrangement, while `[]` clears it. A `focus_node_ids` entry that does not
+ *   resolve in this graph is dropped rather than written as a dangling edge.
+ * @atomicity atomic (node + focus edges in a single flush; a refused write
+ *   never touches the file).
+ * @see get_node
+ * @see list_nodes
+ */
+export const upsertCompositionTool: ToolHandler = async (args, ctx): Promise<ToolResult> => {
+  const { store } = ctx
+
+  const slug = typeof args.slug === 'string' ? args.slug.trim() : ''
+  if (!slug) return textError('`slug` is required: the composition id IS its slug.')
+
+  const title = typeof args.title === 'string' ? args.title.trim() : ''
+  if (!title) return textError('`title` is required.')
+
+  const lifecycle = args.lifecycle
+  if (!COMPOSITION_LIFECYCLES.includes(lifecycle as CompositionLifecycle)) {
+    return textError(
+      `\`lifecycle\` is required and must be one of: ${COMPOSITION_LIFECYCLES.join(', ')}. Got: ${JSON.stringify(lifecycle)}.`,
+    )
+  }
+
+  if (args.description !== undefined && typeof args.description !== 'string') {
+    return textError('`description` must be a string.')
+  }
+  if (args.published_by !== undefined && typeof args.published_by !== 'string') {
+    return textError('`published_by` must be a string.')
+  }
+  if (
+    args.focus_node_ids !== undefined &&
+    (!Array.isArray(args.focus_node_ids) || args.focus_node_ids.some((id) => typeof id !== 'string'))
+  ) {
+    return textError('`focus_node_ids` must be an array of node ids.')
+  }
+  if (args.members !== undefined) {
+    const bad = invalidMembers(args.members)
+    if (bad) return textError(bad)
+  }
+  if (
+    args.rev !== undefined &&
+    (typeof args.rev !== 'number' || !Number.isInteger(args.rev) || args.rev < 0)
+  ) {
+    return textError(
+      '`rev` must be a non-negative integer: the revision you last read, used as a precondition. Omit it to publish unconditionally.',
+    )
+  }
+
+  let outcome: CompositionWriteOutcome
+  try {
+    outcome = await upsertComposition(store, {
+      slug,
+      title,
+      // Passed through as `undefined` when absent, never defaulted. The
+      // difference between "omit members" (preserve the stored arrangement) and
+      // "members: []" (clear it) has to survive this hop intact.
+      description: args.description as string | undefined,
+      lifecycle: lifecycle as CompositionLifecycle,
+      focus_node_ids: args.focus_node_ids as string[] | undefined,
+      members: args.members as CompositionMember[] | undefined,
+      member_query: args.member_query as UPGViewQuery | undefined,
+      presentation: args.presentation as UPGViewPresentation | undefined,
+      published_by: args.published_by as string | undefined,
+      rev: args.rev as number | undefined,
+    })
+  } catch (err) {
+    return textError(`upsert_composition failed: ${(err as Error).message}`)
+  }
+
+  if (outcome.status === 'ok') {
+    const c = outcome.composition
+    return text(
+      JSON.stringify(
+        {
+          message:
+            c.lifecycle === 'published'
+              ? `Published "${c.title}" at ${c.slug} (revision ${c.rev}).`
+              : `Saved "${c.title}" at ${c.slug} as ${c.lifecycle} (revision ${c.rev}).`,
+          status: 'ok',
+          composition: c,
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  // Every refusal names itself and carries its structured body, so a caller can
+  // branch on `status` and read `stored_rev` without parsing prose.
+  return textError(JSON.stringify(outcome, null, 2))
 }
 
 export type { ToolContext }

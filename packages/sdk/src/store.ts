@@ -253,6 +253,41 @@ function mergeEntityFields(
  * `properties`; if it is a new spec field it belongs on `UPGBaseNode`, from
  * which the accepted set is derived.
  */
+
+/**
+ * Order-insensitive JSON for comparing two property bags.
+ *
+ * WHY THIS EXISTS. A property bag is an UNORDERED map, and `JSON.stringify`
+ * compares it as an ordered one. Two bags holding identical facts in a different
+ * key order therefore compared as different, which turned an idempotent re-send
+ * into a write and reported `updated` for a no-op.
+ *
+ * It went unnoticed because it needed both halves to disagree at once, and until
+ * 0.34.0 they usually did not: a cross-edge's stored bag preserved whatever key
+ * order its writer used, so a caller re-sending its own shape matched by luck. It
+ * surfaced when the cross-edge canonicaliser began key-sorting the bag on write
+ * (0.34.0, the fix for a writer-agnosticism defect in the format), because the
+ * stored copy is then sorted and the caller's is not. The canonicalisation did
+ * not cause this; it removed the coincidence that was hiding it.
+ *
+ * Deliberately local and small. It sorts keys at every depth and leaves arrays
+ * alone, because array order in a property bag IS meaningful.
+ */
+function stableJson(value: unknown): string {
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk)
+    if (v !== null && typeof v === 'object') {
+      const out: Record<string, unknown> = {}
+      for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+        out[k] = walk((v as Record<string, unknown>)[k])
+      }
+      return out
+    }
+    return v
+  }
+  return JSON.stringify(walk(value))
+}
+
 export class UnknownNodeFieldError extends Error {
   constructor(
     readonly nodeId: string,
@@ -2399,9 +2434,11 @@ export class UPGPortfolioStore {
       // reaches edges that already exist. Without properties, it stays a no-op.
       // The existing edge's id is preserved (we never re-id on update).
       if (edge.properties && Object.keys(edge.properties).length > 0) {
-        const before = JSON.stringify(existing.properties ?? {})
+        // Compared order-insensitively: a property bag is an unordered map, and
+        // an equality test that depends on key order reports a no-op as a write.
+        const before = stableJson(existing.properties ?? {})
         existing.properties = { ...(existing.properties ?? {}), ...edge.properties }
-        if (JSON.stringify(existing.properties) !== before) {
+        if (stableJson(existing.properties) !== before) {
           this.scheduleSave()
           return { status: 'updated', edge: existing }
         }
@@ -2554,7 +2591,9 @@ export class UPGPortfolioStore {
     if (existing) {
       if (edge.properties && Object.keys(edge.properties).length > 0) {
         const merged = { ...(existing.properties ?? {}), ...edge.properties }
-        if (JSON.stringify(merged) !== JSON.stringify(existing.properties ?? {})) {
+        // Same order-insensitive comparison as the write path. A preview that
+        // disagreed with the write it previews would be worse than no preview.
+        if (stableJson(merged) !== stableJson(existing.properties ?? {})) {
           return { would: 'update', edge: { ...existing, properties: merged } }
         }
       }

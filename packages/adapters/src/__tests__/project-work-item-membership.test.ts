@@ -160,6 +160,58 @@ describe('GitLabAdapter: project membership', () => {
     expect(edge?.target).toBe(result.source_map['ep-1'])
   })
 
+  // The regression case, mirroring Linear's. GitLab was the only one of the five
+  // trackers to gate this emission on a concrete entity kind, so an ordinary issue
+  // resolving to task, bug or user_story carried properties.project_id and reached
+  // the seam never. The milestone rides along to prove the gate is the work-item
+  // allowlist and not the parent type: a release under a project stays edgeless
+  // here rather than being swallowed by a membership edge.
+  it('emits the membership edge for an ordinary issue of every work-item type', async () => {
+    const result = await adapter.convert([
+      {
+        source_id: 'p-1',
+        source_type: 'project',
+        title: 'orbit-ledger',
+        metadata: { entity_type: 'project' },
+      },
+      {
+        source_id: 'iss-task',
+        source_type: 'issue',
+        title: 'Wire the statement exporter',
+        metadata: { entity_type: 'issue', labels: [], state: 'opened', project_id: 'p-1' },
+      },
+      {
+        source_id: 'iss-bug',
+        source_type: 'issue',
+        title: 'Totals drift on rollover',
+        metadata: { entity_type: 'issue', labels: ['bug'], state: 'opened', project_id: 'p-1' },
+      },
+      {
+        source_id: 'iss-story',
+        source_type: 'issue',
+        title: 'Export a statement',
+        metadata: { entity_type: 'issue', labels: ['feature'], state: 'opened', project_id: 'p-1' },
+      },
+      {
+        source_id: 'ms-1',
+        source_type: 'milestone',
+        title: 'Q4 cutover',
+        metadata: { entity_type: 'milestone', state: 'active', project_id: 'p-1' },
+      },
+    ])
+    const membership = result.edges.filter((e) => e.type === PROJECT_WORK_ITEM_EDGE)
+    expect(membership).toHaveLength(3)
+    expect(membership.every((e) => e.source === result.source_map['p-1'])).toBe(true)
+    expect(membership.map((e) => e.target).sort()).toEqual(
+      [
+        result.source_map['iss-bug'],
+        result.source_map['iss-story'],
+        result.source_map['iss-task'],
+      ].sort(),
+    )
+    expect(typeOf(result.edges, 'node_informs_node')).toBeUndefined()
+  })
+
   // A bug IS in the work-item allowlist, so this proves the parent-side guard too:
   // the membership edge must not fire just because the child qualifies.
   it('does NOT hijack a pair the resolver can already answer', async () => {

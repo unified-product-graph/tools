@@ -217,6 +217,78 @@ export interface ReferenceIndex {
   creationRefs: string[]  // 'type:id' keys
 }
 
+// ─── Transclusion ─────────────────────────────────────────────────────────────
+
+/**
+ * A transclusion edge: the document embeds this node's live value at the point
+ * in its prose where the anchor sits.
+ *
+ * Deliberately carries NO position. A line number is the most volatile value a
+ * text document has, since every insertion above moves every anchor below, so a
+ * stored line is wrong after the next paragraph and nothing reports the drift.
+ * Occurrence lines live on IndexEntry, where editing the prose re-derives them.
+ */
+export interface TransclusionEdge {
+  /** The catalog edge type. Always 'document_transcludes_node'. */
+  type: 'document_transcludes_node'
+
+  /** The containing document, identified by its frontmatter entity_id */
+  source: string
+
+  /** The target node, as the caller's resolver identified it */
+  target: string
+
+  /** The anchor key this edge was keyed on ('type:id') */
+  anchor: string
+}
+
+/** Why a referenced entity produced no transclusion edge */
+export type TransclusionSkipReason =
+  /** The frontmatter entity_type is not 'document', so there is no valid source */
+  | 'source_not_a_document'
+  /** The frontmatter is a document but carries no entity_id to source the edge on */
+  | 'source_missing_entity_id'
+  /** Reached the index only via a {{a -> b|verb}} edge ref, never as an inline anchor */
+  | 'not_an_anchor'
+  /** [[type:id@product]]: names another graph, which this edge cannot cross */
+  | 'cross_product_anchor'
+  /** The resolver found no such node, so an edge would dangle */
+  | 'unresolved_anchor'
+
+/** A referenced entity that did not become an edge, and why */
+export interface SkippedAnchor {
+  /** Canonical key: 'type:id' or 'type:id@product' */
+  key: string
+
+  /** Why no edge was written */
+  reason: TransclusionSkipReason
+
+  /** Whether the anchor was a creation anchor ([[+type:id]]) */
+  isCreation: boolean
+}
+
+/** Options for transclusion edge emission */
+export interface TransclusionOptions {
+  /**
+   * Resolve an anchor key ('type:id') to the target's identity in the graph.
+   * Return null when the graph holds no such node.
+   *
+   * Required, and not optional like the validate() lookups: an edge may only be
+   * written to a node the caller has actually resolved, so with no resolver
+   * there is nothing an emitter could honestly emit.
+   */
+  resolveTarget: (key: string) => string | null | Promise<string | null>
+}
+
+/** The result of emitting transclusion edges for one document */
+export interface TransclusionResult {
+  /** The edges to write, one per (document, node) pair */
+  edges: TransclusionEdge[]
+
+  /** Every referenced entity that produced no edge, with its reason */
+  skipped: SkippedAnchor[]
+}
+
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 /** Options for reference validation against a graph */

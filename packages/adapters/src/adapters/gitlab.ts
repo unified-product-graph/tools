@@ -28,7 +28,12 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolvePairEdge, isProjectWorkItemMembership, PROJECT_WORK_ITEM_EDGE } from './resolve-pair-edge.js'
+import {
+  resolvePairEdge,
+  isProjectWorkItemMembership,
+  PROJECT_WORK_ITEM_EDGE,
+  PROJECT_WORK_ITEM_TYPES,
+} from './resolve-pair-edge.js'
 import { getLifecycleForType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -477,6 +482,29 @@ export class GitLabAdapter implements UPGAdapter {
         })
       }
 
+      // Any work item belongs to a project → project_delivers_work_item.
+      // Keyed on PROJECT_WORK_ITEM_TYPES, NOT on the GitLab entity kind. This block
+      // used to live inside the `isEpic` branch below, which made GitLab the only
+      // one of the five trackers to gate project membership on a concrete type:
+      // Linear, Jira, Notion and Shortcut all defer the pair for whatever the item
+      // resolved to. So an ordinary GitLab issue resolving to task, bug or
+      // user_story carried properties.project_id and never reached the Pass-3 seam,
+      // stranding the membership as a vendor property. That is the same failure
+      // 0.33.0 shipped to fix, and it survived here because the suite had only an
+      // epic case to go green on.
+      //
+      // The allowlist is the gate, not `fromType === 'project'`. Widening to the
+      // catalogue's `node` wildcard would swallow project → release and
+      // project → deliverable, which have better, more specific edges of their own.
+      const projectId = meta.project_id as string | undefined
+      if (projectId && PROJECT_WORK_ITEM_TYPES.has(resolvedType)) {
+        deferredEdges.push({
+          fromSourceId: projectId,
+          toSourceId: item.source_id,
+          edgeType: 'project_delivers_work_item' as UPGEdgeType,
+        })
+      }
+
       // Epic has a parent epic → feature_decomposed_into_epic
       if (isEpic) {
         const parentEpicId = meta.parent_id as string | undefined
@@ -485,16 +513,6 @@ export class GitLabAdapter implements UPGAdapter {
             fromSourceId: parentEpicId,
             toSourceId: item.source_id,
             edgeType: 'feature_decomposed_into_epic' as UPGEdgeType,
-          })
-        }
-
-        // Epic belongs to a project → project_delivers_work_item
-        const projectId = meta.project_id as string | undefined
-        if (projectId) {
-          deferredEdges.push({
-            fromSourceId: projectId,
-            toSourceId: item.source_id,
-            edgeType: 'project_delivers_work_item' as UPGEdgeType,
           })
         }
 

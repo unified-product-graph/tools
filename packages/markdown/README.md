@@ -65,6 +65,7 @@ const plain = toPlainMarkdown(source, {
 | `parse(source)`         | Extract frontmatter, entity refs, edge refs, inline properties            |
 | `buildIndex(result)`    | Flatten refs into a typed lookup index                                    |
 | `validate(index, opts)` | Resolve refs against a graph; collect missing-ref diagnostics             |
+| `buildTransclusionEdges(result, opts)` | Emit one `document_transcludes_node` edge per anchored node |
 | `toPlainMarkdown(src)`  | Render to plain CommonMark, rewriting refs via a resolver                 |
 | `updateRefs(src, fn)`   | Rewrite refs in-place (e.g. for id migrations)                            |
 | `toTipTapJSON(result)`  | Convert a parse result to TipTap editor JSON                              |
@@ -73,7 +74,8 @@ const plain = toPlainMarkdown(source, {
 Types: `UPGMarkdownFrontmatter`, `EntityReference`, `EdgeReference`,
 `InlineProperty`, `ParseResult`, `ParseWarning`, `ParseError`,
 `ReferenceIndex`, `IndexEntry`, `ValidationOptions`, `ValidationResult`,
-`TipTapDocument`, `TipTapNode`.
+`TransclusionEdge`, `TransclusionOptions`, `TransclusionResult`,
+`SkippedAnchor`, `TransclusionSkipReason`, `TipTapDocument`, `TipTapNode`.
 
 ## Specification
 

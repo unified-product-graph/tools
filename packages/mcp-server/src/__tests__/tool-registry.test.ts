@@ -86,7 +86,7 @@ describe('Tool registry: completeness', () => {
     }
   })
 
-  it('exposes the expected 98 tools', () => {
+  it('exposes the expected 99 tools', () => {
     // 0.19.0 tool consolidation: 141 (Phase-1 additive) minus the 48 retired
     // spec-introspection + router tools = 93 (see retired-tools.json).
     // 77 from v0.3.0 +
@@ -196,7 +196,24 @@ describe('Tool registry: completeness', () => {
     //   export_edges and get_node are product-scoped and answered empty. Returns
     //   the export_edges shape against the registry store. Local-only
     //   (portfolio.upg read surface). → 98.
-    expect(TOOL_DEFINITIONS).toHaveLength(98)
+    // + upsert_composition (0.34.0): the one composition write the generic node
+    //   tools cannot do correctly. A composition IS a node, so list_nodes({ type:
+    //   'composition' }) and get_node (which returns the composition_focuses_node
+    //   edges alongside the node, and takes the slug because the id IS the slug)
+    //   already serve every read: no list_composition / get_composition is
+    //   needed, and no delete_composition either, since lifecycle 'retired' is
+    //   the modelled withdrawal and delete_node exists. What is NOT servable is
+    //   `rev`: it is derived and incremented inside the write, so an agent
+    //   republishing via update_node({ properties: { rev: N } }) writes the
+    //   number it happens to hold, which is wrong and silently so. The tool also
+    //   writes node + focus edges in one commit (create_node then N create_edge can
+    //   fail halfway into a composition focusing nothing, a state the shape
+    //   declares VALID so nothing would ever report it), and declares
+    //   UPGViewQuery / UPGViewPresentation / CompositionMember INLINE in its own
+    //   input schema, which get_entity_schema cannot: those are `object` /
+    //   `object[]` in the runtime property registry. Local-only (the .upg node
+    //   write surface; CLOUD_NA). → 99.
+    expect(TOOL_DEFINITIONS).toHaveLength(99)
   })
 })
 
