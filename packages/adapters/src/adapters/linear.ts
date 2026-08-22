@@ -28,7 +28,11 @@
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import { getLifecycleForType } from '@unified-product-graph/core'
-import { resolveContainmentEdgeInferrable } from './resolve-pair-edge.js'
+import {
+  resolveContainmentEdgeInferrable,
+  isProjectWorkItemMembership,
+  PROJECT_WORK_ITEM_EDGE,
+} from './resolve-pair-edge.js'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Issue type map (discriminated by issueType.name from Linear API) ─────────
@@ -502,7 +506,22 @@ export class LinearAdapter implements UPGAdapter {
       if (parentId) {
         const parentNode = nodes.find((n) => n.id === parentId)
         const parentType = parentNode?.type ?? 'project'
-        const edgeType = resolveContainmentEdgeInferrable(parentType, resolvedType) ?? 'node_informs_node'
+        // A Linear project holding a work item. Emitted EXPLICITLY because the
+        // resolver above cannot produce it: `project_delivers_work_item` is
+        // `deliberate_only` AND its catalogue target widened to the `node` wildcard
+        // in 0.33.0, so `project:<work item>` is not a pair-map key at all. A Linear
+        // project membership is an authored fact the source system stores, not
+        // co-occurrence. This is the relation the 0.33.0 widening was built for:
+        // without it a project parent silently degrades to node_informs_node and the
+        // memberships strand, exactly as they did on properties.linear_project_id.
+        // Consulted only after the resolver declines, so project -> milestone keeps
+        // project_targets_milestone. See isProjectWorkItemMembership() for the full
+        // why. Do NOT "tidy" this back onto the resolver: the edge silently vanishes.
+        const edgeType =
+          resolveContainmentEdgeInferrable(parentType, resolvedType) ??
+          (isProjectWorkItemMembership(parentType, resolvedType)
+            ? PROJECT_WORK_ITEM_EDGE
+            : 'node_informs_node')
         edges.push({
           id: `edge-${parentId}-${nodeId}`,
           source: parentId,

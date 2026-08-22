@@ -65,7 +65,7 @@ Tests: 45 unit + 4 e2e, green.
   `task_implements_user_story` emitted reversed, `feature_area_contains_feature` /
   `release_contains_feature` onto user_story/epic/bug issues → catalogue-driven
   resolver (correct type + direction, node_informs_node fallback). The real edges
-  (project_delivers_epic, epic_specified_by_user_story, task_implements_user_story,
+  (project_delivers_work_item, epic_specified_by_user_story, task_implements_user_story,
   release_contains_bug) now fire correctly.
 - per-type status validation (bug `open` survives; To Do/In Progress/Done map to
   todo/in_progress/done; user_story is lifecycle-free → omitted).

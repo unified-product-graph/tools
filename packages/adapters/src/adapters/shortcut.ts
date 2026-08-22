@@ -14,7 +14,7 @@
  * Hierarchy edges (all verified in the UPG edge catalogue):
  * - objective  → key_result     → objective_achieved_through_key_result
  * - key_result → metric         → key_result_quantified_by_metric
- * - project    → epic           → project_delivers_epic
+ * - project    → work item      → project_delivers_work_item (emitted explicitly)
  * - epic       → story (feature) → epic_specified_by_user_story
  * - story (feature) → task      → task_implements_user_story
  * - story (bug) → story (feature) → bug_affects_feature
@@ -33,6 +33,7 @@
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
+import { isProjectWorkItemMembership, PROJECT_WORK_ITEM_EDGE } from './resolve-pair-edge.js'
 
 // ─── Story type discriminator ─────────────────────────────────────────────────
 
@@ -538,9 +539,25 @@ function resolveShortcutEdge(
     return 'key_result_quantified_by_metric'
   }
 
-  // project → epic
-  if (parent === 'project' && child === 'epic') {
-    return 'project_delivers_epic'
+  // project → work item (epic, story of any story_type, task)
+  // Emitted EXPLICITLY, and it has to stay that way. `project_delivers_work_item` is
+  // flagged `deliberate_only` in the catalogue AND its target widened to the `node`
+  // wildcard in 0.33.0, so every generic-inference chokepoint (resolvePairEdge,
+  // resolveContainmentEdgeInferrable) returns null for the pair: nothing should
+  // derive project membership from mere co-occurrence. Shortcut's parent_id on an
+  // Epic or Story is not co-occurrence, it is an authored fact the source system
+  // itself stores, so carrying it across is faithful, not inferred. The allowlist
+  // in isProjectWorkItemMembership() is narrower than the catalogue's `node` target
+  // on purpose, so a project parent holding a document or objective is NOT swept in.
+  // Do NOT "tidy" this onto the generic resolver: the edge would silently vanish.
+  if (parent === 'project') {
+    const childUpgType =
+      child === 'story'
+        ? ((childStory ? SHORTCUT_STORY_TYPE_MAP[childStory] : undefined) ?? 'user_story')
+        : SHORTCUT_ENTITY_TYPE_MAP[child]
+    if (childUpgType && isProjectWorkItemMembership('project', childUpgType)) {
+      return PROJECT_WORK_ITEM_EDGE
+    }
   }
 
   // epic → story (feature) → user_story

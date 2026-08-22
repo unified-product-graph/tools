@@ -263,7 +263,7 @@ describe('JiraAdapter: hierarchy edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('project_delivers_epic emitted when epic has project parent', async () => {
+  it('project_delivers_work_item emitted when epic has project parent', async () => {
     const items: SourceItem[] = [
       makeStructural('p1', 'Eng Project', 'project'),
       makeIssue('e1', 'Onboarding Revamp', 'Epic', {
@@ -272,8 +272,8 @@ describe('JiraAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'project_delivers_epic')
-    const edge = result.edges.find((e) => e.type === 'project_delivers_epic')
+    assertAllEdgesCatalogued(result.edges, 'project_delivers_work_item')
+    const edge = result.edges.find((e) => e.type === 'project_delivers_work_item')
     expect(edge).toBeDefined()
   })
 
@@ -424,7 +424,7 @@ describe('JiraAdapter: full fixture', () => {
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'JiraAdapter full fixture')
     // Edges expected:
-    // project_delivers_epic (p1→e1)
+    // project_delivers_work_item (p1→e1)
     // epic_specified_by_user_story (e1→s1)
     // feature_area_contains_feature (c1→s1)
     // release_contains_feature (v1→s1)

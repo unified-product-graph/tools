@@ -447,14 +447,14 @@ describe('GitLabAdapter: edge emission', () => {
     expect(result.edges.find((e) => e.type === 'feature_decomposed_into_epic')).toBeUndefined()
   })
 
-  it('project_delivers_epic emitted when epic has project_id', async () => {
+  it('project_delivers_work_item emitted when epic has project_id', async () => {
     const items: SourceItem[] = [
       makeProject('p-1', 'main-app'),
       makeEpic('ep-1', 'Auth epic', { project_id: 'p-1' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'project_delivers_epic')
-    const edge = result.edges.find((e) => e.type === 'project_delivers_epic')
+    assertAllEdgesCatalogued(result.edges, 'project_delivers_work_item')
+    const edge = result.edges.find((e) => e.type === 'project_delivers_work_item')
     expect(edge).toBeDefined()
     expect(edge?.source).toBe(result.source_map['p-1'])
     expect(edge?.target).toBe(result.source_map['ep-1'])

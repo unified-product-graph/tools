@@ -28,6 +28,7 @@ import {
   listRecipeSlugs,
   producedEntityTypes,
   producedEdgeTypes,
+  caveatsForSource,
   type SourceRecipe,
 } from '@unified-product-graph/adapters/recipes'
 import { text, type ToolHandler, type ToolResult } from '../lib/server-context.js'
@@ -179,6 +180,9 @@ function curatedRecipe(recipe: SourceRecipe): ToolResult {
         },
         execution: EXECUTION,
         ...(warnings.length > 0 ? { warnings } : {}),
+        ...(caveatsForSource(recipe.source).length
+          ? { caveats: caveatsForSource(recipe.source) }
+          : {}),
       },
       null,
       2,
@@ -208,6 +212,11 @@ function scaffoldRecipe(input: string): ToolResult {
         warnings: [
           'Edge "insight_informs_opportunity" (and any other deliberate-only edge) must be authored explicitly from real evidence, never auto-emitted from a source relation. Emit a review candidate, not a blind write.',
         ],
+        // Read hazards are served on BOTH paths and are keyed independently of
+        // whether a curated table exists. Linear has no curated recipe and has
+        // two of the sharpest hazards in the corpus, which is precisely the case
+        // that would be missed if caveats hung off the recipe object.
+        ...(caveatsForSource(input).length ? { caveats: caveatsForSource(input) } : {}),
         available_curated_sources: listRecipeSlugs(),
       },
       null,

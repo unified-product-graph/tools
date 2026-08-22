@@ -309,7 +309,7 @@ describe('ShortcutAdapter: edge emission', () => {
     expect(edge?.target).toBe(result.source_map['kr1'])
   })
 
-  it('project_delivers_epic emitted when epic has project parent', async () => {
+  it('project_delivers_work_item emitted when epic has project parent', async () => {
     const items: SourceItem[] = [
       makeEntity('p1', 'Mobile app', 'project'),
       makeEntity('e1', 'Auth epic', 'epic', {
@@ -319,7 +319,7 @@ describe('ShortcutAdapter: edge emission', () => {
     ]
     const result = await adapter.convert(items)
     assertAllEdgesCatalogued(result.edges, 'project → epic')
-    const edge = result.edges.find((e) => e.type === 'project_delivers_epic')
+    const edge = result.edges.find((e) => e.type === 'project_delivers_work_item')
     expect(edge).toBeDefined()
   })
 

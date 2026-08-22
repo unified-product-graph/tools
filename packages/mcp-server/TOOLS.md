@@ -280,7 +280,7 @@ longer than 50, or any ID does not resolve.
 
 ### `batch_update_nodes`
 
-Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing; pass `unset_properties` per entry to remove keys rather than writing a literal null.
+Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing; pass `unset_properties` per entry to remove keys rather than writing a literal null. `key` is NOT updatable: an entry carrying one is refused and the whole batch lands nothing.
 
 **Atomicity:** `atomic. Validation pass rejects the entire batch before any
 mutation lands.`
@@ -316,7 +316,10 @@ Create one entity, optionally with a parent edge. For 3+ entities, use `batch_cr
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `archived` | boolean |  | Sweep this entity out of default views. Orthogonal to `status`: an entity can be done and live, or done and archived, and those are different facts. |
+| `archived_at` | string |  | ISO timestamp archived. Pairs with `archived: true`. |
 | `description` | string |  | Optional description |
+| `key` | string |  | Optional citable key for this entity (e.g. "LTN-311"). Unique within the product across entity types, immutable once assigned, and never reused, so it is settable HERE and refused by update_node / batch_update_nodes. Supply one you already hold (an imported tracker key, or one your create surface chose); this tool never mints one for you. |
 | `overwrite_organization` | boolean |  | For type="organization" only. When true, replaces the existing portfolio organisation instead of throwing. |
 | `parent_id` | string |  | Parent node ID. Creates an edge automatically. Ignored for portfolio-scoped types. |
 | `properties` | object |  | Type-specific fields |
@@ -718,7 +721,7 @@ match_field, score }>, total, searched_fields }`.
 
 ### `update_node`
 
-Update one entity. Unspecified fields are preserved. Passing `type` performs an atomic single-node migration: every incident edge is re-inferred against the catalog and rollback applies on failure. For 3+ entities, use `batch_update_nodes`.
+Update one entity. Unspecified fields are preserved. `key` is NOT updatable: it is minted once at create, never reused, and passing it here is refused rather than ignored. Passing `type` performs an atomic single-node migration: every incident edge is re-inferred against the catalog and rollback applies on failure. For 3+ entities, use `batch_update_nodes`.
 
 **Atomicity:** `atomic-with-rollback (when `type` is changed); atomic for
 shallow-merge patches.`
@@ -727,6 +730,8 @@ shallow-merge patches.`
 
 | Name | Type | Required | Description |
 | ---- | ---- | -------- | ----------- |
+| `archived` | boolean |  | Sweep this entity out of default views. Orthogonal to `status`: an entity can be done and live, or done and archived, and those are different facts. |
+| `archived_at` | string,null |  | ISO timestamp archived. Pairs with `archived: true`. Pass null to clear it. |
 | `description` | string |  |  |
 | `node_id` | string | ✓ | The node ID to update |
 | `properties` | object |  | Merged with existing properties |

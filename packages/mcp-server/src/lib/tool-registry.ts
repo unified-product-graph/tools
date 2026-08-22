@@ -333,6 +333,18 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: 'string',
           description: 'Parent node ID. Creates an edge automatically. Ignored for portfolio-scoped types.',
         },
+        key: {
+          type: 'string',
+          description: 'Optional citable key for this entity (e.g. "LTN-311"). Unique within the product across entity types, immutable once assigned, and never reused, so it is settable HERE and refused by update_node / batch_update_nodes. Supply one you already hold (an imported tracker key, or one your create surface chose); this tool never mints one for you.',
+        },
+        archived: {
+          type: 'boolean',
+          description: 'Sweep this entity out of default views. Orthogonal to `status`: an entity can be done and live, or done and archived, and those are different facts.',
+        },
+        archived_at: {
+          type: 'string',
+          description: 'ISO timestamp archived. Pairs with `archived: true`.',
+        },
         overwrite_organization: {
           type: 'boolean',
           description: 'For type="organization" only. When true, replaces the existing portfolio organisation instead of throwing.',
@@ -343,7 +355,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'update_node',
-    description: 'Update one entity. Unspecified fields are preserved. Passing `type` performs an atomic single-node migration: every incident edge is re-inferred against the catalog and rollback applies on failure. For 3+ entities, use `batch_update_nodes`.',
+    description: 'Update one entity. Unspecified fields are preserved. `key` is NOT updatable: it is minted once at create, never reused, and passing it here is refused rather than ignored. Passing `type` performs an atomic single-node migration: every incident edge is re-inferred against the catalog and rollback applies on failure. For 3+ entities, use `batch_update_nodes`.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -356,6 +368,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         properties: {
           type: 'object',
           description: 'Merged with existing properties',
+        },
+        archived: {
+          type: 'boolean',
+          description: 'Sweep this entity out of default views. Orthogonal to `status`: an entity can be done and live, or done and archived, and those are different facts.',
+        },
+        archived_at: {
+          type: ['string', 'null'],
+          description: 'ISO timestamp archived. Pairs with `archived: true`. Pass null to clear it.',
         },
         unset_properties: {
           type: 'array',
@@ -398,6 +418,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               ref: { type: 'string', description: 'Optional batch-local alias for this node, usable from parent_ref / edges instead of a positional $N. Must be unique and not look like "$N".' },
               parent_id: { type: 'string', description: 'Parent node ID. Creates an edge automatically.' },
               parent_ref: { type: 'string', description: 'Reference a node created earlier in this batch by positional index ("$0", "$1") or by its declared `ref` alias.' },
+              key: { type: 'string', description: 'Optional citable key for this entity (e.g. "LTN-311"). Unique within the product across entity types, immutable once assigned, and never reused, so it is settable HERE and refused by update_node / batch_update_nodes. Supply one you already hold (an imported tracker key, or one your create surface chose); this tool never mints one for you.' },
+              archived: { type: 'boolean', description: 'Sweep this entity out of default views. Orthogonal to `status`: an entity can be done and live, or done and archived, and those are different facts.' },
+              archived_at: { type: 'string', description: 'ISO timestamp archived. Pairs with `archived: true`.' },
             },
             required: ['type', 'title'],
           },
@@ -441,7 +464,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'batch_update_nodes',
     description:
-      'Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing; pass `unset_properties` per entry to remove keys rather than writing a literal null.',
+      'Update up to 50 entities atomically (all succeed or all fail). Unspecified fields preserved. Properties merge with existing; pass `unset_properties` per entry to remove keys rather than writing a literal null. `key` is NOT updatable: an entry carrying one is refused and the whole batch lands nothing.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -456,6 +479,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
               status: { type: 'string' },
               tags: { type: 'array', items: { type: 'string' } },
               properties: { type: 'object', description: 'Merged with existing properties' },
+              archived: { type: 'boolean', description: 'Sweep this entity out of default views. Orthogonal to `status`: an entity can be done and live, or done and archived, and those are different facts.' },
+              archived_at: { type: ['string', 'null'], description: 'ISO timestamp archived. Pairs with `archived: true`. Pass null to clear it.' },
               unset_properties: {
                 type: 'array',
                 items: { type: 'string' },

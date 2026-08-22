@@ -18,7 +18,11 @@
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import { getLifecycleForType } from '@unified-product-graph/core'
-import { resolveContainmentEdgeInferrable } from './resolve-pair-edge.js'
+import {
+  resolveContainmentEdgeInferrable,
+  isProjectWorkItemMembership,
+  PROJECT_WORK_ITEM_EDGE,
+} from './resolve-pair-edge.js'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
 // ─── Database name → UPG entity type ─────────────────────────────────────────
@@ -727,7 +731,20 @@ export class NotionAdapter implements UPGAdapter {
       // Falls back to node_informs_node when the pair is absent from the catalogue.
       if (parentId) {
         const parentType = nodes.find((n) => n.id === parentId)?.type ?? 'product'
-        const edgeType = resolveContainmentEdgeInferrable(parentType, entityType) ?? 'node_informs_node'
+        // A Notion project database holding a work-item page. Emitted EXPLICITLY
+        // because the resolver above cannot produce it: `project_delivers_work_item`
+        // is `deliberate_only` AND its catalogue target widened to the `node`
+        // wildcard in 0.33.0, so `project:<work item>` is not a pair-map key at all.
+        // A Notion parent relation is an authored fact the workspace stores, not
+        // co-occurrence. Consulted only after the resolver declines, so
+        // project -> milestone keeps project_targets_milestone. See
+        // isProjectWorkItemMembership() for the full why. Do NOT "tidy" this back
+        // onto the resolver: the edge would silently vanish.
+        const edgeType =
+          resolveContainmentEdgeInferrable(parentType, entityType) ??
+          (isProjectWorkItemMembership(parentType, entityType)
+            ? PROJECT_WORK_ITEM_EDGE
+            : 'node_informs_node')
         edges.push({
           id: `edge-${parentId}-${nodeId}`,
           source: parentId,

@@ -19,7 +19,7 @@
  * Cross-domain edges emitted (when metadata is present):
  * - product → feature_area           (product_organises_into_feature_area)
  * - product → project                (product_organises_into_feature_area, approximation)
- * - project → epic                   (project_delivers_epic)
+ * - project → work item              (project_delivers_work_item, emitted explicitly)
  * - epic → child epic                (feature_decomposed_into_epic)
  * - epic → user_story/task/bug  (epic_specified_by_user_story)
  * - release → user_story/task   (release_contains_feature)
@@ -28,7 +28,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolvePairEdge } from './resolve-pair-edge.js'
+import { resolvePairEdge, isProjectWorkItemMembership, PROJECT_WORK_ITEM_EDGE } from './resolve-pair-edge.js'
 import { getLifecycleForType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -488,13 +488,13 @@ export class GitLabAdapter implements UPGAdapter {
           })
         }
 
-        // Epic belongs to a project → project_delivers_epic
+        // Epic belongs to a project → project_delivers_work_item
         const projectId = meta.project_id as string | undefined
         if (projectId) {
           deferredEdges.push({
             fromSourceId: projectId,
             toSourceId: item.source_id,
-            edgeType: 'project_delivers_epic' as UPGEdgeType,
+            edgeType: 'project_delivers_work_item' as UPGEdgeType,
           })
         }
 
@@ -503,7 +503,7 @@ export class GitLabAdapter implements UPGAdapter {
         if (groupId && !projectId) {
           // Only emit group→epic if there's no project link (avoid double edges)
           // This is not a canonical edge: just informational, skip for now
-          // (Epics in GitLab are group-scoped but the canonical project_delivers_epic is preferred)
+          // (Epics in GitLab are group-scoped but the canonical project_delivers_work_item is preferred)
         }
       }
     }
@@ -521,10 +521,26 @@ export class GitLabAdapter implements UPGAdapter {
       const fromType = nodeTypeById.get(fromNodeId)
       const toType = nodeTypeById.get(toNodeId)
       if (!fromType || !toType) continue
+
       const mapped = resolvePairEdge(fromType, toType)
       const source = mapped && mapped.sourceIsChild ? toNodeId : fromNodeId
       const target = mapped && mapped.sourceIsChild ? fromNodeId : toNodeId
-      const resolvedEdgeType = (mapped ? mapped.type : 'node_informs_node') as UPGEdgeType
+
+      // A GitLab project holding a work item through the item's own `project_id`.
+      // Emitted EXPLICITLY because resolvePairEdge above cannot produce it: the edge
+      // is `deliberate_only` AND its catalogue target widened to the `node` wildcard
+      // in 0.33.0, so the pair map has no `project:<work item>` key at all. An
+      // authored `project_id` is not co-occurrence. Reached only after the resolver
+      // declined, so project -> release keeps its own specific edge. See
+      // isProjectWorkItemMembership() for the full why. Do NOT "tidy" this back onto
+      // resolvePairEdge: the edge would silently vanish.
+      const resolvedEdgeType = (
+        mapped
+          ? mapped.type
+          : isProjectWorkItemMembership(fromType, toType)
+            ? PROJECT_WORK_ITEM_EDGE
+            : 'node_informs_node'
+      ) as UPGEdgeType
       const edgeId = `edge-xdomain-${source}-${target}-${resolvedEdgeType}`
       if (edges.some((e) => e.id === edgeId)) continue
       edges.push({
@@ -532,7 +548,7 @@ export class GitLabAdapter implements UPGAdapter {
         source,
         target,
         type: resolvedEdgeType,
-        mapping_confidence: mapped ? 'medium' : 'low',
+        mapping_confidence: resolvedEdgeType === 'node_informs_node' ? 'low' : 'medium',
       })
     }
 

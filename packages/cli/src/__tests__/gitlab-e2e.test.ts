@@ -57,7 +57,7 @@ describe('GitLab e2e — convert conformance', () => {
       const sm = out.result.source_map
       const has = (type: string, s: string, tgt: string) =>
         out.result.edges.some((e) => e.type === type && e.source === sm[s] && e.target === sm[tgt])
-      expect(has('project_delivers_epic', 'project-1', 'epic-1')).toBe(true)
+      expect(has('project_delivers_work_item', 'project-1', 'epic-1')).toBe(true)
       expect(has('epic_specified_by_user_story', 'epic-1', 'issue-1')).toBe(true)
       expect(has('release_contains_bug', 'milestone-1', 'issue-2')).toBe(true)
     } finally {

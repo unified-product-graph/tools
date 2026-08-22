@@ -42,6 +42,7 @@ import {
   validateStatusAgainstLifecycle,
   migrateNodeType as migrateNodeTypeLib,
   batchCreateNodes as batchCreateNodesLib,
+  nodeKeyMutationRefusal,
   applyScalarToEdgeMigrations,
   UnknownEntityTypeError,
   type GetNodeResult,
@@ -1007,6 +1008,24 @@ export const createNode: ToolHandler = async (args, ctx): Promise<ToolResult> =>
       status: args.status as string | undefined,
       properties,
       parent_id: args.parent_id as string | undefined,
+      // A caller-supplied key is accepted here and refused on every update.
+      // NEVER MINTED. Deriving the next key is `max(existing) + 1` over every
+      // keyed node in the product, which requires paged reads: PostgREST
+      // silently caps `select()` at 1,000 rows, so an unpaged derivation
+      // computes `max` over a truncated set and hands a live node a duplicate
+      // key with no error and no warning. That paging lives in
+      // `packages/graph-service/src/keys.ts` and stays the only minter; a
+      // second one is a duplicate-key generator for a field with no
+      // uniqueness check.
+      //
+      // The update doors guard `properties.key` as a second door. This one does
+      // NOT, deliberately: there the front door is closed, so the side door is a
+      // bypass, while here both doors are open, so a key in `properties` is a
+      // duplicate rather than a route around a refusal. Refusing a duplicate of
+      // something we accept would say no to a caller who did nothing wrong.
+      key: args.key as string | undefined,
+      archived: args.archived as boolean | undefined,
+      archived_at: args.archived_at as string | undefined,
     })
 
     //: attach first-use hints. Resolve the canonical type from the
@@ -1088,6 +1107,18 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
   const { store } = ctx
   if (!args.node_id) return textError(`Missing required parameter: node_id`)
   const nid = args.node_id as string
+  // Immutable once assigned, never reused, so no update carries a key, through
+  // the typed field OR through `properties`. Both doors, mirroring
+  // graph-service's `assertKeyNotMutated`, because property writes are
+  // permissive and a key parked in `properties` reads as a key to a human and
+  // to nothing else. Refused as a value the caller can read, not dropped in
+  // silence, and refused BEFORE the type migration below so a rejected call
+  // mutates nothing.
+  const keyRefusal = nodeKeyMutationRefusal(nid, {
+    key: args.key,
+    properties: args.properties as Record<string, unknown> | undefined,
+  })
+  if (keyRefusal !== null) return textError(keyRefusal)
   const warnings: string[] = []
   const strict = (args.strict as boolean) ?? false
 
@@ -1108,6 +1139,10 @@ export const updateNode: ToolHandler = (args, ctx): ToolResult => {
   if (args.tags !== undefined) patch.tags = normalizeTags(args.tags) ?? []
   if (args.status !== undefined) patch.status = args.status
   if (args.properties !== undefined) patch.properties = args.properties
+  // The archive axis is a DECLARED base-node field (0.32.0 C3), writable on
+  // create AND on update. `key` is the asymmetric one, refused above.
+  if (args.archived !== undefined) patch.archived = args.archived
+  if (args.archived_at !== undefined) patch.archived_at = args.archived_at
 
   if (args.status !== undefined) {
     const existingNode = store.getNode(nid)
@@ -1296,6 +1331,13 @@ export const batchUpdateNodes: ToolHandler = (args, ctx): ToolResult => {
   for (let i = 0; i < updates.length; i++) {
     const u = updates[i]
     if (!u.node_id) return textError(`Update at index ${i}: missing required field "node_id"`)
+    // Both doors, refused in the pre-pass so a batch carrying a key lands
+    // nothing at all.
+    const keyRefusal = nodeKeyMutationRefusal(u.node_id as string, {
+      key: u.key,
+      properties: u.properties as Record<string, unknown> | undefined,
+    })
+    if (keyRefusal !== null) return textError(`Update at index ${i}: ${keyRefusal}`)
     const existing = store.getNode(u.node_id as string)
     if (!existing) return textError(`Update at index ${i}: node "${u.node_id}" not found`)
 
@@ -1325,6 +1367,9 @@ export const batchUpdateNodes: ToolHandler = (args, ctx): ToolResult => {
     if (u.status !== undefined) patch.status = u.status
     if (u.tags !== undefined) patch.tags = normalizeTags(u.tags) ?? []
     if (u.properties !== undefined) patch.properties = u.properties
+    // Same archive axis as the single-node door. One posture, both doors.
+    if (u.archived !== undefined) patch.archived = u.archived
+    if (u.archived_at !== undefined) patch.archived_at = u.archived_at
 
     if (u.status !== undefined) {
       const existingNode = store.getNode(u.node_id as string)

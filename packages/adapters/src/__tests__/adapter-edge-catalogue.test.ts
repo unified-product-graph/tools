@@ -94,13 +94,18 @@ describe('resolveContainmentEdgeInferrable', () => {
   it('the adapters read core UPG_DELIBERATE_ONLY_EDGE_TYPES (single source of truth, no local copy)', () => {
     // 0.17.6 added insight_informs_opportunity to the deliberate-only set (a
     // PM-judgment link, never inferred from parentage); 0.20.0 added the planning-
-    // cadence set (story scheduling + the polymorphic work-item issue links). The
-    // adapters pick them up for free via the core set — no local edit beyond this.
+    // cadence set (story scheduling + the polymorphic work-item issue links);
+    // 0.33.0 added project_delivers_work_item (renamed and widened from
+    // project_delivers_epic), so project membership is never derived from mere
+    // co-occurrence. The three adapters that read an explicit project field
+    // (jira, gitlab, shortcut) emit it explicitly instead. The adapters pick the
+    // set up for free from core, with no local copy beyond this expectation.
     expect([...UPG_DELIBERATE_ONLY_EDGE_TYPES].sort()).toEqual([
       'insight_informs_opportunity',
       'objective_defers_capability',
       'objective_defers_feature',
       'planning_cycle_schedules_work_item',
+      'project_delivers_work_item',
       'work_item_blocks_work_item',
       'work_item_duplicates_work_item',
       'work_item_relates_to_work_item',

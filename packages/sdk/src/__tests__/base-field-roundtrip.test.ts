@@ -118,6 +118,11 @@ describe('updateNode round-trips the 0.32.0 base fields', () => {
       external_tool: 'linear',
       external_ref: 'https://example.invalid/LTN-400',
       external_id: 'lin_1',
+      external_links: [
+        { url: 'https://example.invalid/acme/api/pull/812', label: 'PR 812', kind: 'pull_request' },
+      ],
+      created_at: '2026-08-20T08:00:00.000Z',
+      updated_at: '2026-08-21T09:30:00.000Z',
       title: 'Retitled',
     }
     // id, type and properties are excluded: identity, migration-routed, and

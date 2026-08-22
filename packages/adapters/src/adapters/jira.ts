@@ -19,7 +19,7 @@
  * Hierarchy edges emitted:
  * - epic_specified_by_user_story   (epic → story or task)
  * - task_implements_user_story     (sub-task → story parent)
- * - project_delivers_epic               (project → epic)
+ * - project_delivers_work_item          (project → epic/feature/user_story/task/bug, emitted explicitly)
  * - feature_area_contains_feature       (component → issue mapped as feature/story)
  * - release_contains_feature            (fixVersion → feature/story/epic)
  * - release_contains_bug                (fixVersion → bug)
@@ -27,7 +27,7 @@
  */
 
 import type { UPGBaseNode, UPGEdge, UPGEdgeType, UPGEntityType } from '@unified-product-graph/core'
-import { resolvePairEdge } from './resolve-pair-edge.js'
+import { resolvePairEdge, isProjectWorkItemMembership, PROJECT_WORK_ITEM_EDGE } from './resolve-pair-edge.js'
 import { getLifecycleForType } from '@unified-product-graph/core'
 import type { AdapterConfig, ImportResult, SourceItem, UPGAdapter } from '../types.js'
 
@@ -472,6 +472,16 @@ export class JiraAdapter implements UPGAdapter {
         const source = mapped.sourceIsChild ? childNodeId : parentNodeId
         const target = mapped.sourceIsChild ? parentNodeId : childNodeId
         edges.push({ id: `edge-jira-${edgeCounter}`, source, target, type: mapped.type as UPGEdgeType, mapping_confidence: 'medium' })
+      } else if (isProjectWorkItemMembership(pUpg, cUpg)) {
+        // A Jira project holding a work item through the issue's own `parent` field.
+        // Emitted EXPLICITLY because resolvePairEdge above cannot produce it: the
+        // edge is `deliberate_only` AND its catalogue target widened to the `node`
+        // wildcard in 0.33.0, so the pair map has no `project:<work item>` key at
+        // all. An authored parent field is not co-occurrence. Reached only after
+        // the resolver declined, so project -> deliverable / milestone keep their
+        // own specific edges. See isProjectWorkItemMembership() for the full why.
+        // Do NOT "tidy" this back onto the resolver: the edge would silently vanish.
+        edges.push({ id: `edge-jira-${edgeCounter}`, source: parentNodeId, target: childNodeId, type: PROJECT_WORK_ITEM_EDGE as UPGEdgeType, mapping_confidence: 'medium' })
       } else {
         edges.push({ id: `edge-jira-${edgeCounter}`, source: parentNodeId, target: childNodeId, type: 'node_informs_node' as UPGEdgeType, mapping_confidence: 'low' })
       }
@@ -606,7 +616,11 @@ export class JiraAdapter implements UPGAdapter {
   }
 }
 
-// Hierarchy, component, and version edges are all catalogue-driven via
+// Hierarchy, component, and version edges are catalogue-driven via
 // resolvePairEdge() (UPG_EDGE_PAIR_MAP) inside convert(): the emitted edge type
 // and direction come from the catalogue for the resolved (parent, child) UPG-type
 // pair, with a node_informs_node fallback when no canonical edge exists.
+// The one deliberate exception is a project parent holding a work item, which
+// emits `project_delivers_work_item` explicitly after the resolver declines,
+// because that edge is unreachable through generic inference by design. See
+// isProjectWorkItemMembership() in resolve-pair-edge.ts for why.

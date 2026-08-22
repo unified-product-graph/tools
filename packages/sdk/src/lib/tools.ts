@@ -1014,6 +1014,33 @@ export interface CreateNodeArgs {
   properties?: Record<string, unknown>
   parent_id?: string
   /**
+   * Caller-supplied citable key (e.g. `"LTN-311"`). Accepted here and REFUSED
+   * on every update path, mirroring `graph-service`'s `assertKeyNotMutated`:
+   * a key arrives at create or not at all.
+   *
+   * NEVER MINTED HERE. Deriving the next key is `max(existing) + 1` over every
+   * keyed node in the product, which requires PAGED reads: PostgREST silently
+   * caps `select()` at 1,000 rows, so an unpaged derivation computes `max` over
+   * a truncated set and hands a live node a duplicate key with no error. That
+   * paging lives in `packages/graph-service/src/keys.ts` and is the only code
+   * that does it. A second minter is a duplicate-key generator, so this path
+   * accepts a key and never invents one.
+   *
+   * `properties.key` IS DELIBERATELY UNGUARDED HERE, and the asymmetry with the
+   * update paths is a decision rather than an oversight. On update the front
+   * door is closed, so the side door is the only way through and a caller who
+   * finds it has routed around a refusal. On create both doors are open, so a
+   * key in `properties` is not a bypass, it is a duplicate. Refusing a duplicate
+   * of something this path already accepts would be the surface saying no to a
+   * caller who did nothing wrong. graph-service does not guard its create path
+   * either, and mirroring it exactly cuts both ways.
+   */
+  key?: string
+  /** Swept out of default views. Orthogonal to `status` (0.32.0 C3). */
+  archived?: boolean
+  /** ISO timestamp archived. Pairs with `archived === true`. */
+  archived_at?: string
+  /**
    * (Seam 1): authoring-time strictness. When true, unknown-property
    * WARNINGS are promoted to rejections (throws). Strict dimensions (type,
    * status) reject regardless. Same flag, same effect, on every write tool.
@@ -1078,6 +1105,9 @@ export function createNode(
   if (args.description) newNode.description = args.description
   if (args.tags) newNode.tags = normalizeTags(args.tags) ?? []
   if (args.properties) newNode.properties = args.properties
+  if (args.key !== undefined) newNode.key = args.key
+  if (args.archived !== undefined) newNode.archived = args.archived
+  if (args.archived_at !== undefined) newNode.archived_at = args.archived_at
   autoFillSlug(newNode, store)
 
   // Status: validated above (reject on invalid). Apply or default.
@@ -1812,6 +1842,18 @@ export interface BatchNodeInput {
   properties?: Record<string, unknown>
   parent_id?: string
   parent_ref?: string
+  /**
+   * Caller-supplied citable key. Same posture as `createNode`: accepted on
+   * create, refused on every update, and NEVER minted here. The minter stays in
+   * `packages/graph-service/src/keys.ts` because `max(existing) + 1` needs
+   * paged reads (PostgREST caps `select()` at 1,000 rows silently) and a second
+   * unpaged minter is a duplicate-key generator.
+   */
+  key?: string
+  /** Swept out of default views. Orthogonal to `status` (0.32.0 C3). */
+  archived?: boolean
+  /** ISO timestamp archived. Pairs with `archived === true`. */
+  archived_at?: string
   /**: per-node strictness — promote unknown-property warnings to a batch rejection. */
   strict?: boolean
   /**
@@ -2165,6 +2207,9 @@ export function batchCreateNodes(
       if (n.description) newNode.description = n.description
       if (n.tags) newNode.tags = normalizeTags(n.tags) ?? []
       if (n.properties) newNode.properties = n.properties
+      if (n.key !== undefined) newNode.key = n.key
+      if (n.archived !== undefined) newNode.archived = n.archived
+      if (n.archived_at !== undefined) newNode.archived_at = n.archived_at
 
       // Status validated in the validation pass above (invalid → batch
       // rejected). Apply the caller's status or default to initial_phase.
@@ -2473,12 +2518,93 @@ function reconcileProductStageCarriers(
 
 // ── update_node ( unified validation + property unset) ─────────
 
+/**
+ * Thrown when a caller tries to set or change a node key through an update.
+ *
+ * A minted key is immutable by contract and never reused, so there is no update
+ * that legitimately carries one: a key arrives at create or not at all.
+ * Refusing rather than ignoring matters because a silently dropped `key` in an
+ * update patch looks to the caller exactly like a successful rename, and a form
+ * that appears to work and does not is worse than one that says no.
+ *
+ * Mirrors `KeyImmutableError` in `packages/graph-service/src/keys.ts`. Two write
+ * paths over one store must not be tellable apart by which one lets a rename
+ * through.
+ */
+export class NodeKeyImmutableError extends Error {
+  constructor(readonly nodeId: string) {
+    super(
+      `Node key is immutable and cannot be set or changed through an update (node ${nodeId}). ` +
+        `Keys are minted once, on create, and are never reused. ` +
+        `Pass "key" to create_node or batch_create_nodes instead. See UPG 0.32.0 C1.`,
+    )
+    this.name = 'NodeKeyImmutableError'
+  }
+}
+
+/** The shape every update door is checked against: both ways a key can arrive. */
+export interface NodeKeyMutationCheck {
+  key?: unknown
+  properties?: Record<string, unknown> | null
+}
+
+/**
+ * Both doors a key can come through, checked once.
+ *
+ * TWO DOORS, deliberately, mirroring `assertKeyNotMutated` in
+ * `packages/graph-service/src/keys.ts`. The typed `key` field is the obvious
+ * one. `properties.key` is the door that is harder to spot and worse to miss:
+ * property writes are PERMISSIVE about unknown keys, so a caller refused at the
+ * front door learns that the side door works, and a key parked in `properties`
+ * is worse than no key at all. It reads as a key to a human and to nothing
+ * else. No query resolves it, no citation follows it, and no uniqueness check
+ * sees it. graph-service guards its `data` bag for exactly this reason, and
+ * that bag is this `properties` object one adapter down.
+ *
+ * The spec declares no entity property named `key` on any type, so the guard
+ * cannot collide with a legitimate write. This is a mirror, not over-reach.
+ *
+ * Returns the refusal message, or `null` when the patch is clean, so the
+ * throwing doors and the result-returning doors share one answer.
+ */
+export function nodeKeyMutationRefusal(nodeId: string, patch: NodeKeyMutationCheck): string | null {
+  if (patch.key !== undefined) return new NodeKeyImmutableError(nodeId).message
+  if (patch.properties && Object.prototype.hasOwnProperty.call(patch.properties, 'key')) {
+    return new NodeKeyImmutableError(nodeId).message
+  }
+  return null
+}
+
+/**
+ * Guard every throwing update path with this.
+ *
+ * `key` is deliberately ABSENT from `UpdateNodeArgs` / `BatchUpdateInput`, so a
+ * typed caller cannot reach the first door at all. The guard exists for the
+ * runtime-shaped input that can (an MCP argument bag, parsed JSON) and for the
+ * second door, which a typed caller CAN reach because `properties` is an open
+ * record by contract.
+ */
+export function assertNodeKeyNotMutated(nodeId: string, patch: NodeKeyMutationCheck): void {
+  if (nodeKeyMutationRefusal(nodeId, patch) !== null) throw new NodeKeyImmutableError(nodeId)
+}
+
 export interface UpdateNodeArgs {
   node_id: string
   title?: string
   description?: string
   tags?: unknown
   status?: string
+  /**
+   * Swept out of default views. Orthogonal to `status` (0.32.0 C3), so a node
+   * can be done and live, or done and archived.
+   */
+  archived?: boolean
+  /**
+   * ISO timestamp archived. Pairs with `archived === true`. `null` CLEARS the
+   * field, matching the seam `graph-service` already relies on: the spec shape
+   * is absent-never-null on disk and the store omits a null at serialization.
+   */
+  archived_at?: string | null
   /** Properties to set/merge (deep-merge over existing). */
   properties?: Record<string, unknown>
   /**
@@ -2514,6 +2640,11 @@ export function updateNode(
   store: UPGFileStore,
   args: UpdateNodeArgs,
 ): UpdateNodeResult {
+  // Immutable once assigned, never reused, so no update carries a key, through
+  // either door. Checked BEFORE the existence lookup so the answer is the same
+  // whichever node id was named: an update path never writes a key.
+  assertNodeKeyNotMutated(args.node_id, args as NodeKeyMutationCheck)
+
   const existing = store.getNode(args.node_id)
   if (!existing) throw new Error(`Node not found: ${args.node_id}`)
 
@@ -2528,14 +2659,21 @@ export function updateNode(
     throw new WriteValidationError(validation.errors)
   }
 
-  const patch: Partial<UPGBaseNode> = {}
+  const patch: Partial<Omit<UPGBaseNode, 'archived_at'>> & { archived_at?: string | null } = {}
   if (args.title !== undefined) patch.title = args.title
   if (args.description !== undefined) patch.description = args.description
   if (args.tags !== undefined) patch.tags = normalizeTags(args.tags) ?? []
   if (args.status !== undefined) patch.status = args.status
   if (args.properties !== undefined) patch.properties = args.properties
+  // The archive axis is a DECLARED base-node field (0.32.0 C3), writable on
+  // create and on update. `key` is not: it is refused above.
+  if (args.archived !== undefined) patch.archived = args.archived
+  if (args.archived_at !== undefined) patch.archived_at = args.archived_at
 
-  let node = store.updateNode(args.node_id, patch)
+  let node = store.updateNode(
+    args.node_id,
+    patch as Partial<UPGBaseNode>,
+  )
 
   let removed: string[] | undefined
   if (args.unset_properties && args.unset_properties.length > 0) {
@@ -2568,6 +2706,10 @@ export interface BatchUpdateInput {
   description?: string
   tags?: unknown
   status?: string
+  /** Swept out of default views. Orthogonal to `status` (0.32.0 C3). */
+  archived?: boolean
+  /** ISO timestamp archived. `null` CLEARS the field. */
+  archived_at?: string | null
   properties?: Record<string, unknown>
   unset_properties?: string[]
   strict?: boolean
@@ -2610,6 +2752,13 @@ export function batchUpdateNodes(
   for (let i = 0; i < updates.length; i++) {
     const u = updates[i]
     if (!u.node_id) return { ok: false, error: `Update at index ${i}: missing required field "node_id"` }
+    // Immutable once assigned, never reused, through either door. Refused in
+    // the VALIDATION pass so a batch carrying a key lands nothing at all,
+    // rather than half its updates and then a refusal.
+    const keyRefusal = nodeKeyMutationRefusal(u.node_id, u as NodeKeyMutationCheck)
+    if (keyRefusal !== null) {
+      return { ok: false, error: `Update at index ${i}: ${keyRefusal}` }
+    }
     const node = store.getNode(u.node_id)
     if (!node) return { ok: false, error: `Update at index ${i}: node not found: ${u.node_id}` }
     const validation = validateNodeWrite(
@@ -2626,14 +2775,18 @@ export function batchUpdateNodes(
   const updated: Array<{ id: string; unset?: string[] }> = []
   for (let i = 0; i < updates.length; i++) {
     const u = updates[i]
-    const patch: Partial<UPGBaseNode> = {}
+    const patch: Partial<Omit<UPGBaseNode, 'archived_at'>> & { archived_at?: string | null } = {}
     if (u.title !== undefined) patch.title = u.title
     if (u.description !== undefined) patch.description = u.description
     if (u.tags !== undefined) patch.tags = normalizeTags(u.tags) ?? []
     if (u.status !== undefined) patch.status = u.status
     if (u.properties !== undefined) patch.properties = u.properties
+    // Same archive axis as the single-node door, same refusal on `key` above.
+    // One posture, both doors, so they cannot drift apart again.
+    if (u.archived !== undefined) patch.archived = u.archived
+    if (u.archived_at !== undefined) patch.archived_at = u.archived_at
     try {
-      let node = store.updateNode(u.node_id, patch)
+      let node = store.updateNode(u.node_id, patch as Partial<UPGBaseNode>)
       let removed: string[] | undefined
       if (u.unset_properties && u.unset_properties.length > 0) {
         const r = store.unsetNodeProperties(u.node_id, u.unset_properties)

@@ -112,6 +112,43 @@ export interface SourceRecipe {
   tables: SourceMappingTables
 }
 
+// ─── Source caveats ───────────────────────────────────────────────────────────
+
+/**
+ * Per-source read hazards, keyed by slug. Independent of `SOURCE_RECIPES`,
+ * deliberately: a source can have a hazard worth knowing without having a
+ * curated mapping table, and Linear is exactly that case.
+ *
+ * These are not mapping guidance. They are facts about reading the source that,
+ * if unknown, produce a silently wrong import: the class where a FAILURE LOOKS
+ * LIKE A SUCCESS. That is why they belong on the recipe an importer reads rather
+ * than in a code comment inside an adapter.
+ */
+export const SOURCE_CAVEATS: Record<string, string[]> = {
+  linear: [
+    'list_issues TRUNCATES issue descriptions, cutting mid-markup: 913 of 1,032 issues in the measured corpus. get_issue is the only faithful read of an issue body. Use bulk listings for enumeration only. An importer that batches through list_issues ships truncated bodies and reports success.',
+    'An over-complex query returns HTTP 200 with an error body. Error handling that branches on the status code alone reads that failure as a success, imports nothing, and reports fine. Inspect the body, not the status.',
+  ],
+}
+
+/**
+ * Read hazards for a source, resolved from a slug or from free text.
+ *
+ * Matches the same way `resolveSourceRecipe` does (exact slug, then a
+ * whole-word mention) so that "Linear issues" and "linear" reach the same
+ * caveats, and returns an empty list when none are recorded.
+ */
+export function caveatsForSource(input: string | null | undefined): string[] {
+  const raw = (input ?? '').trim().toLowerCase()
+  if (!raw) return []
+  if (SOURCE_CAVEATS[raw]) return SOURCE_CAVEATS[raw]
+  const words = new Set(raw.split(/[^a-z0-9.!]+/).filter(Boolean))
+  for (const slug of Object.keys(SOURCE_CAVEATS)) {
+    if (words.has(slug)) return SOURCE_CAVEATS[slug]
+  }
+  return []
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 /**

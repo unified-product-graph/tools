@@ -62,3 +62,60 @@ export function resolveContainmentEdgeInferrable(
   if (!edge || isDeliberateOnlyEdge(edge)) return null
   return edge
 }
+
+// ─── Explicit project membership ─────────────────────────────────────────────
+
+/**
+ * UPG work-item types a project can deliver, for `project_delivers_work_item`.
+ *
+ * The set is not arbitrary: it is exactly the semantic family the `work_item`
+ * token names in the edge key, the same bounded family as
+ * `planning_cycle_schedules_work_item` and `work_item_blocks_work_item`.
+ *
+ * It is deliberately NARROWER than the catalogue entry, whose `target_type` is
+ * the `node` wildcard. Honouring the wildcard literally would let a project
+ * membership edge swallow pairs that already have a better, more specific edge:
+ * `project_produces_deliverable` and `project_targets_milestone` both exist, and
+ * `release` and `feature_area` are containers rather than work items. Those four
+ * types are excluded here on purpose. Do NOT widen this set to match the
+ * catalogue's `node` target.
+ */
+export const PROJECT_WORK_ITEM_TYPES: ReadonlySet<string> = new Set([
+  'bug',
+  'epic',
+  'feature',
+  'task',
+  'user_story',
+])
+
+/**
+ * True when a parent -> child pair is a project delivering a work item, and the
+ * adapter should therefore emit `project_delivers_work_item` EXPLICITLY.
+ *
+ * Why explicit, in every adapter that calls this: the edge is flagged
+ * `deliberate_only`, so every generic-inference chokepoint (`resolvePairEdge`,
+ * `resolveContainmentEdgeInferrable`) filters it out by design, because nothing
+ * should derive project membership from mere co-occurrence. An adapter reading an
+ * explicit `project_id` / `parent_id` field that the source system itself stores
+ * is not inferring from co-occurrence, it is carrying an authored fact faithfully.
+ * The generic resolver cannot tell those two cases apart, which is exactly why the
+ * explicit path has to be explicit.
+ *
+ * As of 0.33.0 the flag is not even the only barrier: the catalogue entry's target
+ * widened to the `node` wildcard, so `UPG_EDGE_PAIR_MAP['project:epic']` no longer
+ * exists at all and the generic resolvers return null for the pair regardless of
+ * classification. Explicit emission is the ONLY route.
+ *
+ * CALL IT LAST, after the generic resolver has returned null. That ordering is
+ * what makes the deference in `PROJECT_WORK_ITEM_TYPES` real: a pair with a more
+ * specific catalogued edge is resolved before this is ever consulted.
+ *
+ * Do NOT "tidy" any caller back onto the generic resolver. The edge would silently
+ * vanish, with a green test suite, which is precisely how it was lost once already.
+ */
+export function isProjectWorkItemMembership(parentType: string, childType: string): boolean {
+  return parentType === 'project' && PROJECT_WORK_ITEM_TYPES.has(childType)
+}
+
+/** The edge emitted for a project -> work-item membership. */
+export const PROJECT_WORK_ITEM_EDGE = 'project_delivers_work_item'
