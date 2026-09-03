@@ -385,10 +385,12 @@ export function wrapEdgeInferenceError(err: unknown): CliError {
  * Precedence:
  *   1. explicit `--file <path>`
  *   2. `UPG_FILE` env var (honoured on every command, for CI/scripts)
- *   3. `.upg/workspace.json` default_product
- *   4. exactly one `.upg` in `.upg/` (else, with >1 and no workspace, error —
+ *   3. `.upg/workspace.session.json` active_product (the gitignored session
+ *      cursor `upg workspace switch` writes — 0.38.0, F4)
+ *   4. `.upg/workspace.json` default_product
+ *   5. exactly one `.upg` in `.upg/` (else, with >1 and no workspace, error —
  *      never silently pick)
- *   5. exactly one `*.upg` in cwd (else, with >1, error)
+ *   6. exactly one `*.upg` in cwd (else, with >1, error)
  *
  * The ambiguity guard raises a UsageError-style message rather than guessing,
  * because silently selecting one of several files surfaced the *wrong* (broken)
@@ -402,6 +404,23 @@ export async function discoverUPGFile(explicitFile?: string): Promise<string> {
   if (envFile) return path.resolve(envFile)
 
   const cwd = process.cwd()
+
+  // Tier 1.5: the workspace SESSION cursor (0.38.0, F4). `upg workspace
+  // switch` records the active product here — a gitignored sibling — instead
+  // of rewriting the tracked workspace.json, so a read-only exploration never
+  // leaves the repo dirty (and an agent's `git add -A` never commits a cursor
+  // move). `workspace set-default` is the explicit way to move the tracked
+  // default. A cursor pointing at a deleted file is skipped, not fatal.
+  const sessionPath = path.join(cwd, '.upg', 'workspace.session.json')
+  try {
+    const raw = await fs.readFile(sessionPath, 'utf-8')
+    const session = JSON.parse(raw)
+    if (session.active_product) {
+      const filePath = path.join(cwd, '.upg', session.active_product)
+      await fs.access(filePath)
+      return filePath
+    }
+  } catch { /* continue */ }
 
   // Tier 2: .upg/workspace.json default_product (an explicit selection).
   const workspacePath = path.join(cwd, '.upg', 'workspace.json')

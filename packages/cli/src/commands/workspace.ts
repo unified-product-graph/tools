@@ -7,7 +7,7 @@ import { updateProduct, UPG_MEMBER_KINDS } from '@unified-product-graph/sdk'
 
 export const workspaceCommand = new Command('workspace')
   .arguments('[action] [items...]')
-  .description('Workspace actions: list (default), switch <name>, rekind --kind <kind> <file...>.')
+  .description('Workspace actions: list (default), switch <name> (session-only), set-default <name>, rekind --kind <kind> <file...>.')
   .option('--kind <kind>', `For rekind: ${UPG_MEMBER_KINDS.join(' | ')}`)
   .option('--json', 'Machine-readable JSON output (rekind)')
   // Commander passes (…args, options, command). With two declared arguments
@@ -24,9 +24,19 @@ export const workspaceCommand = new Command('workspace')
         try {
           const raw = await fs.readFile(workspacePath, 'utf-8')
           const workspace = JSON.parse(raw)
+          // The session cursor (gitignored) wins over the tracked default for
+          // what "active" means, matching discoverUPGFile's precedence.
+          let sessionActive: string | undefined
+          try {
+            const sraw = await fs.readFile(path.join(cwd, '.upg', 'workspace.session.json'), 'utf-8')
+            sessionActive = JSON.parse(sraw).active_product
+          } catch { /* no session cursor */ }
+          const activeFile = sessionActive ?? workspace.default_product
           console.log(`\nWorkspace: ${workspace.products?.length ?? 0} product(s)\n`)
           for (const p of workspace.products ?? []) {
-            const active = p.file === workspace.default_product ? ' (active)' : ''
+            const active = p.file === activeFile
+              ? (sessionActive && p.file === sessionActive && p.file !== workspace.default_product ? ' (active, session)' : ' (active)')
+              : ''
             const kind = p.member_kind && p.member_kind !== 'product' ? `  [${p.member_kind}]` : ''
             console.log(`  ${p.title}  ${p.file}${kind}${active}`)
           }
@@ -46,9 +56,9 @@ export const workspaceCommand = new Command('workspace')
         return
       }
 
-      if (action === 'switch') {
+      if (action === 'switch' || action === 'set-default') {
         const name = items?.[0]
-        if (!name) die(usageError('Usage: upg workspace switch <name>'))
+        if (!name) die(usageError(`Usage: upg workspace ${action} <name>`))
         const raw = await fs.readFile(workspacePath, 'utf-8')
         const workspace = JSON.parse(raw)
         const match = workspace.products?.find(
@@ -58,9 +68,31 @@ export const workspaceCommand = new Command('workspace')
         if (!match) {
           die(runtimeError(`Product not found: "${name}". Available: ${workspace.products?.map((p: { title: string }) => p.title).join(', ')}`))
         }
-        workspace.default_product = match.file
-        await fs.writeFile(workspacePath, JSON.stringify(workspace, null, 2) + '\n', 'utf-8')
-        console.log(`Switched to: ${match.title} (${match.file})`)
+
+        if (action === 'set-default') {
+          // The EXPLICIT tracked write: moves workspace.json's default_product,
+          // which is committed and shared. This is the only action that touches
+          // the tracked file.
+          workspace.default_product = match.file
+          await fs.writeFile(workspacePath, JSON.stringify(workspace, null, 2) + '\n', 'utf-8')
+          console.log(`Default product set: ${match.title} (${match.file})`)
+          return
+        }
+
+        // `switch` records a SESSION cursor in a gitignored sibling (0.38.0,
+        // F4) instead of rewriting the tracked workspace.json: a read-only
+        // exploration must not leave the repo dirty, and an agent running
+        // `git add -A` must never commit a cursor move. The MCP server's
+        // switch_product already behaved this way (in-memory); the CLI catches
+        // up to the server's own standard. Use `workspace set-default` to move
+        // the shared default deliberately.
+        const sessionPath = path.join(cwd, '.upg', 'workspace.session.json')
+        await fs.writeFile(
+          sessionPath,
+          JSON.stringify({ active_product: match.file, switched_at: new Date().toISOString() }, null, 2) + '\n',
+          'utf-8',
+        )
+        console.log(`Switched to: ${match.title} (${match.file})  [session only — \`workspace set-default\` moves the shared default]`)
         return
       }
 
@@ -116,7 +148,7 @@ export const workspaceCommand = new Command('workspace')
         return
       }
 
-      die(usageError(`Unknown action: "${action}". Use: list, switch, rekind`))
+      die(usageError(`Unknown action: "${action}". Use: list, switch, set-default, rekind`))
     } catch (err) {
       die(err)
     }

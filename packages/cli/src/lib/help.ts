@@ -455,9 +455,10 @@ export const helpTopics: Record<string, HelpEntry> = {
   },
   'install-skills': {
     usage: 'upg install-skills [options]',
-    summary: 'Install the bundled UPG skills into Claude Code (.claude/skills/).',
+    summary: 'Install the bundled UPG skills into Claude Code (.claude/skills/) or Cursor (.cursor/skills/).',
     options: [
       { flag: '--scope <scope>', desc: 'project | user. Defaults to project' },
+      { flag: '--target <target>', desc: 'claude (default) = .claude/skills. cursor = .cursor/skills, the layout Cursor reads' },
       { flag: '--force', desc: 'Overwrite existing skill links' },
       { flag: '--mode <mode>', desc: 'auto (default), symlink, or copy. auto falls back to copy on Windows' },
       { flag: '--list', desc: 'Print skill names; skip the install' },
@@ -466,6 +467,7 @@ export const helpTopics: Record<string, HelpEntry> = {
     examples: [
       { cmd: 'upg install-skills' },
       { cmd: 'upg install-skills --scope user' },
+      { cmd: 'upg install-skills --target cursor' },
       { cmd: 'upg install-skills --list' },
     ],
     seeAlso: 'upg mcp setup',
@@ -475,6 +477,7 @@ export const helpTopics: Record<string, HelpEntry> = {
     summary: 'Wire the UPG MCP server into Claude Code (setup), inspect config (status), or run the server (run).',
     options: [
       { flag: '--scope <scope>', desc: 'setup: project | user' },
+      { flag: '--target <target>', desc: 'setup: claude (default) = .mcp.json / ~/.claude.json. cursor = .cursor/mcp.json (local Cursor; cloud agents use the team dashboard)' },
       { flag: '--force', desc: 'setup: overwrite an existing entry' },
     ],
     examples: [

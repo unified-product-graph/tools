@@ -1,13 +1,26 @@
 /**
  * UPG Local MCP Server
  *
- * Usage: upg-mcp-server [--file <path-to.upg>] [--title "My Product"]
+ * Usage: upg-mcp-server [--workspace <dir>] [--file <path-to.upg>]
+ *                       [--title "My Product"] [--init] [--check] [--help]
  *
- * Discovery order:
- *   1. --file flag → use that file directly
- *   2. .upg/workspace.json → load default_product from workspace
- *   3. *.upg files in cwd → if 1, use it; if many, use first alphabetically
- *   4. Nothing found → create blank product.upg
+ * Resolution order (0.38.0, cloud-agent hardening):
+ *   1. --workspace <dir> / UPG_WORKSPACE → dir IS the .upg workspace (holds
+ *      workspace.json or *.upg files). The server arranges its own cwd around
+ *      it, so every workspace tool resolves there — no shell wrapper needed.
+ *   2. --file flag → use that file directly
+ *   3. .upg/workspace.json in cwd → load default_product from workspace
+ *   4. *.upg files in cwd → if 1, use it; if many, use first alphabetically
+ *   5. Nothing found → REFUSE loudly, naming the cwd and every path checked.
+ *      Creating a blank graph is opt-in via --init, never a fallback: in a
+ *      cloud VM where the cwd of a dashboard-launched stdio process is
+ *      unknown, a silently fabricated graph means every tool call "succeeds"
+ *      against a phantom and writes are lost with no signal.
+ *
+ * --check resolves the workspace exactly as the server would, prints
+ * `{workspace, resolved_file, products, spec_version, server_version}` and
+ * exits 0/1 WITHOUT starting the transport — built for environment install
+ * scripts, so a misconfigured environment fails at build time, not mid-session.
  *
  * Reads a .upg file into memory and exposes it via MCP over stdio.
  * Changes are auto-saved back to the file with debounced writes.
@@ -16,10 +29,94 @@
 import { parseArgs } from 'node:util'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import * as os from 'node:os'
+import * as nodeCrypto from 'node:crypto'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createServer, createUnavailableServer, SERVER_VERSION } from './server.js'
-import { UPG_VERSION, isDeprecatedType, getReplacementType, serializeCanonical, type UPGDocument } from '@unified-product-graph/core'
+import { setWorkspaceRoot } from './lib/server-context.js'
+import { isValidProfile, TOOL_PROFILES, type ToolProfile } from './lib/tool-profiles.js'
+import { UPG_VERSION, isDeprecatedType, getReplacementType, serializeCanonical, parseUpg, type UPGDocument } from '@unified-product-graph/core'
 import { nanoid } from 'nanoid'
+
+const USAGE = `upg-mcp-server — Unified Product Graph local MCP server (stdio)
+
+Usage: upg-mcp-server [options]
+
+Options:
+  --workspace <dir>   The .upg workspace directory (holds workspace.json or
+                      *.upg files). Also read from UPG_WORKSPACE. The server
+                      arranges its own cwd, so no shell wrapper is needed.
+  -f, --file <path>   Serve one specific .upg file.
+  -t, --title <name>  Title for a graph created with --init.
+  --init              Allow creating a blank graph when nothing resolves.
+                      Without it, an empty resolution REFUSES (exit 1) —
+                      creation is never a fallback.
+  --profile <name>    Filter the tool surface server-side: "read-only"
+                      (no tool that writes a graph, a portfolio, or the
+                      network) or "author" (writes allowed; destructive and
+                      infrastructure tools gated). The filter applies to
+                      tools/list AND tools/call.
+  --check             Resolve the workspace exactly as the server would,
+                      print JSON, exit 0/1. Never starts the transport,
+                      never writes. For environment install scripts.
+  -h, --help          Show this help.
+`
+
+/**
+ * Arrange the process cwd so the workspace tools (which resolve against
+ * `cwd/.upg/`) see `wsDir` as the workspace. Two shapes:
+ *  - `wsDir` is literally named `.upg` → chdir to its parent.
+ *  - anything else → a per-workspace runtime shim dir holding a `.upg`
+ *    symlink to it, then chdir there. This internalizes the shell wrapper
+ *    cloud environments were hand-writing (mkdir + ln -sfn + cd), which is
+ *    the layout the field brief verified working end-to-end.
+ * Returns the absolute (real) workspace path for reporting.
+ */
+async function arrangeWorkspaceCwd(wsDir: string): Promise<string> {
+  const real = await fs.realpath(path.resolve(wsDir))
+  if (path.basename(real) === '.upg') {
+    process.chdir(path.dirname(real))
+    return real
+  }
+  const shim = path.join(
+    os.tmpdir(),
+    `upg-ws-${nodeCrypto.createHash('sha256').update(real).digest('hex').slice(0, 12)}`,
+  )
+  await fs.mkdir(shim, { recursive: true })
+  const link = path.join(shim, '.upg')
+  try {
+    const existing = await fs.readlink(link)
+    if (existing !== real) {
+      await fs.unlink(link)
+      await fs.symlink(real, link, 'dir')
+    }
+  } catch {
+    await fs.rm(link, { recursive: true, force: true }).catch(() => {})
+    await fs.symlink(real, link, 'dir')
+  }
+  process.chdir(shim)
+  return real
+}
+
+/**
+ * Validate that `wsDir` is a plausible workspace: it exists and holds either
+ * workspace.json or at least one *.upg file. Returns a human diagnosis on
+ * failure, null on success. Never writes.
+ */
+async function validateWorkspaceDir(wsDir: string): Promise<string | null> {
+  const abs = path.resolve(wsDir)
+  let entries: string[]
+  try {
+    entries = await fs.readdir(abs)
+  } catch {
+    return `--workspace ${abs}: directory does not exist or is unreadable.`
+  }
+  if (entries.includes('workspace.json') || entries.some((f) => f.endsWith('.upg'))) return null
+  return (
+    `--workspace ${abs}: no workspace.json and no *.upg files found there.\n` +
+    `A workspace directory is the one that CONTAINS the graphs (what .upg/ is in a repo).`
+  )
+}
 
 /**
  * Discover which .upg file to load using the 4-tier priority system.
@@ -106,11 +203,49 @@ async function discoverUPGFile(explicitFile?: string): Promise<string | null> {
   return null
 }
 
+/** The blank-graph document `--init` creates. */
+function blankDocument(title: string): UPGDocument {
+  return {
+    upg_version: UPG_VERSION,
+    exported_at: new Date().toISOString(),
+    source: { tool: 'upg-mcp-local', tool_version: SERVER_VERSION },
+    product: { id: nanoid(16), title },
+    nodes: [],
+    edges: [],
+  } as unknown as UPGDocument
+}
+
+/** The loud refusal that replaced the phantom-graph fallback (0.38.0, F1). */
+function refuseEmptyResolution(cwd: string): never {
+  process.stderr.write(
+    `\nUPG MCP server: no graph found — refusing to start.\n\n` +
+    `Checked, in order:\n` +
+    `  1. --workspace / UPG_WORKSPACE   (not set)\n` +
+    `  2. --file                        (not set)\n` +
+    `  3. ${path.join(cwd, '.upg', 'workspace.json')}   (absent)\n` +
+    `  4. ${path.join(cwd, '*.upg')}   (none)\n\n` +
+    `cwd: ${cwd}\n\n` +
+    `Fix one of:\n` +
+    `  --workspace <dir>   point at the directory holding your graphs\n` +
+    `  --file <path>       serve one specific .upg file\n` +
+    `  --init              deliberately create a blank graph here\n\n` +
+    `A silently created blank graph is never the right answer in an\n` +
+    `environment whose cwd you do not control: every tool call would\n` +
+    `"succeed" against a phantom and your writes would be lost.\n`,
+  )
+  process.exit(1)
+}
+
 export async function runMcpServer() {
   const { values } = parseArgs({
     options: {
+      workspace: { type: 'string' },
       file: { type: 'string', short: 'f' },
       title: { type: 'string', short: 't' },
+      init: { type: 'boolean' },
+      check: { type: 'boolean' },
+      profile: { type: 'string' },
+      help: { type: 'boolean', short: 'h' },
     },
     // Tolerate stray positionals. When launched via `upg mcp run`, argv carries
     // the `mcp run` subcommand tokens; without this, parseArgs throws
@@ -119,53 +254,135 @@ export async function runMcpServer() {
     allowPositionals: true,
   })
 
+  if (values.help) {
+    process.stdout.write(USAGE)
+    process.exit(0)
+  }
+
+  // --profile (0.38.0, F5): validated up front so a typo'd profile fails the
+  // launch instead of silently serving the full surface.
+  let profile: ToolProfile | undefined
+  if (values.profile !== undefined) {
+    if (!isValidProfile(values.profile)) {
+      process.stderr.write(
+        `\nUPG MCP server: unknown --profile "${values.profile}". Valid: ${TOOL_PROFILES.join(', ')}.\n`,
+      )
+      process.exit(1)
+    }
+    profile = values.profile
+  }
+
+  // ── Workspace resolution (F1): explicit beats discovery ────────────────────
+  const wsArg = values.workspace ?? process.env.UPG_WORKSPACE
+  let workspaceAbsPath: string | null = null
+  if (wsArg) {
+    const problem = await validateWorkspaceDir(wsArg)
+    if (problem) {
+      process.stderr.write(`\nUPG MCP server: ${problem}\n`)
+      process.exit(1)
+    }
+    if (values.check) {
+      // --check never mutates: report the real path without arranging cwd
+      // (arranging may create the runtime shim dir).
+      workspaceAbsPath = await fs.realpath(path.resolve(wsArg))
+      process.chdir(path.basename(workspaceAbsPath) === '.upg' ? path.dirname(workspaceAbsPath) : workspaceAbsPath)
+      // In the non-`.upg`-named case the workspace tools would use the shim;
+      // for --check we only need file resolution below, which handles both.
+    } else {
+      workspaceAbsPath = await arrangeWorkspaceCwd(wsArg)
+    }
+  } else {
+    try {
+      workspaceAbsPath = await fs.realpath(path.join(process.cwd(), '.upg'))
+    } catch {
+      workspaceAbsPath = null
+    }
+  }
+  setWorkspaceRoot(workspaceAbsPath)
+
+  // ── --check (F2): resolve as the server would, print, exit. No transport. ──
+  if (values.check) {
+    const cwd = process.cwd()
+    let resolved: string | null = null
+    // With --workspace pointing at a non-`.upg`-named dir, resolve directly
+    // against it (the live path resolves via the shim; --check avoids writes).
+    if (wsArg && workspaceAbsPath && path.basename(workspaceAbsPath) !== '.upg') {
+      try {
+        const raw = await fs.readFile(path.join(workspaceAbsPath, 'workspace.json'), 'utf-8')
+        const ws = JSON.parse(raw)
+        if (ws.default_product) resolved = path.join(workspaceAbsPath, ws.default_product)
+      } catch {
+        const entries = await fs.readdir(workspaceAbsPath).catch(() => [] as string[])
+        const upg = entries.filter((f) => f.endsWith('.upg')).sort()
+        if (upg.length > 0) resolved = path.join(workspaceAbsPath, upg[0])
+      }
+    } else {
+      resolved = await discoverUPGFile(values.file)
+    }
+    let products = 0
+    let ok = false
+    let error: string | undefined
+    if (resolved) {
+      try {
+        await fs.access(resolved)
+        parseUpg(await fs.readFile(resolved, 'utf-8'))
+        ok = true
+      } catch (err) {
+        error = `resolved file unreadable or unparsable: ${(err as Error).message}`
+      }
+      if (workspaceAbsPath) {
+        const entries = await fs.readdir(workspaceAbsPath).catch(() => [] as string[])
+        products = entries.filter((f) => f.endsWith('.upg')).length
+      } else if (ok) {
+        products = 1
+      }
+    } else {
+      error = `nothing resolved from cwd ${cwd}; pass --workspace or --file`
+    }
+    process.stdout.write(
+      JSON.stringify(
+        {
+          ok,
+          workspace: workspaceAbsPath,
+          resolved_file: resolved,
+          products,
+          spec_version: UPG_VERSION,
+          server_version: SERVER_VERSION,
+          ...(error ? { error } : {}),
+        },
+        null,
+        2,
+      ) + '\n',
+    )
+    process.exit(ok ? 0 : 1)
+  }
+
   let resolvedPath = await discoverUPGFile(values.file)
 
-  // Tier 4: create blank product.upg
+  // Empty resolution (F1): creation is opt-in via --init, never a fallback.
   if (!resolvedPath) {
+    if (!values.init) refuseEmptyResolution(process.cwd())
     const defaultFile = path.resolve('product.upg')
-    const title = values.title ?? 'My Product'
-    const blank = {
-      upg_version: UPG_VERSION,
-      exported_at: new Date().toISOString(),
-      source: {
-        tool: 'upg-mcp-local',
-        tool_version: SERVER_VERSION,
-      },
-      product: {
-        id: nanoid(16),
-        title,
-      },
-      nodes: [],
-      edges: [],
-    }
     await fs.mkdir(path.dirname(defaultFile), { recursive: true })
-    await fs.writeFile(defaultFile, serializeCanonical(blank as UPGDocument), 'utf-8')
+    await fs.writeFile(defaultFile, serializeCanonical(blankDocument(values.title ?? 'My Product')), 'utf-8')
     process.stderr.write(`Created new UPG file: ${defaultFile}\n`)
     resolvedPath = defaultFile
   } else {
-    // If the discovered file doesn't exist yet, create it (e.g. --file flag with new path)
+    // A discovered-but-absent file (--file with a new path) is likewise only
+    // created deliberately.
     try {
       await fs.access(resolvedPath)
     } catch {
-      const title =
-        values.title ?? path.basename(resolvedPath, '.upg')
-      const blank = {
-        upg_version: UPG_VERSION,
-        exported_at: new Date().toISOString(),
-        source: {
-          tool: 'upg-mcp-local',
-          tool_version: SERVER_VERSION,
-        },
-        product: {
-          id: nanoid(16),
-          title,
-        },
-        nodes: [],
-        edges: [],
+      if (!values.init) {
+        process.stderr.write(
+          `\nUPG MCP server: ${resolvedPath} does not exist — refusing to create it.\n` +
+          `Pass --init to deliberately create a blank graph at that path.\n`,
+        )
+        process.exit(1)
       }
+      const title = values.title ?? path.basename(resolvedPath, '.upg')
       await fs.mkdir(path.dirname(resolvedPath), { recursive: true })
-      await fs.writeFile(resolvedPath, serializeCanonical(blank as UPGDocument), 'utf-8')
+      await fs.writeFile(resolvedPath, serializeCanonical(blankDocument(title)), 'utf-8')
       process.stderr.write(`Created new UPG file: ${resolvedPath}\n`)
     }
   }
@@ -221,8 +438,27 @@ export async function runMcpServer() {
     process.stderr.write(`Run /upg-fix-types to update them.\n\n`)
   }
 
+  // Spec-version drift warning (0.38.0, F3). A graph sealed under an older
+  // spec meeting a newer server is normal and safe to READ; the warning exists
+  // so an agent (or a cloud environment author) can tell "graph lags the
+  // server" apart from "everything is current" — the field case was graphs
+  // sealed at 0.8.13 meeting a 0.36.0 server with no signal anywhere.
+  const sealed = store.getDocument().upg_version
+  if (sealed && sealed !== UPG_VERSION) {
+    const minors = (v: string) => v.split('.').slice(0, 2).map(Number)
+    const [sMaj, sMin] = minors(sealed)
+    const [cMaj, cMin] = minors(UPG_VERSION)
+    if (sMaj < cMaj || (sMaj === cMaj && sMin < cMin)) {
+      const delta = (cMaj - sMaj) * 100 + (cMin - sMin)
+      process.stderr.write(
+        `${delta >= 5 ? '⚠️  ' : ''}Graph spec_version ${sealed} is behind server spec ${UPG_VERSION}. ` +
+        `Reads are safe; before heavy writes, review due migrations (upg verify / the migration pass).\n`,
+      )
+    }
+  }
+
   // Start MCP server over stdio
-  const server = createServer(store)
+  const server = createServer(store, { profile })
   await server.start()
 
   process.stderr.write(`UPG MCP server running: ${resolvedPath}\n`)

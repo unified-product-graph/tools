@@ -14,6 +14,7 @@ import {
   getToolHandler,
   rejectUnsupportedConfiguration,
 } from './lib/tool-registry.js'
+import { isToolAllowed, profileRefusalMessage, type ToolProfile } from './lib/tool-profiles.js'
 import {
   createSessionContext,
   createQueryCache,
@@ -484,9 +485,13 @@ export function createUnavailableServer(diagnosis: string) {
   }
 }
 
-export function createServer(store: UPGFileStore) {
+export function createServer(store: UPGFileStore, opts: { profile?: ToolProfile } = {}) {
+  const profile = opts.profile
   const server = new Server(
-    { name: 'unified-product-graph', version: SERVER_VERSION },
+    // A profiled server SAYS SO in its name (the 0.34.1 degraded-server
+    // lesson: state the surface in what a client displays without calling
+    // anything), so a picker or status line shows the gate.
+    { name: profile ? `unified-product-graph (profile: ${profile})` : 'unified-product-graph', version: SERVER_VERSION },
     {
       capabilities: { tools: {} },
       instructions: SERVER_INSTRUCTIONS,
@@ -523,8 +528,11 @@ export function createServer(store: UPGFileStore) {
   }
 
   // ── tools/list ────────────────────────────────────────────────────────────
+  // Under a profile the list is FILTERED server-side; the dispatch guard below
+  // is the enforcement (a client can call what it was not shown — the list is
+  // discovery, the refusal is the gate).
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: TOOL_DEFINITIONS }
+    return { tools: profile ? TOOL_DEFINITIONS.filter((t) => isToolAllowed(profile, t.name)) : TOOL_DEFINITIONS }
   })
 
   // ── tools/call ────────────────────────────────────────────────────────────
@@ -539,6 +547,11 @@ export function createServer(store: UPGFileStore) {
         ? String(extra.requestId)
         : undefined
     const { name, arguments: args = {} } = request.params
+    // Profile gate (0.38.0, F5): refuse BEFORE the dispatcher so an excluded
+    // call never reaches a handler, a ledger, or a dedup cache.
+    if (profile && !isToolAllowed(profile, name)) {
+      return { isError: true, content: [{ type: 'text' as const, text: profileRefusalMessage(profile, name) }] }
+    }
     return dispatch(name, (args ?? {}) as Record<string, unknown>, reqKey)
   })
 

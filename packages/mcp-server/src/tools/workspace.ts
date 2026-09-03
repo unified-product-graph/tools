@@ -8,7 +8,7 @@ import * as fs from 'node:fs'
 import * as fsp from 'node:fs/promises'
 import * as path from 'node:path'
 import type { ToolContext, ToolHandler, ToolResult } from '../lib/server-context.js'
-import { text, textError } from '../lib/server-context.js'
+import { text, textError, getWorkspaceRoot } from '../lib/server-context.js'
 import { edgeId } from '@unified-product-graph/sdk'
 import type { UPGCrossEdge, UPGCrossEdgeType, UPGEntityType } from '@unified-product-graph/core'
 import type { CompositionMember, UPGViewQuery, UPGViewPresentation } from '@unified-product-graph/core'
@@ -547,6 +547,10 @@ export const getWorkspaceInfo: ToolHandler = async (_args, ctx): Promise<ToolRes
         {
           mode: 'workspace',
           workspace_path: '.upg/',
+          // The ABSOLUTE (real) workspace path (0.38.0, F1): lets an agent in
+          // an environment with an uncontrolled cwd assert it is talking to
+          // the workspace it thinks it is, instead of a phantom.
+          workspace_abs_path: getWorkspaceRoot() ?? upgDir,
           current_product: currentRel,
           products,
         },
@@ -560,6 +564,7 @@ export const getWorkspaceInfo: ToolHandler = async (_args, ctx): Promise<ToolRes
       JSON.stringify(
         {
           mode: 'single-file',
+          workspace_abs_path: getWorkspaceRoot(),
           current_file: path.relative(cwd, currentFile) || path.basename(currentFile),
           products: [
             {

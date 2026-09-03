@@ -327,3 +327,48 @@ describe('install-skills: conflict handling', () => {
     expect(content).not.toContain('user-owned')
   })
 })
+
+describe('install-skills: --target cursor (0.38.0, F6)', () => {
+  let tmp: string
+  let prevCwd: string
+  beforeEach(async () => {
+    tmp = await mkTmp()
+    prevCwd = process.cwd()
+    process.chdir(tmp)
+  })
+  afterEach(async () => {
+    process.chdir(prevCwd)
+    await cleanup(tmp)
+  })
+
+  it('resolves the project destination to .cursor/skills (same layout, different root)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => { /* swallow */ })
+    const result = await runInstallSkills({
+      scope: 'project',
+      target: 'cursor',
+      mode: 'copy',
+      force: true,
+      list: false,
+      remove: false,
+      sourceOverride: REPO_SKILLS,
+    })
+    logSpy.mockRestore()
+    expect(result.dest).toBe(path.join(fs.realpathSync(tmp), '.cursor', 'skills'))
+    // The layout Cursor reads: .cursor/skills/<name>/SKILL.md
+    expect(fs.existsSync(path.join(result.dest, 'upg', 'SKILL.md'))).toBe(true)
+  })
+
+  it('default target stays .claude/skills, unchanged', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => { /* swallow */ })
+    const result = await runInstallSkills({
+      scope: 'project',
+      mode: 'copy',
+      force: true,
+      list: false,
+      remove: false,
+      sourceOverride: REPO_SKILLS,
+    })
+    logSpy.mockRestore()
+    expect(result.dest).toBe(path.join(fs.realpathSync(tmp), '.claude', 'skills'))
+  })
+})

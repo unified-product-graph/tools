@@ -118,6 +118,24 @@ export function syncFilePath(upgPath: string): string {
   return path.join(dir, `${base}.upg-sync`)
 }
 
+// ── Workspace root (0.38.0, F1) ──────────────────────────────────────────────
+// The ABSOLUTE (real) path of the .upg workspace directory this server is
+// serving, set once at startup. One server process serves one workspace, so
+// module state is the honest scope. Tools report it (get_workspace_info /
+// get_graph_digest) so an agent can assert it is where it thinks it is —
+// the assertion a cloud VM with an uncontrolled cwd otherwise cannot make.
+let workspaceRoot: string | null = null
+
+/** Record the absolute workspace path at startup (null = single-file mode with no workspace dir). */
+export function setWorkspaceRoot(absPath: string | null): void {
+  workspaceRoot = absPath
+}
+
+/** The absolute workspace path recorded at startup, or null. */
+export function getWorkspaceRoot(): string | null {
+  return workspaceRoot
+}
+
 export async function readSyncState(upgPath: string): Promise<SyncState | null> {
   const p = syncFilePath(upgPath)
   try {

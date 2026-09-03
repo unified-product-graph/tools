@@ -43,9 +43,12 @@ describe('mcp-server entrypoint detection (symlinked invocation)', () => {
     symlinkSync(DIST_ENTRY, link)
 
     const started = await new Promise<boolean>((resolvePromise) => {
-      // cwd = tmp so the server creates its blank product.upg in the throwaway
-      // dir (Tier 4 discovery) rather than polluting the repo.
-      const child = spawn(process.execPath, [link], {
+      // cwd = tmp + --init so the server deliberately creates its blank
+      // product.upg in the throwaway dir. Since 0.38.0 (F1) an empty cwd
+      // without --init REFUSES rather than fabricating a graph, so the
+      // opt-in flag is required here — which also gives the --init path
+      // its coverage.
+      const child = spawn(process.execPath, [link, '--init'], {
         cwd: tmp,
         stdio: ['pipe', 'pipe', 'pipe'],
       })

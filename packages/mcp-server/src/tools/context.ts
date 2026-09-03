@@ -5,7 +5,7 @@
  */
 
 import type { ToolContext, ToolHandler, ToolResult, UPGLens } from '../lib/server-context.js'
-import { text, textError, isCanonicalLens, CANONICAL_LENS_IDS } from '../lib/server-context.js'
+import { text, textError, isCanonicalLens, CANONICAL_LENS_IDS, getWorkspaceRoot } from '../lib/server-context.js'
 import {
   UPG_DOMAINS,
   UPG_DOMAIN_GUIDES,
@@ -287,7 +287,10 @@ export const getGraphDigest: ToolHandler = (args, ctx): ToolResult => {
     lensDigest = { personas: digest.counts.by_type['persona'] ?? 0, outcomes: digest.counts.by_type['outcome'] ?? 0, hypotheses_validated: digest.chains.hypothesis_total - digest.chains.hypothesis_untested }
   }
 
-  return text(JSON.stringify({ ...digest, lens: sessionContext.lens, lens_digest: lensDigest, _hash: currentHash }, null, 2))
+  // workspace_abs_path (0.38.0, F1): the location assertion. An agent in an
+  // environment with an uncontrolled cwd checks this against the path it
+  // expects, instead of discovering a phantom graph three writes later.
+  return text(JSON.stringify({ ...digest, workspace_abs_path: getWorkspaceRoot(), source_file: store.getFilePath(), lens: sessionContext.lens, lens_digest: lensDigest, _hash: currentHash }, null, 2))
 }
 
 /** Below this many non-product nodes a graph is still "young" and benefits

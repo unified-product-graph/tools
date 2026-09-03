@@ -40,12 +40,23 @@ export interface ClaudeSettings {
  * NOT read server *definitions* from it. Writing there is why a fresh setup
  * never connected until a `.mcp.json` was added by hand.
  */
-function resolveSettingsPath(scope: McpScope): string {
+function resolveSettingsPath(scope: McpScope, target: McpTarget = 'claude'): string {
+  if (target === 'cursor') {
+    // LOCAL Cursor reads `.cursor/mcp.json` (project) / `~/.cursor/mcp.json`
+    // (user), same `mcpServers` shape. Cursor CLOUD Agents read NEITHER —
+    // servers come only from the team dashboard — so the cursor-target setup
+    // also prints the dashboard snippet (0.38.0, F6; the field session lost
+    // an hour to exactly this).
+    if (scope === 'user') return path.join(os.homedir(), '.cursor', 'mcp.json')
+    return path.join(process.cwd(), '.cursor', 'mcp.json')
+  }
   if (scope === 'user') {
     return path.join(os.homedir(), '.claude.json')
   }
   return path.join(process.cwd(), '.mcp.json')
 }
+
+export type McpTarget = 'claude' | 'cursor'
 
 /**
  * Detect the best command+args to use for the MCP server.
@@ -116,6 +127,8 @@ async function promptConfirm(question: string): Promise<boolean> {
 export interface SetupOptions {
   scope: McpScope
   force: boolean
+  /** Which client's config to write. Default 'claude'. */
+  target?: McpTarget
   commandOverride?: string
   /** Override settings file path (test hook). */
   settingsPathOverride?: string
@@ -131,7 +144,7 @@ export interface SetupResult {
 }
 
 export async function runMcpSetup(opts: SetupOptions): Promise<SetupResult> {
-  const settingsPath = opts.settingsPathOverride ?? resolveSettingsPath(opts.scope)
+  const settingsPath = opts.settingsPathOverride ?? resolveSettingsPath(opts.scope, opts.target ?? 'claude')
   const entry = detectMcpCommand(opts.commandOverride)
 
   const settings = await readSettings(settingsPath)
@@ -234,6 +247,7 @@ const mcpSetupCommand = new Command('setup')
   )
   .option('--force', 'Overwrite an existing entry without prompting', false)
   .option('--command <cmd>', 'Override the server command. Example: "node /path/to/index.js"')
+  .option('--target <claude|cursor>', 'Which client config to write. cursor = .cursor/mcp.json (local Cursor; cloud agents use the team dashboard)', 'claude')
   .action(async (opts) => {
     try {
       const scope = opts.scope as string
@@ -241,9 +255,15 @@ const mcpSetupCommand = new Command('setup')
         console.error(`Invalid --scope "${scope}". Use "user" or "project".`)
         process.exit(2)
       }
+      const target = opts.target as string
+      if (target !== 'claude' && target !== 'cursor') {
+        console.error(`Invalid --target "${target}". Use "claude" or "cursor".`)
+        process.exit(2)
+      }
 
       const result = await runMcpSetup({
         scope: scope as McpScope,
+        target: target as McpTarget,
         force: Boolean(opts.force),
         commandOverride: opts.command as string | undefined,
       })
@@ -262,7 +282,23 @@ const mcpSetupCommand = new Command('setup')
       console.log()
       console.log(chalk.dim(formatEntry(result.entry)))
       console.log()
-      console.log(`  Open Claude Code in this directory. The UPG tools will be available automatically.`)
+      if (target === 'cursor') {
+        console.log(`  Local Cursor reads this file. ${chalk.yellow('Cursor CLOUD Agents do NOT')} — they load`)
+        console.log(`  servers only from the team dashboard (Integrations & MCP). Paste there:`)
+        console.log()
+        console.log(chalk.dim(JSON.stringify({
+          'unified-product-graph': {
+            type: 'stdio',
+            command: 'upg-mcp-server',
+            args: ['--workspace', '/absolute/path/to/your-graph-repo'],
+          },
+        }, null, 2)))
+        console.log()
+        console.log(chalk.dim('  Pin the package in the environment install (npm i -g @unified-product-graph/mcp-server@<version>)'))
+        console.log(chalk.dim('  and add `upg-mcp-server --check --workspace <dir>` so a broken workspace fails the build.'))
+      } else {
+        console.log(`  Open Claude Code in this directory. The UPG tools will be available automatically.`)
+      }
       console.log()
     } catch (err) {
       console.error((err as Error).message)

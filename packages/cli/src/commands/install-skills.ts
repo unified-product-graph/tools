@@ -20,6 +20,7 @@ import chalk from 'chalk'
 
 export type InstallMode = 'symlink' | 'copy'
 export type InstallScope = 'user' | 'project'
+export type InstallTarget = 'claude' | 'cursor'
 
 export interface Manifest {
   version: string
@@ -110,9 +111,13 @@ export function listSkillsInSource(src: string): string[] {
     .sort()
 }
 
-function resolveDestination(scope: InstallScope): string {
-  if (scope === 'user') return path.join(os.homedir(), '.claude', 'skills')
-  return path.join(process.cwd(), '.claude', 'skills')
+function resolveDestination(scope: InstallScope, target: InstallTarget = 'claude'): string {
+  // Cursor reads `.cursor/skills/<name>/SKILL.md` — the same per-skill layout,
+  // different root (0.38.0, F6). The bundled skills install unchanged; only
+  // the destination moves.
+  const root = target === 'cursor' ? '.cursor' : '.claude'
+  if (scope === 'user') return path.join(os.homedir(), root, 'skills')
+  return path.join(process.cwd(), root, 'skills')
 }
 
 async function readManifest(destDir: string): Promise<Manifest | null> {
@@ -249,6 +254,8 @@ async function installOneAuto(srcSkillDir: string, destSkillDir: string): Promis
 
 export interface RunOptions {
   scope: InstallScope
+  /** Which client's skills directory to install into. Default 'claude'. */
+  target?: InstallTarget
   mode: 'symlink' | 'copy' | 'auto'
   force: boolean
   list: boolean
@@ -276,7 +283,7 @@ export interface RunResult {
  * Core runner. Exported for tests, and does no `process.exit` calls.
  */
 export async function runInstallSkills(opts: RunOptions): Promise<RunResult> {
-  const dest = opts.destOverride ?? resolveDestination(opts.scope)
+  const dest = opts.destOverride ?? resolveDestination(opts.scope, opts.target ?? 'claude')
 
   // --remove: manifest-driven cleanup.
   if (opts.remove) {
@@ -429,11 +436,17 @@ export const installSkillsCommand = new Command('install-skills')
   .option('--mode <symlink|copy>', 'auto (default), symlink, or copy. auto falls back to copy on Windows', 'auto')
   .option('--list', 'Print skill names. Skips the install', false)
   .option('--remove', 'Remove UPG skills recorded in the manifest', false)
+  .option('--target <claude|cursor>', 'claude = .claude/skills (default). cursor = .cursor/skills, the layout Cursor reads', 'claude')
   .action(async (opts) => {
     try {
       const scope = opts.scope as InstallScope
       if (scope !== 'user' && scope !== 'project') {
         console.error(`Invalid --scope "${opts.scope}". Use "user" or "project".`)
+        process.exit(2)
+      }
+      const target = opts.target as string
+      if (target !== 'claude' && target !== 'cursor') {
+        console.error(`Invalid --target "${target}". Use "claude" or "cursor".`)
         process.exit(2)
       }
       const modeRaw = opts.mode as string
@@ -444,6 +457,7 @@ export const installSkillsCommand = new Command('install-skills')
 
       const result = await runInstallSkills({
         scope,
+        target: target as InstallTarget,
         mode: modeRaw as 'symlink' | 'copy' | 'auto',
         force: Boolean(opts.force),
         list: Boolean(opts.list),
@@ -475,7 +489,11 @@ export const installSkillsCommand = new Command('install-skills')
       console.log()
       console.log(chalk.green(`✓ ${total} skills in ${result.dest} (${scopeLabel}, mode=${modeLabel})`))
       if (parts.length) console.log(`  ${parts.join(', ')}`)
-      console.log(chalk.dim('  Next: run `upg mcp setup` to wire the MCP server, then open Claude Code and type /upg'))
+      if ((target as InstallTarget) === 'cursor') {
+        console.log(chalk.dim('  Next: run `upg mcp setup --target cursor` for local Cursor; cloud agents add the server via the team dashboard.'))
+      } else {
+        console.log(chalk.dim('  Next: run `upg mcp setup` to wire the MCP server, then open Claude Code and type /upg'))
+      }
     } catch (err) {
       console.error((err as Error).message)
       process.exit(2)

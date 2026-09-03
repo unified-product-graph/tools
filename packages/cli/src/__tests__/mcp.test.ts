@@ -314,3 +314,22 @@ describe('mcp status: configured vs not-configured', () => {
     expect(result.user.configured).toBe(true)
   })
 })
+
+describe('mcp setup: --target cursor (0.38.0, F6)', () => {
+  it('writes .cursor/mcp.json in the cwd for project scope', async () => {
+    const os = await import('node:os')
+    const fsp = await import('node:fs/promises')
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), 'upg-mcp-cursor-'))
+    const prevCwd = process.cwd()
+    process.chdir(tmp)
+    try {
+      const result = await runMcpSetup({ scope: 'project', target: 'cursor', force: true })
+      expect(result.settingsPath).toBe(path.join(await fsp.realpath(tmp), '.cursor', 'mcp.json'))
+      const written = JSON.parse(await fsp.readFile(result.settingsPath, 'utf-8'))
+      expect(written.mcpServers['unified-product-graph']).toBeTruthy()
+    } finally {
+      process.chdir(prevCwd)
+      await fsp.rm(tmp, { recursive: true, force: true })
+    }
+  })
+})

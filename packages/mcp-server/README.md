@@ -52,10 +52,70 @@ If no `.upg` file exists, the server creates a blank `product.upg`. Use `create_
 
 The server picks the `.upg` file to load in this order:
 
-1. `--file` flag: use that file directly
-2. `.upg/workspace.json`: load the default product from a workspace
-3. `*.upg` files in cwd: first alphabetically
-4. Otherwise: create a blank `product.upg`
+1. `--workspace <dir>` (or `UPG_WORKSPACE`): the directory holding your graphs (`workspace.json` or `*.upg` files). The server arranges its own cwd around it, so no shell wrapper is needed.
+2. `--file` flag: use that file directly
+3. `.upg/workspace.json` in cwd: load the default product from a workspace
+4. `*.upg` files in cwd: first alphabetically
+5. Otherwise: **refuse to start** (exit 1), naming the cwd and every path checked. Creating a blank graph is opt-in via `--init`, never a fallback — in an environment whose cwd you do not control, a silently created blank graph means every tool call "succeeds" against a phantom and your writes are lost.
+
+`get_workspace_info` and `get_graph_digest` report `workspace_abs_path` so an agent can assert it is talking to the workspace it thinks it is.
+
+### Preflight (`--check`)
+
+`upg-mcp-server --check --workspace <dir>` resolves the workspace exactly as the server would, prints `{ok, workspace, resolved_file, products, spec_version, server_version}` and exits 0/1 without starting the transport and without writing anything. Put it in your environment's install script so a misconfigured environment fails at build time instead of silently mid-session.
+
+## Cloud Agent Environments (Cursor Cloud Agents and similar)
+
+Cloud agent runtimes load MCP servers from a team dashboard, not from a repo-level `.cursor/mcp.json` / `.mcp.json` — those files are **not read** by the cloud runtime. The working directory of a dashboard-launched stdio process is not under your control, which is exactly what `--workspace` exists for.
+
+**Pin the version; do not use `@latest`.** A fresh VM cold-starts the download each session, restricted egress breaks it mid-run, and `@latest` decouples the server's spec version from the version your graphs were sealed with. Install once in the environment build, launch from the installed binary:
+
+```jsonc
+// environment install step
+// npm i -g @unified-product-graph/mcp-server@<pinned>
+// upg-mcp-server --check --workspace /path/to/your-graph-repo
+
+// team dashboard → MCP servers → stdio entry
+{
+  "unified-product-graph": {
+    "type": "stdio",
+    "command": "upg-mcp-server",
+    "args": ["--workspace", "/path/to/your-graph-repo", "--profile", "author"]
+  }
+}
+```
+
+On startup the server warns on stderr when a loaded graph's sealed `spec_version` is behind the server's spec — reads are safe; review due migrations (`upg verify`) before heavy writes.
+
+## Tool Profiles (`--profile`)
+
+The server can filter its own tool surface — more robust than a client-side allowlist, because the filter applies to `tools/call`, not just `tools/list`, and the handshake's server name states the active profile.
+
+- `--profile read-only` — the 44 read tools only: nothing that writes a graph, a portfolio, or the network (`submit_feedback` is excluded — it POSTs externally). `switch_product`/`reload_product` stay in, since multi-product *reading* needs the pointer.
+- `--profile author` — writes allowed; destructive and infrastructure tools gated: `delete_*`, `batch_delete_*`, `migrate_*`, `rename_edge_type`, `push_to_cloud`, `init_workspace`, `create_product`, and the three that delete under another verb (`deduplicate_nodes`, `merge_canonical_entities`, `repair_dangling_edges`).
+
+For runtimes that gate client-side instead (e.g. Cursor's `environment.json` `mcpServerAllowlist[].toolAllowlist`), paste the equivalent lists:
+
+```jsonc
+// read-only
+"toolAllowlist": [
+  "aggregate_edge_properties", "audit_axis_overlap", "audit_property_coverage",
+  "compare_classifications", "diff_classification", "export_edges",
+  "get_anti_pattern_violations_for", "get_area_context", "get_area_graph",
+  "get_catalog_entry", "get_changes", "get_entity_schema", "get_graph_digest",
+  "get_import_recipe", "get_node", "get_nodes", "get_organization",
+  "get_portfolio_tree", "get_product_context", "get_session_context",
+  "get_spec_version", "get_sync_state", "get_tree", "get_workspace_info",
+  "list_catalog", "list_local_products", "list_nodes",
+  "list_portfolio_cross_edges", "list_portfolios", "list_product_areas",
+  "list_registry", "list_registry_edges", "portfolio_census",
+  "portfolio_digest", "portfolio_query", "portfolio_validate", "query",
+  "reload_product", "score_entity", "search_nodes", "skill_audit", "start",
+  "switch_product", "validate_graph"
+]
+```
+
+For the author list, take every tool except the gated set above. Prefer `--profile` where you control the launch command: a server-side gate cannot be bypassed by a client that calls what it was not shown.
 
 ## Conceptual Surface
 
