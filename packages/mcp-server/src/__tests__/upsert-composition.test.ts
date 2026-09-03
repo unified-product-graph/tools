@@ -156,11 +156,20 @@ describe('the input schema declares the view shapes inline', () => {
     ])
   })
 
-  it('reflects the 0.34.0 presentation shape including orphan_disposition', () => {
+  it('reflects the 0.37.0 presentation shape (six review fields + nest_by widening)', () => {
     const p = props().presentation
     expect(Object.keys(p.properties).sort()).toEqual(
-      ['group_by', 'sort', 'layout', 'nest_by', 'orphan_disposition'].sort(),
+      [
+        'group_by', 'sort', 'layout', 'nest_by', 'orphan_disposition',
+        // the 0.37.0 presentation review (B0/B-1/F-7/F-8)
+        'rows_by', 'lane_order', 'collapsed_lanes', 'collapsed_rows', 'root',
+      ].sort(),
     )
+    // group_by / rows_by are string-or-edge unions; nest_by items string-or-object.
+    expect(p.properties.group_by.oneOf).toHaveLength(2)
+    expect(p.properties.rows_by.oneOf).toHaveLength(2)
+    expect(p.properties.nest_by.items.oneOf).toHaveLength(2)
+    expect(p.properties.root.properties.kind.enum).toEqual(['product', 'type', 'focus'])
     expect(p.properties.orphan_disposition.enum).toEqual(['root', 'hide'])
     // Absent means root, and saying so is the whole safety argument: a consumer
     // that ignores the field must never silently drop a selected node.

@@ -290,7 +290,38 @@ const VIEW_PRESENTATION_SCHEMA = {
   description:
     'Advisory rendering intent. A consumer MAY ignore every field here and stay conformant, because every default it then applies is the safe one.',
   properties: {
-    group_by: { type: 'string', description: 'Property name, base field, or "status_category", to group lanes by.' },
+    group_by: {
+      description:
+        'The lane (column) axis. A string (property name, base field, or "status_category") partitions on a value; the object form lanes by an EDGE: each lane is a far-end neighbour of the named edge type (lane identity = neighbour node id, label = its title). `direction` is which way the edge is walked from the member; absent means "out". A member with no such edge lands in a "none" lane, never dropped.',
+      oneOf: [
+        { type: 'string' },
+        {
+          type: 'object',
+          properties: {
+            dimension: { type: 'string', enum: ['edge'] },
+            edge_type: { type: 'string', description: 'Canonical edge type whose far-end neighbour identifies the lane.' },
+            direction: { type: 'string', enum: ['out', 'in'], description: 'Which way the edge is walked from the member. Absent means "out".' },
+          },
+          required: ['dimension', 'edge_type'],
+        },
+      ],
+    },
+    rows_by: {
+      description:
+        'The row axis, making the board a two-axis grid (rows_by x group_by). Same string-or-edge shape as `group_by`. Absent means a one-axis board, which is what every earlier view already meant. Dropping this field flattens the grid: same nodes, but the dimension the author was reasoning in is gone.',
+      oneOf: [
+        { type: 'string' },
+        {
+          type: 'object',
+          properties: {
+            dimension: { type: 'string', enum: ['edge'] },
+            edge_type: { type: 'string' },
+            direction: { type: 'string', enum: ['out', 'in'] },
+          },
+          required: ['dimension', 'edge_type'],
+        },
+      ],
+    },
     sort: {
       type: 'array',
       description: 'Sort keys in precedence order.',
@@ -308,11 +339,50 @@ const VIEW_PRESENTATION_SCHEMA = {
       enum: ['board', 'table', 'list', 'cards', 'timeline', 'gallery', 'tree'],
       description: 'Requested layout family. Advisory.',
     },
-    nest_by: {
+    lane_order: {
       type: 'array',
       items: { type: 'string' },
       description:
-        'Edge types to nest by, outermost first, when `layout` is "tree". Naming the edge types keeps the nesting portable: `group_by` partitions a flat set on a value and cannot express nesting, because the levels of a tree are edges rather than property values.',
+        'Lane keys in display order, leftmost first (lane keys are the group_by values; node ids under an edge axis). Lanes not listed follow the listed ones in natural order, so a new value never vanishes for being unlisted.',
+    },
+    collapsed_lanes: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Lane keys drawn collapsed. A consumer that ignores this renders every lane expanded, which is the safe direction: it shows more, never hides.',
+    },
+    collapsed_rows: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Row keys drawn collapsed, when `rows_by` is set. Same contract as collapsed_lanes, on the row axis.',
+    },
+    nest_by: {
+      type: 'array',
+      items: {
+        oneOf: [
+          { type: 'string' },
+          {
+            type: 'object',
+            properties: {
+              edge_type: { type: 'string' },
+              parent: { type: 'string', enum: ['source', 'target'], description: 'Which declared endpoint of the edge is the tree parent.' },
+            },
+            required: ['edge_type', 'parent'],
+          },
+        ],
+      },
+      description:
+        'Edge types to nest by, outermost first, when `layout` is "tree". A bare name binds in catalog-declared orientation: the edge\'s source_type is the PARENT and its target_type the CHILD; guessing the orientation or walking a converse on a bare name is non-conformant. The object form states parent-at-target intent a bare name cannot: a bare string is exactly { parent: "source" }.',
+    },
+    root: {
+      type: 'object',
+      description:
+        'Where the tree roots, when `layout` is "tree": the product node, every member of a type, or the composition\'s focus set. Absent means product. Root never changes the selected set; it designates which already-selected members are drawn as tops. A stated root is also what makes orphan_disposition "hide" safe to honour.',
+      properties: {
+        kind: { type: 'string', enum: ['product', 'type', 'focus'] },
+        type: { type: 'string', description: 'For kind "type": the entity type whose members are the roots.' },
+      },
+      required: ['kind'],
     },
     orphan_disposition: {
       type: 'string',
