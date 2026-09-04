@@ -101,17 +101,38 @@ export const PROJECT_WORK_ITEM_TYPES: ReadonlySet<string> = new Set([
  * The generic resolver cannot tell those two cases apart, which is exactly why the
  * explicit path has to be explicit.
  *
- * As of 0.33.0 the flag is not even the only barrier: the catalogue entry's target
- * widened to the `node` wildcard, so `UPG_EDGE_PAIR_MAP['project:epic']` no longer
- * exists at all and the generic resolvers return null for the pair regardless of
- * classification. Explicit emission is the ONLY route.
+ * 0.33.0 added a second barrier: the catalogue entry's target widened to the
+ * `node` wildcard, so `UPG_EDGE_PAIR_MAP['project:epic']` did not exist and the
+ * generic resolvers returned null for the pair regardless of classification.
+ * Explicit emission was then the ONLY route.
+ *
+ * 0.41.0 CHANGED THAT, and the consequence is worth stating plainly rather than
+ * leaving for someone to discover. Concrete containment edges landed for exactly
+ * these five child types (`project_contains_{epic,feature,user_story,task,bug}`),
+ * so the pair map answers again. Under the ordering rule below, every caller now
+ * resolves to containment and this explicit path is NOT reached for any of the
+ * five. That is the rule working as written, not a regression: the membership is
+ * carried by a more precise edge, and `parent_id` resolves natively.
+ *
+ * OPERATIONAL CONSEQUENCE for anyone running an incremental sync: a re-import
+ * emits `project_contains_task` where a previous import emitted
+ * `project_delivers_work_item`. Nothing rewrites the old edges, so a graph
+ * imported twice across the boundary can hold both for one pair. That is the
+ * shadow pair the 0.41.0 ruling accepted knowingly; containment is the parent
+ * axis and wins. Retiring the polymorphic edge for these five types, with a
+ * migration, is the follow-up decision that ruling names.
+ *
+ * KEPT, not dead: this path still carries a project membership for any target
+ * OUTSIDE the five, which is the wildcard's remaining job, and the constant is
+ * still the right thing to read for graphs already holding the edge.
  *
  * CALL IT LAST, after the generic resolver has returned null. That ordering is
  * what makes the deference in `PROJECT_WORK_ITEM_TYPES` real: a pair with a more
  * specific catalogued edge is resolved before this is ever consulted.
  *
- * Do NOT "tidy" any caller back onto the generic resolver. The edge would silently
- * vanish, with a green test suite, which is precisely how it was lost once already.
+ * Do NOT "tidy" any caller onto the generic resolver as a REPLACEMENT for this
+ * check. The relationship would silently vanish for any pair the resolver cannot
+ * answer, with a green test suite, which is precisely how it was lost once.
  */
 export function isProjectWorkItemMembership(parentType: string, childType: string): boolean {
   return parentType === 'project' && PROJECT_WORK_ITEM_TYPES.has(childType)

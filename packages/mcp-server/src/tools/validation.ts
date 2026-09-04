@@ -503,6 +503,28 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
    */
   let undeclaredPropertyDriftTotal = 0
   let propertyEnumDriftTotal = 0
+  /**
+   * The same TRUE totals for the remaining walk-computed classes (0.41.0, F2).
+   *
+   * These shipped reading `array.length`, which is wrong twice over: capped by
+   * `limit`, and EMPTY whenever the requested scope excludes the class, so a
+   * narrow scope reported 0 for every class it did not ask about. On this
+   * repo's own tracker that turned a 219-entry `undeclared_property_drift`
+   * backlog into a clean 0 the moment a caller scoped to something else. A
+   * false all-clear is the one failure a validator must never produce, and
+   * `scope`'s own description has always promised the opposite: "Counts in
+   * `summary` are always returned for every class."
+   *
+   * So detection now runs for every class on every call; `scope` governs which
+   * ENTRY ARRAYS come back, which is what it was documented to do. The cost is
+   * that a narrowly scoped call does the same work as `all` and returns less.
+   * That is the honest trade: the counts are the part a CI gate reads.
+   */
+  let edgeTypePairDriftTotal = 0
+  let graphTopologySelfLoopsTotal = 0
+  let propertyTypeDriftTotal = 0
+  let countsDriftTotal = 0
+  let integrityDriftTotal = 0
   const polymorphicUpgradeHints: PolymorphicUpgradeHintEntry[] = []
   const countsDrift: CountsDriftEntry[] = []
   const integrityDrift: IntegrityDriftEntry[] = []
@@ -694,7 +716,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     // the spec's own rule they should be `linear:...`, and they are the reason
     // that rule exists — an underscore key is indistinguishable from a
     // misspelled spec property. That is a migration, not a validator change.
-    if (includes('undeclared_property_drift') && node.properties) {
+    if (node.properties) {
       const effectiveTypeForUndeclared = (getReplacementType(node.type as string) ?? node.type) as string
       const { unknown_properties } = checkUndeclaredProperties(
         effectiveTypeForUndeclared,
@@ -703,7 +725,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       for (const key of unknown_properties) {
         // Counted ALWAYS; pushed only while the page has room.
         undeclaredPropertyDriftTotal++
-        if (undeclaredPropertyDrift.length >= limit) continue
+        if (!includes('undeclared_property_drift') || undeclaredPropertyDrift.length >= limit) continue
         undeclaredPropertyDrift.push({
           id: node.id,
           type: node.type as string,
@@ -716,14 +738,15 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     // Reports declared properties on the node whose value type doesn't match
     // the schema's declared type. Undeclared properties are covered by
     // `undeclared_property_drift` above.
-    if (includes('property_type_drift') && node.properties) {
+    if (node.properties) {
       const effectiveTypeForTypes = (getReplacementType(node.type as string) ?? node.type) as string
       const { violations } = checkPropertyTypes(
         effectiveTypeForTypes,
         node.properties as Record<string, unknown>,
       )
       for (const v of violations) {
-        if (propertyTypeDrift.length >= limit) break
+        propertyTypeDriftTotal++
+        if (!includes('property_type_drift') || propertyTypeDrift.length >= limit) continue
         propertyTypeDrift.push({
           id: node.id,
           type: node.type as string,
@@ -749,7 +772,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     // Scoped to `type: 'string'` with a declared enum. Array-valued enums
     // (`string[]`) are deliberately out: their members are validated per-element
     // by checkPropertyTypes, and folding them in here would double-report.
-    if (includes('property_enum_drift') && node.properties) {
+    if (node.properties) {
       const effectiveTypeForEnums = (getReplacementType(node.type as string) ?? node.type) as string
       const schema = UPG_PROPERTY_SCHEMA[effectiveTypeForEnums]
       if (schema) {
@@ -758,7 +781,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
           if (!def || def.type !== 'string' || !Array.isArray(def.enum) || def.enum.length === 0) continue
           if (typeof raw !== 'string' || def.enum.includes(raw)) continue
           propertyEnumDriftTotal++
-          if (propertyEnumDrift.length >= limit) continue
+          if (!includes('property_enum_drift') || propertyEnumDrift.length >= limit) continue
           propertyEnumDrift.push({
             id: node.id,
             type: node.type as string,
@@ -776,13 +799,13 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // values, an unknown key, or a missing required assessment field surface as
   // property_type_drift. validateEdgeProperties is a no-op for schema-less edge
   // types, so parity / framework-exercise edges are untouched.
-  if (includes('property_type_drift')) {
+  {
     for (const edge of doc.edges) {
-      if (propertyTypeDrift.length >= limit) break
       const edgeProps = (edge as { properties?: Record<string, unknown> }).properties
       if (!edgeProps) continue
       for (const msg of validateEdgeProperties(edge.type as string, edgeProps)) {
-        if (propertyTypeDrift.length >= limit) break
+        propertyTypeDriftTotal++
+        if (!includes('property_type_drift') || propertyTypeDrift.length >= limit) continue
         propertyTypeDrift.push({
           id: edge.id,
           type: edge.type as string,
@@ -875,10 +898,11 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // source_id / source_type properties on a node (external-import
   // provenance); those are properties on a node, not loops in the graph
   // topology.
-  if (includes('edge_type_pair_drift') || includes('graph_topology_self_loops')) {
+  {
     for (const edge of doc.edges) {
-      if (includes('graph_topology_self_loops') && edge.source === edge.target) {
-        if (graphTopologySelfLoops.length < limit) {
+      if (edge.source === edge.target) {
+        graphTopologySelfLoopsTotal++
+        if (includes('graph_topology_self_loops') && graphTopologySelfLoops.length < limit) {
           graphTopologySelfLoops.push({
             id: edge.id,
             type: edge.type as string,
@@ -886,7 +910,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
           })
         }
       }
-      if (includes('edge_type_pair_drift')) {
+      {
         const sourceNode = nodeById.get(edge.source)
         const targetNode = nodeById.get(edge.target)
         if (!sourceNode || !targetNode) continue // dangling; separate concern
@@ -895,7 +919,8 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
           sourceNode.type as string,
           targetNode.type as string,
         )
-        if (!pairCheck.valid && edgeTypePairDrift.length < limit) {
+        if (!pairCheck.valid) edgeTypePairDriftTotal++
+        if (!pairCheck.valid && includes('edge_type_pair_drift') && edgeTypePairDrift.length < limit) {
           edgeTypePairDrift.push({
             id: edge.id,
             type: edge.type as string,
@@ -1078,10 +1103,12 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   // A legacy flat file (no `$upg` block) declares nothing and so can drift in
   // neither class — `checkHeaderSeal` reports both empty for it.
   let headerSealNote: string | undefined
-  if (includes('counts_drift') || includes('integrity_drift')) {
+  {
     try {
       const raw = readFileSync(store.getFilePath(), 'utf-8')
       const seal = checkHeaderSealText(raw)
+      countsDriftTotal = seal.counts_drift.length
+      integrityDriftTotal = seal.integrity_drift.length
       if (includes('counts_drift')) countsDrift.push(...seal.counts_drift.slice(0, limit))
       if (includes('integrity_drift')) integrityDrift.push(...seal.integrity_drift.slice(0, limit))
       if (seal.skipped_reason) headerSealNote = seal.skipped_reason
@@ -1351,9 +1378,16 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     summary.lifecycle_drift === 0 &&
     summary.self_referential === 0 &&
     summary.property_drift === 0 &&
-    edgeTypePairDrift.length === 0 &&
-    graphTopologySelfLoops.length === 0 &&
-    propertyTypeDrift.length === 0 &&
+    // Totals, not array lengths (0.41.0, F2). These gate on the graph's whole
+    // population, exactly as the six classes above already do: the flag
+    // promises "EVERY drift class is empty", which cannot depend on which
+    // classes the caller asked to SEE. Reading the arrays here meant a scoped
+    // call could return structurally_valid: true over a graph with hundreds of
+    // pair violations, which is the same false all-clear F2 reports in the
+    // summary, in the one field a CI conformance gate actually reads.
+    edgeTypePairDriftTotal === 0 &&
+    graphTopologySelfLoopsTotal === 0 &&
+    propertyTypeDriftTotal === 0 &&
     // Header seal (feedback 1bb903bf). These two DO gate `structurally_valid`,
     // on the existing contract's own terms: it promises "every drift class is
     // empty", and a header that lies about its body is not spec-shaped — the
@@ -1368,8 +1402,8 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     // `structurally_valid` is exactly the thing that must catch a corrupted
     // merge, and a signal that stays green through one is worth little. The
     // repair is also unusually cheap and total: `upg fmt` reseals both fields.
-    countsDrift.length === 0 &&
-    integrityDrift.length === 0 &&
+    countsDriftTotal === 0 &&
+    integrityDriftTotal === 0 &&
     // Configuration drift, ERRORS only (0.30.0). A graph whose declarations
     // contradict each other cannot be projected reliably, and the checks say so
     // in their own messages, so returning valid:true to a CI gate would be the
@@ -1440,13 +1474,16 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       anti_pattern_violations_medium: mediumCount,
       anti_pattern_violations_low: lowCount,
       anti_pattern_violations_gating: skipAntiPatterns ? undefined : antiPatternGatingCount,
-      edge_type_pair_drift: edgeTypePairDrift.length,
-      graph_topology_self_loops: graphTopologySelfLoops.length,
-      property_type_drift: propertyTypeDrift.length,
+      // Every one of these is the graph's WHOLE count, independent of both
+      // `scope` and `limit` (0.41.0, F2). Reading `array.length` here is what
+      // made a scoped call report a false 0.
+      edge_type_pair_drift: edgeTypePairDriftTotal,
+      graph_topology_self_loops: graphTopologySelfLoopsTotal,
+      property_type_drift: propertyTypeDriftTotal,
       undeclared_property_drift: undeclaredPropertyDriftTotal,
       property_enum_drift: propertyEnumDriftTotal,
-      counts_drift: countsDrift.length,
-      integrity_drift: integrityDrift.length,
+      counts_drift: countsDriftTotal,
+      integrity_drift: integrityDriftTotal,
       configuration_drift: skipDrift ? undefined : configurationDrift.length,
       polymorphic_upgrade_hints: includePolymorphicUpgrades ? polymorphicUpgradeHints.length : undefined,
       parity_divergence: parityDivergence.length > 0 ? parityDivergence.length : undefined,

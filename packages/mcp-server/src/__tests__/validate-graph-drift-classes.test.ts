@@ -340,3 +340,125 @@ describe('validate_graph: valid flag respects the new drift classes', () => {
     expect(body.summary.edge_type_pair_drift).toBe(1)
   })
 })
+
+// ─── F2: scope narrows the arrays, never the counts ──────────────────
+//
+// 0.41.0. `scope` gated the DETECTION, not just the response, so every class
+// the caller did not name reported 0. The field case that surfaced it: an
+// operator scoped to the new `property_enum_drift` class to inspect it, and a
+// 156-entry `undeclared_property_drift` backlog read as 0 in the same payload.
+// Reproduced on this repo's own tracker before the fix: 219 at scope `all`,
+// 0 at scope `lifecycle_drift`, identical graph hash.
+//
+// A validator may return less detail than asked. It may never report a clean
+// number over a dirty graph, which is the same failure class as a write
+// reporting success over a file it did not save.
+
+describe('validate_graph: scope narrows entry arrays, never summary counts (F2)', () => {
+  /** One graph carrying drift in three classes at once. */
+  async function dirtyGraph(): Promise<ToolContext> {
+    return makeCtx(
+      await loadStore(
+        makeDoc(
+          [
+            { id: 'p1', type: 'persona' as UPGEntityType, title: 'P' },
+            { id: 'j1', type: 'job' as UPGEntityType, title: 'J' },
+            {
+              id: 'f1',
+              type: 'feature' as UPGEntityType,
+              title: 'F',
+              // Undeclared property: not in the feature schema.
+              properties: { not_a_spec_property: 'x' },
+            } as UPGBaseNode,
+          ],
+          [
+            // Wrong pair: persona_pursues_job wired persona -> feature.
+            { id: 'e1', source: 'p1', target: 'f1', type: 'persona_pursues_job' as UPGEdgeType },
+            // Self loop.
+            { id: 'e2', source: 'j1', target: 'j1', type: 'node_informs_node' as UPGEdgeType },
+          ],
+        ),
+      ),
+    )
+  }
+
+  it('reports every class in summary no matter which one the scope names', async () => {
+    const ctx = await dirtyGraph()
+    const all = JSON.parse(
+      (await validateGraph({ scope: 'all', skip_anti_patterns: true }, ctx)).content[0].text,
+    )
+    // The graph is genuinely dirty in three classes.
+    expect(all.summary.edge_type_pair_drift).toBeGreaterThan(0)
+    expect(all.summary.graph_topology_self_loops).toBeGreaterThan(0)
+    expect(all.summary.undeclared_property_drift).toBeGreaterThan(0)
+
+    // Scoping to ONE class must not zero the other two.
+    for (const scope of ['edge_type_pair_drift', 'graph_topology_self_loops', 'undeclared_property_drift']) {
+      const scoped = JSON.parse(
+        (await validateGraph({ scope, skip_anti_patterns: true }, ctx)).content[0].text,
+      )
+      expect(scoped.summary.edge_type_pair_drift).toBe(all.summary.edge_type_pair_drift)
+      expect(scoped.summary.graph_topology_self_loops).toBe(all.summary.graph_topology_self_loops)
+      expect(scoped.summary.undeclared_property_drift).toBe(all.summary.undeclared_property_drift)
+    }
+  })
+
+  it('still withholds the entry arrays the scope excludes', async () => {
+    const ctx = await dirtyGraph()
+    const scoped = JSON.parse(
+      (await validateGraph({ scope: 'edge_type_pair_drift', skip_anti_patterns: true }, ctx))
+        .content[0].text,
+    )
+    expect(scoped.edge_type_pair_drift.length).toBeGreaterThan(0)
+    expect(scoped.graph_topology_self_loops).toBeUndefined()
+    expect(scoped.undeclared_property_drift).toBeUndefined()
+  })
+
+  it('structurally_valid does not go green because the scope looked elsewhere', async () => {
+    const ctx = await dirtyGraph()
+    const scoped = JSON.parse(
+      (await validateGraph({ scope: 'lifecycle_drift', skip_anti_patterns: true }, ctx))
+        .content[0].text,
+    )
+    // Nothing wrong in lifecycle_drift; plenty wrong in the graph.
+    expect(scoped.lifecycle_drift).toEqual([])
+    expect(scoped.structurally_valid).toBe(false)
+  })
+
+  it('counts do not move with limit either', async () => {
+    const ctx = await dirtyGraph()
+    const wide = JSON.parse(
+      (await validateGraph({ scope: 'all', limit: 1000, skip_anti_patterns: true }, ctx))
+        .content[0].text,
+    )
+    const narrow = JSON.parse(
+      (await validateGraph({ scope: 'all', limit: 1, skip_anti_patterns: true }, ctx))
+        .content[0].text,
+    )
+    expect(narrow.summary.edge_type_pair_drift).toBe(wide.summary.edge_type_pair_drift)
+    expect(narrow.summary.graph_topology_self_loops).toBe(wide.summary.graph_topology_self_loops)
+    expect(narrow.summary.property_type_drift).toBe(wide.summary.property_type_drift)
+  })
+
+  it('a clean graph still reports clean under every scope', async () => {
+    const ctx = makeCtx(
+      await loadStore(
+        makeDoc(
+          [
+            { id: 'p1', type: 'persona' as UPGEntityType, title: 'P' },
+            { id: 'j1', type: 'job' as UPGEntityType, title: 'J' },
+          ],
+          [{ id: 'e1', source: 'p1', target: 'j1', type: 'persona_pursues_job' as UPGEdgeType }],
+        ),
+      ),
+    )
+    for (const scope of ['all', 'entity_drift', 'edge_type_pair_drift']) {
+      const body = JSON.parse(
+        (await validateGraph({ scope, skip_anti_patterns: true }, ctx)).content[0].text,
+      )
+      expect(body.summary.edge_type_pair_drift).toBe(0)
+      expect(body.summary.graph_topology_self_loops).toBe(0)
+      expect(body.structurally_valid).toBe(true)
+    }
+  })
+})

@@ -147,11 +147,31 @@ function diagnoseUnchangedCrossEdge(
 /**
  * Discover every `.upg` file in the workspace: the project root plus its
  * immediate subdirectories (including `.upg/`). Skips dotfiles other than
- * `.upg/`. Returns absolute paths. Shared by `list_local_products` and the
- * portfolio read layer (`portfolio_query` / `portfolio_digest`) so product
- * discovery stays consistent across them. (batch-3 #13)
+ * `.upg/`. Returns absolute paths. Shared by `list_local_products`, the
+ * portfolio read layer (`portfolio_query` / `portfolio_digest`) and the
+ * `--check` product census so discovery stays consistent across them.
+ * (batch-3 #13; census added 0.41.0)
+ *
+ * @param cwd Anchor for the filesystem scan. Normally the project root, so
+ *   `.upg/` is reached as one of its immediate subdirectories.
+ * @param registryDir Directory holding `workspace.json`. Defaults to
+ *   `<cwd>/.upg`, which is the layout every caller but `--check` sees. A
+ *   `--workspace` pointing at a directory NOT named `.upg` puts the registry
+ *   at the scan anchor itself, and passing it explicitly is what lets the
+ *   census resolve registered subpaths in that layout too.
+ *
+ * Deliberately NOT re-anchored on the workspace directory for the census:
+ * scanning `.upg/` directly would sweep in every one of its subfolders,
+ * including `_archive/`, whose graphs are unregistered ON PURPOSE. Keeping
+ * the historical anchor means registered subpaths still reach any depth
+ * through the registry while archived ones stay out. That holds for a
+ * `.upg`-named workspace, where `_archive/` sits two levels below the anchor.
+ * A `--workspace` pointing at a differently named directory makes that
+ * directory the anchor, so its immediate subfolders ARE scanned. The
+ * asymmetry is `list_local_products`' own and predates the census; what
+ * matters is that both read it the same way.
  */
-export function findWorkspaceUpgFiles(cwd: string): string[] {
+export function findWorkspaceUpgFiles(cwd: string, registryDir?: string): string[] {
   const candidates: string[] = []
   const seen = new Set<string>()
   const add = (abs: string) => {
@@ -191,13 +211,14 @@ export function findWorkspaceUpgFiles(cwd: string): string[] {
   // even though the filesystem scan above only reaches one level. The registry
   // is the source of truth; the scan is the convenience fallback. Tolerant:
   // a missing/malformed workspace.json leaves the scan results untouched.
+  const registry = registryDir ?? path.join(cwd, '.upg')
   try {
-    const ws = JSON.parse(fs.readFileSync(path.join(cwd, '.upg', 'workspace.json'), 'utf-8')) as {
+    const ws = JSON.parse(fs.readFileSync(path.join(registry, 'workspace.json'), 'utf-8')) as {
       products?: Array<{ file?: unknown }>
     }
     for (const p of ws.products ?? []) {
       if (typeof p.file !== 'string') continue
-      const abs = path.resolve(cwd, '.upg', p.file)
+      const abs = path.resolve(registry, p.file)
       if (fs.existsSync(abs)) add(abs)
     }
   } catch {
@@ -206,6 +227,38 @@ export function findWorkspaceUpgFiles(cwd: string): string[] {
 
   return candidates
 }
+
+/**
+ * Count the product graphs a workspace holds, by exactly the rule
+ * `list_local_products` enumerates them: discover with
+ * `findWorkspaceUpgFiles`, then keep only documents carrying a `product`
+ * header. `portfolio.upg` carries organization / product_areas / portfolios
+ * instead and is not a product, so it drops out here the same way it drops
+ * out of the tool ( section 11a).
+ *
+ * Exists so `--check` cannot report a different number than the tool an
+ * operator checks it against. What it replaces was a `readdir` of top-level
+ * `.upg` files, which in this repo's own workspace answered 6 (portfolio.upg
+ * plus three unregistered scratch graphs) where the real inventory is 31, and
+ * saw none of the registered subfolder graphs at all. `--check` is the flag an
+ * install script asserts on, so a wrong count passes a wrong check as readily
+ * as it fails a right one.
+ */
+export function countWorkspaceProducts(cwd: string, registryDir?: string): number {
+  let products = 0
+  for (const file of findWorkspaceUpgFiles(cwd, registryDir)) {
+    try {
+      const doc = JSON.parse(fs.readFileSync(file, 'utf-8')) as { product?: unknown }
+      if (doc.product) products++
+    } catch {
+      // Unreadable or unparsable: not a countable product. The resolved
+      // default_product is parsed separately by --check, which reports that
+      // failure as `ok: false` with the parse error.
+    }
+  }
+  return products
+}
+
 
 /**
  * Find all `.upg` files in the current directory and its immediate

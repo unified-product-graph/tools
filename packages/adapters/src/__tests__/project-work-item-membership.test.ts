@@ -1,16 +1,30 @@
 /**
- * project_delivers_work_item: the explicit-emission contract.
+ * Project -> work-item membership: the never-lose-it contract.
  *
  * Five adapters read an authored project field (jira, gitlab, shortcut, linear,
- * notion). None of them can obtain this edge from a generic resolver: it is
- * flagged `deliberate_only`, AND in 0.33.0 its catalogue target widened to the
- * `node` wildcard, so `UPG_EDGE_PAIR_MAP['project:epic']` no longer exists at all.
- * Every one of the five must therefore emit it EXPLICITLY.
+ * notion). What this file guards is that the RELATIONSHIP survives conversion.
+ * Which edge type carries it is a spec question that has now moved twice, so
+ * the assertions below are deliberately carrier-agnostic, with one test pinning
+ * the current carrier so the move is recorded rather than blurred.
  *
- * This file exists because that edge was lost once with a fully green suite. The
- * 0.33.0 rename plus widening silently downgraded a project parent to
+ * 0.33.0: no generic resolver could produce it. The edge was `deliberate_only`
+ * AND its target had widened to the `node` wildcard, so
+ * `UPG_EDGE_PAIR_MAP['project:epic']` did not exist and explicit emission was
+ * the only route.
+ *
+ * 0.41.0: concrete containment edges landed for exactly these five child types
+ * (`project_contains_{epic,feature,user_story,task,bug}`), so the pair map
+ * answers again and the adapters resolve to containment BEFORE reaching the
+ * explicit path. That is not a regression and not a tidy-up: it is the seam's
+ * own documented ordering rule working as written, which defers to a more
+ * specific catalogued edge whenever one exists. One now does. The membership is
+ * carried by a more precise edge than before, and `parent_id` resolves natively.
+ *
+ * This file exists because the relationship was lost once with a fully green
+ * suite. The 0.33.0 rename plus widening silently downgraded a project parent to
  * node_informs_node in linear and notion, and no test noticed. Each case below
- * fails if an adapter is ever "tidied" back onto the generic resolver.
+ * fails if the membership ever disappears or degrades to a generic edge again,
+ * whichever type is carrying it.
  *
  * Two halves, and the second matters as much as the first:
  * 1. UNDER-FIRE: a project parent holding a work item emits the membership edge.
@@ -43,6 +57,23 @@ const NOT_WORK_ITEMS = ['deliverable', 'milestone', 'release', 'feature_area'] a
 const typeOf = (edges: { source: string; target: string; type: string }[], type: string) =>
   edges.find((e) => e.type === type)
 
+/**
+ * Every edge type that can legitimately carry a project -> work-item membership:
+ * the polymorphic reference that shipped in 0.33.0, and the five concrete
+ * containment edges that landed in 0.41.0 alongside it. Asserting on the set is
+ * what makes these tests survive the carrier moving again; asserting the
+ * membership is PRESENT is the part that actually guards against the 0.33.0
+ * failure.
+ */
+const MEMBERSHIP_EDGES = new Set<string>([
+  PROJECT_WORK_ITEM_EDGE,
+  ...WORK_ITEMS.map((t) => `project_contains_${t}`),
+])
+const memberships = (edges: { source: string; target: string; type: string }[]) =>
+  edges.filter((e) => MEMBERSHIP_EDGES.has(e.type))
+const membership = (edges: { source: string; target: string; type: string }[]) =>
+  edges.find((e) => MEMBERSHIP_EDGES.has(e.type))
+
 // ─── The seam itself ─────────────────────────────────────────────────────────
 
 describe('project work-item membership seam', () => {
@@ -50,14 +81,26 @@ describe('project work-item membership seam', () => {
     expect(new Set(UPG_EDGE_TYPES).has(PROJECT_WORK_ITEM_EDGE)).toBe(true)
   })
 
-  it('no generic resolver can produce the edge, so explicit emission is the only route', () => {
+  it('resolves to the concrete containment edge, which is the 0.41.0 carrier', () => {
     for (const child of WORK_ITEMS) {
-      expect(resolvePairEdge('project', child), `project:${child} via pair map`).toBeNull()
+      // The pair map answers again, and answers with containment. Before
+      // 0.41.0 both of these were null and explicit emission was the only route.
+      expect(resolvePairEdge('project', child), `project:${child} via pair map`).toEqual({
+        type: `project_contains_${child}`,
+        sourceIsChild: false,
+      })
       expect(
         resolveContainmentEdgeInferrable('project', child),
         `project:${child} via containment`,
-      ).toBeNull()
+      ).toBe(`project_contains_${child}`)
     }
+  })
+
+  it('the polymorphic reference edge is still a real catalogue entry, not migrated away', () => {
+    // 0.41.0 added containment ALONGSIDE it and migrated nothing, so graphs
+    // already carrying project_delivers_work_item stay valid. Retiring it for
+    // these five types is a separate, later decision.
+    expect(new Set(UPG_EDGE_TYPES).has(PROJECT_WORK_ITEM_EDGE)).toBe(true)
   })
 
   it('fires for every work-item child', () => {
@@ -108,7 +151,7 @@ describe('JiraAdapter: project membership', () => {
       issue('issue-TK1', 'Wire the exporter', 'Task', 'project-ORB'),
       issue('issue-BG1', 'Totals drift on rollover', 'Bug', 'project-ORB'),
     ])
-    const membership = result.edges.filter((e) => e.type === PROJECT_WORK_ITEM_EDGE)
+    const membership = memberships(result.edges)
     expect(membership).toHaveLength(4)
     expect(membership.every((e) => e.source === result.source_map['project-ORB'])).toBe(true)
     expect(typeOf(result.edges, 'node_informs_node')).toBeUndefined()
@@ -130,7 +173,7 @@ describe('JiraAdapter: project membership', () => {
         metadata: { entity_kind: 'component', parent_id: 'project-ORB', parent_type: 'project' },
       },
     ])
-    expect(typeOf(result.edges, PROJECT_WORK_ITEM_EDGE)).toBeUndefined()
+    expect(membership(result.edges)).toBeUndefined()
   })
 })
 
@@ -154,7 +197,7 @@ describe('GitLabAdapter: project membership', () => {
         metadata: { entity_type: 'epic', state: 'opened', project_id: 'p-1' },
       },
     ])
-    const edge = typeOf(result.edges, PROJECT_WORK_ITEM_EDGE)
+    const edge = membership(result.edges)
     expect(edge).toBeDefined()
     expect(edge?.source).toBe(result.source_map['p-1'])
     expect(edge?.target).toBe(result.source_map['ep-1'])
@@ -199,7 +242,7 @@ describe('GitLabAdapter: project membership', () => {
         metadata: { entity_type: 'milestone', state: 'active', project_id: 'p-1' },
       },
     ])
-    const membership = result.edges.filter((e) => e.type === PROJECT_WORK_ITEM_EDGE)
+    const membership = memberships(result.edges)
     expect(membership).toHaveLength(3)
     expect(membership.every((e) => e.source === result.source_map['p-1'])).toBe(true)
     expect(membership.map((e) => e.target).sort()).toEqual(
@@ -229,7 +272,7 @@ describe('GitLabAdapter: project membership', () => {
         metadata: { entity_type: 'issue', labels: ['bug'], state: 'opened', milestone_id: 'ms-1' },
       },
     ])
-    expect(typeOf(result.edges, PROJECT_WORK_ITEM_EDGE)).toBeUndefined()
+    expect(membership(result.edges)).toBeUndefined()
     expect(typeOf(result.edges, 'release_contains_bug')).toBeDefined()
   })
 })
@@ -269,12 +312,12 @@ describe('ShortcutAdapter: project membership', () => {
       child('s2', 'Totals drift on rollover', 'story', 'bug'),
       child('s3', 'Prune stale exports', 'story', 'chore'),
     ])
-    expect(result.edges.filter((e) => e.type === PROJECT_WORK_ITEM_EDGE)).toHaveLength(4)
+    expect(memberships(result.edges)).toHaveLength(4)
   })
 
   it('does NOT emit it for a document under a project', async () => {
     const result = await adapter.convert([project, child('d1', 'Ledger design note', 'document')])
-    expect(typeOf(result.edges, PROJECT_WORK_ITEM_EDGE)).toBeUndefined()
+    expect(membership(result.edges)).toBeUndefined()
     expect(typeOf(result.edges, 'node_informs_node')).toBeDefined()
   })
 })
@@ -309,7 +352,7 @@ describe('LinearAdapter: project membership', () => {
         issue('iss-3', 'Totals drift on rollover', ['bug']),
       ]),
     ])
-    expect(result.edges.filter((e) => e.type === PROJECT_WORK_ITEM_EDGE)).toHaveLength(3)
+    expect(memberships(result.edges)).toHaveLength(3)
     expect(typeOf(result.edges, 'node_informs_node')).toBeUndefined()
   })
 
@@ -324,7 +367,7 @@ describe('LinearAdapter: project membership', () => {
         },
       ]),
     ])
-    expect(typeOf(result.edges, PROJECT_WORK_ITEM_EDGE)).toBeUndefined()
+    expect(membership(result.edges)).toBeUndefined()
     expect(typeOf(result.edges, 'project_targets_milestone')).toBeDefined()
   })
 })
@@ -348,7 +391,7 @@ describe('NotionAdapter: project membership', () => {
         page('st-1', 'Export a statement', 'User Stories'),
       ]),
     ])
-    expect(result.edges.filter((e) => e.type === PROJECT_WORK_ITEM_EDGE)).toHaveLength(2)
+    expect(memberships(result.edges)).toHaveLength(2)
     expect(typeOf(result.edges, 'node_informs_node')).toBeUndefined()
   })
 
@@ -356,7 +399,7 @@ describe('NotionAdapter: project membership', () => {
     const result = await adapter.convert([
       page('proj-1', 'Orbit Ledger', 'Projects', [page('ms-1', 'Q4 cutover', 'Milestones')]),
     ])
-    expect(typeOf(result.edges, PROJECT_WORK_ITEM_EDGE)).toBeUndefined()
+    expect(membership(result.edges)).toBeUndefined()
     expect(typeOf(result.edges, 'project_targets_milestone')).toBeDefined()
   })
 })

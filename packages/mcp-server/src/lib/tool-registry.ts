@@ -1302,7 +1302,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         scope: {
           type: 'string',
           enum: ['all', 'entity_drift', 'edge_drift', 'property_drift', 'top_level_drift', 'lifecycle_drift', 'self_referential', 'property_enum_drift', 'configuration_drift'],
-          description: 'Which drift class(es) to include in the response (default "all"). Counts in `summary` are always returned for every class.',
+          description: 'Which drift class(es) to return ENTRY ARRAYS for (default "all"). Detection always runs for every class, so counts in `summary` and the `structurally_valid` verdict cover the whole graph no matter how this is set. Narrowing trades response size, never completeness of the counts.',
         },
         limit: { type: 'number', description: 'Max entries per class (default 100, max 1000)' },
         severity: {

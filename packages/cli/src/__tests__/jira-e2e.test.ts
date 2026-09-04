@@ -60,7 +60,8 @@ describe('Jira e2e — convert conformance', () => {
       const sm = out.result.source_map
       const has = (type: string, s: string, tgt: string) =>
         out.result.edges.some((e) => e.type === type && e.source === sm[s] && e.target === sm[tgt])
-      expect(has('project_delivers_work_item', 'project-PROJ', 'issue-EP1')).toBe(true)
+      // 0.41.0: the project -> work-item carrier moved to concrete containment.
+      expect(has('project_contains_epic', 'project-PROJ', 'issue-EP1')).toBe(true)
       expect(has('epic_specified_by_user_story', 'issue-EP1', 'issue-ST1')).toBe(true)
       // sub-task -> story: task_implements_user_story is task-sourced (direction flips)
       expect(has('task_implements_user_story', 'issue-SUB1', 'issue-ST1')).toBe(true)

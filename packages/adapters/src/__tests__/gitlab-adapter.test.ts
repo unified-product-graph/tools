@@ -447,14 +447,19 @@ describe('GitLabAdapter: edge emission', () => {
     expect(result.edges.find((e) => e.type === 'feature_decomposed_into_epic')).toBeUndefined()
   })
 
-  it('project_delivers_work_item emitted when epic has project_id', async () => {
+  // 0.41.0: the carrier moved from the polymorphic project_delivers_work_item
+  // to concrete containment, because the pair map now answers project:epic and
+  // the seam defers to a more specific catalogued edge whenever one exists.
+  // What this test guards is unchanged: the membership must be emitted, with
+  // the project as source. See project-work-item-membership.test.ts.
+  it('project membership emitted when epic has project_id', async () => {
     const items: SourceItem[] = [
       makeProject('p-1', 'main-app'),
       makeEpic('ep-1', 'Auth epic', { project_id: 'p-1' }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'project_delivers_work_item')
-    const edge = result.edges.find((e) => e.type === 'project_delivers_work_item')
+    assertAllEdgesCatalogued(result.edges, 'project_contains_epic')
+    const edge = result.edges.find((e) => e.type === 'project_contains_epic')
     expect(edge).toBeDefined()
     expect(edge?.source).toBe(result.source_map['p-1'])
     expect(edge?.target).toBe(result.source_map['ep-1'])

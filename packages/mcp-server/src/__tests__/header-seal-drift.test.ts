@@ -228,15 +228,27 @@ describe('validate_graph header seal (feedback 1bb903bf)', () => {
       expect(res.counts_drift).toBeUndefined()
     })
 
-    it('an unrelated scope skips the file re-read entirely', async () => {
+    it('an unrelated scope withholds the arrays but still counts and still gates', async () => {
       const path = writeGraph(cwd, (json) => {
         json.$upg.counts.nodes = 0
       })
       const res = await validate(await loadStore(path), { scope: 'entity_drift' })
 
+      // Scope still governs which ENTRY ARRAYS come back. That half is unchanged.
       expect(res.counts_drift).toBeUndefined()
       expect(res.integrity_drift).toBeUndefined()
-      expect(res.structurally_valid).toBe(true)
+
+      // What changed in 0.41.0 (F2): the count and the verdict no longer
+      // depend on which class the caller asked to see. This graph's header
+      // says 0 nodes over a body that has some, and it said so before the
+      // scope was chosen. Reporting structurally_valid: true here was a false
+      // all-clear in the exact signal the seal check exists to protect: the
+      // comment on that check calls a gate which stays green through a
+      // corrupted merge "worth little", and this was that gate going green.
+      // The cost of the correction is one file re-read on a call that already
+      // walks every node and edge.
+      expect((res.summary as { counts_drift: number }).counts_drift).toBe(1)
+      expect(res.structurally_valid).toBe(false)
     })
 
     it('both classes are listed as valid scopes in the error message', async () => {

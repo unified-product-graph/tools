@@ -263,7 +263,9 @@ describe('JiraAdapter: hierarchy edge emission', () => {
     expect(edge).toBeDefined()
   })
 
-  it('project_delivers_work_item emitted when epic has project parent', async () => {
+  // 0.41.0: carrier moved to concrete containment. See the gitlab twin and
+  // project-work-item-membership.test.ts for the full reasoning.
+  it('project membership emitted when epic has project parent', async () => {
     const items: SourceItem[] = [
       makeStructural('p1', 'Eng Project', 'project'),
       makeIssue('e1', 'Onboarding Revamp', 'Epic', {
@@ -272,8 +274,8 @@ describe('JiraAdapter: hierarchy edge emission', () => {
       }),
     ]
     const result = await adapter.convert(items)
-    assertAllEdgesCatalogued(result.edges, 'project_delivers_work_item')
-    const edge = result.edges.find((e) => e.type === 'project_delivers_work_item')
+    assertAllEdgesCatalogued(result.edges, 'project_contains_epic')
+    const edge = result.edges.find((e) => e.type === 'project_contains_epic')
     expect(edge).toBeDefined()
   })
 

@@ -14,9 +14,10 @@
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, readdirSync, mkdirSync, copyFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, readdirSync, mkdirSync, copyFileSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { resolve, join } from 'node:path'
+import { resolve, join, basename, dirname } from 'node:path'
+import { listLocalProducts } from '../tools/workspace.js'
 import { fileURLToPath } from 'node:url'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
@@ -116,6 +117,122 @@ describe('F2 — --check and --help', () => {
     copyFileSync(FIXTURE_UPG, join(ws, 'threadline.upg'))
     run(['--check', '--workspace', ws], tmp)
     expect(readdirSync(ws)).toEqual(['threadline.upg'])
+  })
+})
+
+/**
+ * 0.41.0 (F1 from the 0.41.0 feedback triage) — `--check`'s `products` count.
+ *
+ * It used to be a `readdir` of top-level `.upg` files, which is neither the
+ * registry nor the inventory: it counted `portfolio.upg` (not a product) and
+ * every unregistered scratch graph, while missing every graph in a registered
+ * subfolder. The reporter's 54-graph workspace answered 2. This repo's own
+ * answered 6 for 31. `--check` is what an install script asserts on, so a
+ * wrong count passes a wrong check as readily as it fails a right one.
+ *
+ * The count now follows the rule `list_local_products` enumerates by, and
+ * these cases pin the three ways the old one was wrong.
+ */
+describe('F1 — --check counts products the way list_local_products does', () => {
+  /** A workspace with a registry, a subfolder graph, a portfolio, an archive. */
+  function buildWorkspace(): string {
+    tmp = mkdtempSync(resolve(tmpdir(), 'upg-startup-'))
+    const ws = join(tmp, 'graphs')
+    mkdirSync(join(ws, 'products'), { recursive: true })
+    mkdirSync(join(ws, '_archive'), { recursive: true })
+    copyFileSync(FIXTURE_UPG, join(ws, 'products', 'threadline.upg'))
+    copyFileSync(FIXTURE_UPG, join(ws, 'products', 'second.upg'))
+    // Unregistered ON PURPOSE: archived, not inventory.
+    copyFileSync(FIXTURE_UPG, join(ws, '_archive', 'retired.upg'))
+    // Not a product: no `product` header, carries portfolios instead.
+    writeFileSync(
+      join(ws, 'portfolio.upg'),
+      JSON.stringify({ version: '1.0', organization: { title: 'Test Org' }, portfolios: [], product_areas: [] }, null, 2),
+    )
+    writeFileSync(
+      join(ws, 'workspace.json'),
+      JSON.stringify(
+        {
+          version: '1.0',
+          default_product: 'products/threadline.upg',
+          products: [
+            { file: 'products/threadline.upg', title: 'Threadline' },
+            { file: 'products/second.upg', title: 'Second' },
+          ],
+        },
+        null,
+        2,
+      ),
+    )
+    return ws
+  }
+
+  /** What `list_local_products` answers for a workspace, run as --check runs. */
+  async function toolCount(workspaceDir: string): Promise<number> {
+    const before = process.cwd()
+    try {
+      // --check chdirs to the scan anchor before counting: the project root
+      // for a `.upg`-named workspace, the workspace itself otherwise.
+      process.chdir(basename(workspaceDir) === '.upg' ? dirname(workspaceDir) : workspaceDir)
+      const r = (await Promise.resolve(listLocalProducts({}, {} as never))) as {
+        content: Array<{ text: string }>
+      }
+      return (JSON.parse(r.content[0].text).products as unknown[]).length
+    } finally {
+      process.chdir(before)
+    }
+  }
+
+  it('counts registered graphs in subfolders the top-level readdir never saw', () => {
+    const ws = buildWorkspace()
+    const r = run(['--check', '--workspace', ws], tmp!)
+    expect(r.status).toBe(0)
+    // The old rule was a readdir of ws/*.upg, which here is portfolio.upg
+    // alone: 1, for a workspace holding two registered products. The registry
+    // reaches both at any depth.
+    expect(JSON.parse(r.stdout).products).toBeGreaterThanOrEqual(2)
+  })
+
+  it('excludes portfolio.upg, which is a registry document and not a product', () => {
+    const ws = buildWorkspace()
+    rmSync(join(ws, '_archive'), { recursive: true, force: true })
+    const r = run(['--check', '--workspace', ws], tmp!)
+    // Two products on disk, plus portfolio.upg, which has no `product` header.
+    expect(JSON.parse(r.stdout).products).toBe(2)
+  })
+
+  it('answers exactly what list_local_products answers, which is the contract', async () => {
+    const ws = buildWorkspace()
+    const checkCount = JSON.parse(run(['--check', '--workspace', ws], tmp!).stdout).products
+    expect(checkCount).toBe(await toolCount(ws))
+
+    // And again with the archive removed, so agreement is not a coincidence
+    // of one fixture. NOTE the number moves: in this layout the workspace IS
+    // the scan anchor, so `_archive/` sits one level down and both the census
+    // and the tool see it. Under a `.upg`-named workspace it sits two levels
+    // down and neither does. That asymmetry belongs to `list_local_products`
+    // and predates this count; what is pinned here is that --check never
+    // disagrees with it.
+    rmSync(join(ws, '_archive'), { recursive: true, force: true })
+    const after = JSON.parse(run(['--check', '--workspace', ws], tmp!).stdout).products
+    expect(after).toBe(await toolCount(ws))
+    expect(after).toBeLessThan(checkCount)
+  })
+
+  it('a single-graph workspace still answers 1', () => {
+    tmp = mkdtempSync(resolve(tmpdir(), 'upg-startup-'))
+    const ws = join(tmp, 'graphs')
+    mkdirSync(ws)
+    copyFileSync(FIXTURE_UPG, join(ws, 'threadline.upg'))
+    const r = run(['--check', '--workspace', ws], tmp)
+    expect(JSON.parse(r.stdout).products).toBe(1)
+  })
+
+  it('still writes nothing while counting', () => {
+    const ws = buildWorkspace()
+    const before = readdirSync(ws).sort()
+    run(['--check', '--workspace', ws], tmp!)
+    expect(readdirSync(ws).sort()).toEqual(before)
   })
 })
 

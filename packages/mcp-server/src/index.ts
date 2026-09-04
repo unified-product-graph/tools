@@ -19,7 +19,12 @@
  *
  * --check resolves the workspace exactly as the server would, prints
  * `{workspace, resolved_file, products, spec_version, server_version}` and
- * exits 0/1 WITHOUT starting the transport — built for environment install
+ * exits 0/1 WITHOUT starting the transport. `products` is exactly the count
+ * `list_local_products` returns for the same workspace: registered graphs at
+ * any depth, `portfolio.upg` and any other document without a `product`
+ * header excluded. Agreement with the tool IS the contract, so an operator
+ * asserting on `--check` in an install script and reading the tool in the
+ * session can never be shown two different inventories — built for environment install
  * scripts, so a misconfigured environment fails at build time, not mid-session.
  *
  * Reads a .upg file into memory and exposes it via MCP over stdio.
@@ -34,6 +39,7 @@ import * as nodeCrypto from 'node:crypto'
 import { UPGFileStore } from '@unified-product-graph/sdk'
 import { createServer, createUnavailableServer, SERVER_VERSION } from './server.js'
 import { setWorkspaceRoot } from './lib/server-context.js'
+import { countWorkspaceProducts } from './tools/workspace.js'
 import { isValidProfile, TOOL_PROFILES, type ToolProfile } from './lib/tool-profiles.js'
 import { UPG_VERSION, isDeprecatedType, getReplacementType, serializeCanonical, parseUpg, type UPGDocument } from '@unified-product-graph/core'
 import { nanoid } from 'nanoid'
@@ -331,8 +337,12 @@ export async function runMcpServer() {
         error = `resolved file unreadable or unparsable: ${(err as Error).message}`
       }
       if (workspaceAbsPath) {
-        const entries = await fs.readdir(workspaceAbsPath).catch(() => [] as string[])
-        products = entries.filter((f) => f.endsWith('.upg')).length
+        // Count by the same rule `list_local_products` enumerates by, so the
+        // assertion payload and the tool can never disagree (0.41.0, F1).
+        // cwd is already the scan anchor: the project root for a `.upg`-named
+        // workspace, the workspace dir itself otherwise, which is why the
+        // registry directory is passed explicitly.
+        products = countWorkspaceProducts(process.cwd(), workspaceAbsPath)
       } else if (ok) {
         products = 1
       }
