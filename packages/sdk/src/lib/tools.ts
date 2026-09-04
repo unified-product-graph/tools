@@ -1886,16 +1886,31 @@ export interface BatchCreateArgs {
 
 export interface BatchCreateOk {
   ok: true
-  created: Array<{ id: string; type: string; title: string; status?: string }>
+  /**
+   * The created nodes. `properties` is echoed (0.40.0) so a caller can key the
+   * results by whatever it wrote — the field case keyed 163 design tokens by
+   * `css_variable` and had to RE-READ THE FILE to do it, because the response
+   * carried only id/type/title. Echoing what the caller just sent costs nothing
+   * and removes a whole read from the documented batch workflow.
+   */
+  created: Array<{ id: string; type: string; title: string; status?: string; properties?: Record<string, unknown> }>
   edges: UPGEdge[]
   explicit_edges?: UPGEdge[]
   count: number
+  /**
+   * Alias/positional ref resolutions (0.40.0 on the SUCCESS path; it was already
+   * emitted on dry-run and on failure). Without it a caller that chained by
+   * `ref` had no way to map its own tokens onto the returned ids except by
+   * re-reading, which is the same round trip `properties` above removes.
+   */
+  ref_map?: BatchRefMapEntry[]
   warnings?: string[]
 }
 
 /**
- * Batch-4 #16: a resolved alias/positional ref, echoed on dry-run and on
- * failure so the author can see what each token maps to and debug a mis-count.
+ * Batch-4 #16: a resolved alias/positional ref, echoed on dry-run, on failure,
+ * and (0.40.0) on success, so the author can see what each token maps to —
+ * whether debugging a mis-count or mapping chained refs onto created ids.
  */
 export interface BatchRefMapEntry {
   token: string
@@ -2204,7 +2219,7 @@ export function batchCreateNodes(
   }
 
   // ── Apply pass with full rollback ───────────────────────────────────────
-  const createdNodes: Array<{ id: string; type: string; title: string; status?: string }> = []
+  const createdNodes: Array<{ id: string; type: string; title: string; status?: string; properties?: Record<string, unknown> }> = []
   const createdNodeRefs: UPGBaseNode[] = []
   const createdParentEdges: UPGEdge[] = []
   const explicitCreated: UPGEdge[] = []
@@ -2248,7 +2263,15 @@ export function batchCreateNodes(
 
       autoFillSlug(newNode, store)
       store.addNode(newNode)
-      createdNodes.push({ id: newNode.id, type: newNode.type, title: newNode.title, status: newNode.status })
+      // `properties` echoed (0.40.0) so a caller can key results by what it wrote
+    // instead of re-reading the file; omitted when empty so the common case
+    // stays as small on the wire as it was.
+    const echoed: { id: string; type: string; title: string; status?: string; properties?: Record<string, unknown> } =
+      { id: newNode.id, type: newNode.type, title: newNode.title, status: newNode.status }
+    if (newNode.properties && Object.keys(newNode.properties).length > 0) {
+      echoed.properties = newNode.properties as Record<string, unknown>
+    }
+    createdNodes.push(echoed)
       createdNodeRefs.push(newNode)
 
       let parentId = n.parent_id
@@ -2325,12 +2348,14 @@ export function batchCreateNodes(
     )
   }
 
+  const successRefMap = buildRefMap()
   const result: BatchCreateOk = {
     ok: true,
     created: createdNodes,
     edges: createdParentEdges,
     count: createdNodes.length,
   }
+  if (successRefMap.length > 0) result.ref_map = successRefMap
   if (explicitCreated.length > 0) result.explicit_edges = explicitCreated
   if (warnings.length > 0) result.warnings = warnings
   return result
