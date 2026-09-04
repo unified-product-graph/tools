@@ -693,11 +693,12 @@ export const updateProductTool: ToolHandler = async (args, ctx): Promise<ToolRes
       member_kind: args.member_kind as 'product' | 'org_rollup' | 'watched' | 'operating_function' | undefined,
       rename_file: args.rename_file as boolean | undefined,
       slug: args.slug as string | undefined,
+      file_path: args.file_path as string | undefined,
       cwd: process.cwd(),
     })
     if (result.updated.length === 0) {
       return textError(
-        'Nothing to update: pass at least one of: stage, title, description, health_status, url, member_kind, rename_file, slug.',
+        'Nothing to update: pass at least one of: stage, title, description, health_status, url, member_kind, rename_file, slug, file_path.',
       )
     }
     await store.flush()

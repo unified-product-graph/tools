@@ -1031,6 +1031,56 @@ export const portfolioValidate: ToolHandler = async (args, ctx): Promise<ToolRes
     summaries.push(entry)
   }
 
+  // registry_file_path_drift (0.39.0, B5): does each registered `file_path`
+  // point at a file that exists?
+  //
+  // The field case: portfolio.upg registered `.upg/sanity-studio.upg` while the
+  // graph lived at `products/sanity-studio.upg`. Discovery kept working
+  // (workspace.json is authoritative for resolution), so nothing ever surfaced
+  // it; no tool rewrote a registry file_path; and hand-editing the
+  // integrity-hashed document is forbidden. A wrong-but-harmless entry with no
+  // sanctioned repair. Reported here, repaired by `update_product({file_path})`.
+  //
+  // Advisory, like registry_drift: a stale path does not make a portfolio
+  // invalid, it makes it misleading, so it never moves `all_valid`. The
+  // filesystem walk `resolveScopedProducts` already did lets the report name
+  // where the graph actually IS — by id first, title second — which turns the
+  // finding into the repair call the author should make.
+  const registryFilePathDrift: Array<{
+    product_id: string | null
+    title: string
+    registered_path: string
+    found_at?: string
+    reason: string
+  }> = []
+  try {
+    const portfolioStore = await openPortfolioStoreIfExists(cwd)
+    if (portfolioStore) {
+      const portfolioDoc = portfolioStore.getDocument() as unknown as {
+        products?: Array<{ id?: string; title?: string; file_path?: string }>
+      }
+      for (const entry of portfolioDoc.products ?? []) {
+        const registered = entry.file_path
+        if (typeof registered !== 'string' || registered.length === 0) continue
+        if (fs.existsSync(path.resolve(cwd, registered))) continue
+        const actual =
+          products.find((prod) => entry.id && prod.id === entry.id) ??
+          products.find((prod) => entry.title && prod.title === entry.title)
+        registryFilePathDrift.push({
+          product_id: entry.id ?? null,
+          title: entry.title ?? '(untitled)',
+          registered_path: registered,
+          ...(actual ? { found_at: actual.file } : {}),
+          reason: actual
+            ? `Registered path does not exist; the graph is at ${actual.file}. Repair with update_product({ file_path: "${actual.file}" }).`
+            : 'Registered path does not exist and no workspace product matches this id or title. The graph may have been removed, or the entry is stale.',
+        })
+      }
+    }
+  } catch {
+    // Advisory: a portfolio that cannot be opened is already reported elsewhere.
+  }
+
   const response: Record<string, unknown> = {
     products: summaries,
     rollup: {
@@ -1042,6 +1092,7 @@ export const portfolioValidate: ToolHandler = async (args, ctx): Promise<ToolRes
       all_valid: summaries.length > 0 && validCount === summaries.length,
     },
   }
+  if (registryFilePathDrift.length > 0) response.registry_file_path_drift = registryFilePathDrift
   if (errored.length > 0) response.errored_products = errored
   if (unmatched.length > 0) response.unmatched_scope = unmatched
   if (products.length === 0) {

@@ -527,6 +527,22 @@ export interface UpdateProductArgs {
   /** spec #44 (0.10.1): re-kind an existing graph (product | org_rollup | watched). */
   member_kind?: UPGMemberKind
   /**
+   * Repair the `portfolio.upg` registry's `file_path` for this product, WITHOUT
+   * moving any file (0.39.0, B5). The registry can disagree with disk — a graph
+   * moved into a subfolder while the registry kept the old flat path — and
+   * discovery keeps working because `workspace.json` is authoritative, so
+   * nothing surfaces it and no tool repaired it; the document is
+   * integrity-hashed, so hand-editing is not an option either.
+   *
+   * The path is workspace-relative and must resolve to an existing file:
+   * repointing the registry at nothing would trade a stale entry for a broken
+   * one. Distinct from `rename_file` / `slug`, which MOVE the graph and then
+   * repoint everything; this only corrects the registry's claim about where the
+   * graph already is. `portfolio_validate`'s `registry_file_path_drift` reports
+   * the mismatch and names the call.
+   */
+  file_path?: string
+  /**
    * Workspace root. Required to keep the `workspace.json` cache and the
    * `portfolio.upg` registry in sync on a `member_kind` re-kind. When omitted,
    * only the graph's own `$upg.member_kind` is updated (still the source of truth).
@@ -578,7 +594,7 @@ export interface UpdateProductResult {
  * rename updated the header but left the title caches stale (0.17.0).
  */
 export async function updateProduct(args: UpdateProductArgs): Promise<UpdateProductResult> {
-  const { store, stage, title, description, health_status, url, member_kind, cwd } = args
+  const { store, stage, title, description, health_status, url, member_kind, cwd, file_path } = args
   const product = store.getProduct() as unknown as
     | (Record<string, unknown> & { stage?: string; title?: string })
     | undefined
@@ -668,6 +684,43 @@ export async function updateProduct(args: UpdateProductArgs): Promise<UpdateProd
   // file; renaming requires rename_file or an explicit slug, plus cwd. Runs after
   // the title cache reconcile so the workspace.json entry is found by its current
   // path before the path itself is repointed.
+  // Registry file_path repair (0.39.0, B5). Runs BEFORE the rename block: a
+  // caller doing both is repairing a stale entry and then moving the file, and
+  // the rename repoints from the corrected path rather than from the stale one.
+  if (file_path !== undefined && cwd) {
+    const wanted = file_path.trim()
+    if (wanted.length === 0) throw new Error('file_path must be a non-empty workspace-relative path.')
+    const abs = path.resolve(cwd, wanted)
+    try {
+      await fsp.access(abs)
+    } catch {
+      throw new Error(
+        `file_path "${wanted}" does not resolve to an existing file (looked at ${abs}). ` +
+        'This repairs the registry\'s claim about where the graph IS; it never moves a file. ' +
+        'To MOVE the graph, use rename_file / slug instead.',
+      )
+    }
+    const portfolioStore = await openPortfolioStoreIfExists(cwd)
+    if (portfolioStore) {
+      const portfolioDoc = portfolioStore.getDocument() as unknown as {
+        products?: Array<{ id?: string; title?: string; file_path?: string }>
+      }
+      const productId = (product as { id?: string }).id
+      const entry =
+        portfolioDoc.products?.find((e) => productId && e.id === productId) ??
+        portfolioDoc.products?.find((e) => e.title === (product as { title?: string }).title)
+      if (entry && entry.file_path !== wanted) {
+        entry.file_path = wanted
+        // Mutating the returned document does NOT mark the store dirty, so a
+        // flush without this is a silent no-op (the registerProductOnPortfolio
+        // path above marks it the same way).
+        portfolioStore.markDirty()
+        await portfolioStore.flush()
+        updated.push('file_path')
+      }
+    }
+  }
+
   let renamed: { from: string; to: string; slug: string } | undefined
   const wantsRename = args.rename_file === true || (args.slug !== undefined && args.slug.trim().length > 0)
   if (wantsRename && cwd) {

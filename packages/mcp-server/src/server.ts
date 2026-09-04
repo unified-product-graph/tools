@@ -382,6 +382,32 @@ export function createDispatcher(ctx: ToolContext, opts: { logFile?: string } = 
         const handler = getToolHandler(name)
         let result = handler ? await handler(args, ctx) : textError(`Unknown tool: ${name}`)
         if (isActiveWrite && !result.isError) result = withActiveProductEcho(result, ctx.store)
+        // 0.39.0 (A4): a write tool's response means ON DISK.
+        //
+        // `store.scheduleSave()` is a 300ms fire-and-forget debounce, so a
+        // successful write used to return while the file still held the
+        // pre-write state. The documented workflow — batch_* then read the
+        // file for ids and verification — therefore raced its own writes; a
+        // field run of ~2,000 tool calls hit it three times and worked around
+        // it with sleeps. Flushing HERE, at the one chokepoint every mutating
+        // call passes through, makes the guarantee structural instead of
+        // resting on each of ~40 handlers remembering to flush.
+        //
+        // The debounce still coalesces in-memory edits; only the RESPONSE
+        // waits. A flush failure downgrades the result to an error rather
+        // than reporting success over an unwritten file: a response that says
+        // "done" while the disk disagrees is the silent-write-loss class.
+        if (MUTATING_TOOLS.has(name) && !result.isError) {
+          try {
+            await ctx.store.flush()
+          } catch (err) {
+            result = textError(
+              `The write succeeded in memory but could not be saved to disk: ${(err as Error).message}\n` +
+              `Nothing is lost from this session's state, but the file does NOT yet reflect it. ` +
+              `Resolve the write error, then reload_product({ discard_local: true }) and redo the change.`,
+            ) as CallResult
+          }
+        }
         if (logFile) {
           fs.appendFileSync(logFile, JSON.stringify({ ts: t0, tool: name, params: args, result, durationMs: Date.now() - t0 }) + '\n')
         }

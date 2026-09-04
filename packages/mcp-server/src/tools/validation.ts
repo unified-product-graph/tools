@@ -37,6 +37,7 @@ import {
   type UPGProductStage,
   type UPGHeaderCountsMismatch,
   type UPGHeaderIntegrityMismatch,
+  UPG_PROPERTY_SCHEMA,
 } from '@unified-product-graph/core'
 import { readFileSync } from 'node:fs'
 import type { UPGSplitMigration, UPGBaseNode, UPGEdge } from '@unified-product-graph/core'
@@ -91,6 +92,7 @@ type LocalScope =
   | 'counts_drift'
   | 'integrity_drift'
   | 'undeclared_property_drift'
+  | 'property_enum_drift'
 
 const SCOPES: readonly LocalScope[] = [
   'all',
@@ -106,6 +108,7 @@ const SCOPES: readonly LocalScope[] = [
   'counts_drift',
   'integrity_drift',
   'undeclared_property_drift',
+  'property_enum_drift',
   'configuration_drift',
 ] as const
 type Scope = LocalScope
@@ -485,6 +488,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
   const graphTopologySelfLoops: GraphTopologySelfLoopEntry[] = []
   const propertyTypeDrift: PropertyTypeDriftEntry[] = []
   const undeclaredPropertyDrift: Array<{ id: string; type: string; property: string }> = []
+  const propertyEnumDrift: Array<{ id: string; type: string; property: string; value: string; allowed: string[] }> = []
   /**
    * TRUE total, counted independently of the capped entry array.
    *
@@ -498,6 +502,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
    * siblings has never been visible.
    */
   let undeclaredPropertyDriftTotal = 0
+  let propertyEnumDriftTotal = 0
   const polymorphicUpgradeHints: PolymorphicUpgradeHintEntry[] = []
   const countsDrift: CountsDriftEntry[] = []
   const integrityDrift: IntegrityDriftEntry[] = []
@@ -727,6 +732,41 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
           actual_type: v.actual_type,
           reason: v.reason,
         })
+      }
+    }
+
+    // New drift class; property_enum_drift (0.39.0, B3).
+    //
+    // A declared enum was DOCUMENTATION until now: nothing checked a stored
+    // value against it, so a field estate wrote `shadow` / `size` / `opacity`
+    // into design_token.category and saw zero drift, and could not tell whether
+    // the enum was strict, extensible, or decorative. Reported, never refused:
+    // writes stay permissive (the same posture as undeclared_property_drift),
+    // because a value outside the enum is usually a vocabulary the spec has not
+    // caught up with, and the honest response is to surface it rather than to
+    // reject an author's data.
+    //
+    // Scoped to `type: 'string'` with a declared enum. Array-valued enums
+    // (`string[]`) are deliberately out: their members are validated per-element
+    // by checkPropertyTypes, and folding them in here would double-report.
+    if (includes('property_enum_drift') && node.properties) {
+      const effectiveTypeForEnums = (getReplacementType(node.type as string) ?? node.type) as string
+      const schema = UPG_PROPERTY_SCHEMA[effectiveTypeForEnums]
+      if (schema) {
+        for (const [key, raw] of Object.entries(node.properties as Record<string, unknown>)) {
+          const def = schema[key]
+          if (!def || def.type !== 'string' || !Array.isArray(def.enum) || def.enum.length === 0) continue
+          if (typeof raw !== 'string' || def.enum.includes(raw)) continue
+          propertyEnumDriftTotal++
+          if (propertyEnumDrift.length >= limit) continue
+          propertyEnumDrift.push({
+            id: node.id,
+            type: node.type as string,
+            property: key,
+            value: raw,
+            allowed: def.enum,
+          })
+        }
       }
     }
   }
@@ -1271,6 +1311,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     // whose true count is 5,956 against a 100-entry page. A summary figure and a
     // payload estimate answer different questions and must not share a variable.
     undeclaredPropertyDrift.length +
+    propertyEnumDrift.length +
     polymorphicUpgradeHints.length +
     parityDivergence.length +
     countsDrift.length +
@@ -1403,6 +1444,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
       graph_topology_self_loops: graphTopologySelfLoops.length,
       property_type_drift: propertyTypeDrift.length,
       undeclared_property_drift: undeclaredPropertyDriftTotal,
+      property_enum_drift: propertyEnumDriftTotal,
       counts_drift: countsDrift.length,
       integrity_drift: integrityDrift.length,
       configuration_drift: skipDrift ? undefined : configurationDrift.length,
@@ -1416,6 +1458,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     graph_topology_self_loops?: GraphTopologySelfLoopEntry[]
     property_type_drift?: PropertyTypeDriftEntry[]
     undeclared_property_drift?: Array<{ id: string; type: string; property: string }>
+    property_enum_drift?: Array<{ id: string; type: string; property: string; value: string; allowed: string[] }>
     polymorphic_with_typed_alternative?: PolymorphicUpgradeHintEntry[]
     parity_divergence?: ParityDivergenceEntry[]
     counts_drift?: CountsDriftEntry[]
@@ -1433,6 +1476,7 @@ export const validateGraph: ToolHandler = (args, ctx): ToolResult => {
     if (includes('graph_topology_self_loops')) response.graph_topology_self_loops = graphTopologySelfLoops
     if (includes('property_type_drift')) response.property_type_drift = propertyTypeDrift
     if (includes('undeclared_property_drift')) response.undeclared_property_drift = undeclaredPropertyDrift
+    if (includes('property_enum_drift')) response.property_enum_drift = propertyEnumDrift
     if (includes('counts_drift')) response.counts_drift = countsDrift
     if (includes('integrity_drift')) response.integrity_drift = integrityDrift
     // Emitted whenever the scope includes it, empty or not, exactly like every

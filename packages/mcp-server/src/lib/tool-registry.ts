@@ -1145,6 +1145,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         rename_file: { type: 'boolean', description: 'Rename the .upg file to match the title slug. Opt-in; moves the file and reconciles the open handle, workspace.json path, and portfolio.upg file_path.' },
         slug: { type: 'string', description: 'Explicit slug for the file rename (implies rename_file). Slugified and collision-resolved so a sibling file is never clobbered.' },
+        file_path: { type: 'string', description: 'Repair the portfolio.upg registry\'s file_path for this product WITHOUT moving any file (0.39.0). Workspace-relative, and must resolve to an existing file. Use when portfolio_validate reports registry_file_path_drift: the registry says one path, the graph lives at another, and discovery keeps working because workspace.json is authoritative. To MOVE the graph, use rename_file / slug instead.' },
       },
     },
   },
@@ -1300,7 +1301,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         scope: {
           type: 'string',
-          enum: ['all', 'entity_drift', 'edge_drift', 'property_drift', 'top_level_drift', 'lifecycle_drift', 'self_referential', 'configuration_drift'],
+          enum: ['all', 'entity_drift', 'edge_drift', 'property_drift', 'top_level_drift', 'lifecycle_drift', 'self_referential', 'property_enum_drift', 'configuration_drift'],
           description: 'Which drift class(es) to include in the response (default "all"). Counts in `summary` are always returned for every class.',
         },
         limit: { type: 'number', description: 'Max entries per class (default 100, max 1000)' },
